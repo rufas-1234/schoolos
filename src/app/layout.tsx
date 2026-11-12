@@ -1,6 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Barlow_Condensed, Inter } from "next/font/google";
 import "./globals.css";
+
+const bodyFont = Inter({
+  subsets: ["latin"],
+  variable: "--font-body",
+});
+
+const displayFont = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
+});
 
 export const metadata: Metadata = {
   title: "SchoolOS | School management",
@@ -9,7 +21,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`h-full antialiased ${bodyFont.variable} ${displayFont.variable}`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

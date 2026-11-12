@@ -14,7 +14,8 @@ import {
   userRoles,
 } from "@/db/schema";
 
-export async function requireSchoolPermission(permissionKey: string) {
+export async function requireSchoolPermission(permissionKey: string | readonly string[]) {
+  const requiredPermissions = typeof permissionKey === "string" ? [permissionKey] : permissionKey;
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
 
@@ -32,6 +33,9 @@ export async function requireSchoolPermission(permissionKey: string) {
       schoolId: schools.id,
       schoolPublicId: schools.publicId,
       schoolName: schools.name,
+      schoolEmail: schools.email,
+      schoolPhone: schools.phone,
+      schoolAddress: schools.address,
     })
     .from(schoolMemberships)
     .innerJoin(schools, eq(schoolMemberships.schoolId, schools.id))
@@ -57,7 +61,8 @@ export async function requireSchoolPermission(permissionKey: string) {
       ),
     );
 
-  if (!hasPermission(granted.map((permission) => permission.permissionKey), permissionKey)) {
+  const grantedKeys = granted.map((permission) => permission.permissionKey);
+  if (!requiredPermissions.some((required) => hasPermission(grantedKeys, required))) {
     redirect("/unauthorized");
   }
   const roleNames = await db
@@ -71,6 +76,9 @@ export async function requireSchoolPermission(permissionKey: string) {
     schoolId: membership.schoolId,
     schoolPublicId: membership.schoolPublicId,
     schoolName: membership.schoolName,
+    schoolEmail: membership.schoolEmail,
+    schoolPhone: membership.schoolPhone,
+    schoolAddress: membership.schoolAddress,
     membershipId: membership.membershipId,
     grantedPermissions: granted.map((permission) => permission.permissionKey),
     roleNames: roleNames.map((role) => role.name),

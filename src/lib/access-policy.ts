@@ -2,6 +2,9 @@ export type SchoolMembership = {
   membershipId: number;
   schoolId: number;
   schoolName: string;
+  schoolEmail: string | null;
+  schoolPhone: string | null;
+  schoolAddress: string | null;
 };
 
 export function requireSingleSchoolMembership<T extends SchoolMembership>(memberships: T[]): T {

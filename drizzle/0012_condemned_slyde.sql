@@ -1,0 +1,2 @@
+ALTER TABLE `student_enrollments` DROP INDEX `student_enrollments_school_student_year_uq`;--> statement-breakpoint
+ALTER TABLE `student_enrollments` ADD CONSTRAINT `student_enrollments_school_student_year_section_uq` UNIQUE(`schoolId`,`studentId`,`academicYearId`,`classSectionId`);

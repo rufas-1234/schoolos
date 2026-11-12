@@ -105,7 +105,7 @@ CREATE TABLE `uploaded_files` (
 	`publicId` varchar(36) NOT NULL,
 	`schoolId` bigint unsigned NOT NULL,
 	`uploadedBy` varchar(36) NOT NULL,
-	`storageKey` varchar(1024) NOT NULL,
+	`storageKey` varchar(700) NOT NULL,
 	`fileName` varchar(255) NOT NULL,
 	`contentType` varchar(150) NOT NULL,
 	`byteSize` int unsigned NOT NULL,

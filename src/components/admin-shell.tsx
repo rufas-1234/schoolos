@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   BookOpen,
+  BriefcaseBusiness,
+  CalendarDays,
   ChevronDown,
   GraduationCap,
   LayoutDashboard,
@@ -15,30 +17,96 @@ import {
   ShieldCheck,
   Users,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { academicSections } from "@/lib/academic-sections";
+import { studentSections } from "@/lib/student-sections";
 import { cn } from "@/lib/utils";
+import { StudentQuickSearch } from "@/components/student-quick-search";
 
-const navigation = [
+type NavigationChild = {
+  id: string;
+  label: string;
+  href?: string;
+  matchPath?: string;
+  matchQuery?: { key: string; value: string | null };
+  permission?: string;
+};
+
+type NavigationItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  permission: string;
+  permissionAlternatives?: readonly string[];
+  children?: readonly NavigationChild[];
+};
+
+const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
+  {
+    href: "/admin/academics",
+    label: "Academics",
+    icon: CalendarDays,
+    permission: "school.settings.manage",
+    children: academicSections.map((section) => ({
+      id: section.id,
+      label: section.label,
+      href: `/admin/academics?section=${section.id}`,
+      matchQuery: { key: "section", value: section.id },
+    })),
+  },
+  {
+    href: "/admin/hr",
+    label: "Human resources",
+    icon: BriefcaseBusiness,
+    permission: "school.settings.manage",
+    permissionAlternatives: ["staff.manage"],
+    children: [
+      { id: "overview", label: "HR overview", href: "/admin/hr" },
+      { id: "attendance", label: "Staff attendance", href: "/admin/hr/attendance" },
+      { id: "leave", label: "Leave management", href: "/admin/hr/leave" },
+      { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll" },
+    ],
+  },
   {
     href: "/admin/settings",
     label: "School profile",
     icon: School,
     permission: "school.settings.manage",
   },
-  { href: "/admin/students", label: "Students", icon: Users, permission: "students.view" },
+  {
+    href: "/admin/staff",
+    label: "Staff",
+    icon: BriefcaseBusiness,
+    permission: "school.settings.manage",
+    permissionAlternatives: ["staff.manage"],
+  },
+  {
+    href: "/admin/students",
+    label: "Student Info",
+    icon: Users,
+    permission: "students.view",
+    children: studentSections,
+  },
 ];
 
 export function AdminShell({
   children,
   schoolName,
+  schoolEmail,
+  schoolPhone,
+  schoolAddress,
   userName,
   roleNames,
   permissions,
 }: {
   children: ReactNode;
   schoolName: string;
+  schoolEmail: string | null;
+  schoolPhone: string | null;
+  schoolAddress: string | null;
   userName: string;
   roleNames: string[];
   permissions: string[];
@@ -47,9 +115,61 @@ export function AdminShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const routeQuery = searchParams.toString();
+  const [academicsOpen, setAcademicsOpen] = useState(() =>
+    pathname.startsWith("/admin/academics"),
+  );
+  const [studentInfoOpen, setStudentInfoOpen] = useState(() =>
+    pathname.startsWith("/admin/students"),
+  );
+  const [humanResourcesOpen, setHumanResourcesOpen] = useState(() =>
+    pathname.startsWith("/admin/hr"),
+  );
   const router = useRouter();
-  const visibleNavigation = navigation.filter((item) => permissions.includes(item.permission));
+  const visibleNavigation = navigation.filter((item) =>
+    permissions.includes(item.permission) ||
+    (item.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false)
+  );
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
+  const homeHref = permissions.includes("dashboard.view") ? "/admin/dashboard" : "/admin/hr";
+  const schoolMonogram =
+    schoolName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join("")
+      .toLocaleUpperCase() || "S";
+  const activeSection = academicSections.find(
+    (section) => section.id === searchParams.get("section"),
+  );
+  const activeStudentSection = studentSections.find((section) => {
+    if (!("href" in section) || !section.href) return false;
+    const sectionPath = ("matchPath" in section ? section.matchPath : undefined)
+      ?? section.href.split("?")[0];
+    if (sectionPath !== pathname) return false;
+    return !("matchQuery" in section) || !section.matchQuery ||
+      searchParams.get(section.matchQuery.key) === section.matchQuery.value;
+  });
+  const activeHrSection = navigation
+    .find((item) => item.href === "/admin/hr")
+    ?.children?.find((section) => section.href === pathname);
+  const pageLabel = pathname.startsWith("/admin/academics")
+    ? activeSection?.label ?? "Academics"
+    : pathname.startsWith("/admin/students")
+      ? activeStudentSection?.label ?? "Student Info"
+      : pathname.startsWith("/admin/hr")
+        ? activeHrSection?.label ?? "Human resources"
+      : visibleNavigation.find(
+        (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+      )?.label ?? "Workspace";
+
+  useEffect(() => {
+    document
+      .querySelectorAll<HTMLAnchorElement>(".admin-sidebar-nav a[aria-current='page']")
+      .forEach((link) => link.scrollIntoView({ block: "nearest" }));
+  }, [open, pathname, routeQuery]);
 
   async function signOut() {
     setSignOutError("");
@@ -67,8 +187,8 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <aside className="flex h-full w-[260px] flex-col border-r border-slate-100 bg-white px-5 py-6">
-      <Link href="/admin/dashboard" className="mb-9 flex items-center gap-3 px-1">
+    <aside className="print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-100 bg-white px-5 py-6">
+      <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
           <GraduationCap size={24} />
         </span>
@@ -81,9 +201,109 @@ export function AdminShell({
       <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
         Workspace
       </p>
-      <nav className="space-y-1">
-        {visibleNavigation.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+      <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
+        {visibleNavigation.map(({ href, label, icon: Icon, children }) => {
+          const nestedNavigationActive = visibleNavigation.some(
+            (item) =>
+              item.href.startsWith(`${href}/`) &&
+              (pathname === item.href || pathname.startsWith(`${item.href}/`)),
+          );
+          const active =
+            pathname === href ||
+            (pathname.startsWith(`${href}/`) && !nestedNavigationActive);
+          if (children) {
+            const visibleSections = children.filter(
+              (section) => !section.permission || permissions.includes(section.permission),
+            );
+            const isStudentInfo = href === "/admin/students";
+            const isHumanResources = href === "/admin/hr";
+            const sectionOpen = isStudentInfo
+              ? studentInfoOpen
+              : isHumanResources
+                ? humanResourcesOpen
+                : academicsOpen;
+            const setSectionOpen = isStudentInfo
+              ? setStudentInfoOpen
+              : isHumanResources
+                ? setHumanResourcesOpen
+                : setAcademicsOpen;
+            const activeChild = visibleSections.find((section) => {
+              if (!section.href) return false;
+              const sectionPath = section.matchPath ?? section.href.split("?")[0];
+              return (
+                sectionPath === pathname &&
+                (!section.matchQuery ||
+                  searchParams.get(section.matchQuery.key) === section.matchQuery.value)
+              );
+            });
+            return (
+              <div key={href}>
+                <button
+                  type="button"
+                  aria-expanded={sectionOpen}
+                  onClick={() => {
+                    if (active) {
+                      setSectionOpen((value) => !value);
+                    } else {
+                      setSectionOpen(true);
+                      router.push(href);
+                    }
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition",
+                    active
+                      ? "bg-violet-50 text-violet-800"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                  )}
+                >
+                  <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+                  {label}
+                  <ChevronDown
+                    size={16}
+                    className={cn("ml-auto transition-transform", sectionOpen && "rotate-180")}
+                  />
+                </button>
+                {sectionOpen && (
+                  <div className="ml-5 mt-1 space-y-1 border-l border-slate-100 pl-3">
+                    {visibleSections.map((section) => {
+                      if (!section.href) {
+                        return (
+                          <span
+                            key={section.id}
+                            aria-disabled="true"
+                            title={`${section.label} is not available yet`}
+                            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-400"
+                          >
+                            {section.label}
+                            <span className="text-[10px] font-semibold uppercase tracking-wide">
+                              Soon
+                            </span>
+                          </span>
+                        );
+                      }
+                      const sectionActive = activeChild?.id === section.id;
+                      return (
+                        <Link
+                          key={section.id}
+                          href={section.href}
+                          onClick={() => setOpen(false)}
+                          aria-current={sectionActive ? "page" : undefined}
+                          className={cn(
+                            "block rounded-lg px-3 py-2 text-sm transition",
+                            sectionActive
+                              ? "bg-violet-50 font-semibold text-violet-800"
+                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                          )}
+                        >
+                          {section.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
           return (
             <Link
               key={href}
@@ -108,9 +328,9 @@ export function AdminShell({
         <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm">
           <ShieldCheck size={18} />
         </div>
-        <p className="text-sm font-semibold text-slate-800">Foundation phase</p>
+        <p className="text-sm font-semibold text-slate-800">School administration</p>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          Your workspace is ready for secure school setup.
+          Manage academics, people, and school settings from one workspace.
         </p>
       </div>
     </aside>
@@ -118,9 +338,28 @@ export function AdminShell({
 
   return (
     <div className="min-h-screen bg-[#f7f7fa]">
-      <div className="fixed inset-y-0 left-0 z-30 hidden lg:block">{sidebar}</div>
+      <header className="admin-print-header" aria-label={`${schoolName} letterhead`}>
+        <div className="admin-print-crest" aria-hidden="true">
+          <span>{schoolMonogram}</span>
+        </div>
+        <div className="admin-print-identity">
+          <p className="admin-print-eyebrow">Official school record</p>
+          <h1>{schoolName}</h1>
+          <div className="admin-print-contact">
+            <div>Address: {schoolAddress || "Not configured"}</div>
+            <div>
+              {[
+                schoolPhone ? `Phone: ${schoolPhone}` : "Phone: Not configured",
+                schoolEmail ? `Email: ${schoolEmail}` : "Email: Not configured",
+              ].join("  •  ")}
+            </div>
+          </div>
+        </div>
+        <div className="admin-print-seal" aria-hidden="true">SCHOOL</div>
+      </header>
+      <div className="print:hidden fixed inset-y-0 left-0 z-30 hidden lg:block">{sidebar}</div>
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="print:hidden fixed inset-0 z-40 lg:hidden">
           <button
             aria-label="Close navigation"
             className="absolute inset-0 bg-slate-950/30"
@@ -130,8 +369,8 @@ export function AdminShell({
         </div>
       )}
 
-      <div className="lg:pl-[260px]">
-        <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-100 bg-white/90 px-5 backdrop-blur md:px-8">
+      <div className="admin-shell-content lg:pl-[260px]">
+        <header className="print:hidden sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-100 bg-white/90 px-5 backdrop-blur md:px-8">
           <div className="flex items-center gap-3">
             <button
               className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 lg:hidden"
@@ -144,12 +383,12 @@ export function AdminShell({
               <BookOpen size={16} />
               <span>Administration</span>
               <span>/</span>
-              <span className="font-semibold text-slate-700">
-                {visibleNavigation.find((item) => item.href === pathname)?.label ?? "Workspace"}
-              </span>
+              <span className="font-semibold text-slate-700">{pageLabel}</span>
             </div>
             <span className="text-sm font-semibold text-slate-800 sm:hidden">SchoolOS</span>
           </div>
+
+          {permissions.includes("students.view") && <StudentQuickSearch />}
 
           <div className="flex items-center gap-2">
             <div className="mx-1 hidden h-8 w-px bg-slate-100 sm:block" />
@@ -194,15 +433,19 @@ export function AdminShell({
           </div>
         </header>
         {signOutError && (
-          <p role="alert" className="border-b border-rose-100 bg-rose-50 px-5 py-2 text-sm text-rose-700 md:px-8">
+          <p role="alert" className="print:hidden border-b border-rose-100 bg-rose-50 px-5 py-2 text-sm text-rose-700 md:px-8">
             {signOutError}
           </p>
         )}
         <main className="mx-auto max-w-[1500px] px-5 py-7 md:px-8 md:py-9">{children}</main>
       </div>
+      <footer className="admin-print-footer">
+        <span>{schoolName} <span aria-hidden="true">•</span> Official school record</span>
+        <span>Handle student information confidentially</span>
+      </footer>
       {open && (
         <button
-          className="fixed right-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-lg lg:hidden"
+          className="print:hidden fixed right-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-lg lg:hidden"
           onClick={() => setOpen(false)}
           aria-label="Close navigation"
         >

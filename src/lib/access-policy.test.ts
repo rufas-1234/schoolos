@@ -3,7 +3,14 @@ import { hasPermission, requireSingleSchoolMembership } from "./access-policy";
 
 describe("school access policy", () => {
   it("uses the only active membership as the tenant context", () => {
-    const membership = { membershipId: 7, schoolId: 21, schoolName: "Example School" };
+    const membership = {
+      membershipId: 7,
+      schoolId: 21,
+      schoolName: "Example School",
+      schoolEmail: null,
+      schoolPhone: null,
+      schoolAddress: null,
+    };
     expect(requireSingleSchoolMembership([membership])).toEqual(membership);
   });
 
@@ -14,8 +21,22 @@ describe("school access policy", () => {
   it("requires an explicit school choice when multiple memberships exist", () => {
     expect(() =>
       requireSingleSchoolMembership([
-        { membershipId: 7, schoolId: 21, schoolName: "North School" },
-        { membershipId: 8, schoolId: 22, schoolName: "South School" },
+        {
+          membershipId: 7,
+          schoolId: 21,
+          schoolName: "North School",
+          schoolEmail: null,
+          schoolPhone: null,
+          schoolAddress: null,
+        },
+        {
+          membershipId: 8,
+          schoolId: 22,
+          schoolName: "South School",
+          schoolEmail: null,
+          schoolPhone: null,
+          schoolAddress: null,
+        },
       ]),
     ).toThrow("Select an authorized school");
   });

@@ -1,0 +1,1 @@
+ALTER TABLE `teachers` ADD CONSTRAINT `teachers_school_email_uq` UNIQUE(`schoolId`,`email`);

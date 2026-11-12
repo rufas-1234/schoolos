@@ -970,7 +970,7 @@
         },
         "storageKey": {
           "name": "storageKey",
-          "type": "varchar(1024)",
+          "type": "varchar(700)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

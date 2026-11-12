@@ -12,12 +12,14 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "db:seed-demo": "tsx scripts/seed-demo-data.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1163.0",
     "@aws-sdk/s3-request-presigner": "^3.1163.0",
     "@radix-ui/react-slot": "^1.5.0",
+    "@vercel/blob": "^2.8.2",
     "better-auth": "^1.7.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

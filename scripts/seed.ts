@@ -10,6 +10,7 @@ import {
   rolePermissions,
   roles,
   schoolMemberships,
+  schoolBranches,
   schools,
   user,
   userRoles,
@@ -109,6 +110,20 @@ async function seed() {
     }
     if (!school) throw new Error("The school record could not be created.");
 
+    const [mainBranch] = await tx
+      .select({ id: schoolBranches.id })
+      .from(schoolBranches)
+      .where(and(eq(schoolBranches.schoolId, school.id), eq(schoolBranches.code, "MAIN")))
+      .limit(1);
+    if (!mainBranch) {
+      await tx.insert(schoolBranches).values({
+        publicId: randomUUID(),
+        schoolId: school.id,
+        name: "Main campus",
+        code: "MAIN",
+      });
+    }
+
     for (const [key, description] of permissionCatalog) {
       const [existingPermission] = await tx
         .select({ id: permissions.id })
@@ -180,6 +195,7 @@ async function seed() {
       "students.create",
       "students.update",
       "students.delete",
+      "staff.manage",
     ];
     const rolePermissionIds = new Set(
       (
@@ -198,6 +214,34 @@ async function seed() {
       if (permission && !rolePermissionIds.has(permission.id)) {
         await tx.insert(rolePermissions).values({ roleId: adminRole.id, permissionId: permission.id });
       }
+    }
+
+    const [hrRole] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.schoolId, school.id), eq(roles.name, "Human resources officer")))
+      .limit(1);
+    const [staffPermission] = await tx
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(eq(permissions.key, "staff.manage"))
+      .limit(1);
+    if (!hrRole || !staffPermission) {
+      throw new Error("The Human resources officer role or staff permission could not be created.");
+    }
+    const [hrRolePermission] = await tx
+      .select({ roleId: rolePermissions.roleId })
+      .from(rolePermissions)
+      .where(and(
+        eq(rolePermissions.roleId, hrRole.id),
+        eq(rolePermissions.permissionId, staffPermission.id),
+      ))
+      .limit(1);
+    if (!hrRolePermission) {
+      await tx.insert(rolePermissions).values({
+        roleId: hrRole.id,
+        permissionId: staffPermission.id,
+      });
     }
   });
 

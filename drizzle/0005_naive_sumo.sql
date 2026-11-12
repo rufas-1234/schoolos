@@ -1,0 +1,1 @@
+ALTER TABLE `student_academic_events` ADD `externalInstitution` varchar(255);

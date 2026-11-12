@@ -1,0 +1,1 @@
+ALTER TABLE `students` ADD `gender` varchar(30);

@@ -1,18 +1,18 @@
 # SchoolOS
 
-A phased school-management foundation built with Next.js, Better Auth, Drizzle ORM, TiDB Cloud, and S3-compatible object storage.
+A phased school-management foundation built with Next.js, Better Auth, Drizzle ORM, TiDB Cloud, and private object storage.
 
 ## Current status
 
-The Phase 1 foundation includes responsive sign-in and admin shell, Better Auth email/password with public sign-up disabled, MySQL/TiDB schema and versioned migrations, school memberships and role-permission authorization, a secure non-production administrator seed, school profile editing, audited settings changes, database-backed dashboard counts, and an S3-compatible presigned-upload abstraction.
+The Phase 1 foundation includes responsive sign-in and admin shell, Better Auth email/password with public sign-up disabled, MySQL/TiDB schema and versioned migrations, school memberships and role-permission authorization, a secure non-production administrator seed, school profile editing, audited settings changes, database-backed dashboard counts, and private object-storage adapters for Vercel Blob and S3-compatible services.
 
-Phase 2 has started with a tenant-scoped student directory and basic student record creation. Academic structure, teacher and staff management, attendance, examinations, finance, and other operational modules are not implemented yet.
+Phase 2 includes tenant-scoped student and staff directories, admission review, student document uploads, and an academic structure for branches, school years, terms and exam periods, holidays, classes, year-specific streams/sections, capacities, class teachers, theory and practical subjects, compulsory and optional class subjects, teacher assignments, classrooms, and weekly class routines. Academic setup records can be edited in place, with creation and management actions above their corresponding record lists. Class and subject records are branch-scoped; routines validate class, teacher, and room schedule conflicts and can be filtered by branch, class, and section. Student placements, class rosters, promotion, repetition, in-school transfers, transfers out, graduation, and dated enrollment history are recorded as audited academic events. Human Resources now includes expanded staff profiles, optional links to existing school accounts, a staff overview, daily attendance, per-staff annual leave entitlements and request approvals, and payroll records/reports with payment status. Payroll does not calculate tax, deductions, benefits, or take-home pay; account linking does not provision accounts or roles. Guardian relationships, student attendance, examination results, finance, and other operational modules are not implemented yet.
 
 ## Requirements
 
 - Node.js 24 and npm.
 - A TiDB Cloud database (or compatible MySQL database) with TLS enabled.
-- An S3-compatible object-storage bucket when file uploads are introduced.
+- A private Vercel Blob store or an S3-compatible object-storage bucket for student documents.
 
 ## Local setup (PowerShell)
 
@@ -56,7 +56,17 @@ Phase 2 has started with a tenant-scoped student directory and basic student rec
 
    The seed refuses to run when `NODE_ENV=production`. It creates an administrator account, the school, initial roles, and the required permission assignments. It does not print the password.
 
-6. Start the app:
+6. To populate an empty development school with clearly labeled sample academic, student, teacher, and staff records:
+
+   ```powershell
+   $env:ALLOW_DEMO_DATA_SEED = "true"
+   npm run db:seed-demo
+   Remove-Item Env:\ALLOW_DEMO_DATA_SEED
+   ```
+
+   Demo seeding is blocked in production and on Vercel, runs against a local database by default, adds visibly labeled sample records without changing existing records, and is safe to repeat. Only set `ALLOW_DEMO_SEED_REMOTE=true` when intentionally targeting a separate non-production remote database.
+
+7. Start the app:
 
    ```powershell
    npm run dev
@@ -76,12 +86,13 @@ Phase 2 has started with a tenant-scoped student directory and basic student rec
 | `npm run db:generate` | Generate a version-controlled Drizzle migration |
 | `npm run db:migrate` | Apply migrations explicitly |
 | `npm run db:seed` | Provision initial non-production school administrator |
+| `npm run db:seed-demo` | Add clearly labeled sample academic, student, teacher, and staff data |
 
 ## Configuration
 
 See `.env.example` for the required variable names. Do not commit `.env` or any credentials. Keep TiDB and object-storage credentials in server-only environment variables; only the app name is public.
 
-The object-storage adapter uses S3-compatible endpoints and stores files outside the application filesystem. Phase 1 defines the adapter and metadata schema; upload routes and feature-specific file validation will be added with the relevant school modules.
+Student documents and profile photos are stored outside the application filesystem. Configure a private Vercel Blob store (providing `BLOB_READ_WRITE_TOKEN` or `BLOB_STORE_ID` with Vercel OIDC) or all five `OBJECT_STORAGE_*` variables for S3-compatible storage. Documents accept PDF, JPEG, PNG, and WebP; profile photos accept JPEG, PNG, and WebP. Files are limited to 4 MB each. Private downloads are served through authenticated application routes.
 
 ## Deployment
 
@@ -92,7 +103,7 @@ The object-storage adapter uses S3-compatible endpoints and stores files outside
 - Set `DATABASE_URL`, `DATABASE_SSL=true`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `NEXT_PUBLIC_APP_NAME`.
 - Run `npm run db:migrate` as an explicit deployment operation before routing traffic to a release. Do not run it during normal application startup.
 - Set the Vercel function region near the TiDB region and restrict TiDB network access as appropriate.
-- Add S3-compatible storage variables when uploads are enabled.
+- Connect a private Vercel Blob store to the project, or configure S3-compatible storage variables when uploads are enabled.
 
 ### Node.js or Docker
 
@@ -109,9 +120,9 @@ Build a Docker image with `docker build -t schoolos .`. Provide the same product
 
 - Better Auth manages password hashing and secure sessions. Rate limiting is database-backed; public sign-up is disabled.
 - School context is resolved from the signed-in user’s active membership, not from browser-supplied tenant identifiers.
-- Database reads and mutations are server-side. School-profile updates require the `school.settings.manage` permission and are audit logged.
+- Database reads and mutations are server-side. School-profile updates require the `school.settings.manage` permission; staff and HR workflows require `school.settings.manage` or `staff.manage` and are school-scoped, with changes audit logged.
 - The seed is for a deliberately configured non-production environment only. Never reuse its credentials in production.
 
 ## Next phase
 
-Continue Phase 2 by adding academic structure, then extending student records with admission workflows and related guardian, teacher, and staff management. Keep changes incremental and tenant-scoped; apply reviewed Drizzle migrations explicitly in each environment.
+Continue Phase 2 with richer student profiles, guardian relationships, staff account provisioning, attendance, and examination workflows. Keep changes incremental and tenant-scoped; apply reviewed Drizzle migrations explicitly in each environment.

@@ -10,12 +10,313 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-body), Arial, Helvetica, sans-serif;
   --font-mono: Consolas, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), "Arial Narrow", Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.admin-record-dialog {
+  overscroll-behavior: contain;
+}
+
+.admin-sidebar-nav {
+  scroll-padding-block: 0.75rem;
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: #cbd5e1;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.admin-record-dialog form {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.admin-record-dialog form > h2,
+.admin-record-dialog form > div:first-child h2 {
+  display: none;
+}
+
+.admin-print-header,
+.admin-print-footer,
+.admin-table-print-title {
+  display: none;
+}
+
+.student-profile-print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 25mm 14mm 20mm;
+  }
+
+  html,
+  body {
+    background: white;
+    color: #172033;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .admin-print-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 17mm;
+    margin-bottom: 8mm;
+    padding-bottom: 4mm;
+    border-bottom: 2px solid #6d28d9;
+    background: white;
+    break-inside: avoid;
+  }
+
+  .admin-print-crest {
+    display: flex;
+    width: 14mm;
+    height: 14mm;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #6d28d9;
+    border-radius: 50%;
+    color: #5b21b6;
+  }
+
+  .admin-print-crest span {
+    font-family: var(--font-display), "Arial Narrow", Arial, sans-serif;
+    font-size: 15pt;
+    font-weight: 700;
+    letter-spacing: -0.06em;
+  }
+
+  .admin-print-identity {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-print-eyebrow {
+    margin: 0 0 2px;
+    color: #6d28d9;
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .admin-print-identity h1 {
+    margin: 0;
+    overflow: hidden;
+    color: #172033;
+    font-family: var(--font-display), "Arial Narrow", Arial, sans-serif;
+    font-size: 17pt;
+    font-weight: 700;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-print-contact {
+    margin-top: 3px;
+    color: #596579;
+    font-size: 8pt;
+    line-height: 1.25;
+  }
+
+  .admin-print-seal {
+    align-self: flex-start;
+    margin-top: 2mm;
+    border: 1px solid #d8c8f3;
+    border-radius: 999px;
+    padding: 4px 8px;
+    color: #5b21b6;
+    font-size: 6pt;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+  }
+
+  .admin-print-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10mm;
+    border-top: 1px solid #d8deea;
+    padding-top: 5px;
+    color: #596579;
+    font-size: 7pt;
+    break-inside: avoid;
+  }
+
+  .admin-shell-content {
+    padding-left: 0 !important;
+  }
+
+  body:has(.student-profile-printing) * {
+    visibility: hidden !important;
+  }
+
+  dialog.admin-record-dialog:has(.student-profile-printing) {
+    position: absolute !important;
+    inset: 0 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    background: white !important;
+    box-shadow: none !important;
+    visibility: visible !important;
+  }
+
+  body:has(.student-profile-printing) .student-profile-printing,
+  body:has(.student-profile-printing) .student-profile-printing * {
+    visibility: visible !important;
+  }
+
+  .student-profile-printing {
+    position: static;
+    width: 100%;
+    padding: 0;
+  }
+
+  .student-profile-printing .student-profile-print-ui {
+    display: none !important;
+  }
+
+  .student-profile-printing .student-profile-print-only {
+    display: block !important;
+  }
+
+  .student-profile-print-section {
+    margin-top: 8mm;
+    break-inside: avoid;
+  }
+
+  .student-profile-print-section h4 {
+    margin: 0 0 3mm;
+    border-bottom: 1px solid #d8deea;
+    padding-bottom: 2mm;
+    color: #5b21b6;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+
+  .student-profile-print-section dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4mm 8mm;
+    margin: 0;
+  }
+
+  .student-profile-print-section dl > div {
+    min-width: 0;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 2mm;
+  }
+
+  .student-profile-print-section dt {
+    color: #596579;
+    font-size: 7pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .student-profile-print-section dd {
+    margin: 1mm 0 0;
+    overflow-wrap: anywhere;
+    color: #172033;
+    font-size: 9pt;
+  }
+
+  .admin-shell-content > main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .admin-table-print-title {
+    display: block;
+    margin: 0 0 8px;
+    color: #172033;
+    font-family: var(--font-display), "Arial Narrow", Arial, sans-serif;
+    font-size: 14pt;
+    font-weight: 700;
+  }
+
+  .admin-data-table {
+    break-inside: auto;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .admin-data-table > div,
+  .admin-data-table > div > div {
+    overflow: visible !important;
+  }
+
+  .admin-data-table table {
+    min-width: 100%;
+    font-size: 9pt;
+    border-collapse: collapse;
+  }
+
+  .admin-data-table th,
+  .admin-data-table td {
+    border: 1px solid #d1d5db;
+    padding: 6px;
+  }
+
+  .admin-data-table thead {
+    display: table-header-group;
+  }
+
+  .admin-data-table tr {
+    break-inside: avoid;
+  }
+
+  .admin-data-table tbody tr:nth-child(even) {
+    background: #f7f5fc !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .admin-shell-content {
+    padding-left: 0 !important;
+  }
 }

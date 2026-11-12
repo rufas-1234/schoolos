@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RequiredMark } from "@/components/required-mark";
 import { updateSchoolProfile, type ProfileActionState } from "./actions";
 
 type SchoolProfile = {
@@ -22,6 +23,9 @@ export function SchoolSettingsForm({ school }: { school: SchoolProfile }) {
 
   return (
     <form action={action} className="space-y-6">
+      <p className="text-xs text-slate-500">
+        <RequiredMark /> Required fields
+      </p>
       {state.error && (
         <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {state.error}
@@ -74,7 +78,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-slate-700">
+        {label} {required && <RequiredMark />}
+      </span>
       <input
         className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
         defaultValue={defaultValue}
