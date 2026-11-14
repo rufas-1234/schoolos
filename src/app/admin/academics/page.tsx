@@ -54,7 +54,6 @@ import {
   AcademicYearStatusForm,
   ClassRoomForm,
   ClassRoomList,
-  ClassRoutineForm,
   ClassRoutineList,
   EnrollmentOperationForm,
   EnrollmentRecordList,
@@ -1101,16 +1100,6 @@ export default async function AcademicStructurePage({
                 sections={sectionFilterOptions}
                 assignments={routineAssignmentOptions}
                 rooms={roomOptions}
-                toolbarActions={
-                  <AdminActionDialog label="Add routine" title="Add class routine">
-                    <ClassRoutineForm
-                      branches={branchOptions}
-                      sections={sectionOptions}
-                      assignments={routineAssignmentOptions}
-                      rooms={roomOptions}
-                    />
-                  </AdminActionDialog>
-                }
                 routines={routines.map((routine) => ({
                   id: routine.id,
                   publicId: routine.publicId,

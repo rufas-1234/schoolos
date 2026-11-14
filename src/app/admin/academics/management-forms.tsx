@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import {
+  AdminActionDialog,
   AdminDeleteButton,
   AdminDataTable,
   AdminRecordDialog,
@@ -174,11 +175,15 @@ export function ClassRoutineForm({
   assignments,
   rooms,
   record,
+  defaultSectionId,
+  defaultDayOfWeek = 1,
 }: {
   branches: Option[];
   sections: (Option & { branchId: number; classLevelId: number })[];
   assignments: (Option & { classLevelId: number })[];
   rooms: (Option & { branchId: number })[];
+  defaultSectionId?: number;
+  defaultDayOfWeek?: number;
   record?: {
     id: number;
     branchId: number;
@@ -190,8 +195,12 @@ export function ClassRoutineForm({
     endsAt: string;
   };
 }) {
-  const [branchId, setBranchId] = useState(String(record?.branchId ?? ""));
-  const [sectionId, setSectionId] = useState(String(record?.classSectionId ?? ""));
+  const [branchId, setBranchId] = useState(String(
+    record?.branchId ??
+      sections.find((section) => section.id === defaultSectionId)?.branchId ??
+      "",
+  ));
+  const [sectionId, setSectionId] = useState(String(record?.classSectionId ?? defaultSectionId ?? ""));
   const [assignmentId, setAssignmentId] = useState(String(record?.classSubjectId ?? ""));
   const [roomId, setRoomId] = useState(String(record?.classRoomId ?? ""));
   const availableSections = sections.filter((section) => String(section.branchId) === branchId);
@@ -293,7 +302,7 @@ export function ClassRoutineForm({
         <select
           name="dayOfWeek"
           required
-          defaultValue={String(record?.dayOfWeek ?? 1)}
+          defaultValue={String(record?.dayOfWeek ?? defaultDayOfWeek)}
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
         >
           <option value="1">Monday</option>
@@ -446,7 +455,6 @@ export function ClassRoutineList({
   assignments,
   rooms,
   routines,
-  toolbarActions,
 }: {
   branches: Option[];
   classes: { id: number; branchId: number; label: string }[];
@@ -472,7 +480,6 @@ export function ClassRoutineList({
     teacherName: string;
     roomNumber: string;
   }[];
-  toolbarActions?: ReactNode;
 }) {
   const [branchId, setBranchId] = useState("");
   const [classLevelId, setClassLevelId] = useState("");
@@ -489,6 +496,31 @@ export function ClassRoutineList({
       (!classLevelId || String(routine.classLevelId) === classLevelId) &&
       (!classSectionId || String(routine.classSectionId) === classSectionId),
   );
+  const selectedSection = visibleSections.find((section) => String(section.id) === classSectionId);
+  const selectedRoutines = filteredRoutines
+    .filter((routine) => String(routine.classSectionId) === classSectionId)
+    .sort((first, second) =>
+      first.startsAt.localeCompare(second.startsAt) ||
+      first.endsAt.localeCompare(second.endsAt),
+    );
+  const timeSlots = Array.from(
+    new Map(
+      selectedRoutines.map((routine) => [
+        `${routine.startsAt}-${routine.endsAt}`,
+        { startsAt: routine.startsAt, endsAt: routine.endsAt },
+      ]),
+    ).values(),
+  );
+  const weekdays = [
+    { value: 1, label: "Monday" },
+    { value: 2, label: "Tuesday" },
+    { value: 3, label: "Wednesday" },
+    { value: 4, label: "Thursday" },
+    { value: 5, label: "Friday" },
+    { value: 6, label: "Saturday" },
+    { value: 7, label: "Sunday" },
+  ];
+  const criteriaSelected = Boolean(branchId && classLevelId && classSectionId);
 
   return (
     <div className="space-y-4">
@@ -525,57 +557,116 @@ export function ClassRoutineList({
           onChange={setClassSectionId}
         />
       </div>
-      <AdminDataTable
-          title="Weekly class routine"
-          columns={[
-            { key: "branch", label: "Branch" },
-            { key: "year", label: "Academic year" },
-            { key: "class", label: "Class" },
-            { key: "section", label: "Section" },
-            { key: "subject", label: "Subject" },
-            { key: "teacher", label: "Teacher" },
-            { key: "day", label: "Day" },
-            { key: "time", label: "Time" },
-            { key: "room", label: "Room" },
-          ]}
-          rows={filteredRoutines.map((routine) => ({
-            id: routine.id,
-            values: {
-              branch: routine.branchName,
-              year: routine.yearName,
-              class: routine.className,
-              section: routine.sectionName,
-              subject: routine.subjectName,
-              teacher: routine.teacherName,
-              day: ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][routine.dayOfWeek] ?? "",
-              time: `${routine.startsAt}–${routine.endsAt}`,
-              room: routine.roomNumber,
-            },
-            actions: <div className="flex items-center gap-3">
-                <AdminRecordDialog title="Edit class routine">
-                  <ClassRoutineForm
-                    branches={branches}
-                    sections={sections}
-                    assignments={assignments}
-                    rooms={rooms}
-                    record={routine}
-                  />
-                </AdminRecordDialog>
-                <form action={deleteClassRoutine}>
-                  <input type="hidden" name="publicId" value={routine.publicId} />
-                  <AdminDeleteButton label="Delete class routine" />
-                </form>
-              </div>,
-          }))}
-          emptyMessage={
-            routines.length === 0
-              ? "No routine periods have been scheduled."
-              : "No routines match these filters."
-          }
-          toolbarActions={toolbarActions}
-          requireSearchCriteria
-          searchCriteriaSelected={Boolean(branchId && classLevelId && classSectionId)}
-      />
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900">Weekly class routine</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {criteriaSelected && selectedSection
+                ? `${selectedSection.label} · ${selectedRoutines.length} scheduled ${selectedRoutines.length === 1 ? "period" : "periods"}`
+                : "Select a branch, class, and section to open its weekly timetable."}
+            </p>
+          </div>
+        </div>
+        {!criteriaSelected ? (
+          <p className="px-5 py-10 text-center text-sm text-slate-500">
+            Select a branch, class, and section above to view or create the class routine.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th scope="col" className="w-36 border-b border-r border-slate-200 px-4 py-3 font-semibold">
+                    Period
+                  </th>
+                  {weekdays.map((day) => (
+                    <th key={day.value} scope="col" className="min-w-40 border-b border-slate-200 px-3 py-2 text-center font-semibold">
+                      <span className="block">{day.label}</span>
+                      {selectedSection && (
+                        <span className="mt-2 inline-flex">
+                          <AdminActionDialog label="Add period" title={`Add ${day.label} period`}>
+                            <ClassRoutineForm
+                              branches={branches}
+                              sections={sections}
+                              assignments={assignments}
+                              rooms={rooms}
+                              defaultSectionId={selectedSection.id}
+                              defaultDayOfWeek={day.value}
+                            />
+                          </AdminActionDialog>
+                        </span>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {timeSlots.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-12 text-center">
+                      <p className="font-medium text-slate-800">No periods scheduled for this section yet.</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Use “Add routine” to add the first subject, day, and time.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  timeSlots.map((slot) => (
+                    <tr key={`${slot.startsAt}-${slot.endsAt}`} className="align-top">
+                      <th scope="row" className="whitespace-nowrap border-r border-slate-200 bg-slate-50/70 px-4 py-4 font-semibold text-slate-700">
+                        <span className="block text-xs font-medium uppercase tracking-wide text-slate-400">Time</span>
+                        <span className="mt-1 block">{slot.startsAt}–{slot.endsAt}</span>
+                      </th>
+                      {weekdays.map((day) => {
+                        const routine = selectedRoutines.find(
+                          (entry) =>
+                            entry.dayOfWeek === day.value &&
+                            entry.startsAt === slot.startsAt &&
+                            entry.endsAt === slot.endsAt,
+                        );
+
+                        return (
+                          <td key={day.value} className="border-l border-slate-100 p-2">
+                            {routine ? (
+                              <div className="min-h-28 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+                                <p className="font-semibold text-violet-950">{routine.subjectName}</p>
+                                <p className="mt-1 text-xs text-slate-600">{routine.teacherName}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {routine.roomNumber ? `Room ${routine.roomNumber}` : "No room assigned"}
+                                </p>
+                                <div className="mt-3 flex items-center gap-2">
+                                  <AdminRecordDialog title={`Edit ${routine.subjectName} routine`}>
+                                    <ClassRoutineForm
+                                      branches={branches}
+                                      sections={sections}
+                                      assignments={assignments}
+                                      rooms={rooms}
+                                      record={routine}
+                                    />
+                                  </AdminRecordDialog>
+                                  <form action={deleteClassRoutine}>
+                                    <input type="hidden" name="publicId" value={routine.publicId} />
+                                    <AdminDeleteButton label={`Delete ${routine.subjectName} routine`} />
+                                  </form>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-200 text-slate-300">
+                                —
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
