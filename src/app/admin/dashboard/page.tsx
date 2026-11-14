@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   CalendarDays,
+  CircleDollarSign,
   CircleHelp,
   ClipboardList,
   GraduationCap,
@@ -84,6 +85,8 @@ export default async function DashboardPage() {
   const enrollmentCount = Number(enrollmentResult[0]?.value ?? 0);
   const teacherCount = Number(teachersResult[0]?.value ?? 0);
   const staffCount = Number(staffResult[0]?.value ?? 0);
+  const canManageFees = context.grantedPermissions.includes("fees.manage");
+  const canRecordPayments = context.grantedPermissions.includes("payments.record");
 
   return (
     <div className="space-y-8">
@@ -191,6 +194,15 @@ export default async function DashboardPage() {
             <SetupItem number="02" title="Student directory" description="Review admissions and manage student records." href="/admin/students" />
             <SetupItem number="03" title="Staff directory" description="Keep teaching and non-teaching staff details up to date." href="/admin/staff" />
             <SetupItem number="04" title="School profile" description="Update contact information, currency, and timezone." href="/admin/settings" />
+            {(canManageFees || canRecordPayments) && (
+              <SetupItem
+                number="05"
+                title="Fees & payments"
+                description="Set up fee structures, collect payments, and review balances."
+                href={canManageFees ? "/admin/fees" : "/admin/fees/collection"}
+                icon={<CircleDollarSign size={19} />}
+              />
+            )}
           </div>
         </section>
 
@@ -279,16 +291,18 @@ function SetupItem({
   title,
   description,
   href,
+  icon,
 }: {
   number: string;
   title: string;
   description: string;
   href?: string;
+  icon?: ReactNode;
 }) {
   const content = (
     <>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-xs font-bold text-violet-700">
-        {number}
+        {icon ?? number}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-slate-800">{title}</span>
