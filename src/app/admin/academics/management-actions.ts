@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -1080,6 +1080,63 @@ export async function updateSectionAssignment(
     return { error: "Capacity cannot be lower than the number of currently enrolled students." };
   }
   revalidatePath("/admin/academics");
+  return { success: true };
+}
+
+export async function setClassLevelStatus(
+  _previousState: AcademicActionState,
+  formData: FormData,
+): Promise<AcademicActionState> {
+  const context = await requireSchoolPermission("school.settings.manage");
+  const classLevelId = idField.safeParse(readFormValue(formData, "classLevelId"));
+  const status = z.enum(["active", "archived"]).safeParse(readFormValue(formData, "status"));
+  if (!classLevelId.success || !status.success) {
+    return { error: "Choose a class and valid status." };
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    const [classLevel] = await tx.select({
+      id: classLevels.id,
+      publicId: classLevels.publicId,
+      status: classLevels.status,
+    })
+      .from(classLevels)
+      .where(and(eq(classLevels.id, classLevelId.data), eq(classLevels.schoolId, context.schoolId)))
+      .for("update")
+      .limit(1);
+    if (!classLevel) return "class-not-found";
+    if (status.data === "archived") {
+      const [activeEnrollments] = await tx.select({ total: count() })
+        .from(studentEnrollments)
+        .innerJoin(classSections, eq(classSections.id, studentEnrollments.classSectionId))
+        .where(and(
+          eq(studentEnrollments.schoolId, context.schoolId),
+          eq(classSections.classLevelId, classLevel.id),
+          inArray(studentEnrollments.status, ["pending", "enrolled"]),
+        ));
+      if (Number(activeEnrollments.total) > 0) return "class-has-students";
+    }
+    if (classLevel.status === status.data) return "unchanged";
+    await tx.update(classLevels).set({ status: status.data })
+      .where(and(eq(classLevels.id, classLevel.id), eq(classLevels.schoolId, context.schoolId)));
+    await writeAudit(
+      tx,
+      context,
+      status.data === "archived" ? "academic.class_level.archived" : "academic.class_level.restored",
+      "class_level",
+      classLevel.publicId,
+      ["status"],
+    );
+    return "updated";
+  });
+
+  if (outcome === "class-not-found") return { error: "Choose a class belonging to your school." };
+  if (outcome === "class-has-students") {
+    return { error: "Move currently assigned students before archiving this class. Historical enrollment and fee records will be preserved." };
+  }
+  revalidatePath("/admin/academics");
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/fees");
   return { success: true };
 }
 

@@ -426,6 +426,7 @@ export const classLevels = mysqlTable(
       .references(() => schoolBranches.id),
     name: varchar("name", { length: 120 }).notNull(),
     code: varchar("code", { length: 30 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1149,9 +1150,14 @@ export const feeStructures = mysqlTable(
     academicYearId: bigint("academicYearId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => academicYears.id),
+    academicTermId: bigint("academicTermId", { mode: "number", unsigned: true }).references(
+      () => academicTerms.id,
+    ),
     classLevelId: bigint("classLevelId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => classLevels.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true })
+      .references(() => students.id),
     feeGroupId: bigint("feeGroupId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => feeGroups.id),
@@ -1166,18 +1172,21 @@ export const feeStructures = mysqlTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("fee_structures_school_year_class_group_type_uq").on(
+    uniqueIndex("fee_structures_school_year_class_group_type_term_uq").on(
       table.schoolId,
       table.academicYearId,
       table.classLevelId,
       table.feeGroupId,
       table.feeTypeId,
+      table.academicTermId,
+      table.studentId,
     ),
     index("fee_structures_school_branch_year_idx").on(
       table.schoolId,
       table.branchId,
       table.academicYearId,
     ),
+    index("fee_structures_school_term_idx").on(table.schoolId, table.academicTermId),
   ],
 );
 
@@ -1189,6 +1198,7 @@ export const studentFeeInvoices = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schools.id),
+    invoiceNumber: varchar("invoiceNumber", { length: 40 }).notNull(),
     studentId: bigint("studentId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => students.id),
@@ -1218,6 +1228,7 @@ export const studentFeeInvoices = mysqlTable(
       table.enrollmentId,
       table.feeStructureId,
     ),
+    uniqueIndex("student_fee_invoices_school_number_uq").on(table.schoolId, table.invoiceNumber),
     index("student_fee_invoices_school_status_due_idx").on(
       table.schoolId,
       table.status,
@@ -1238,8 +1249,11 @@ export const feePayments = mysqlTable(
     invoiceId: bigint("invoiceId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => studentFeeInvoices.id),
+    receiptNumber: varchar("receiptNumber", { length: 40 }).notNull(),
+    idempotencyKey: varchar("idempotencyKey", { length: 64 }).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     fineAmount: decimal("fineAmount", { precision: 12, scale: 2 }).notNull().default("0"),
+    reversedAmount: decimal("reversedAmount", { precision: 12, scale: 2 }).notNull().default("0"),
     paymentMethod: varchar("paymentMethod", { length: 30 }).notNull(),
     reference: varchar("reference", { length: 120 }),
     notes: varchar("notes", { length: 500 }),
@@ -1250,8 +1264,38 @@ export const feePayments = mysqlTable(
     createdAt: createdAt(),
   },
   (table) => [
+    uniqueIndex("fee_payments_school_receipt_uq").on(table.schoolId, table.receiptNumber),
+    uniqueIndex("fee_payments_school_idempotency_uq").on(table.schoolId, table.idempotencyKey),
     index("fee_payments_school_paid_at_idx").on(table.schoolId, table.paidAt),
     index("fee_payments_school_invoice_idx").on(table.schoolId, table.invoiceId),
+  ],
+);
+
+export const feePaymentReversals = mysqlTable(
+  "fee_payment_reversals",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    paymentId: bigint("paymentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => feePayments.id),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    fineAmount: decimal("fineAmount", { precision: 12, scale: 2 }).notNull().default("0"),
+    reversalType: varchar("reversalType", { length: 20 }).notNull(),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    reference: varchar("reference", { length: 120 }),
+    idempotencyKey: varchar("idempotencyKey", { length: 64 }).notNull(),
+    recordedBy: varchar("recordedBy", { length: 36 })
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("fee_payment_reversals_school_idempotency_uq").on(table.schoolId, table.idempotencyKey),
+    index("fee_payment_reversals_school_payment_idx").on(table.schoolId, table.paymentId),
   ],
 );
 

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, lte, sum } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, lte, sql, sum } from "drizzle-orm";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { db } from "@/db";
@@ -8,6 +8,7 @@ import {
   classLevels,
   classSections,
   feePayments,
+  feePaymentReversals,
   feeStructures,
   feeTypes,
   schools,
@@ -126,11 +127,13 @@ export default async function FeeReportsPage({
   ];
   const dateRange = feePaymentDateRangeInTimezone(from, to, school?.timezone ?? "UTC");
   if (!dateRange) throw new Error("The requested fee report date range is invalid.");
-  const [payments, dueInvoices, paymentTotals] = await Promise.all([
+  const [payments, dueInvoices, paymentTotals, reversals, reversalTotals] = await Promise.all([
     db.select({
       publicId: feePayments.publicId,
       amount: feePayments.amount,
+      reversedAmount: feePayments.reversedAmount,
       fineAmount: feePayments.fineAmount,
+      receiptNumber: feePayments.receiptNumber,
       paymentMethod: feePayments.paymentMethod,
       reference: feePayments.reference,
       paidAt: feePayments.paidAt,
@@ -279,6 +282,99 @@ export default async function FeeReportsPage({
         ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
       ))
       .then((rows) => rows[0]),
+    db.select({
+      publicId: feePaymentReversals.publicId,
+      amount: feePaymentReversals.amount,
+      fineAmount: feePaymentReversals.fineAmount,
+      reversalType: feePaymentReversals.reversalType,
+      reason: feePaymentReversals.reason,
+      reference: feePaymentReversals.reference,
+      createdAt: feePaymentReversals.createdAt,
+      receiptNumber: feePayments.receiptNumber,
+      paymentPublicId: feePayments.publicId,
+      studentName: students.firstName,
+      studentLastName: students.lastName,
+      branchName: schoolBranches.name,
+      className: classLevels.name,
+      sectionName: classSections.name,
+    })
+      .from(feePaymentReversals)
+      .innerJoin(feePayments, and(
+        eq(feePayments.id, feePaymentReversals.paymentId),
+        eq(feePayments.schoolId, context.schoolId),
+      ))
+      .innerJoin(studentFeeInvoices, and(
+        eq(studentFeeInvoices.id, feePayments.invoiceId),
+        eq(studentFeeInvoices.schoolId, context.schoolId),
+      ))
+      .innerJoin(students, and(
+        eq(students.id, studentFeeInvoices.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .innerJoin(studentEnrollments, and(
+        eq(studentEnrollments.id, studentFeeInvoices.enrollmentId),
+        eq(studentEnrollments.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSections.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+      ))
+      .innerJoin(schoolBranches, and(
+        eq(schoolBranches.id, classLevels.branchId),
+        eq(schoolBranches.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(feePaymentReversals.schoolId, context.schoolId),
+        gte(feePaymentReversals.createdAt, dateRange.start),
+        lt(feePaymentReversals.createdAt, dateRange.endExclusive),
+        ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
+        ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
+        ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+      ))
+      .orderBy(desc(feePaymentReversals.createdAt))
+      .limit(500),
+    db.select({
+      amount: sum(feePaymentReversals.amount),
+      fineAmount: sum(feePaymentReversals.fineAmount),
+    })
+      .from(feePaymentReversals)
+      .innerJoin(feePayments, and(
+        eq(feePayments.id, feePaymentReversals.paymentId),
+        eq(feePayments.schoolId, context.schoolId),
+      ))
+      .innerJoin(studentFeeInvoices, and(
+        eq(studentFeeInvoices.id, feePayments.invoiceId),
+        eq(studentFeeInvoices.schoolId, context.schoolId),
+      ))
+      .innerJoin(studentEnrollments, and(
+        eq(studentEnrollments.id, studentFeeInvoices.enrollmentId),
+        eq(studentEnrollments.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSections.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+      ))
+      .innerJoin(schoolBranches, and(
+        eq(schoolBranches.id, classLevels.branchId),
+        eq(schoolBranches.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(feePaymentReversals.schoolId, context.schoolId),
+        gte(feePaymentReversals.createdAt, dateRange.start),
+        lt(feePaymentReversals.createdAt, dateRange.endExclusive),
+        ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
+        ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
+        ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+      ))
+      .then((rows) => rows[0]),
   ]);
   const invoiceIds = dueInvoices.map((invoice) => invoice.id);
   const invoicePayments = [];
@@ -286,8 +382,8 @@ export default async function FeeReportsPage({
     const batch = invoiceIds.slice(offset, offset + 500);
     const batchPayments = await db.select({
       invoiceId: feePayments.invoiceId,
-      amount: sum(feePayments.amount),
-      fineAmount: sum(feePayments.fineAmount),
+      amount: sum(sql`${feePayments.amount} - ${feePayments.reversedAmount}`),
+      fineAmount: sum(sql`greatest(0, ${feePayments.fineAmount} - least(${feePayments.reversedAmount}, ${feePayments.fineAmount}))`),
     })
       .from(feePayments)
       .where(and(eq(feePayments.schoolId, context.schoolId), inArray(feePayments.invoiceId, batch)))
@@ -305,15 +401,19 @@ export default async function FeeReportsPage({
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
     const dueFine = today > invoice.dueDate
-      ? calculateFineMinorUnits(amount - discount, invoice.fineType, Number(invoice.fineValue)) ?? 0
+      ? calculateFineMinorUnits(amount - discount, invoice.fineType, invoice.fineValue) ?? 0
       : 0;
     const payment = paidByInvoice.get(invoice.id) ?? { paid: 0, fine: 0 };
     const totalDue = amount - discount + dueFine;
     const balance = Math.max(0, totalDue - payment.paid);
     return { ...invoice, paid: payment.paid, balance, status: feeInvoiceStatus(totalDue, payment.paid) ?? "unpaid" };
   }).filter((invoice) => invoice.balance > 0);
-  const totalCollected = parseMoneyToMinorUnits(paymentTotals?.amount ?? "0") ?? 0;
-  const totalFines = parseMoneyToMinorUnits(paymentTotals?.fineAmount ?? "0") ?? 0;
+  const totalCollected =
+    (parseMoneyToMinorUnits(paymentTotals?.amount ?? "0") ?? 0) -
+    (parseMoneyToMinorUnits(reversalTotals?.amount ?? "0") ?? 0);
+  const totalFines =
+    (parseMoneyToMinorUnits(paymentTotals?.fineAmount ?? "0") ?? 0) -
+    (parseMoneyToMinorUnits(reversalTotals?.fineAmount ?? "0") ?? 0);
   const totalOutstanding = outstanding.reduce((total, item) => total + item.balance, 0);
   const currency = school?.currency ?? "";
 
@@ -322,7 +422,7 @@ export default async function FeeReportsPage({
       <header>
         <p className="text-sm font-semibold text-violet-700">Finance</p>
         <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee reports</h1>
-        <p className="mt-2 text-sm text-slate-600">Review collections, fines and outstanding balances by date, branch and class.</p>
+        <p className="mt-2 text-sm text-slate-600">Review payments, reversals, refunds, fines and outstanding balances by date, branch and class.</p>
       </header>
 
       <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
@@ -368,7 +468,7 @@ export default async function FeeReportsPage({
         title="Payment report"
         description={`Payments recorded ${from} through ${to}; up to 500 most recent entries.`}
         empty="No payments were recorded during this date range."
-        headings={["Student", "Class / section", "Fee type", "Date", "Method", "Paid", "Fine", "Receipt"]}
+        headings={["Student", "Class / section", "Fee type", "Date", "Method", "Payment", "Reversed", "Fine", "Receipt"]}
         hasRows={payments.length > 0}
       >
         {payments.map((payment) => (
@@ -379,8 +479,29 @@ export default async function FeeReportsPage({
             <td className="px-4 py-3">{payment.paidAt.toISOString().slice(0, 10)}</td>
             <td className="px-4 py-3 capitalize">{payment.paymentMethod.replace("_", " ")}</td>
             <td className="px-4 py-3">{currency} {payment.amount}</td>
+            <td className="px-4 py-3">{currency} {payment.reversedAmount}</td>
             <td className="px-4 py-3">{currency} {payment.fineAmount}</td>
-            <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${payment.publicId}`}>Receipt</Link></td>
+            <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${payment.publicId}`}>{payment.receiptNumber}</Link></td>
+          </tr>
+        ))}
+      </ReportTable>
+
+      <ReportTable
+        title="Reversals and refunds"
+        description={`Reversals recorded ${from} through ${to}; up to 500 most recent entries.`}
+        empty="No payment reversals or refunds were recorded during this date range."
+        headings={["Student", "Class / section", "Date", "Type", "Amount", "Reason", "Receipt"]}
+        hasRows={reversals.length > 0}
+      >
+        {reversals.map((reversal) => (
+          <tr key={reversal.publicId} className="border-t border-slate-100">
+            <td className="px-4 py-3">{reversal.studentName} {reversal.studentLastName}</td>
+            <td className="px-4 py-3">{reversal.branchName} / {reversal.className} / {reversal.sectionName}</td>
+            <td className="px-4 py-3">{reversal.createdAt.toISOString().slice(0, 10)}</td>
+            <td className="px-4 py-3 capitalize">{reversal.reversalType}</td>
+            <td className="px-4 py-3">{currency} {reversal.amount}</td>
+            <td className="px-4 py-3">{reversal.reason}{reversal.reference ? ` · Ref ${reversal.reference}` : ""}</td>
+            <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${reversal.paymentPublicId}`}>{reversal.receiptNumber}</Link></td>
           </tr>
         ))}
       </ReportTable>

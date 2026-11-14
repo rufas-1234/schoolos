@@ -1,0 +1,4 @@
+ALTER TABLE `fee_structures` DROP INDEX `fee_structures_school_year_class_group_type_uq`;--> statement-breakpoint
+ALTER TABLE `fee_structures` ADD `studentId` bigint unsigned;--> statement-breakpoint
+ALTER TABLE `fee_structures` ADD CONSTRAINT `fee_structures_school_year_class_group_type_term_uq` UNIQUE(`schoolId`,`academicYearId`,`classLevelId`,`feeGroupId`,`feeTypeId`,`academicTermId`,`studentId`);--> statement-breakpoint
+ALTER TABLE `fee_structures` ADD CONSTRAINT `fee_structures_studentId_students_id_fk` FOREIGN KEY (`studentId`) REFERENCES `students`(`id`) ON DELETE no action ON UPDATE no action;

@@ -1,6 +1,9 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
+import type { ReactNode } from "react";
 import { db } from "@/db";
+import { AdminRecordDialog } from "@/components/admin-data-table";
 import {
+  academicTerms,
   academicYears,
   classLevels,
   feeDiscounts,
@@ -9,6 +12,7 @@ import {
   feeTypes,
   schools,
   schoolBranches,
+  studentFeeDiscounts,
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -24,7 +28,7 @@ import {
 
 export default async function FeesSetupPage() {
   const context = await requireSchoolPermission("fees.manage");
-  const [school, branches, years, classes, groups, types, discounts, eligibleStudents, structures] =
+  const [school, branches, years, terms, classes, groups, types, discounts, studentDiscountAssignments, eligibleStudents, structures] =
     await Promise.all([
       db.select({ currency: schools.currency }).from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
       db.select({ id: schoolBranches.id, name: schoolBranches.name })
@@ -36,6 +40,18 @@ export default async function FeesSetupPage() {
         .where(eq(academicYears.schoolId, context.schoolId))
         .orderBy(asc(academicYears.startDate)),
       db.select({
+        id: academicTerms.id,
+        name: academicTerms.name,
+        yearName: academicYears.name,
+        startDate: academicTerms.startDate,
+        endDate: academicTerms.endDate,
+        academicYearId: academicTerms.academicYearId,
+      })
+        .from(academicTerms)
+        .innerJoin(academicYears, eq(academicTerms.academicYearId, academicYears.id))
+        .where(eq(academicTerms.schoolId, context.schoolId))
+        .orderBy(asc(academicTerms.startDate)),
+      db.select({
         id: classLevels.id,
         name: classLevels.name,
         branchName: schoolBranches.name,
@@ -44,17 +60,20 @@ export default async function FeesSetupPage() {
         .innerJoin(schoolBranches, eq(classLevels.branchId, schoolBranches.id))
         .where(and(
           eq(classLevels.schoolId, context.schoolId),
+          eq(classLevels.status, "active"),
           eq(schoolBranches.schoolId, context.schoolId),
           eq(schoolBranches.status, "active"),
         ))
         .orderBy(asc(schoolBranches.name), asc(classLevels.name)),
-      db.select({ id: feeGroups.id, name: feeGroups.name })
+      db.select({ id: feeGroups.id, name: feeGroups.name, description: feeGroups.description })
         .from(feeGroups)
         .where(eq(feeGroups.schoolId, context.schoolId))
         .orderBy(asc(feeGroups.name)),
       db.select({
         id: feeTypes.id,
         name: feeTypes.name,
+        description: feeTypes.description,
+        feeGroupId: feeTypes.feeGroupId,
         groupName: feeGroups.name,
       })
         .from(feeTypes)
@@ -63,6 +82,7 @@ export default async function FeesSetupPage() {
         .orderBy(asc(feeGroups.name), asc(feeTypes.name)),
       db.select({
         id: feeDiscounts.id,
+        description: feeDiscounts.description,
         name: feeDiscounts.name,
         code: feeDiscounts.code,
         discountType: feeDiscounts.discountType,
@@ -72,6 +92,32 @@ export default async function FeesSetupPage() {
         .from(feeDiscounts)
         .where(eq(feeDiscounts.schoolId, context.schoolId))
         .orderBy(asc(feeDiscounts.name)),
+      db.select({
+        id: studentFeeDiscounts.id,
+        studentId: studentFeeDiscounts.studentId,
+        feeTypeId: studentFeeDiscounts.feeTypeId,
+        discountId: studentFeeDiscounts.discountId,
+        note: studentFeeDiscounts.note,
+        studentName: students.firstName,
+        studentLastName: students.lastName,
+        feeTypeName: feeTypes.name,
+        discountName: feeDiscounts.name,
+      })
+        .from(studentFeeDiscounts)
+        .innerJoin(students, and(
+          eq(students.id, studentFeeDiscounts.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .innerJoin(feeTypes, and(
+          eq(feeTypes.id, studentFeeDiscounts.feeTypeId),
+          eq(feeTypes.schoolId, context.schoolId),
+        ))
+        .innerJoin(feeDiscounts, and(
+          eq(feeDiscounts.id, studentFeeDiscounts.discountId),
+          eq(feeDiscounts.schoolId, context.schoolId),
+        ))
+        .where(eq(studentFeeDiscounts.schoolId, context.schoolId))
+        .orderBy(asc(students.lastName), asc(students.firstName)),
       db.select({
         id: students.id,
         name: students.firstName,
@@ -84,17 +130,34 @@ export default async function FeesSetupPage() {
         .then((rows) => rows.filter((student) => student.id && student.admissionNumber !== undefined)),
       db.select({
         id: feeStructures.id,
+        branchId: feeStructures.branchId,
+        academicYearId: feeStructures.academicYearId,
+        academicTermId: feeStructures.academicTermId,
+        studentId: feeStructures.studentId,
+        classLevelId: feeStructures.classLevelId,
+        feeGroupId: feeStructures.feeGroupId,
+        feeTypeId: feeStructures.feeTypeId,
+        fineType: feeStructures.fineType,
+        fineValue: feeStructures.fineValue,
         className: classLevels.name,
         yearName: academicYears.name,
         groupName: feeGroups.name,
         typeName: feeTypes.name,
         amount: feeStructures.amount,
         dueDate: feeStructures.dueDate,
+        termName: academicTerms.name,
+        studentName: students.firstName,
+        studentLastName: students.lastName,
         branchName: schoolBranches.name,
       })
         .from(feeStructures)
         .innerJoin(classLevels, eq(feeStructures.classLevelId, classLevels.id))
         .innerJoin(academicYears, eq(feeStructures.academicYearId, academicYears.id))
+        .leftJoin(academicTerms, eq(feeStructures.academicTermId, academicTerms.id))
+        .leftJoin(students, and(
+          eq(students.id, feeStructures.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
         .innerJoin(feeGroups, eq(feeStructures.feeGroupId, feeGroups.id))
         .innerJoin(feeTypes, eq(feeStructures.feeTypeId, feeTypes.id))
         .innerJoin(schoolBranches, eq(feeStructures.branchId, schoolBranches.id))
@@ -108,6 +171,10 @@ export default async function FeesSetupPage() {
   }));
   const branchOptions: FeeOption[] = branches.map((branch) => ({ id: branch.id, label: branch.name }));
   const yearOptions: FeeOption[] = years.map((year) => ({ id: year.id, label: year.name }));
+  const termOptions: FeeOption[] = terms.map((term) => ({
+    id: term.id,
+    label: `${term.yearName} · ${term.name} (${term.startDate} – ${term.endDate})`,
+  }));
   const classOptions: FeeOption[] = classes.map((item) => ({
     id: item.id,
     label: `${item.branchName} — ${item.name}`,
@@ -125,17 +192,6 @@ export default async function FeesSetupPage() {
     id: structure.id,
     label: `${structure.branchName} · ${structure.className} · ${structure.yearName} · ${structure.typeName}`,
   }));
-  const catalogCards: { title: string; entries: string[] }[] = [
-    { title: "Groups", entries: groups.map((group) => group.name) },
-    { title: "Fee types", entries: types.map((type) => `${type.groupName} / ${type.name}`) },
-    {
-      title: "Discounts",
-      entries: discounts.map((discount) =>
-        `${discount.name} · ${discount.discountType === "percentage" ? `${discount.value}%` : `${school?.currency ?? ""} ${discount.value}`} · ${discount.frequency.replace("_", " ")}`,
-      ),
-    },
-  ];
-
   return (
     <div className="space-y-8">
       <header>
@@ -161,10 +217,35 @@ export default async function FeesSetupPage() {
         <FeeStructureForm
           branches={branchOptions}
           years={yearOptions}
+          terms={termOptions}
+          students={studentsForDiscounts}
           classes={classOptions}
           groups={groupOptions}
           types={typeOptions}
         />
+      </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h2 className="font-semibold text-slate-900">Student discounts and scholarships</h2>
+        {studentDiscountAssignments.length ? (
+          <ul className="mt-3 divide-y divide-slate-100">
+            {studentDiscountAssignments.map((assignment) => (
+              <li key={assignment.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                <span>
+                  {assignment.studentName} {assignment.studentLastName} · {assignment.feeTypeName} · {assignment.discountName}
+                  {assignment.note ? <span className="block text-xs text-slate-500">{assignment.note}</span> : null}
+                </span>
+                <AdminRecordDialog title={`Edit ${assignment.studentName}'s discount`}>
+                  <StudentFeeDiscountForm
+                    students={studentsForDiscounts}
+                    discounts={discountOptions}
+                    feeTypes={typeOptions}
+                    record={assignment}
+                  />
+                </AdminRecordDialog>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="mt-2 text-sm text-slate-500">No student-specific discounts or scholarships are assigned.</p>}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.7fr)]">
@@ -178,10 +259,22 @@ export default async function FeesSetupPage() {
               {structures.map((structure) => (
                 <div key={structure.id} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                   <div>
-                    <p className="font-medium text-slate-900">{structure.branchName} · {structure.className} · {structure.yearName}</p>
+                    <p className="font-medium text-slate-900">{structure.branchName} · {structure.className} · {structure.yearName}{structure.termName ? ` · ${structure.termName}` : ""}{structure.studentName ? ` · ${structure.studentName} ${structure.studentLastName}` : ""}</p>
                     <p className="mt-1 text-slate-500">{structure.groupName} / {structure.typeName} · due {structure.dueDate}</p>
                   </div>
                   <p className="font-semibold text-slate-800">{school?.currency} {structure.amount}</p>
+                  <AdminRecordDialog title={`Edit ${structure.typeName} fee structure`} wide>
+                    <FeeStructureForm
+                      branches={branchOptions}
+                      years={yearOptions}
+                      terms={termOptions}
+                      students={studentsForDiscounts}
+                      classes={classOptions}
+                      groups={groupOptions}
+                      types={typeOptions}
+                      record={structure}
+                    />
+                  </AdminRecordDialog>
                 </div>
               ))}
             </div>
@@ -193,15 +286,60 @@ export default async function FeesSetupPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        {catalogCards.map(({ title, entries }) => (
-          <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h2 className="font-semibold text-slate-900">{title}</h2>
-            <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              {entries.length ? entries.map((entry) => <li key={entry}>{entry}</li>) : <li>None created yet.</li>}
-            </ul>
-          </div>
-        ))}
+        <CatalogCard title="Fee groups" empty="No fee groups yet." count={groups.length}>
+          {groups.map((group) => (
+            <li key={group.id} className="flex items-center justify-between gap-2">
+              <span>{group.name}</span>
+              <AdminRecordDialog title={`Edit ${group.name}`}>
+                <FeeGroupForm record={group} />
+              </AdminRecordDialog>
+            </li>
+          ))}
+        </CatalogCard>
+        <CatalogCard title="Fee types" empty="No fee types yet." count={types.length}>
+          {types.map((type) => (
+            <li key={type.id} className="flex items-center justify-between gap-2">
+              <span>{type.groupName} / {type.name}</span>
+              <AdminRecordDialog title={`Edit ${type.name}`}>
+                <FeeTypeForm groups={groupOptions} record={type} />
+              </AdminRecordDialog>
+            </li>
+          ))}
+        </CatalogCard>
+        <CatalogCard title="Discounts" empty="No discounts yet." count={discounts.length}>
+          {discounts.map((discount) => (
+            <li key={discount.id} className="flex items-center justify-between gap-2">
+              <span>
+                {discount.name} · {discount.discountType === "percentage" ? `${discount.value}%` : `${school?.currency ?? ""} ${discount.value}`}
+              </span>
+              <AdminRecordDialog title={`Edit ${discount.name}`}>
+                <FeeDiscountForm record={discount} />
+              </AdminRecordDialog>
+            </li>
+          ))}
+        </CatalogCard>
       </section>
+    </div>
+  );
+}
+
+function CatalogCard({
+  title,
+  empty,
+  count,
+  children,
+}: {
+  title: string;
+  empty: string;
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <h2 className="font-semibold text-slate-900">{title}</h2>
+      <ul className="mt-3 space-y-2 text-sm text-slate-600">
+        {count > 0 ? children : <li>{empty}</li>}
+      </ul>
     </div>
   );
 }

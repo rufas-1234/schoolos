@@ -1,10 +1,13 @@
 import { and, asc, desc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { AdminRecordDialog } from "@/components/admin-data-table";
 import Link from "next/link";
 import { db } from "@/db";
 import {
   classLevels,
   classSections,
   academicYears,
+  academicTerms,
   feeGroups,
   feePayments,
   feeStructures,
@@ -23,7 +26,7 @@ import {
 } from "@/lib/fees-policy";
 import type { SearchableSelectOption } from "@/components/searchable-select";
 import { FeeInvoiceFilters } from "./fee-invoice-filters";
-import { RecordFeePaymentForm } from "../fee-forms";
+import { EditFeeInvoiceForm, RecordFeePaymentForm } from "../fee-forms";
 
 type SearchParams = {
   search?: string | string[];
@@ -106,12 +109,14 @@ export default async function FeeCollectionPage({
     db.select({
       id: studentFeeInvoices.id,
       publicId: studentFeeInvoices.publicId,
+      invoiceNumber: studentFeeInvoices.invoiceNumber,
       amount: studentFeeInvoices.amount,
       discountAmount: studentFeeInvoices.discountAmount,
       fineType: studentFeeInvoices.fineType,
       fineValue: studentFeeInvoices.fineValue,
       dueDate: studentFeeInvoices.dueDate,
       createdAt: studentFeeInvoices.createdAt,
+      studentId: students.id,
       studentName: students.firstName,
       studentLastName: students.lastName,
       admissionNumber: students.admissionNumber,
@@ -121,6 +126,7 @@ export default async function FeeCollectionPage({
       branchId: schoolBranches.id,
       branchName: schoolBranches.name,
       yearName: academicYears.name,
+      termName: academicTerms.name,
       groupName: feeGroups.name,
       typeName: feeTypes.name,
     })
@@ -153,6 +159,7 @@ export default async function FeeCollectionPage({
         eq(academicYears.id, feeStructures.academicYearId),
         eq(academicYears.schoolId, context.schoolId),
       ))
+      .leftJoin(academicTerms, eq(academicTerms.id, feeStructures.academicTermId))
       .innerJoin(feeGroups, and(
         eq(feeGroups.id, feeStructures.feeGroupId),
         eq(feeGroups.schoolId, context.schoolId),
@@ -181,7 +188,10 @@ export default async function FeeCollectionPage({
   ]);
   const invoiceIds = invoices.map((invoice) => invoice.id);
   const payments = invoiceIds.length
-    ? await db.select({ invoiceId: feePayments.invoiceId, amount: sum(feePayments.amount) })
+    ? await db.select({
+        invoiceId: feePayments.invoiceId,
+        amount: sum(sql`${feePayments.amount} - ${feePayments.reversedAmount}`),
+      })
       .from(feePayments)
       .where(and(eq(feePayments.schoolId, context.schoolId), inArray(feePayments.invoiceId, invoiceIds)))
       .groupBy(feePayments.invoiceId)
@@ -195,7 +205,7 @@ export default async function FeeCollectionPage({
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
     const fine = today > invoice.dueDate
-      ? calculateFineMinorUnits(amount - discount, invoice.fineType, Number(invoice.fineValue)) ?? 0
+      ? calculateFineMinorUnits(amount - discount, invoice.fineType, invoice.fineValue) ?? 0
       : 0;
     const paid = paidByInvoice.get(invoice.id) ?? 0;
     const totalDue = amount - discount + fine;
@@ -246,6 +256,14 @@ export default async function FeeCollectionPage({
         selectedSection={requestedSection === null ? "" : String(requestedSection)}
         selectedStatus={statusFilter}
       />
+      {(requestedClass !== null || requestedSection !== null) && (
+        <Link
+          href={`/admin/fees/invoices/print?${requestedSection !== null ? `sectionId=${requestedSection}` : `classLevelId=${requestedClass}`}`}
+          className="inline-flex rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Print filtered invoices
+        </Link>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard label="Invoices shown" value={String(rows.length)} />
@@ -262,8 +280,22 @@ export default async function FeeCollectionPage({
                 <p className="mt-1 text-sm text-slate-500">
                   Admission {invoice.admissionNumber || "—"} · Roll {invoice.rollNumber || "—"} · {invoice.branchName} / {invoice.className} / {invoice.sectionName}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">{invoice.groupName} / {invoice.typeName} · due {invoice.dueDate}</p>
-                <p className="mt-2 text-xs text-slate-400">Invoice {invoice.publicId.slice(0, 8).toUpperCase()} · {invoice.createdAt.toISOString().slice(0, 10)}</p>
+                <p className="mt-1 text-sm text-slate-500">{invoice.groupName} / {invoice.typeName}{invoice.termName ? ` · ${invoice.termName}` : ""} · due {invoice.dueDate}</p>
+                <p className="mt-2 text-xs text-slate-400">Invoice {invoice.invoiceNumber} · {invoice.createdAt.toISOString().slice(0, 10)}</p>
+                <div className="mt-2 flex gap-3 text-xs font-semibold text-violet-700">
+                  <Link href={`/admin/fees/invoices/print?invoiceId=${invoice.publicId}`}>Print invoice</Link>
+                  <Link href={`/admin/fees/invoices/print?studentId=${invoice.studentId}`}>Print student invoices</Link>
+                  <AdminRecordDialog title={`Edit invoice ${invoice.invoiceNumber}`}>
+                    <EditFeeInvoiceForm invoice={{
+                      id: invoice.id,
+                      amount: invoice.amount,
+                      discountAmount: invoice.discountAmount,
+                      dueDate: invoice.dueDate,
+                      fineType: invoice.fineType,
+                      fineValue: invoice.fineValue,
+                    }} />
+                  </AdminRecordDialog>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-right text-sm">
                 <span className="text-slate-500">Fee</span><span>{currency} {money(parseMoneyToMinorUnits(invoice.amount) ?? 0)}</span>
@@ -281,6 +313,7 @@ export default async function FeeCollectionPage({
                     invoiceId={invoice.id}
                     maxAmount={money(invoice.balance)}
                     currency={currency}
+                    idempotencyKey={randomUUID()}
                   />
                 </div>
               </details>

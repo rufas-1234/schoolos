@@ -5,12 +5,19 @@ export const feeFineTypes = ["none", "fixed", "percentage"] as const;
 export const feePaymentMethods = ["cash", "bank_transfer", "card", "mobile_money", "cheque", "other"] as const;
 export const feeInvoiceStatuses = ["unpaid", "partial", "paid"] as const;
 
-function percentageOfMinorUnits(amountMinor: number, percentage: number): number | null {
-  const basisPoints = Math.round(percentage * 100);
+function parseDecimalToMinorUnits(value: string | number): number | null {
+  const text = typeof value === "number" && Number.isFinite(value) ? String(value) : value;
+  if (typeof text !== "string" || !/^\d{1,8}(\.\d{1,2})?$/.test(text)) return null;
+  const [whole, fraction = ""] = text.split(".");
+  const minorUnits = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  return Number.isSafeInteger(minorUnits) ? minorUnits : null;
+}
+
+function percentageOfMinorUnits(amountMinor: number, basisPoints: number): number | null {
   if (!Number.isSafeInteger(basisPoints) || basisPoints < 0 || basisPoints > 10000) return null;
-  const wholePart = Math.floor(amountMinor / 10000) * basisPoints;
-  const remainderPart = Math.round((amountMinor % 10000) * basisPoints / 10000);
-  const minorUnits = wholePart + remainderPart;
+  const numerator = BigInt(amountMinor) * BigInt(basisPoints);
+  const roundedMinorUnits = (numerator + BigInt(5000)) / BigInt(10000);
+  const minorUnits = Number(roundedMinorUnits);
   return Number.isSafeInteger(minorUnits) ? minorUnits : null;
 }
 
@@ -24,18 +31,17 @@ export function parseMoneyToMinorUnits(value: string): number | null {
 export function calculateDiscountMinorUnits(
   amountMinor: number,
   discountType: string,
-  value: number,
+  value: string | number,
 ): number | null {
-  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0 || !Number.isFinite(value) || value < 0) {
+  const valueMinor = parseDecimalToMinorUnits(value);
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0 || valueMinor === null) {
     return null;
   }
   if (discountType === "fixed") {
-    const discount = Math.round(value * 100);
-    if (!Number.isSafeInteger(discount)) return null;
-    return Math.min(amountMinor, discount);
+    return Math.min(amountMinor, valueMinor);
   }
-  if (discountType === "percentage" && value <= 100) {
-    const discount = percentageOfMinorUnits(amountMinor, value);
+  if (discountType === "percentage" && valueMinor <= 10000) {
+    const discount = percentageOfMinorUnits(amountMinor, valueMinor);
     return discount === null ? null : Math.min(amountMinor, discount);
   }
   return null;
@@ -44,18 +50,18 @@ export function calculateDiscountMinorUnits(
 export function calculateFineMinorUnits(
   amountMinor: number,
   fineType: string,
-  value: number,
+  value: string | number,
 ): number | null {
-  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0 || !Number.isFinite(value) || value < 0) {
+  const valueMinor = parseDecimalToMinorUnits(value);
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0 || valueMinor === null) {
     return null;
   }
   if (fineType === "none") return 0;
   if (fineType === "fixed") {
-    const fine = Math.round(value * 100);
-    return Number.isSafeInteger(fine) ? fine : null;
+    return valueMinor;
   }
-  if (fineType === "percentage" && value <= 100) {
-    return percentageOfMinorUnits(amountMinor, value);
+  if (fineType === "percentage" && valueMinor <= 10000) {
+    return percentageOfMinorUnits(amountMinor, valueMinor);
   }
   return null;
 }

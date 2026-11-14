@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, type ReactNode } from "react";
+import Link from "next/link";
 import { SearchableSelect } from "@/components/searchable-select";
 import { RequiredMark } from "@/components/required-mark";
 import {
@@ -11,6 +12,8 @@ import {
   createFeeType,
   generateStudentFeeInvoices,
   recordFeePayment,
+  reverseFeePayment,
+  updateFeeInvoice,
   type FeeActionState,
 } from "./actions";
 
@@ -22,19 +25,23 @@ function ActionForm({
   title,
   children,
   submitLabel,
+  recordId,
 }: {
   action: (state: FeeActionState, formData: FormData) => Promise<FeeActionState>;
   title: string;
   children: ReactNode;
   submitLabel: string;
+  recordId?: number;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   return (
     <form action={formAction} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
       <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      {recordId !== undefined && <input type="hidden" name="recordId" value={recordId} />}
       {children}
       {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
       {state.message && <p role="status" className="text-sm text-emerald-700">{state.message}</p>}
+      {state.receiptUrl && <Link href={state.receiptUrl} className="block text-sm font-semibold text-violet-700">Open receipt</Link>}
       {state.success && !state.message && <p role="status" className="text-sm text-emerald-700">Saved successfully.</p>}
       <button
         type="submit"
@@ -88,14 +95,14 @@ function SelectField({
   label: string;
   name: string;
   options: FeeOption[];
-  defaultValue?: string;
+  defaultValue?: string | number;
 }) {
   return (
     <SearchableSelect
       label={label}
       name={name}
       options={options.map((option) => ({ value: String(option.id), label: option.label }))}
-      defaultValue={defaultValue ?? ""}
+      defaultValue={defaultValue === undefined ? "" : String(defaultValue)}
       placeholder={options.length ? "Search or choose..." : "Create one first"}
       required
     />
@@ -106,50 +113,87 @@ function ValueSelectField({
   label,
   name,
   options,
+  defaultValue,
 }: {
   label: string;
   name: string;
   options: ValueOption[];
+  defaultValue?: string;
+}) {
+  return <SearchableSelect label={label} name={name} options={options} defaultValue={defaultValue} placeholder="Search or choose..." required />;
+}
+
+export function FeeGroupForm({
+  record,
+}: {
+  record?: { id: number; name: string; description: string | null };
 }) {
   return (
-    <SearchableSelect label={label} name={name} options={options} placeholder="Search or choose..." required />
-  );
-}
-
-export function FeeGroupForm() {
-  return (
-    <ActionForm action={createFeeGroup} title="Add fee group" submitLabel="Add group">
-      <Field label="Group name" name="name" placeholder="Tuition" />
-      <Field label="Description" name="description" required={false} placeholder="Optional notes" />
+    <ActionForm
+      action={createFeeGroup}
+      title={record ? "Edit fee group" : "Add fee group"}
+      submitLabel={record ? "Save group" : "Add group"}
+      recordId={record?.id}
+    >
+      <Field label="Group name" name="name" placeholder="Tuition" defaultValue={record?.name} />
+      <Field label="Description" name="description" required={false} placeholder="Optional notes" defaultValue={record?.description} />
     </ActionForm>
   );
 }
 
-export function FeeTypeForm({ groups }: { groups: FeeOption[] }) {
+export function FeeTypeForm({
+  groups,
+  record,
+}: {
+  groups: FeeOption[];
+  record?: { id: number; name: string; description: string | null; feeGroupId: number };
+}) {
   return (
-    <ActionForm action={createFeeType} title="Add fee type" submitLabel="Add type">
-      <SelectField label="Fee group" name="feeGroupId" options={groups} />
-      <Field label="Fee type" name="name" placeholder="Term 1" />
-      <Field label="Description" name="description" required={false} placeholder="Optional notes" />
+    <ActionForm
+      action={createFeeType}
+      title={record ? "Edit fee type" : "Add fee type"}
+      submitLabel={record ? "Save type" : "Add type"}
+      recordId={record?.id}
+    >
+      <SelectField label="Fee group" name="feeGroupId" options={groups} defaultValue={record?.feeGroupId} />
+      <Field label="Fee type" name="name" placeholder="Term 1" defaultValue={record?.name} />
+      <Field label="Description" name="description" required={false} placeholder="Optional notes" defaultValue={record?.description} />
     </ActionForm>
   );
 }
 
-export function FeeDiscountForm() {
+export function FeeDiscountForm({
+  record,
+}: {
+  record?: {
+    id: number;
+    name: string;
+    code: string;
+    description: string | null;
+    discountType: string;
+    value: string;
+    frequency: string;
+  };
+}) {
   return (
-    <ActionForm action={createFeeDiscount} title="Create discount" submitLabel="Add discount">
-      <Field label="Discount name" name="name" placeholder="Sibling discount" />
-      <Field label="Discount code" name="code" placeholder="SIBLING" />
-      <Field label="Description" name="description" required={false} />
+    <ActionForm
+      action={createFeeDiscount}
+      title={record ? "Edit discount" : "Create discount"}
+      submitLabel={record ? "Save discount" : "Add discount"}
+      recordId={record?.id}
+    >
+      <Field label="Discount name" name="name" placeholder="Sibling discount" defaultValue={record?.name} />
+      <Field label="Discount code" name="code" placeholder="SIBLING" defaultValue={record?.code} />
+      <Field label="Description" name="description" required={false} defaultValue={record?.description} />
       <ValueSelectField label="Discount method" name="discountType" options={[
         { value: "fixed", label: "Fixed amount" },
         { value: "percentage", label: "Percentage" },
-      ]} />
-      <Field label="Value (amount or percent)" name="value" type="number" />
+      ]} defaultValue={record?.discountType} />
+      <Field label="Value (amount or percent)" name="value" type="number" defaultValue={record?.value} />
       <ValueSelectField label="Frequency" name="frequency" options={[
         { value: "one_time", label: "One time" },
         { value: "yearly", label: "Yearly" },
-      ]} />
+      ]} defaultValue={record?.frequency} />
     </ActionForm>
   );
 }
@@ -158,17 +202,28 @@ export function StudentFeeDiscountForm({
   students,
   discounts,
   feeTypes,
+  record,
 }: {
   students: FeeOption[];
   discounts: FeeOption[];
   feeTypes: FeeOption[];
+  record?: {
+    studentId: number;
+    feeTypeId: number;
+    discountId: number;
+    note: string | null;
+  };
 }) {
   return (
-    <ActionForm action={assignStudentFeeDiscount} title="Assign a student discount" submitLabel="Assign discount">
-      <SelectField label="Student" name="studentId" options={students} />
-      <SelectField label="Fee type" name="feeTypeId" options={feeTypes} />
-      <SelectField label="Discount" name="discountId" options={discounts} />
-      <Field label="Note" name="note" required={false} placeholder="Optional reason or approval reference" />
+  <ActionForm
+    action={assignStudentFeeDiscount}
+    title={record ? "Edit student discount or scholarship" : "Assign a student discount or scholarship"}
+    submitLabel={record ? "Save assignment" : "Assign discount"}
+  >
+      <SelectField label="Student" name="studentId" options={students} defaultValue={record?.studentId} />
+      <SelectField label="Fee type" name="feeTypeId" options={feeTypes} defaultValue={record?.feeTypeId} />
+      <SelectField label="Discount" name="discountId" options={discounts} defaultValue={record?.discountId} />
+      <Field label="Note" name="note" required={false} placeholder="Optional reason or approval reference" defaultValue={record?.note} />
     </ActionForm>
   );
 }
@@ -176,33 +231,79 @@ export function StudentFeeDiscountForm({
 export function FeeStructureForm({
   branches,
   years,
+  terms,
+  students,
   classes,
   groups,
   types,
+  record,
 }: {
   branches: FeeOption[];
   years: FeeOption[];
+  terms: FeeOption[];
+  students: FeeOption[];
   classes: FeeOption[];
   groups: FeeOption[];
   types: FeeOption[];
+  record?: {
+    id: number;
+    branchId: number;
+    academicYearId: number;
+    academicTermId: number | null;
+    studentId: number | null;
+    classLevelId: number;
+    feeGroupId: number;
+    feeTypeId: number;
+    amount: string;
+    dueDate: string;
+    fineType: string;
+    fineValue: string;
+  };
 }) {
   return (
-    <ActionForm action={createFeeStructure} title="Set up fee structure" submitLabel="Save structure">
-      <SelectField label="Branch" name="branchId" options={branches} />
-      <SelectField label="Academic year" name="academicYearId" options={years} />
-      <SelectField label="Class" name="classLevelId" options={classes} />
-      <SelectField label="Fee group" name="feeGroupId" options={groups} />
-      <SelectField label="Fee type" name="feeTypeId" options={types} />
+    <ActionForm
+      action={createFeeStructure}
+      title={record ? "Edit fee structure" : "Set up fee structure"}
+      submitLabel={record ? "Save structure" : "Save structure"}
+      recordId={record?.id}
+    >
+      <SelectField label="Branch" name="branchId" options={branches} defaultValue={record?.branchId} />
+      <SelectField label="Academic year" name="academicYearId" options={years} defaultValue={record?.academicYearId} />
+      <SearchableSelect
+        label="Academic term (optional)"
+        name="academicTermId"
+        options={[
+          { value: "", label: "Entire academic year" },
+          ...terms.map((term) => ({ value: String(term.id), label: term.label })),
+        ]}
+        defaultValue={record?.academicTermId ? String(record.academicTermId) : ""}
+        placeholder="Search a term or use the full academic year..."
+        required={false}
+      />
+      <SearchableSelect
+        label="Student-specific charge (optional)"
+        name="studentId"
+        options={[
+          { value: "", label: "Apply to the whole class" },
+          ...students.map((student) => ({ value: String(student.id), label: student.label })),
+        ]}
+        placeholder="Search a student or leave blank for the whole class..."
+        defaultValue={record?.studentId ? String(record.studentId) : ""}
+        required={false}
+      />
+      <SelectField label="Class" name="classLevelId" options={classes} defaultValue={record?.classLevelId} />
+      <SelectField label="Fee group" name="feeGroupId" options={groups} defaultValue={record?.feeGroupId} />
+      <SelectField label="Fee type" name="feeTypeId" options={types} defaultValue={record?.feeTypeId} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Amount" name="amount" type="number" />
-        <Field label="Due date" name="dueDate" type="date" />
+        <Field label="Amount" name="amount" type="number" defaultValue={record?.amount} />
+        <Field label="Due date" name="dueDate" type="date" defaultValue={record?.dueDate} />
       </div>
       <ValueSelectField label="Late fine" name="fineType" options={[
         { value: "none", label: "No fine" },
         { value: "fixed", label: "Fixed amount" },
         { value: "percentage", label: "Percentage of fee" },
-      ]} />
-      <Field label="Fine value (0 for none)" name="fineValue" type="number" defaultValue="0" />
+      ]} defaultValue={record?.fineType} />
+      <Field label="Fine value (0 for none)" name="fineValue" type="number" defaultValue={record?.fineValue ?? "0"} />
     </ActionForm>
   );
 }
@@ -234,14 +335,17 @@ export function RecordFeePaymentForm({
   invoiceId,
   maxAmount,
   currency,
+  idempotencyKey,
 }: {
   invoiceId: number;
   maxAmount: string;
   currency: string;
+  idempotencyKey: string;
 }) {
   return (
     <ActionForm action={recordFeePayment} title="Record payment" submitLabel="Record payment">
       <input type="hidden" name="invoiceId" value={invoiceId} />
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <Field label={`Amount (${currency})`} name="amount" type="number" placeholder={maxAmount} />
       <ValueSelectField label="Payment method" name="paymentMethod" options={[
         { value: "cash", label: "Cash" },
@@ -254,6 +358,64 @@ export function RecordFeePaymentForm({
       <Field label="Reference" name="reference" required={false} placeholder="Receipt or transaction reference" />
       <Field label="Notes" name="notes" required={false} />
       <p className="text-xs text-slate-500">Outstanding balance: {currency} {maxAmount}</p>
+    </ActionForm>
+  );
+}
+
+export function FeePaymentReversalForm({
+  paymentId,
+  amount,
+  currency,
+  idempotencyKey,
+}: {
+  paymentId: number;
+  amount: string;
+  currency: string;
+  idempotencyKey: string;
+}) {
+  return (
+    <ActionForm action={reverseFeePayment} title="Reverse or refund payment" submitLabel="Record reversal">
+      <input type="hidden" name="paymentId" value={paymentId} />
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      <Field label={`Amount (${currency})`} name="amount" type="number" placeholder={amount} />
+      <ValueSelectField label="Action" name="reversalType" options={[
+        { value: "reversal", label: "Reverse payment" },
+        { value: "refund", label: "Refund" },
+      ]} />
+      <Field label="Reason" name="reason" placeholder="Required audit reason" />
+      <Field label="Reference" name="reference" required={false} placeholder="Optional bank or refund reference" />
+      <p className="text-xs text-slate-500">Unreversed amount: {currency} {amount}. This creates a financial history record; it does not delete the payment.</p>
+    </ActionForm>
+  );
+}
+
+export function EditFeeInvoiceForm({
+  invoice,
+}: {
+  invoice: {
+    id: number;
+    amount: string;
+    discountAmount: string;
+    dueDate: string;
+    fineType: string;
+    fineValue: string;
+  };
+}) {
+  return (
+    <ActionForm action={updateFeeInvoice} title="Edit invoice" submitLabel="Save invoice">
+      <input type="hidden" name="invoiceId" value={invoice.id} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Invoice amount" name="amount" type="number" defaultValue={invoice.amount} />
+        <Field label="Discount amount" name="discountAmount" type="number" defaultValue={invoice.discountAmount} />
+        <Field label="Due date" name="dueDate" type="date" defaultValue={invoice.dueDate} />
+        <ValueSelectField label="Late fine" name="fineType" options={[
+          { value: "none", label: "No fine" },
+          { value: "fixed", label: "Fixed amount" },
+          { value: "percentage", label: "Percentage of fee" },
+        ]} defaultValue={invoice.fineType} />
+      </div>
+      <Field label="Fine value" name="fineValue" type="number" defaultValue={invoice.fineValue} />
+      <p className="text-xs text-slate-500">The invoice item identity and generated number are retained. If a payment exists, only its due date may be changed without first recording a reversal or refund.</p>
     </ActionForm>
   );
 }

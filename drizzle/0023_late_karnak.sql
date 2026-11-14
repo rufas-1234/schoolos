@@ -1,0 +1,1 @@
+ALTER TABLE `fee_payment_reversals` ADD `fineAmount` decimal(12,2) DEFAULT '0' NOT NULL;

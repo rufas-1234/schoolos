@@ -26,9 +26,34 @@ import {
   recordEnrollmentOperation,
   setSchoolBranchStatus,
   setAcademicYearStatus,
+  setClassLevelStatus,
   updateSectionAssignment,
   updateSubjectTeacher,
 } from "./management-actions";
+
+export function ClassLevelStatusForm({
+  classLevelId,
+  status,
+}: {
+  classLevelId: number;
+  status: string;
+}) {
+  return (
+    <ActionForm
+      title={status === "active" ? "Archive class" : "Restore class"}
+      action={setClassLevelStatus}
+      submitLabel={status === "active" ? "Archive class" : "Restore class"}
+    >
+      <input type="hidden" name="classLevelId" value={classLevelId} />
+      <input type="hidden" name="status" value={status === "active" ? "archived" : "active"} />
+      <p className="text-sm text-slate-600">
+        {status === "active"
+          ? "Archiving hides this class from new placements and fee setup, while keeping its sections, student history, and invoices."
+          : "Restoring makes this class available for new placements and fee setup again."}
+      </p>
+    </ActionForm>
+  );
+}
 
 export function AcademicYearStatusForm({ years }: { years: Option[] }) {
   return (

@@ -18,6 +18,8 @@ describe("fees policies", () => {
   });
 
   it("caps fixed and percentage discounts at the fee amount", () => {
+    expect(calculateDiscountMinorUnits(10000, "fixed", "15.50")).toBe(1550);
+    expect(calculateDiscountMinorUnits(5, "percentage", "10.00")).toBe(1);
     expect(calculateDiscountMinorUnits(10000, "fixed", 15.5)).toBe(1550);
     expect(calculateDiscountMinorUnits(10000, "percentage", 12.5)).toBe(1250);
     expect(calculateDiscountMinorUnits(1, "percentage", 50)).toBe(1);

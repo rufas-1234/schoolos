@@ -1,5 +1,6 @@
 import { and, asc, countDistinct, desc, eq, inArray, ne } from "drizzle-orm";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { db } from "@/db";
 import { CalendarDays } from "lucide-react";
 import {
@@ -57,6 +58,7 @@ import {
   ClassRoutineList,
   EnrollmentOperationForm,
   EnrollmentRecordList,
+  ClassLevelStatusForm,
   SchoolBranchForm,
   SchoolBranchList,
   SectionAssignmentForm,
@@ -109,6 +111,7 @@ export default async function AcademicStructurePage({
     terms,
     classes,
     classStudentCounts,
+    sectionStudentCounts,
     sections,
     schoolSubjects,
     subjectAssignments,
@@ -159,6 +162,7 @@ export default async function AcademicStructurePage({
         id: classLevels.id,
         name: classLevels.name,
         code: classLevels.code,
+        status: classLevels.status,
         branchId: classLevels.branchId,
         branchName: schoolBranches.name,
       })
@@ -194,12 +198,38 @@ export default async function AcademicStructurePage({
       .groupBy(classSections.classLevelId),
     db
       .select({
+        classSectionId: classSections.id,
+        studentCount: countDistinct(students.id),
+      })
+      .from(studentEnrollments)
+      .innerJoin(students, and(
+        eq(studentEnrollments.studentId, students.id),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSections, and(
+        eq(studentEnrollments.classSectionId, classSections.id),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(academicYears, and(
+        eq(studentEnrollments.academicYearId, academicYears.id),
+        eq(academicYears.id, classSections.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+      ))
+      .groupBy(classSections.id),
+    db
+      .select({
         id: classSections.id,
         name: classSections.name,
         yearName: academicYears.name,
         yearStatus: academicYears.status,
         academicYearId: classSections.academicYearId,
         classLevelId: classSections.classLevelId,
+        classStatus: classLevels.status,
         className: classLevels.name,
         branchId: classLevels.branchId,
         branchName: schoolBranches.name,
@@ -292,6 +322,7 @@ export default async function AcademicStructurePage({
         endsAt: classRoutines.endsAt,
         branchId: classLevels.branchId,
         classLevelId: classLevels.id,
+        classStatus: classLevels.status,
         classSectionId: classSections.id,
         branchName: schoolBranches.name,
         yearName: academicYears.name,
@@ -398,6 +429,10 @@ export default async function AcademicStructurePage({
   const studentCountByClass = new Map(
     classStudentCounts.map((entry) => [entry.classLevelId, entry.studentCount]),
   );
+  const studentCountBySection = new Map(
+    sectionStudentCounts.map((entry) => [entry.classSectionId, entry.studentCount]),
+  );
+  const activeAcademicYear = years.find((year) => year.status === "active");
   const attendanceRoster =
     sectionId === "attendance" && activeAttendanceSection && canViewAttendance
       ? await db
@@ -443,7 +478,7 @@ export default async function AcademicStructurePage({
     .filter((year) => year.status !== "archived")
     .map((year) => ({ id: year.id, label: `${year.name} · ${year.status}` }));
   const allYearOptions = years.map((year) => ({ id: year.id, label: `${year.name} · ${year.status}` }));
-  const classOptions = classes.map((classLevel) => ({
+  const classOptions = classes.filter((classLevel) => classLevel.status === "active").map((classLevel) => ({
     id: classLevel.id,
     label: `${classLevel.branchName} · ${classLevel.name} (${classLevel.code})`,
   }));
@@ -457,7 +492,7 @@ export default async function AcademicStructurePage({
       id: teacher.id,
       label: `${teacher.branchName} · ${teacher.firstName} ${teacher.lastName}${teacher.employeeCode ? ` · ${teacher.employeeCode}` : ""}`,
     }));
-  const sectionOptions = sections.map((section) => ({
+  const sectionOptions = sections.filter((section) => section.classStatus === "active").map((section) => ({
     id: section.id,
     label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
   }));
@@ -469,7 +504,7 @@ export default async function AcademicStructurePage({
     id: room.id,
     label: `${room.branchName} · ${room.roomNumber} · capacity ${room.capacity}`,
   }));
-  const classFilterOptions = classes.map((classLevel) => ({
+  const classFilterOptions = classes.filter((classLevel) => classLevel.status === "active").map((classLevel) => ({
     id: classLevel.id,
     branchId: classLevel.branchId,
     label: `${classLevel.branchName} · ${classLevel.name}`,
@@ -512,14 +547,14 @@ export default async function AcademicStructurePage({
     ...branchFilters,
     ...classFilters,
   ];
-  const sectionFilterOptions = sections.map((section) => ({
+  const sectionFilterOptions = sections.filter((section) => section.classStatus === "active").map((section) => ({
     id: section.id,
     branchId: section.branchId,
     classLevelId: section.classLevelId,
     label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
   }));
   const activeSectionOptions = sections
-    .filter((section) => section.yearStatus === "active")
+    .filter((section) => section.yearStatus === "active" && section.classStatus === "active")
     .map((section) => ({
       id: section.id,
       label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
@@ -687,6 +722,7 @@ export default async function AcademicStructurePage({
                   { key: "branch", label: "Branch" },
                   { key: "name", label: "Class" },
                   { key: "code", label: "Code" },
+                  { key: "status", label: "Status" },
                   { key: "studentCount", label: "Students enrolled" },
                 ]}
                 empty="No classes yet."
@@ -702,9 +738,25 @@ export default async function AcademicStructurePage({
                     branch: classLevel.branchName,
                     name: classLevel.name,
                     code: classLevel.code,
+                    status: classLevel.status,
                     studentCount: String(studentCountByClass.get(classLevel.id) ?? 0),
                     branchId: String(classLevel.branchId),
                   },
+                  actions: (
+                    <>
+                      {activeAcademicYear && (
+                        <Link
+                          href={`/admin/academics/rosters/print?classLevelId=${classLevel.id}&academicYearId=${activeAcademicYear.id}`}
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Print roster
+                        </Link>
+                      )}
+                      <AdminRecordDialog title={classLevel.status === "active" ? "Archive class" : "Restore class"}>
+                        <ClassLevelStatusForm classLevelId={classLevel.id} status={classLevel.status} />
+                      </AdminRecordDialog>
+                    </>
+                  ),
                   editForm: (
                     <ClassLevelForm
                       branches={allBranchOptions}
@@ -732,6 +784,7 @@ export default async function AcademicStructurePage({
                   { key: "class", label: "Class" },
                   { key: "section", label: "Section name" },
                   { key: "year", label: "Academic year" },
+                  { key: "students", label: "Students enrolled" },
                   { key: "capacity", label: "Capacity" },
                   { key: "teacher", label: "Class teacher" },
                 ]}
@@ -754,6 +807,7 @@ export default async function AcademicStructurePage({
                     class: section.className,
                     section: section.name,
                     year: section.yearName,
+                    students: String(studentCountBySection.get(section.id) ?? 0),
                     capacity: section.capacity === null ? "Unlimited" : String(section.capacity),
                     teacher: section.teacherFirstName
                       ? `${section.teacherFirstName} ${section.teacherLastName}`
@@ -762,6 +816,14 @@ export default async function AcademicStructurePage({
                     classLevelId: String(section.classLevelId),
                     academicYearId: String(section.academicYearId),
                   },
+                  actions: (
+                    <Link
+                      href={`/admin/academics/rosters/print?sectionId=${section.id}&academicYearId=${section.academicYearId}`}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Print roster
+                    </Link>
+                  ),
                   editForm: (
                     <div className="space-y-3">
                       <ClassSectionForm years={allYearOptions} classes={classOptions} record={section} />
