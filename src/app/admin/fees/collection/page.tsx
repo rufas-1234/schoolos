@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { AdminRecordDialog } from "@/components/admin-data-table";
+import { AdminActionDialog, AdminRecordDialog } from "@/components/admin-data-table";
 import Link from "next/link";
 import { db } from "@/db";
 import {
@@ -26,7 +26,7 @@ import {
 } from "@/lib/fees-policy";
 import type { SearchableSelectOption } from "@/components/searchable-select";
 import { FeeInvoiceFilters } from "./fee-invoice-filters";
-import { EditFeeInvoiceForm, RecordFeePaymentForm } from "../fee-forms";
+import { EditFeeInvoiceForm, RecordFeePaymentForm, type FeeOption } from "../fee-forms";
 
 type SearchParams = {
   search?: string | string[];
@@ -201,7 +201,7 @@ export default async function FeeCollectionPage({
     parseMoneyToMinorUnits(payment.amount ?? "0") ?? 0,
   ]));
   const today = todayInTimezone(school?.timezone ?? "UTC");
-  const rows = invoices.map((invoice) => {
+  const invoiceRows = invoices.map((invoice) => {
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
     const fine = today > invoice.dueDate
@@ -216,7 +216,8 @@ export default async function FeeCollectionPage({
       balance: totalDue - paid,
       status: feeInvoiceStatus(totalDue, paid) ?? "unpaid",
     };
-  }).filter((invoice) => !statusFilter || invoice.status === statusFilter);
+  });
+  const rows = invoiceRows.filter((invoice) => !statusFilter || invoice.status === statusFilter);
   const currency = school?.currency ?? "";
   const branchOptions: SearchableSelectOption[] = [
     { value: "", label: "All branches" },
@@ -234,6 +235,12 @@ export default async function FeeCollectionPage({
     })),
   ];
   const totalOutstanding = rows.reduce((total, invoice) => total + Math.max(0, invoice.balance), 0);
+  const payableInvoices: FeeOption[] = invoiceRows
+    .filter((invoice) => invoice.balance > 0)
+    .map((invoice) => ({
+      id: invoice.id,
+      label: `${invoice.invoiceNumber} · ${invoice.studentName} ${invoice.studentLastName} · ${currency} ${money(invoice.balance)} due`,
+    }));
 
   return (
     <div className="space-y-6">
@@ -246,16 +253,25 @@ export default async function FeeCollectionPage({
         <Link href="/admin/fees" className="text-sm font-semibold text-violet-700 hover:text-violet-900">Fee setup</Link>
       </header>
 
-      <FeeInvoiceFilters
-        search={search}
-        branches={branchOptions}
-        classes={classOptions}
-        sections={sectionOptions}
-        selectedBranch={requestedBranch === null ? "" : String(requestedBranch)}
-        selectedClass={requestedClass === null ? "" : String(requestedClass)}
-        selectedSection={requestedSection === null ? "" : String(requestedSection)}
-        selectedStatus={statusFilter}
-      />
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+        <FeeInvoiceFilters
+          search={search}
+          branches={branchOptions}
+          classes={classOptions}
+          sections={sectionOptions}
+          selectedBranch={requestedBranch === null ? "" : String(requestedBranch)}
+          selectedClass={requestedClass === null ? "" : String(requestedClass)}
+          selectedSection={requestedSection === null ? "" : String(requestedSection)}
+          selectedStatus={statusFilter}
+        />
+        <AdminActionDialog label="Quick add payment" title="Quick add payment">
+          <RecordFeePaymentForm
+            currency={currency}
+            idempotencyKey={randomUUID()}
+            invoices={payableInvoices}
+          />
+        </AdminActionDialog>
+      </div>
       {(requestedClass !== null || requestedSection !== null) && (
         <Link
           href={`/admin/fees/invoices/print?${requestedSection !== null ? `sectionId=${requestedSection}` : `classLevelId=${requestedClass}`}`}

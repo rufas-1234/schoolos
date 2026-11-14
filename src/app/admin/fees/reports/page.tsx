@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, lt, lte, sql, sum } from "drizzle-orm
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { db } from "@/db";
+import { PrintButton } from "@/components/print-button";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 import {
   academicYears,
@@ -419,13 +420,16 @@ export default async function FeeReportsPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-sm font-semibold text-violet-700">Finance</p>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee reports</h1>
-        <p className="mt-2 text-sm text-slate-600">Review payments, reversals, refunds, fines and outstanding balances by date, branch and class.</p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-violet-700 print:text-black">Finance</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee reports</h1>
+          <p className="mt-2 text-sm text-slate-600">Review payments, reversals, refunds, fines and outstanding balances by date, branch and class.</p>
+        </div>
+        <PrintButton label="Print report" />
       </header>
 
-      <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
+      <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
         <label className="text-sm font-medium text-slate-700">From
           <input type="date" name="from" defaultValue={from} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
@@ -458,7 +462,8 @@ export default async function FeeReportsPage({
         </div>
       </form>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <p className="hidden text-sm text-slate-600 print:block">Reporting period: {from} through {to}</p>
+      <section className="grid gap-4 sm:grid-cols-3 print:grid-cols-3">
         <SummaryCard label="Collected in period" value={`${currency} ${money(totalCollected)}`} />
         <SummaryCard label="Fines collected" value={`${currency} ${money(totalFines)}`} />
         <SummaryCard label="Outstanding due in period" value={`${currency} ${money(totalOutstanding)}`} />
@@ -554,14 +559,14 @@ function ReportTable({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white print:overflow-visible print:break-inside-avoid">
       <div className="p-5">
         <h2 className="font-semibold text-slate-900">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
       {hasRows ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left text-sm">
+        <div className="overflow-x-auto print:overflow-visible">
+          <table className="w-full min-w-[860px] text-left text-sm print:min-w-0 print:text-xs">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>{headings.map((heading) => <th key={heading} className="px-4 py-3 font-semibold">{heading}</th>)}</tr>
             </thead>

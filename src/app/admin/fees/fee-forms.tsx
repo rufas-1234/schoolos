@@ -4,8 +4,14 @@ import { useActionState, type ReactNode } from "react";
 import Link from "next/link";
 import { SearchableSelect } from "@/components/searchable-select";
 import { RequiredMark } from "@/components/required-mark";
+import { AdminDeleteButton } from "@/components/admin-data-table";
 import {
   assignStudentFeeDiscount,
+  deleteFeeDiscount,
+  deleteFeeGroup,
+  deleteFeeStructure,
+  deleteFeeType,
+  deleteStudentFeeDiscount,
   createFeeDiscount,
   createFeeGroup,
   createFeeStructure,
@@ -19,6 +25,10 @@ import {
 
 export type FeeOption = { id: number; label: string };
 type ValueOption = { value: string; label: string };
+type FeeDeleteAction = (
+  state: FeeActionState,
+  formData: FormData,
+) => Promise<FeeActionState>;
 
 function ActionForm({
   action,
@@ -121,6 +131,32 @@ function ValueSelectField({
   defaultValue?: string;
 }) {
   return <SearchableSelect label={label} name={name} options={options} defaultValue={defaultValue} placeholder="Search or choose..." required />;
+}
+
+export function DeleteFeeRecordForm({
+  recordId,
+  recordType,
+}: {
+  recordId: number;
+  recordType: "group" | "type" | "discount" | "student-discount" | "structure";
+}) {
+  const action: FeeDeleteAction = {
+    group: deleteFeeGroup,
+    type: deleteFeeType,
+    discount: deleteFeeDiscount,
+    "student-discount": deleteStudentFeeDiscount,
+    structure: deleteFeeStructure,
+  }[recordType];
+  const [state, formAction, pending] = useActionState(action, {});
+  return (
+    <form action={formAction} className="flex items-center gap-2">
+      <input type="hidden" name="recordId" value={recordId} />
+      <AdminDeleteButton label="Delete fee record" />
+      {pending && <span className="text-xs text-slate-500">Deleting...</span>}
+      {state.error && <p role="alert" className="text-xs text-rose-600">{state.error}</p>}
+      {state.message && <p role="status" className="text-xs text-emerald-700">{state.message}</p>}
+    </form>
+  );
 }
 
 export function FeeGroupForm({
@@ -336,17 +372,27 @@ export function RecordFeePaymentForm({
   maxAmount,
   currency,
   idempotencyKey,
+  invoices,
 }: {
-  invoiceId: number;
-  maxAmount: string;
+  invoiceId?: number;
+  maxAmount?: string;
   currency: string;
   idempotencyKey: string;
+  invoices?: FeeOption[];
 }) {
   return (
-    <ActionForm action={recordFeePayment} title="Record payment" submitLabel="Record payment">
-      <input type="hidden" name="invoiceId" value={invoiceId} />
+    <ActionForm
+      action={recordFeePayment}
+      title={invoices ? "Quick add payment" : "Record payment"}
+      submitLabel={invoices ? "Add payment" : "Record payment"}
+    >
+      {invoices ? (
+        <SelectField label="Invoice" name="invoiceId" options={invoices} />
+      ) : (
+        <input type="hidden" name="invoiceId" value={invoiceId} />
+      )}
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-      <Field label={`Amount (${currency})`} name="amount" type="number" placeholder={maxAmount} />
+      <Field label={`Amount (${currency})`} name="amount" type="number" placeholder={maxAmount ?? "Enter payment amount"} />
       <ValueSelectField label="Payment method" name="paymentMethod" options={[
         { value: "cash", label: "Cash" },
         { value: "bank_transfer", label: "Bank transfer" },
@@ -357,7 +403,7 @@ export function RecordFeePaymentForm({
       ]} />
       <Field label="Reference" name="reference" required={false} placeholder="Receipt or transaction reference" />
       <Field label="Notes" name="notes" required={false} />
-      <p className="text-xs text-slate-500">Outstanding balance: {currency} {maxAmount}</p>
+      {maxAmount && <p className="text-xs text-slate-500">Outstanding balance: {currency} {maxAmount}</p>}
     </ActionForm>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { ChevronDown } from "lucide-react";
 import { RequiredMark } from "@/components/required-mark";
 
 export type SearchableSelectOption = {
@@ -38,8 +39,9 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+  const filterQuery = open && selectedValue && query === selectedOption?.label ? "" : query;
   const filteredOptions = options
-    .filter((option) => option.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    .filter((option) => option.label.toLocaleLowerCase().includes(filterQuery.trim().toLocaleLowerCase()))
     .slice(0, 40);
 
   function choose(option: SearchableSelectOption) {
@@ -90,7 +92,10 @@ export function SearchableSelect({
         aria-controls={open ? listId : undefined}
         aria-activedescendant={activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined}
         placeholder={placeholder}
-        onFocus={() => setOpen(true)}
+        onFocus={(event) => {
+          setOpen(true);
+          if (selectedValue) event.currentTarget.select();
+        }}
         onBlur={() => setOpen(false)}
         onKeyDown={handleKeyDown}
         onChange={(event) => {
@@ -99,8 +104,21 @@ export function SearchableSelect({
           setActiveIndex(-1);
           setOpen(true);
         }}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-10 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
       />
+      <button
+        type="button"
+        aria-label={`${label} dropdown`}
+        aria-expanded={open}
+        onPointerDown={(event) => event.preventDefault()}
+        onClick={() => {
+          setOpen((value) => !value);
+          inputRef.current?.focus();
+        }}
+        className="absolute right-2 top-8 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+      >
+        <ChevronDown size={16} aria-hidden="true" />
+      </button>
       {open && (
         <div
           id={listId}
@@ -115,7 +133,7 @@ export function SearchableSelect({
               type="button"
               role="option"
               aria-selected={selectedValue === option.value}
-              onMouseDown={(event) => event.preventDefault()}
+              onPointerDown={(event) => event.preventDefault()}
               onMouseEnter={() => setActiveIndex(index)}
               onClick={() => choose(option)}
               className={`w-full rounded-lg px-3 py-2 text-left text-sm ${

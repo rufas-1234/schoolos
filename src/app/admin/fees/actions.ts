@@ -136,6 +136,122 @@ function duplicateError(label: string): FeeActionState {
   return { error: `A ${label} with those details already exists.` };
 }
 
+type FeeRecordType = "group" | "type" | "discount" | "student-discount" | "structure";
+
+async function deleteFeeRecord(
+  type: FeeRecordType,
+  formData: FormData,
+): Promise<FeeActionState> {
+  const context = await requireSchoolPermission("fees.manage");
+  const recordId = idField.safeParse(value(formData, "recordId"));
+  if (!recordId.success) return { error: "Select a valid fee record." };
+  const outcome = await db.transaction(async (tx) => {
+    if (type === "group") {
+      const [record] = await tx.select({ publicId: feeGroups.publicId }).from(feeGroups)
+        .where(and(eq(feeGroups.id, recordId.data), eq(feeGroups.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return "not-found";
+      const [linked] = await tx.select({ id: feeTypes.id }).from(feeTypes)
+        .where(and(eq(feeTypes.schoolId, context.schoolId), eq(feeTypes.feeGroupId, recordId.data))).limit(1);
+      const [structured] = await tx.select({ id: feeStructures.id }).from(feeStructures)
+        .where(and(eq(feeStructures.schoolId, context.schoolId), eq(feeStructures.feeGroupId, recordId.data))).limit(1);
+      if (linked || structured) return "in-use";
+      await tx.delete(feeGroups).where(and(eq(feeGroups.id, recordId.data), eq(feeGroups.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "fee_group.deleted", "fee_group", record.publicId, ["deleted"]);
+    } else if (type === "type") {
+      const [record] = await tx.select({ publicId: feeTypes.publicId }).from(feeTypes)
+        .where(and(eq(feeTypes.id, recordId.data), eq(feeTypes.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return "not-found";
+      const [linked] = await tx.select({ id: feeStructures.id }).from(feeStructures)
+        .where(and(eq(feeStructures.schoolId, context.schoolId), eq(feeStructures.feeTypeId, recordId.data))).limit(1);
+      const [assigned] = await tx.select({ id: studentFeeDiscounts.id }).from(studentFeeDiscounts)
+        .where(and(eq(studentFeeDiscounts.schoolId, context.schoolId), eq(studentFeeDiscounts.feeTypeId, recordId.data))).limit(1);
+      if (linked || assigned) return "in-use";
+      await tx.delete(feeTypes).where(and(eq(feeTypes.id, recordId.data), eq(feeTypes.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "fee_type.deleted", "fee_type", record.publicId, ["deleted"]);
+    } else if (type === "discount") {
+      const [record] = await tx.select({ publicId: feeDiscounts.publicId }).from(feeDiscounts)
+        .where(and(eq(feeDiscounts.id, recordId.data), eq(feeDiscounts.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return "not-found";
+      const [assigned] = await tx.select({ id: studentFeeDiscounts.id }).from(studentFeeDiscounts)
+        .where(and(eq(studentFeeDiscounts.schoolId, context.schoolId), eq(studentFeeDiscounts.discountId, recordId.data))).limit(1);
+      const [invoiced] = await tx.select({ id: studentFeeInvoices.id }).from(studentFeeInvoices)
+        .where(and(eq(studentFeeInvoices.schoolId, context.schoolId), eq(studentFeeInvoices.discountId, recordId.data))).limit(1);
+      if (assigned || invoiced) return "in-use";
+      await tx.delete(feeDiscounts).where(and(eq(feeDiscounts.id, recordId.data), eq(feeDiscounts.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "fee_discount.deleted", "fee_discount", record.publicId, ["deleted"]);
+    } else if (type === "student-discount") {
+      const [record] = await tx.select({
+        publicId: studentFeeDiscounts.publicId,
+        discountId: studentFeeDiscounts.discountId,
+        studentId: studentFeeDiscounts.studentId,
+        feeTypeId: studentFeeDiscounts.feeTypeId,
+      }).from(studentFeeDiscounts)
+        .where(and(eq(studentFeeDiscounts.id, recordId.data), eq(studentFeeDiscounts.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return "not-found";
+      const [invoiced] = await tx.select({ id: studentFeeInvoices.id })
+        .from(studentFeeInvoices)
+        .innerJoin(feeStructures, and(
+          eq(feeStructures.id, studentFeeInvoices.feeStructureId),
+          eq(feeStructures.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(studentFeeInvoices.schoolId, context.schoolId),
+          eq(studentFeeInvoices.discountId, record.discountId),
+          eq(studentFeeInvoices.studentId, record.studentId),
+          eq(feeStructures.feeTypeId, record.feeTypeId),
+        )).limit(1);
+      if (invoiced) return "in-use";
+      await tx.delete(studentFeeDiscounts).where(and(
+        eq(studentFeeDiscounts.id, recordId.data),
+        eq(studentFeeDiscounts.schoolId, context.schoolId),
+      ));
+      await writeAudit(tx, context.schoolId, context.user.id, "student_fee_discount.deleted", "student_fee_discount", record.publicId, ["deleted"]);
+    } else {
+      const [record] = await tx.select({ publicId: feeStructures.publicId }).from(feeStructures)
+        .where(and(eq(feeStructures.id, recordId.data), eq(feeStructures.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return "not-found";
+      const [invoiced] = await tx.select({ id: studentFeeInvoices.id }).from(studentFeeInvoices)
+        .where(and(eq(studentFeeInvoices.schoolId, context.schoolId), eq(studentFeeInvoices.feeStructureId, recordId.data))).limit(1);
+      if (invoiced) return "in-use";
+      await tx.delete(feeStructures).where(and(
+        eq(feeStructures.id, recordId.data),
+        eq(feeStructures.schoolId, context.schoolId),
+      ));
+      await writeAudit(tx, context.schoolId, context.user.id, "fee_structure.deleted", "fee_structure", record.publicId, ["deleted"]);
+    }
+    return "deleted";
+  });
+  if (outcome === "not-found") return { error: "Fee record not found for this school." };
+  if (outcome === "in-use") return { error: "This fee record is referenced by other setup or financial records and cannot be deleted. Edit it instead so financial history stays intact." };
+  revalidateFees();
+  return { success: true, message: "Fee record deleted." };
+}
+
+export async function deleteFeeGroup(_previousState: FeeActionState, formData: FormData) {
+  return deleteFeeRecord("group", formData);
+}
+
+export async function deleteFeeType(_previousState: FeeActionState, formData: FormData) {
+  return deleteFeeRecord("type", formData);
+}
+
+export async function deleteFeeDiscount(_previousState: FeeActionState, formData: FormData) {
+  return deleteFeeRecord("discount", formData);
+}
+
+export async function deleteStudentFeeDiscount(_previousState: FeeActionState, formData: FormData) {
+  return deleteFeeRecord("student-discount", formData);
+}
+
+export async function deleteFeeStructure(_previousState: FeeActionState, formData: FormData) {
+  return deleteFeeRecord("structure", formData);
+}
+
 export async function createFeeGroup(
   _previousState: FeeActionState,
   formData: FormData,

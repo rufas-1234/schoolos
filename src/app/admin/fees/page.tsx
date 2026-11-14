@@ -18,6 +18,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import {
   FeeDiscountForm,
+  DeleteFeeRecordForm,
   FeeGroupForm,
   FeeStructureForm,
   FeeTypeForm,
@@ -234,14 +235,20 @@ export default async function FeesSetupPage() {
                   {assignment.studentName} {assignment.studentLastName} · {assignment.feeTypeName} · {assignment.discountName}
                   {assignment.note ? <span className="block text-xs text-slate-500">{assignment.note}</span> : null}
                 </span>
-                <AdminRecordDialog title={`Edit ${assignment.studentName}'s discount`}>
-                  <StudentFeeDiscountForm
-                    students={studentsForDiscounts}
-                    discounts={discountOptions}
-                    feeTypes={typeOptions}
-                    record={assignment}
-                  />
-                </AdminRecordDialog>
+                <div className="flex items-center gap-2">
+                  <AdminRecordDialog title={`${assignment.studentName}'s discount`} mode="view">
+                    <RecordDetails entries={[
+                      ["Student", `${assignment.studentName} ${assignment.studentLastName}`],
+                      ["Fee type", assignment.feeTypeName],
+                      ["Discount / scholarship", assignment.discountName],
+                      ["Note", assignment.note || "None"],
+                    ]} />
+                  </AdminRecordDialog>
+                  <AdminRecordDialog title={`Edit ${assignment.studentName}'s discount`}>
+                    <StudentFeeDiscountForm students={studentsForDiscounts} discounts={discountOptions} feeTypes={typeOptions} record={assignment} />
+                  </AdminRecordDialog>
+                  <DeleteFeeRecordForm recordId={assignment.id} recordType="student-discount" />
+                </div>
               </li>
             ))}
           </ul>
@@ -263,18 +270,23 @@ export default async function FeesSetupPage() {
                     <p className="mt-1 text-slate-500">{structure.groupName} / {structure.typeName} · due {structure.dueDate}</p>
                   </div>
                   <p className="font-semibold text-slate-800">{school?.currency} {structure.amount}</p>
-                  <AdminRecordDialog title={`Edit ${structure.typeName} fee structure`} wide>
-                    <FeeStructureForm
-                      branches={branchOptions}
-                      years={yearOptions}
-                      terms={termOptions}
-                      students={studentsForDiscounts}
-                      classes={classOptions}
-                      groups={groupOptions}
-                      types={typeOptions}
-                      record={structure}
-                    />
-                  </AdminRecordDialog>
+                  <div className="flex items-center gap-2">
+                    <AdminRecordDialog title={`${structure.typeName} fee structure`} mode="view">
+                      <RecordDetails entries={[
+                        ["Branch / class", `${structure.branchName} / ${structure.className}`],
+                        ["Academic year / term", `${structure.yearName}${structure.termName ? ` / ${structure.termName}` : ""}`],
+                        ["Student", structure.studentName ? `${structure.studentName} ${structure.studentLastName}` : "Whole class"],
+                        ["Fee group / type", `${structure.groupName} / ${structure.typeName}`],
+                        ["Amount", `${school?.currency ?? ""} ${structure.amount}`],
+                        ["Due date", structure.dueDate],
+                        ["Late fine", `${structure.fineType} · ${structure.fineValue}`],
+                      ]} />
+                    </AdminRecordDialog>
+                    <AdminRecordDialog title={`Edit ${structure.typeName} fee structure`} wide>
+                      <FeeStructureForm branches={branchOptions} years={yearOptions} terms={termOptions} students={studentsForDiscounts} classes={classOptions} groups={groupOptions} types={typeOptions} record={structure} />
+                    </AdminRecordDialog>
+                    <DeleteFeeRecordForm recordId={structure.id} recordType="structure" />
+                  </div>
                 </div>
               ))}
             </div>
@@ -290,9 +302,11 @@ export default async function FeesSetupPage() {
           {groups.map((group) => (
             <li key={group.id} className="flex items-center justify-between gap-2">
               <span>{group.name}</span>
-              <AdminRecordDialog title={`Edit ${group.name}`}>
-                <FeeGroupForm record={group} />
-              </AdminRecordDialog>
+              <div className="flex items-center gap-2">
+                <AdminRecordDialog title={group.name} mode="view"><RecordDetails entries={[["Name", group.name], ["Description", group.description || "None"]]} /></AdminRecordDialog>
+                <AdminRecordDialog title={`Edit ${group.name}`}><FeeGroupForm record={group} /></AdminRecordDialog>
+                <DeleteFeeRecordForm recordId={group.id} recordType="group" />
+              </div>
             </li>
           ))}
         </CatalogCard>
@@ -300,9 +314,11 @@ export default async function FeesSetupPage() {
           {types.map((type) => (
             <li key={type.id} className="flex items-center justify-between gap-2">
               <span>{type.groupName} / {type.name}</span>
-              <AdminRecordDialog title={`Edit ${type.name}`}>
-                <FeeTypeForm groups={groupOptions} record={type} />
-              </AdminRecordDialog>
+              <div className="flex items-center gap-2">
+                <AdminRecordDialog title={type.name} mode="view"><RecordDetails entries={[["Name", type.name], ["Fee group", type.groupName], ["Description", type.description || "None"]]} /></AdminRecordDialog>
+                <AdminRecordDialog title={`Edit ${type.name}`}><FeeTypeForm groups={groupOptions} record={type} /></AdminRecordDialog>
+                <DeleteFeeRecordForm recordId={type.id} recordType="type" />
+              </div>
             </li>
           ))}
         </CatalogCard>
@@ -312,14 +328,36 @@ export default async function FeesSetupPage() {
               <span>
                 {discount.name} · {discount.discountType === "percentage" ? `${discount.value}%` : `${school?.currency ?? ""} ${discount.value}`}
               </span>
-              <AdminRecordDialog title={`Edit ${discount.name}`}>
-                <FeeDiscountForm record={discount} />
-              </AdminRecordDialog>
+              <div className="flex items-center gap-2">
+                <AdminRecordDialog title={discount.name} mode="view">
+                  <RecordDetails entries={[
+                    ["Name / code", `${discount.name} / ${discount.code}`],
+                    ["Method / value", `${discount.discountType} / ${discount.value}`],
+                    ["Frequency", discount.frequency.replace("_", " ")],
+                    ["Description", discount.description || "None"],
+                  ]} />
+                </AdminRecordDialog>
+                <AdminRecordDialog title={`Edit ${discount.name}`}><FeeDiscountForm record={discount} /></AdminRecordDialog>
+                <DeleteFeeRecordForm recordId={discount.id} recordType="discount" />
+              </div>
             </li>
           ))}
         </CatalogCard>
       </section>
     </div>
+  );
+}
+
+function RecordDetails({ entries }: { entries: [string, string][] }) {
+  return (
+    <dl className="grid gap-4 sm:grid-cols-2">
+      {entries.map(([label, value]) => (
+        <div key={label} className="border-b border-slate-100 pb-3">
+          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+          <dd className="mt-1 text-sm text-slate-900">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

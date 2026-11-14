@@ -33,6 +33,7 @@ type NavigationChild = {
   matchPath?: string;
   matchQuery?: { key: string; value: string | null };
   permission?: string;
+  permissionAlternatives?: readonly string[];
 };
 
 type NavigationItem = {
@@ -76,24 +77,28 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    href: "/admin/fees",
-    label: "Fee setup",
-    icon: CircleDollarSign,
-    permission: "fees.manage",
-  },
-  {
     href: "/admin/fees/collection",
-    label: "Fee collection",
+    label: "Student finances",
     icon: CircleDollarSign,
     permission: "fees.manage",
     permissionAlternatives: ["payments.record"],
-  },
-  {
-    href: "/admin/fees/reports",
-    label: "Fee reports",
-    icon: CircleDollarSign,
-    permission: "fees.manage",
-    permissionAlternatives: ["payments.record"],
+    children: [
+      { id: "fee-setup", label: "Fee setup", href: "/admin/fees", permission: "fees.manage" },
+      {
+        id: "fee-collection",
+        label: "Fee collection",
+        href: "/admin/fees/collection",
+        permission: "payments.record",
+        permissionAlternatives: ["fees.manage"],
+      },
+      {
+        id: "fee-reports",
+        label: "Fee reports",
+        href: "/admin/fees/reports",
+        permission: "payments.record",
+        permissionAlternatives: ["fees.manage"],
+      },
+    ],
   },
   {
     href: "/admin/settings",
@@ -157,6 +162,9 @@ export function AdminShell({
   const [humanResourcesOpen, setHumanResourcesOpen] = useState(() =>
     pathname.startsWith("/admin/hr"),
   );
+  const [studentFinancesOpen, setStudentFinancesOpen] = useState(() =>
+    pathname.startsWith("/admin/fees"),
+  );
   const router = useRouter();
   const visibleNavigation = navigation.filter((item) =>
     permissions.includes(item.permission) ||
@@ -192,12 +200,17 @@ export function AdminShell({
   const activeHrSection = navigation
     .find((item) => item.href === "/admin/hr")
     ?.children?.find((section) => section.href === pathname);
+  const activeFinanceSection = navigation
+    .find((item) => item.label === "Student finances")
+    ?.children?.find((section) => section.href === pathname);
   const pageLabel = pathname.startsWith("/admin/academics")
     ? activeSection?.label ?? "Academics"
     : pathname.startsWith("/admin/students")
       ? activeStudentSection?.label ?? "Student Info"
       : pathname.startsWith("/admin/hr")
         ? activeHrSection?.label ?? "Human resources"
+        : pathname.startsWith("/admin/fees")
+          ? activeFinanceSection?.label ?? "Student finances"
       : visibleNavigation.find(
         (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
       )?.label ?? "Workspace";
@@ -247,23 +260,31 @@ export function AdminShell({
           );
           const active =
             pathname === href ||
-            (pathname.startsWith(`${href}/`) && !nestedNavigationActive);
+            (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
+            (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees"));
           if (children) {
             const visibleSections = children.filter(
-              (section) => !section.permission || permissions.includes(section.permission),
+              (section) =>
+                (!section.permission || permissions.includes(section.permission)) ||
+                (section.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false),
             );
             const isStudentInfo = href === "/admin/students";
             const isHumanResources = href === "/admin/hr";
+            const isStudentFinances = href === "/admin/fees/collection";
             const sectionOpen = isStudentInfo
               ? studentInfoOpen
               : isHumanResources
                 ? humanResourcesOpen
-                : academicsOpen;
+                : isStudentFinances
+                  ? studentFinancesOpen
+                  : academicsOpen;
             const setSectionOpen = isStudentInfo
               ? setStudentInfoOpen
               : isHumanResources
                 ? setHumanResourcesOpen
-                : setAcademicsOpen;
+                : isStudentFinances
+                  ? setStudentFinancesOpen
+                  : setAcademicsOpen;
             const activeChild = visibleSections.find((section) => {
               if (!section.href) return false;
               const sectionPath = section.matchPath ?? section.href.split("?")[0];
