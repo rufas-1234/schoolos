@@ -9,6 +9,7 @@ import {
 import { db } from "@/db";
 import {
   schoolMemberships,
+  schoolBranches,
   staffDepartments,
   staffDesignations,
   staffMembers,
@@ -28,7 +29,7 @@ const employmentTypeLabels: Record<string, string> = {
 export default async function StaffDirectoryPage() {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
 
-  const [records, totals, accounts, departments, designations] = await Promise.all([
+  const [records, totals, accounts, branches, departments, designations] = await Promise.all([
     db
       .select({
         id: staffMembers.id,
@@ -36,14 +37,39 @@ export default async function StaffDirectoryPage() {
         firstName: staffMembers.firstName,
         lastName: staffMembers.lastName,
         employeeCode: staffMembers.employeeCode,
+        branchId: staffMembers.branchId,
+        personnelRole: staffMembers.personnelRole,
         jobTitle: staffMembers.jobTitle,
         department: staffMembers.department,
         email: staffMembers.email,
         phone: staffMembers.phone,
         dateOfBirth: staffMembers.dateOfBirth,
+        fatherName: staffMembers.fatherName,
+        motherName: staffMembers.motherName,
+        gender: staffMembers.gender,
+        maritalStatus: staffMembers.maritalStatus,
         address: staffMembers.address,
+        permanentAddress: staffMembers.permanentAddress,
         emergencyContactName: staffMembers.emergencyContactName,
         emergencyContactPhone: staffMembers.emergencyContactPhone,
+        drivingLicense: staffMembers.drivingLicense,
+        showAsExpert: staffMembers.showAsExpert,
+        qualification: staffMembers.qualification,
+        experience: staffMembers.experience,
+        epfNumber: staffMembers.epfNumber,
+        basicSalary: staffMembers.basicSalary,
+        contractType: staffMembers.contractType,
+        location: staffMembers.location,
+        bankAccountName: staffMembers.bankAccountName,
+        bankAccountNumber: staffMembers.bankAccountNumber,
+        bankName: staffMembers.bankName,
+        bankBranch: staffMembers.bankBranch,
+        facebookUrl: staffMembers.facebookUrl,
+        twitterUrl: staffMembers.twitterUrl,
+        linkedinUrl: staffMembers.linkedinUrl,
+        instagramUrl: staffMembers.instagramUrl,
+        documents: staffMembers.documents,
+        customFields: staffMembers.customFields,
         linkedUserId: staffMembers.linkedUserId,
         employmentType: staffMembers.employmentType,
         status: staffMembers.status,
@@ -66,6 +92,13 @@ export default async function StaffDirectoryPage() {
         eq(user.isActive, true),
       ))
       .orderBy(asc(user.name)),
+    db.select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
+      .from(schoolBranches)
+      .where(and(
+        eq(schoolBranches.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
+      ))
+      .orderBy(asc(schoolBranches.name)),
     db.select({ name: staffDepartments.name }).from(staffDepartments)
       .where(eq(staffDepartments.schoolId, context.schoolId))
       .orderBy(asc(staffDepartments.name)),
@@ -125,6 +158,7 @@ export default async function StaffDirectoryPage() {
             <AdminActionDialog label="Add staff member" title="Add staff member">
               <StaffForm
                 accounts={accounts}
+                branches={branches}
                 departmentOptions={departments.map((entry) => entry.name)}
                 designationOptions={designations.map((entry) => entry.name)}
               />
@@ -150,6 +184,7 @@ export default async function StaffDirectoryPage() {
                   <StaffForm
                     record={record}
                     accounts={accounts}
+                    branches={branches}
                     departmentOptions={departments.map((entry) => entry.name)}
                     designationOptions={designations.map((entry) => entry.name)}
                   />

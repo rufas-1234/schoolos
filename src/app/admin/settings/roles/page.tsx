@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
+import { AdminRecordDialog } from "@/components/admin-data-table";
 import { db } from "@/db";
 import {
   permissions,
@@ -9,7 +10,12 @@ import {
   userRoles,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { AccountRolesForm, CreateRoleForm } from "../role-forms";
+import {
+  AccountRolesForm,
+  CreateRoleForm,
+  DeleteRoleForm,
+  EditRoleForm,
+} from "../role-forms";
 
 export default async function UserRolesPage() {
   const context = await requireSchoolPermission("roles.manage");
@@ -61,16 +67,33 @@ export default async function UserRolesPage() {
   const rolePermissionsList = schoolRoles.length
     ? await db.select({
       roleId: rolePermissions.roleId,
+      permissionId: permissions.id,
       permission: permissions.key,
+      description: permissions.description,
     }).from(rolePermissions)
       .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
       .where(inArray(rolePermissions.roleId, schoolRoles.map((role) => role.id)))
     : [];
   const permissionsByRole = new Map<number, string[]>();
+  const permissionIdsByRole = new Map<number, number[]>();
+  const permissionDescriptions = new Map(availablePermissions.map((permission) => [
+    permission.key,
+    permission.description,
+  ]));
   for (const item of rolePermissionsList) {
     const keys = permissionsByRole.get(item.roleId) ?? [];
     keys.push(item.permission);
     permissionsByRole.set(item.roleId, keys);
+    const ids = permissionIdsByRole.get(item.roleId) ?? [];
+    ids.push(item.permissionId);
+    permissionIdsByRole.set(item.roleId, ids);
+  }
+  const assignedCountByRole = new Map<number, number>();
+  for (const assignment of assignedRoles) {
+    assignedCountByRole.set(
+      assignment.roleId,
+      (assignedCountByRole.get(assignment.roleId) ?? 0) + 1,
+    );
   }
 
   return (
@@ -88,23 +111,73 @@ export default async function UserRolesPage() {
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="font-semibold text-slate-900">Roles in {context.schoolName}</h2>
-            <p className="mt-1 text-sm text-slate-500">System roles are protected; custom roles can be added for school needs.</p>
+            <p className="mt-1 text-sm text-slate-500">View any role; edit and delete custom roles. Unassign a role from accounts before deleting it.</p>
           </div>
           <ul className="divide-y divide-slate-100">
             {schoolRoles.map((role) => (
-              <li key={role.id} className="p-5">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
+              <li key={role.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold text-slate-800">{role.name}</h3>
-                    {role.description && <p className="mt-1 text-sm text-slate-500">{role.description}</p>}
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                      {role.isSystem ? "System" : "Custom"}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                    {role.isSystem ? "System" : "Custom"}
-                  </span>
+                  {role.description && <p className="mt-1 text-sm text-slate-500">{role.description}</p>}
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {(permissionsByRole.get(role.id) ?? []).join(" · ") || "No permissions assigned"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {assignedCountByRole.get(role.id) ?? 0} active account{assignedCountByRole.get(role.id) === 1 ? "" : "s"}
+                  </p>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">
-                  {(permissionsByRole.get(role.id) ?? []).join(" · ") || "No permissions assigned"}
-                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <AdminRecordDialog mode="view" title={`View ${role.name}`}>
+                    <dl className="space-y-4">
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</dt>
+                        <dd className="mt-1 text-sm text-slate-800">{role.description || "No description"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role type</dt>
+                        <dd className="mt-1 text-sm text-slate-800">{role.isSystem ? "System role (read-only)" : "Custom role"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active account assignments</dt>
+                        <dd className="mt-1 text-sm text-slate-800">{assignedCountByRole.get(role.id) ?? 0}</dd>
+                      </div>
+                      <div>
+                        <dt className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Permissions</dt>
+                        {(permissionsByRole.get(role.id) ?? []).length ? (
+                          <ul className="space-y-2">
+                            {(permissionsByRole.get(role.id) ?? []).map((key) => (
+                              <li key={key} className="rounded-lg border border-slate-100 px-3 py-2">
+                                <p className="text-sm font-medium text-slate-800">{permissionDescriptions.get(key) ?? key}</p>
+                                <p className="mt-0.5 text-xs text-slate-500">{key}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-slate-500">No permissions assigned.</p>
+                        )}
+                      </div>
+                    </dl>
+                  </AdminRecordDialog>
+                  {!role.isSystem && (
+                    <>
+                      <AdminRecordDialog title={`Edit ${role.name}`}>
+                        <EditRoleForm
+                          role={{
+                            ...role,
+                            permissionIds: permissionIdsByRole.get(role.id) ?? [],
+                          }}
+                          permissions={availablePermissions}
+                        />
+                      </AdminRecordDialog>
+                      <DeleteRoleForm roleId={role.id} roleName={role.name} />
+                    </>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

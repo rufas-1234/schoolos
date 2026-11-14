@@ -513,6 +513,15 @@ export const classRooms = mysqlTable(
   ],
 );
 
+export type StaffStoredFile = { fileName: string; objectKey: string };
+export type StaffDocuments = {
+  profilePhoto: StaffStoredFile | null;
+  resume: StaffStoredFile | null;
+  joiningLetter: StaffStoredFile | null;
+  otherDocument: StaffStoredFile | null;
+};
+export type StaffCustomField = { label: string; value: string };
+
 export const staffMembers = mysqlTable(
   "staff_members",
   {
@@ -521,17 +530,44 @@ export const staffMembers = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(
+      () => schoolBranches.id,
+    ),
     firstName: varchar("firstName", { length: 120 }).notNull(),
     lastName: varchar("lastName", { length: 120 }).notNull(),
     employeeCode: varchar("employeeCode", { length: 40 }),
+    personnelRole: varchar("personnelRole", { length: 40 }),
     jobTitle: varchar("jobTitle", { length: 120 }).notNull(),
     department: varchar("department", { length: 120 }).notNull(),
     email: varchar("email", { length: 320 }),
     phone: varchar("phone", { length: 40 }),
     dateOfBirth: date("dateOfBirth", { mode: "string" }),
+    fatherName: varchar("fatherName", { length: 160 }),
+    motherName: varchar("motherName", { length: 160 }),
+    gender: varchar("gender", { length: 20 }),
+    maritalStatus: varchar("maritalStatus", { length: 20 }),
     address: varchar("address", { length: 1000 }),
+    permanentAddress: varchar("permanentAddress", { length: 1000 }),
     emergencyContactName: varchar("emergencyContactName", { length: 160 }),
     emergencyContactPhone: varchar("emergencyContactPhone", { length: 40 }),
+    drivingLicense: varchar("drivingLicense", { length: 80 }),
+    showAsExpert: boolean("showAsExpert").notNull().default(false),
+    qualification: varchar("qualification", { length: 2000 }),
+    experience: varchar("experience", { length: 2000 }),
+    epfNumber: varchar("epfNumber", { length: 80 }),
+    basicSalary: decimal("basicSalary", { precision: 12, scale: 2 }),
+    contractType: varchar("contractType", { length: 20 }),
+    location: varchar("location", { length: 255 }),
+    bankAccountName: varchar("bankAccountName", { length: 160 }),
+    bankAccountNumber: varchar("bankAccountNumber", { length: 80 }),
+    bankName: varchar("bankName", { length: 160 }),
+    bankBranch: varchar("bankBranch", { length: 160 }),
+    facebookUrl: varchar("facebookUrl", { length: 2048 }),
+    twitterUrl: varchar("twitterUrl", { length: 2048 }),
+    linkedinUrl: varchar("linkedinUrl", { length: 2048 }),
+    instagramUrl: varchar("instagramUrl", { length: 2048 }),
+    documents: json("documents").$type<StaffDocuments>(),
+    customFields: json("customFields").$type<StaffCustomField[]>(),
     linkedUserId: varchar("linkedUserId", { length: 36 }).references(() => user.id, {
       onDelete: "set null",
     }),

@@ -1,201 +1,357 @@
 "use client";
 
-import { useActionState } from "react";
-import { RequiredMark } from "@/components/required-mark";
-import { createStaffMember, updateStaffMember } from "./actions";
+import { useActionState, useState } from "react";
+import { createStaffMember, updateStaffMember, type StaffActionState } from "./actions";
+import type { StaffCustomField, StaffDocuments, StaffStoredFile } from "@/db/schema";
+import { employmentTypes, staffContractTypes, staffGenders, staffMaritalStatuses, staffRoles } from "@/lib/staff-policy";
 
 type StaffEditRecord = {
   publicId: string;
+  branchId: number | null;
   firstName: string;
   lastName: string;
   employeeCode: string | null;
+  personnelRole: string | null;
   jobTitle: string;
   department: string;
   email: string | null;
   phone: string | null;
   dateOfBirth: string | null;
+  fatherName: string | null;
+  motherName: string | null;
+  gender: string | null;
+  maritalStatus: string | null;
   address: string | null;
+  permanentAddress: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  drivingLicense: string | null;
+  showAsExpert: boolean;
+  qualification: string | null;
+  experience: string | null;
+  epfNumber: string | null;
+  basicSalary: string | null;
+  contractType: string | null;
+  location: string | null;
+  bankAccountName: string | null;
+  bankAccountNumber: string | null;
+  bankName: string | null;
+  bankBranch: string | null;
+  facebookUrl: string | null;
+  twitterUrl: string | null;
+  linkedinUrl: string | null;
+  instagramUrl: string | null;
+  documents: StaffDocuments | null;
+  customFields: StaffCustomField[] | null;
   linkedUserId: string | null;
   employmentType: string;
   startDate: string | null;
 };
 
-type StaffAccountOption = { id: string; name: string; email: string };
-
-export function StaffForm({
-  record,
-  accounts = [],
-  departmentOptions = [],
-  designationOptions = [],
-}: {
+type StaffFormProps = {
   record?: StaffEditRecord;
-  accounts?: StaffAccountOption[];
-  departmentOptions?: string[];
-  designationOptions?: string[];
-} = {}) {
-  const [state, formAction, pending] = useActionState(
-    record ? updateStaffMember : createStaffMember,
-    {},
-  );
+  accounts: { id: string; name: string; email: string }[];
+  branches: { id: number; name: string; code: string }[];
+  departmentOptions: string[];
+  designationOptions: string[];
+};
+
+const tabs = [
+  "Basic Information",
+  "Payroll Details",
+  "Bank Details",
+  "Social Links",
+  "Document Information",
+  "Custom Fields",
+] as const;
+type Tab = (typeof tabs)[number];
+
+export function StaffForm({ record, accounts, branches, departmentOptions, designationOptions }: StaffFormProps) {
+  const action = record ? updateStaffMember : createStaffMember;
+  const [state, formAction, pending] = useActionState<StaffActionState, FormData>(action, {});
+  const [activeTab, setActiveTab] = useState<Tab>(tabs[0]);
+  const [pendingUploads, setPendingUploads] = useState(0);
+  const customField = (index: number) => record?.customFields?.[index];
 
   return (
-    <form action={formAction} className="min-w-72 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs text-slate-500">
-        <RequiredMark /> Required fields
-      </p>
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900">
-          {record ? "Edit staff member" : "Add staff member"}
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          {record
-            ? "Update this staff member's directory details."
-            : "Add teaching and non-teaching employees to this school directory."}
-        </p>
-      </div>
-
+    <form action={formAction} className="space-y-5">
       {record && <input type="hidden" name="publicId" value={record.publicId} />}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="First name" name="firstName" required defaultValue={record?.firstName} />
-        <Field label="Last name" name="lastName" required defaultValue={record?.lastName} />
-        <Field label="Employee code" name="employeeCode" defaultValue={record?.employeeCode ?? ""} />
-        <CatalogField
-          label="Job title"
-          name="jobTitle"
-          options={designationOptions}
-          required
-          placeholder="e.g. Mathematics teacher"
-          defaultValue={record?.jobTitle}
-        />
-        <CatalogField
-          label="Department"
-          name="department"
-          options={departmentOptions}
-          required
-          placeholder="e.g. Academics"
-          defaultValue={record?.department}
-        />
-        <Field label="Email address" name="email" type="email" defaultValue={record?.email ?? ""} />
-        <Field label="Phone number" name="phone" type="tel" defaultValue={record?.phone ?? ""} />
-        <Field label="Date of birth (optional)" name="dateOfBirth" type="date" defaultValue={record?.dateOfBirth ?? ""} />
-        <Field label="Address (optional)" name="address" defaultValue={record?.address ?? ""} />
-        <Field label="Emergency contact name (optional)" name="emergencyContactName" defaultValue={record?.emergencyContactName ?? ""} />
-        <Field label="Emergency contact phone (optional)" name="emergencyContactPhone" type="tel" defaultValue={record?.emergencyContactPhone ?? ""} />
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Link existing school account (optional)
-          <select
-            name="linkedUserId"
-            defaultValue={record?.linkedUserId ?? ""}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6" role="tablist" aria-label="Staff profile sections">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+              activeTab === tab
+                ? "bg-violet-700 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
           >
-            <option value="">No account linked</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} · {account.email}
-              </option>
-            ))}
-          </select>
-          <span className="block text-xs font-normal text-slate-500">
-            Linking does not create an account or grant roles or permissions.
-          </span>
-        </label>
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Employment type <RequiredMark />
-          <select
-            name="employmentType"
-            required
-            defaultValue={record?.employmentType ?? "full_time"}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
-          >
-            <option value="full_time">Full-time</option>
-            <option value="part_time">Part-time</option>
-            <option value="contract">Contract</option>
-            <option value="temporary">Temporary</option>
-          </select>
-        </label>
-        <Field label="Start date" name="startDate" type="date" defaultValue={record?.startDate ?? ""} />
+            {tab}
+          </button>
+        ))}
       </div>
 
-      {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
-      {state.success && (
-        <p role="status" className="text-sm text-emerald-700">
-          {record ? "Staff member updated." : "Staff member added."}
+      <section role="tabpanel" aria-label={activeTab} className="grid gap-4 sm:grid-cols-2">
+        <div hidden={activeTab !== "Basic Information"} className="contents">
+            <Field label="Staff number"><input name="employeeCode" defaultValue={record?.employeeCode ?? ""} maxLength={40} className={inputClass} /></Field>
+            <Field label="Staff role">
+              <select name="personnelRole" defaultValue={record?.personnelRole ?? ""} className={inputClass}>
+                <option value="">Select role</option>
+                {staffRoles.map((role) => <option key={role} value={role}>{titleCase(role)}</option>)}
+              </select>
+            </Field>
+            <Field label="Department">
+              <select name="department" defaultValue={record?.department ?? ""} required className={inputClass}>
+                <option value="">Select department</option>
+                {selectOptions(departmentOptions, record?.department).map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </Field>
+            <Field label="Designation">
+              <select name="jobTitle" defaultValue={record?.jobTitle ?? ""} required className={inputClass}>
+                <option value="">Select designation</option>
+                {selectOptions(designationOptions, record?.jobTitle).map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </Field>
+            <Field label="First name"><input name="firstName" required minLength={2} maxLength={120} defaultValue={record?.firstName ?? ""} className={inputClass} /></Field>
+            <Field label="Last name"><input name="lastName" required minLength={2} maxLength={120} defaultValue={record?.lastName ?? ""} className={inputClass} /></Field>
+            <Field label="Father's name"><input name="fatherName" maxLength={160} defaultValue={record?.fatherName ?? ""} className={inputClass} /></Field>
+            <Field label="Mother's name"><input name="motherName" maxLength={160} defaultValue={record?.motherName ?? ""} className={inputClass} /></Field>
+            <Field label="Email"><input name="email" type="email" maxLength={320} defaultValue={record?.email ?? ""} className={inputClass} /></Field>
+            <Field label="Gender">
+              <select name="gender" defaultValue={record?.gender ?? ""} className={inputClass}>
+                <option value="">Select gender</option>
+                {staffGenders.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+              </select>
+            </Field>
+            <Field label="Date of birth"><input name="dateOfBirth" type="date" defaultValue={record?.dateOfBirth ?? ""} className={inputClass} /></Field>
+            <Field label="Joining date"><input name="startDate" type="date" defaultValue={record?.startDate ?? ""} className={inputClass} /></Field>
+            <Field label="Mobile number"><input name="phone" type="tel" maxLength={40} defaultValue={record?.phone ?? ""} className={inputClass} /></Field>
+            <Field label="Marital status">
+              <select name="maritalStatus" defaultValue={record?.maritalStatus ?? ""} className={inputClass}>
+                <option value="">Select marital status</option>
+                {staffMaritalStatuses.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+              </select>
+            </Field>
+            <Field label="Emergency mobile"><input name="emergencyContactPhone" type="tel" maxLength={40} defaultValue={record?.emergencyContactPhone ?? ""} className={inputClass} /></Field>
+            <Field label="Emergency contact name"><input name="emergencyContactName" maxLength={160} defaultValue={record?.emergencyContactName ?? ""} className={inputClass} /></Field>
+            <Field label="Driving license"><input name="drivingLicense" maxLength={80} defaultValue={record?.drivingLicense ?? ""} className={inputClass} /></Field>
+            <Field label="Branch" required>
+              <select name="branchId" required defaultValue={record?.branchId?.toString() ?? ""} className={inputClass}>
+                <option value="">Select branch</option>
+                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
+              </select>
+            </Field>
+            <Field label="Profile photo">
+              <StaffFileField
+                purpose="profilePhoto"
+                staffPublicId={record?.publicId}
+                initialFile={record?.documents?.profilePhoto ?? null}
+                onPendingChange={(delta) => setPendingUploads((count) => count + delta)}
+              />
+            </Field>
+            <Field label="Show as expert staff">
+              <select name="showAsExpert" defaultValue={record?.showAsExpert ? "yes" : "no"} className={inputClass}>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </Field>
+            <Field label="Current address" full><textarea name="address" rows={2} maxLength={1000} defaultValue={record?.address ?? ""} className={inputClass} /></Field>
+            <Field label="Permanent address" full><textarea name="permanentAddress" rows={2} maxLength={1000} defaultValue={record?.permanentAddress ?? ""} className={inputClass} /></Field>
+            <Field label="Qualifications" full><textarea name="qualification" rows={2} maxLength={2000} defaultValue={record?.qualification ?? ""} className={inputClass} /></Field>
+            <Field label="Experience" full><textarea name="experience" rows={2} maxLength={2000} defaultValue={record?.experience ?? ""} className={inputClass} /></Field>
+            <Field label="Linked school account" full>
+              <select name="linkedUserId" defaultValue={record?.linkedUserId ?? ""} className={inputClass}>
+                <option value="">No linked account</option>
+                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.email})</option>)}
+              </select>
+            </Field>
+            <Field label="Employment type">
+              <select name="employmentType" defaultValue={record?.employmentType ?? "full_time"} className={inputClass}>
+                {employmentTypes.map((value) => <option key={value} value={value}>{titleCase(value.replaceAll("_", " "))}</option>)}
+              </select>
+            </Field>
+        </div>
+
+        <div hidden={activeTab !== "Payroll Details"} className="contents">
+            <Field label="EPF number"><input name="epfNumber" maxLength={80} defaultValue={record?.epfNumber ?? ""} className={inputClass} /></Field>
+            <Field label="Basic salary"><input name="basicSalary" type="number" min="0" step="0.01" defaultValue={record?.basicSalary ?? ""} className={inputClass} /></Field>
+            <Field label="Contract type">
+              <select name="contractType" defaultValue={record?.contractType ?? ""} className={inputClass}>
+                <option value="">Select contract type</option>
+                {staffContractTypes.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+              </select>
+            </Field>
+            <Field label="Location"><input name="location" maxLength={255} defaultValue={record?.location ?? ""} className={inputClass} /></Field>
+        </div>
+
+        <div hidden={activeTab !== "Bank Details"} className="contents">
+            <Field label="Account name"><input name="bankAccountName" maxLength={160} defaultValue={record?.bankAccountName ?? ""} className={inputClass} /></Field>
+            <Field label="Account number"><input name="bankAccountNumber" maxLength={80} defaultValue={record?.bankAccountNumber ?? ""} className={inputClass} /></Field>
+            <Field label="Bank name"><input name="bankName" maxLength={160} defaultValue={record?.bankName ?? ""} className={inputClass} /></Field>
+            <Field label="Bank branch"><input name="bankBranch" maxLength={160} defaultValue={record?.bankBranch ?? ""} className={inputClass} /></Field>
+        </div>
+
+        <div hidden={activeTab !== "Social Links"} className="contents">
+            <Field label="Facebook URL"><input name="facebookUrl" type="url" maxLength={2048} defaultValue={record?.facebookUrl ?? ""} className={inputClass} /></Field>
+            <Field label="Twitter URL"><input name="twitterUrl" type="url" maxLength={2048} defaultValue={record?.twitterUrl ?? ""} className={inputClass} /></Field>
+            <Field label="LinkedIn URL"><input name="linkedinUrl" type="url" maxLength={2048} defaultValue={record?.linkedinUrl ?? ""} className={inputClass} /></Field>
+            <Field label="Instagram URL"><input name="instagramUrl" type="url" maxLength={2048} defaultValue={record?.instagramUrl ?? ""} className={inputClass} /></Field>
+        </div>
+
+        <div hidden={activeTab !== "Document Information"} className="contents">
+            <Field label="Resume"><StaffFileField purpose="resume" staffPublicId={record?.publicId} initialFile={record?.documents?.resume ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
+            <Field label="Joining letter"><StaffFileField purpose="joiningLetter" staffPublicId={record?.publicId} initialFile={record?.documents?.joiningLetter ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
+            <Field label="Other document"><StaffFileField purpose="otherDocument" staffPublicId={record?.publicId} initialFile={record?.documents?.otherDocument ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
+        </div>
+
+        <div hidden={activeTab !== "Custom Fields"} className="contents">
+            {[0, 1].map((index) => (
+              <div key={index} className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+                <Field label={`Custom field ${index + 1} name`}>
+                  <input name={`customFieldName${index + 1}`} maxLength={120} defaultValue={customField(index)?.label ?? ""} className={inputClass} />
+                </Field>
+                <Field label={`Custom field ${index + 1} value`}>
+                  <input name={`customFieldValue${index + 1}`} maxLength={500} defaultValue={customField(index)?.value ?? ""} className={inputClass} />
+                </Field>
+              </div>
+            ))}
+        </div>
+      </section>
+
+      {!branches.length && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Add an active branch before creating or saving a staff profile.
         </p>
       )}
-
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400"
-      >
-        {pending ? "Saving..." : record ? "Save changes" : "Add staff member"}
-      </button>
+      {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
+      <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+        {state.success && <p role="status" className="text-sm font-medium text-emerald-700">Staff profile saved.</p>}
+        {!state.success && <span />}
+        <button
+          type="submit"
+          disabled={pending || pendingUploads > 0 || !branches.length}
+          className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? "Saving..." : pendingUploads ? "Uploading..." : record ? "Save changes" : "Add staff"}
+        </button>
+      </div>
     </form>
   );
 }
 
-function CatalogField({
-  label,
-  name,
-  options,
-  required = false,
-  placeholder,
-  defaultValue,
+function StaffFileField({
+  purpose,
+  staffPublicId,
+  initialFile,
+  onPendingChange,
 }: {
-  label: string;
-  name: string;
-  options: string[];
-  required?: boolean;
-  placeholder?: string;
-  defaultValue?: string;
+  purpose: "profilePhoto" | "resume" | "joiningLetter" | "otherDocument";
+  staffPublicId?: string;
+  initialFile: StaffStoredFile | null;
+  onPendingChange: (delta: number) => void;
 }) {
-  const listId = `staff-${name}-options`;
+  const [file, setFile] = useState(initialFile);
+  const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const label = purpose[0].toUpperCase() + purpose.slice(1);
+  const slot = purpose;
+
+  async function upload(selected: File | undefined) {
+    if (!selected) return;
+    setError("");
+    setUploading(true);
+    onPendingChange(1);
+    try {
+      const body = new FormData();
+      body.set("purpose", purpose);
+      body.set("file", selected);
+      if (staffPublicId) body.set("staffPublicId", staffPublicId);
+      const response = await fetch("/api/admin/staff/upload", { method: "POST", body });
+      const result = await response.json() as { error?: string; fileName?: string; objectKey?: string };
+      if (!response.ok || !result.fileName || !result.objectKey) {
+        setError(result.error ?? "The file could not be uploaded.");
+        return;
+      }
+      setFile({ fileName: result.fileName, objectKey: result.objectKey });
+    } catch {
+      setError("The file could not be uploaded. Check your connection and try again.");
+    } finally {
+      setUploading(false);
+      onPendingChange(-1);
+    }
+  }
+
   return (
-    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-      {label} {required && <RequiredMark />}
+    <div className="space-y-2">
+      <input type="hidden" name={`${purpose}FileName`} value={file?.fileName ?? ""} />
+      <input type="hidden" name={`${purpose}ObjectKey`} value={file?.objectKey ?? ""} />
       <input
-        name={name}
-        required={required}
-        list={listId}
-        placeholder={placeholder}
-        defaultValue={defaultValue}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+        type="file"
+        accept={purpose === "profilePhoto" ? "image/jpeg,image/png,image/webp" : "application/pdf,image/jpeg,image/png,image/webp"}
+        onChange={(event) => void upload(event.currentTarget.files?.[0])}
+        className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-violet-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-violet-700"
       />
-      <datalist id={listId}>
-        {options.map((option) => <option key={option} value={option} />)}
-      </datalist>
-    </label>
+      {file && (
+        <div className="flex items-center justify-between gap-2 text-xs">
+          {staffPublicId ? (
+            <a
+              href={`/api/admin/staff/${staffPublicId}/files/${slot}`}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate font-medium text-violet-700 underline"
+            >
+              {file.fileName}
+            </a>
+          ) : (
+            <span className="truncate text-slate-600">{file.fileName}</span>
+          )}
+          <button type="button" onClick={() => setFile(null)} className="shrink-0 text-rose-700 underline">
+            Remove
+          </button>
+        </div>
+      )}
+      {uploading && <p className="text-xs text-slate-500">Uploading...</p>}
+      {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
+      {!file && purpose === "profilePhoto" && (
+        <p className="text-xs text-slate-500">JPEG, PNG, or WebP; up to 4 MB.</p>
+      )}
+      {!file && purpose !== "profilePhoto" && (
+        <p className="text-xs text-slate-500">PDF, JPEG, PNG, or WebP; up to 4 MB.</p>
+      )}
+      <span className="sr-only">{label}</span>
+    </div>
   );
 }
 
 function Field({
   label,
-  name,
   required = false,
-  type = "text",
-  placeholder,
-  defaultValue,
+  full = false,
+  children,
 }: {
   label: string;
-  name: string;
   required?: boolean;
-  type?: string;
-  placeholder?: string;
-  defaultValue?: string;
+  full?: boolean;
+  children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-      {label} {required && <RequiredMark />}
-      <input
-        name={name}
-        type={type}
-        required={required}
-        placeholder={placeholder}
-        defaultValue={defaultValue}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
-      />
+    <label className={`space-y-1.5 text-sm font-medium text-slate-700 ${full ? "sm:col-span-2" : ""}`}>
+      <span>{label}{required ? " *" : ""}</span>
+      {children}
     </label>
   );
+}
+
+const inputClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100";
+
+function selectOptions(options: string[], current?: string | null) {
+  return [...new Set([...options, ...(current ? [current] : [])])];
+}
+
+function titleCase(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

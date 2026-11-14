@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -91,6 +91,158 @@ export async function createSchoolRole(
   }
 
   revalidatePath("/admin/settings/roles");
+  return { success: true };
+}
+
+export async function updateSchoolRole(
+  _previousState: RoleActionState,
+  formData: FormData,
+): Promise<RoleActionState> {
+  const context = await requireSchoolPermission("roles.manage");
+  const parsed = z.object({
+    id: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()),
+    name: z.string().trim().min(2).max(80),
+    description: z.string().trim().max(255),
+    permissionIds: z.array(z.string().regex(/^\d+$/).transform(Number))
+      .min(1)
+      .refine((ids) => new Set(ids).size === ids.length),
+  }).safeParse({
+    id: value(formData, "id"),
+    name: value(formData, "name"),
+    description: value(formData, "description"),
+    permissionIds: permissionIds(formData),
+  });
+  if (!parsed.success) {
+    return { error: "Enter a role name and select at least one unique permission." };
+  }
+  const selectedPermissions = await db.select({ id: permissions.id, key: permissions.key })
+    .from(permissions)
+    .where(inArray(permissions.id, parsed.data.permissionIds));
+  if (selectedPermissions.length !== parsed.data.permissionIds.length) {
+    return { error: "One or more selected permissions are unavailable." };
+  }
+
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const [existing] = await tx.select({
+        id: roles.id,
+        isSystem: roles.isSystem,
+      }).from(roles).where(and(
+        eq(roles.id, parsed.data.id),
+        eq(roles.schoolId, context.schoolId),
+      )).for("update").limit(1);
+      if (!existing) return "not-found";
+      if (existing.isSystem) return "system-role";
+
+      const assignedToCurrentUser = await tx.select({ roleId: userRoles.roleId })
+        .from(userRoles)
+        .where(and(
+          eq(userRoles.membershipId, context.membershipId),
+          eq(userRoles.roleId, existing.id),
+        ))
+        .limit(1);
+      const retainsRoleManagement = selectedPermissions.some(
+        (permission) => permission.key === "roles.manage",
+      );
+      if (assignedToCurrentUser.length && !retainsRoleManagement) {
+        const [otherManagementRole] = await tx.select({ id: roles.id })
+          .from(userRoles)
+          .innerJoin(roles, eq(userRoles.roleId, roles.id))
+          .innerJoin(rolePermissions, eq(roles.id, rolePermissions.roleId))
+          .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+          .where(and(
+            eq(userRoles.membershipId, context.membershipId),
+            ne(userRoles.roleId, existing.id),
+            eq(roles.schoolId, context.schoolId),
+            eq(permissions.key, "roles.manage"),
+          ))
+          .limit(1);
+        if (!otherManagementRole) return "cannot-remove-own-access";
+      }
+
+      await tx.update(roles).set({
+        name: parsed.data.name,
+        description: parsed.data.description || null,
+      }).where(eq(roles.id, existing.id));
+      await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, existing.id));
+      await tx.insert(rolePermissions).values(
+        selectedPermissions.map((permission) => ({
+          roleId: existing.id,
+          permissionId: permission.id,
+        })),
+      );
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: "roles.updated",
+        resourceType: "role",
+        resourcePublicId: String(existing.id),
+        changedFields: ["name", "description", "permissions"],
+      });
+      return "updated";
+    });
+    if (outcome === "not-found") return { error: "That role was not found in this school." };
+    if (outcome === "system-role") return { error: "System roles cannot be modified." };
+    if (outcome === "cannot-remove-own-access") {
+      return { error: "Keep the role-management permission on this role or another role assigned to you." };
+    }
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return { error: "A role with that name already exists." };
+    throw error;
+  }
+
+  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function deleteSchoolRole(
+  _previousState: RoleActionState,
+  formData: FormData,
+): Promise<RoleActionState> {
+  const context = await requireSchoolPermission("roles.manage");
+  const id = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe())
+    .safeParse(value(formData, "id"));
+  if (!id.success) return { error: "Choose a valid role." };
+
+  const outcome = await db.transaction(async (tx) => {
+    const [existing] = await tx.select({
+      id: roles.id,
+      isSystem: roles.isSystem,
+    }).from(roles).where(and(
+      eq(roles.id, id.data),
+      eq(roles.schoolId, context.schoolId),
+    )).for("update").limit(1);
+    if (!existing) return "not-found";
+    if (existing.isSystem) return "system-role";
+
+    const [assignment] = await tx.select({ membershipId: userRoles.membershipId })
+      .from(userRoles)
+      .where(eq(userRoles.roleId, existing.id))
+      .limit(1);
+    if (assignment) return "in-use";
+
+    await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, existing.id));
+    await tx.delete(roles).where(and(
+      eq(roles.id, existing.id),
+      eq(roles.schoolId, context.schoolId),
+    ));
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "roles.deleted",
+      resourceType: "role",
+      resourcePublicId: String(existing.id),
+      changedFields: ["name", "description", "permissions"],
+    });
+    return "deleted";
+  });
+
+  if (outcome === "not-found") return { error: "That role was not found in this school." };
+  if (outcome === "system-role") return { error: "System roles cannot be deleted." };
+  if (outcome === "in-use") return { error: "Unassign this role from all accounts before deleting it." };
+  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin");
   return { success: true };
 }
 
