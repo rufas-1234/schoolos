@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, inArray, ne } from "drizzle-orm";
 import type { ReactNode } from "react";
 import { db } from "@/db";
 import { CalendarDays } from "lucide-react";
@@ -108,6 +108,7 @@ export default async function AcademicStructurePage({
     years,
     terms,
     classes,
+    classStudentCounts,
     sections,
     schoolSubjects,
     subjectAssignments,
@@ -165,6 +166,32 @@ export default async function AcademicStructurePage({
       .innerJoin(schoolBranches, eq(classLevels.branchId, schoolBranches.id))
       .where(eq(classLevels.schoolId, context.schoolId))
       .orderBy(asc(schoolBranches.name), asc(classLevels.name)),
+    db
+      .select({
+        classLevelId: classSections.classLevelId,
+        studentCount: countDistinct(students.id),
+      })
+      .from(studentEnrollments)
+      .innerJoin(students, and(
+        eq(studentEnrollments.studentId, students.id),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSections, and(
+        eq(studentEnrollments.classSectionId, classSections.id),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(academicYears, and(
+        eq(studentEnrollments.academicYearId, academicYears.id),
+        eq(academicYears.id, classSections.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.status, "enrolled"),
+        eq(academicYears.status, "active"),
+        ne(students.status, "disabled"),
+      ))
+      .groupBy(classSections.classLevelId),
     db
       .select({
         id: classSections.id,
@@ -367,6 +394,9 @@ export default async function AcademicStructurePage({
     (section) =>
       section.id === requestedAttendanceSection &&
       section.yearStatus === "active",
+  );
+  const studentCountByClass = new Map(
+    classStudentCounts.map((entry) => [entry.classLevelId, entry.studentCount]),
   );
   const attendanceRoster =
     sectionId === "attendance" && activeAttendanceSection && canViewAttendance
@@ -657,6 +687,7 @@ export default async function AcademicStructurePage({
                   { key: "branch", label: "Branch" },
                   { key: "name", label: "Class" },
                   { key: "code", label: "Code" },
+                  { key: "studentCount", label: "Students enrolled" },
                 ]}
                 empty="No classes yet."
                 toolbarActions={
@@ -671,6 +702,7 @@ export default async function AcademicStructurePage({
                     branch: classLevel.branchName,
                     name: classLevel.name,
                     code: classLevel.code,
+                    studentCount: String(studentCountByClass.get(classLevel.id) ?? 0),
                     branchId: String(classLevel.branchId),
                   },
                   editForm: (
