@@ -9,10 +9,12 @@ export function FeeReportFilters({
   branches,
   classes,
   sections,
+  feeTypes,
   statuses,
   selectedBranch,
   selectedClass,
   selectedSection,
+  selectedFeeType,
   selectedStatus,
 }: {
   from: string;
@@ -20,10 +22,12 @@ export function FeeReportFilters({
   branches: SearchableSelectOption[];
   classes: SearchableSelectOption[];
   sections: SearchableSelectOption[];
+  feeTypes: SearchableSelectOption[];
   statuses: SearchableSelectOption[];
   selectedBranch: string;
   selectedClass: string;
   selectedSection: string;
+  selectedFeeType: string;
   selectedStatus: string;
 }) {
   function submitOnChange(event: ChangeEvent<HTMLInputElement>) {
@@ -60,6 +64,14 @@ export function FeeReportFilters({
         options={sections}
         defaultValue={selectedSection}
         placeholder="Search sections..."
+        autoSubmit
+      />
+      <SearchableSelect
+        label="Fee type"
+        name="feeTypeId"
+        options={feeTypes}
+        defaultValue={selectedFeeType}
+        placeholder="Search fee types..."
         autoSubmit
       />
       <SearchableSelect

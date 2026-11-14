@@ -34,6 +34,7 @@ type SearchParams = {
   branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
+  feeTypeId?: string | string[];
   status?: string | string[];
 };
 
@@ -59,7 +60,7 @@ export default async function FeeReportsPage({
 }) {
   const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
   const params = await searchParams;
-  const [school, branches, classes, sections] = await Promise.all([
+  const [school, branches, classes, sections, feeTypesList] = await Promise.all([
     db.select({ currency: schools.currency, timezone: schools.timezone })
       .from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
     db.select({ id: schoolBranches.id, name: schoolBranches.name })
@@ -95,6 +96,10 @@ export default async function FeeReportsPage({
       ))
       .where(eq(classSections.schoolId, context.schoolId))
       .orderBy(asc(schoolBranches.name), asc(classLevels.name), asc(classSections.name)),
+    db.select({ id: feeTypes.id, name: feeTypes.name })
+      .from(feeTypes)
+      .where(eq(feeTypes.schoolId, context.schoolId))
+      .orderBy(asc(feeTypes.name)),
   ]);
   const today = todayInTimezone(school?.timezone ?? "UTC");
   const firstDay = `${today.slice(0, 7)}-01`;
@@ -112,6 +117,9 @@ export default async function FeeReportsPage({
     : null;
   const requestedSection = typeof params.sectionId === "string" && /^\d+$/.test(params.sectionId)
     ? Number(params.sectionId)
+    : null;
+  const requestedFeeTypeId = typeof params.feeTypeId === "string" && /^\d+$/.test(params.feeTypeId)
+    ? Number(params.feeTypeId)
     : null;
   const requestedStatus = typeof params.status === "string" &&
     ["unpaid", "partial", "paid"].includes(params.status)
@@ -131,6 +139,10 @@ export default async function FeeReportsPage({
       value: String(section.id),
       label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
     })),
+  ];
+  const feeTypeOptions: SearchableSelectOption[] = [
+    { value: "", label: "All fee types" },
+    ...feeTypesList.map((feeType) => ({ value: String(feeType.id), label: feeType.name })),
   ];
   const statusOptions: SearchableSelectOption[] = [
     { value: "", label: "All statuses" },
@@ -204,6 +216,7 @@ export default async function FeeReportsPage({
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
         ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
         ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+        ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .orderBy(desc(feePayments.paidAt))
       .limit(500),
@@ -259,6 +272,7 @@ export default async function FeeReportsPage({
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
         ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
         ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+        ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .orderBy(asc(studentFeeInvoices.dueDate)),
     db.select({
@@ -286,6 +300,14 @@ export default async function FeeReportsPage({
         eq(schoolBranches.id, classLevels.branchId),
         eq(schoolBranches.schoolId, context.schoolId),
       ))
+      .innerJoin(feeStructures, and(
+        eq(feeStructures.id, studentFeeInvoices.feeStructureId),
+        eq(feeStructures.schoolId, context.schoolId),
+      ))
+      .innerJoin(feeTypes, and(
+        eq(feeTypes.id, feeStructures.feeTypeId),
+        eq(feeTypes.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(feePayments.schoolId, context.schoolId),
         gte(feePayments.paidAt, dateRange.start),
@@ -293,6 +315,7 @@ export default async function FeeReportsPage({
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
         ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
         ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+        ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .then((rows) => rows[0]),
     db.select({
@@ -340,6 +363,14 @@ export default async function FeeReportsPage({
         eq(schoolBranches.id, classLevels.branchId),
         eq(schoolBranches.schoolId, context.schoolId),
       ))
+      .innerJoin(feeStructures, and(
+        eq(feeStructures.id, studentFeeInvoices.feeStructureId),
+        eq(feeStructures.schoolId, context.schoolId),
+      ))
+      .innerJoin(feeTypes, and(
+        eq(feeTypes.id, feeStructures.feeTypeId),
+        eq(feeTypes.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(feePaymentReversals.schoolId, context.schoolId),
         gte(feePaymentReversals.createdAt, dateRange.start),
@@ -347,6 +378,7 @@ export default async function FeeReportsPage({
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
         ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
         ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+        ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .orderBy(desc(feePaymentReversals.createdAt))
       .limit(500),
@@ -379,6 +411,14 @@ export default async function FeeReportsPage({
         eq(schoolBranches.id, classLevels.branchId),
         eq(schoolBranches.schoolId, context.schoolId),
       ))
+      .innerJoin(feeStructures, and(
+        eq(feeStructures.id, studentFeeInvoices.feeStructureId),
+        eq(feeStructures.schoolId, context.schoolId),
+      ))
+      .innerJoin(feeTypes, and(
+        eq(feeTypes.id, feeStructures.feeTypeId),
+        eq(feeTypes.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(feePaymentReversals.schoolId, context.schoolId),
         gte(feePaymentReversals.createdAt, dateRange.start),
@@ -386,6 +426,7 @@ export default async function FeeReportsPage({
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
         ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
         ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+        ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .then((rows) => rows[0]),
   ]);
@@ -469,10 +510,12 @@ export default async function FeeReportsPage({
         branches={branchOptions}
         classes={classOptions}
         sections={sectionOptions}
+        feeTypes={feeTypeOptions}
         statuses={statusOptions}
         selectedBranch={requestedBranch === null ? "" : String(requestedBranch)}
         selectedClass={requestedClass === null ? "" : String(requestedClass)}
         selectedSection={requestedSection === null ? "" : String(requestedSection)}
+        selectedFeeType={requestedFeeTypeId === null ? "" : String(requestedFeeTypeId)}
         selectedStatus={requestedStatus}
       />
 
@@ -534,6 +577,7 @@ export default async function FeeReportsPage({
             {requestedBranch ? ` · ${branches.find((branch) => branch.id === requestedBranch)?.name ?? "Selected branch"}` : ""}
             {requestedClass ? ` · ${classes.find((item) => item.id === requestedClass)?.name ?? "Selected class"}` : ""}
             {requestedSection ? ` · ${sections.find((section) => section.id === requestedSection)?.name ?? "Selected section"}` : ""}
+            {requestedFeeTypeId ? ` · ${feeTypesList.find((feeType) => feeType.id === requestedFeeTypeId)?.name ?? "Selected fee type"}` : ""}
             {` · ${filteredInvoices.length} invoice${filteredInvoices.length === 1 ? "" : "s"}`}
           </p>
         </header>
