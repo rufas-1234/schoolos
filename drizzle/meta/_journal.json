@@ -141,6 +141,13 @@
       "when": 1794652840118,
       "tag": "0019_groovy_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1794660606744,
+      "tag": "0020_grant_fees_to_school_admins",
+      "breakpoints": true
     }
   ]
 }
