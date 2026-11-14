@@ -33,6 +33,7 @@ type SearchParams = {
   branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
+  status?: string | string[];
 };
 
 function money(minorUnits: number): string {
@@ -111,6 +112,10 @@ export default async function FeeReportsPage({
   const requestedSection = typeof params.sectionId === "string" && /^\d+$/.test(params.sectionId)
     ? Number(params.sectionId)
     : null;
+  const requestedStatus = typeof params.status === "string" &&
+    ["unpaid", "partial", "paid"].includes(params.status)
+    ? params.status
+    : "";
   const branchOptions: SearchableSelectOption[] = [
     { value: "", label: "All branches" },
     ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
@@ -125,6 +130,12 @@ export default async function FeeReportsPage({
       value: String(section.id),
       label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
     })),
+  ];
+  const statusOptions: SearchableSelectOption[] = [
+    { value: "", label: "All statuses" },
+    { value: "paid", label: "Fully paid" },
+    { value: "partial", label: "Partially paid" },
+    { value: "unpaid", label: "Unpaid" },
   ];
   const dateRange = feePaymentDateRangeInTimezone(from, to, school?.timezone ?? "UTC");
   if (!dateRange) throw new Error("The requested fee report date range is invalid.");
@@ -398,7 +409,7 @@ export default async function FeeReportsPage({
       fine: parseMoneyToMinorUnits(item.fineAmount ?? "0") ?? 0,
     },
   ]));
-  const outstanding = dueInvoices.map((invoice) => {
+  const invoicesWithStatus = dueInvoices.map((invoice) => {
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
     const dueFine = today > invoice.dueDate
@@ -408,14 +419,18 @@ export default async function FeeReportsPage({
     const totalDue = amount - discount + dueFine;
     const balance = Math.max(0, totalDue - payment.paid);
     return { ...invoice, paid: payment.paid, balance, status: feeInvoiceStatus(totalDue, payment.paid) ?? "unpaid" };
-  }).filter((invoice) => invoice.balance > 0);
+  });
+  const filteredInvoices = invoicesWithStatus.filter((invoice) =>
+    !requestedStatus || invoice.status === requestedStatus
+  );
+  const outstandingInvoices = invoicesWithStatus.filter((invoice) => invoice.balance > 0);
   const totalCollected =
     (parseMoneyToMinorUnits(paymentTotals?.amount ?? "0") ?? 0) -
     (parseMoneyToMinorUnits(reversalTotals?.amount ?? "0") ?? 0);
   const totalFines =
     (parseMoneyToMinorUnits(paymentTotals?.fineAmount ?? "0") ?? 0) -
     (parseMoneyToMinorUnits(reversalTotals?.fineAmount ?? "0") ?? 0);
-  const totalOutstanding = outstanding.reduce((total, item) => total + item.balance, 0);
+  const totalOutstanding = outstandingInvoices.reduce((total, item) => total + item.balance, 0);
   const currency = school?.currency ?? "";
 
   return (
@@ -429,7 +444,7 @@ export default async function FeeReportsPage({
         <PrintButton label="Print report" />
       </header>
 
-      <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
+      <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-7">
         <label className="text-sm font-medium text-slate-700">From
           <input type="date" name="from" defaultValue={from} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
@@ -456,6 +471,13 @@ export default async function FeeReportsPage({
           options={sectionOptions}
           defaultValue={requestedSection === null ? "" : String(requestedSection)}
           placeholder="Search sections..."
+        />
+        <SearchableSelect
+          label="Payment status"
+          name="status"
+          options={statusOptions}
+          defaultValue={requestedStatus}
+          placeholder="Search statuses..."
         />
         <div className="flex items-end">
           <button className="w-full rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
@@ -512,13 +534,13 @@ export default async function FeeReportsPage({
       </ReportTable>
 
       <ReportTable
-        title="Balance / fees due report"
-        description={`Invoices due ${from} through ${to}; balance includes applicable late fines.`}
-        empty="No outstanding invoices are due in this date range."
+        title="Invoice payment status report"
+        description={`Invoices due ${from} through ${to}${requestedStatus ? ` with ${requestedStatus === "paid" ? "full payment" : requestedStatus === "partial" ? "partial payment" : "no payment"}` : " across all payment statuses"}; balance includes applicable late fines.`}
+        empty={`No ${requestedStatus ? `${requestedStatus} ` : ""}invoices are due in this date range.`}
         headings={["Student", "Class / section", "Fee type", "Due date", "Paid", "Balance", "Status"]}
-        hasRows={outstanding.length > 0}
+        hasRows={filteredInvoices.length > 0}
       >
-        {outstanding.map((invoice) => (
+        {filteredInvoices.map((invoice) => (
           <tr key={invoice.id} className="border-t border-slate-100">
             <td className="px-4 py-3">{invoice.studentName} {invoice.studentLastName}<span className="block text-xs text-slate-500">{invoice.admissionNumber || "—"} · {invoice.rollNumber || "—"}</span></td>
             <td className="px-4 py-3">{invoice.branchName} / {invoice.className} / {invoice.sectionName}</td>
