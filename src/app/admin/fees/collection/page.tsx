@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or, sum } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
 import Link from "next/link";
 import { db } from "@/db";
 import {
@@ -21,7 +21,9 @@ import {
   feeInvoiceStatus,
   parseMoneyToMinorUnits,
 } from "@/lib/fees-policy";
-import { RecordFeePaymentForm, type FeeOption } from "../fee-forms";
+import type { SearchableSelectOption } from "@/components/searchable-select";
+import { FeeInvoiceFilters } from "./fee-invoice-filters";
+import { RecordFeePaymentForm } from "../fee-forms";
 
 type SearchParams = {
   search?: string | string[];
@@ -167,6 +169,7 @@ export default async function FeeCollectionPage({
         ...(search ? [or(
           like(students.firstName, `%${search}%`),
           like(students.lastName, `%${search}%`),
+          like(sql`lower(concat(${students.firstName}, ' ', ${students.lastName}))`, `%${search.toLocaleLowerCase()}%`),
           like(students.admissionNumber, `%${search}%`),
           like(studentEnrollments.rollNumber, `%${search}%`),
           like(students.phone, `%${search}%`),
@@ -205,15 +208,21 @@ export default async function FeeCollectionPage({
     };
   }).filter((invoice) => !statusFilter || invoice.status === statusFilter);
   const currency = school?.currency ?? "";
-  const branchOptions: FeeOption[] = branches.map((branch) => ({ id: branch.id, label: branch.name }));
-  const classOptions: FeeOption[] = classes.map((item) => ({
-    id: item.id,
-    label: `${item.branchName} — ${item.name}`,
-  }));
-  const sectionOptions: FeeOption[] = sections.map((section) => ({
-    id: section.id,
-    label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
-  }));
+  const branchOptions: SearchableSelectOption[] = [
+    { value: "", label: "All branches" },
+    ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+  ];
+  const classOptions: SearchableSelectOption[] = [
+    { value: "", label: "All classes" },
+    ...classes.map((item) => ({ value: String(item.id), label: `${item.branchName} — ${item.name}` })),
+  ];
+  const sectionOptions: SearchableSelectOption[] = [
+    { value: "", label: "All sections" },
+    ...sections.map((section) => ({
+      value: String(section.id),
+      label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
+    })),
+  ];
   const totalOutstanding = rows.reduce((total, invoice) => total + Math.max(0, invoice.balance), 0);
 
   return (
@@ -227,45 +236,16 @@ export default async function FeeCollectionPage({
         <Link href="/admin/fees" className="text-sm font-semibold text-violet-700 hover:text-violet-900">Fee setup</Link>
       </header>
 
-      <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
-        <label className="text-sm font-medium text-slate-700 sm:col-span-2">
-          Search student
-          <input name="search" defaultValue={search} placeholder="Name, admission or roll number" className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Branch
-          <select name="branchId" defaultValue={requestedBranch ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All branches</option>
-            {branchOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Class
-          <select name="classLevelId" defaultValue={requestedClass ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All classes</option>
-            {classOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Section
-          <select name="sectionId" defaultValue={requestedSection ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All sections</option>
-            {sectionOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">
-          Payment status
-          <select name="status" defaultValue={statusFilter} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All statuses</option>
-            <option value="unpaid">Unpaid</option>
-            <option value="partial">Partial</option>
-            <option value="paid">Paid</option>
-          </select>
-        </label>
-        <div className="sm:col-span-2 xl:col-span-6">
-          <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
-        </div>
-      </form>
+      <FeeInvoiceFilters
+        search={search}
+        branches={branchOptions}
+        classes={classOptions}
+        sections={sectionOptions}
+        selectedBranch={requestedBranch === null ? "" : String(requestedBranch)}
+        selectedClass={requestedClass === null ? "" : String(requestedClass)}
+        selectedSection={requestedSection === null ? "" : String(requestedSection)}
+        selectedStatus={statusFilter}
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard label="Invoices shown" value={String(rows.length)} />

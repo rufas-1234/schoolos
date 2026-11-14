@@ -189,7 +189,7 @@ export default async function FeesSetupPage() {
             <p className="p-5 text-sm text-slate-500">No fee structures have been created yet.</p>
           )}
         </div>
-        <GenerateInvoicesForm structures={structureOptions} />
+        <GenerateInvoicesForm structures={structureOptions} students={studentsForDiscounts} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">

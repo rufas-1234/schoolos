@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, type ReactNode } from "react";
+import { SearchableSelect } from "@/components/searchable-select";
 import { RequiredMark } from "@/components/required-mark";
 import {
   assignStudentFeeDiscount,
@@ -90,19 +91,14 @@ function SelectField({
   defaultValue?: string;
 }) {
   return (
-    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-      {label} <RequiredMark />
-      <select
-        name={name}
-        required
-        defaultValue={defaultValue ?? ""}
-        disabled={!options.length}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white disabled:opacity-60"
-      >
-        <option value="" disabled>{options.length ? "Choose one" : "Create one first"}</option>
-        {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-      </select>
-    </label>
+    <SearchableSelect
+      label={label}
+      name={name}
+      options={options.map((option) => ({ value: String(option.id), label: option.label }))}
+      defaultValue={defaultValue ?? ""}
+      placeholder={options.length ? "Search or choose..." : "Create one first"}
+      required
+    />
   );
 }
 
@@ -116,18 +112,7 @@ function ValueSelectField({
   options: ValueOption[];
 }) {
   return (
-    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-      {label} <RequiredMark />
-      <select
-        name={name}
-        required
-        defaultValue=""
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
-      >
-        <option value="" disabled>Choose one</option>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
+    <SearchableSelect label={label} name={name} options={options} placeholder="Search or choose..." required />
   );
 }
 
@@ -222,12 +207,24 @@ export function FeeStructureForm({
   );
 }
 
-export function GenerateInvoicesForm({ structures }: { structures: FeeOption[] }) {
+export function GenerateInvoicesForm({
+  structures,
+  students,
+}: {
+  structures: FeeOption[];
+  students: FeeOption[];
+}) {
   return (
     <ActionForm action={generateStudentFeeInvoices} title="Generate student invoices" submitLabel="Generate invoices">
       <SelectField label="Fee structure" name="feeStructureId" options={structures} />
+      <SearchableSelect
+        label="Student (optional)"
+        name="studentId"
+        options={students.map((student) => ({ value: String(student.id), label: student.label }))}
+        placeholder="Search a student or leave blank for the whole class..."
+      />
       <p className="text-xs leading-5 text-slate-500">
-        Creates one invoice for each admitted or active student enrolled in the matching class and academic year. Existing invoices are left unchanged.
+        Choose a student to generate only their invoice, or leave blank to generate invoices for all eligible students in the matching class and academic year. Existing invoices are left unchanged.
       </p>
     </ActionForm>
   );

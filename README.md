@@ -6,7 +6,7 @@ A phased school-management foundation built with Next.js, Better Auth, Drizzle O
 
 The Phase 1 foundation includes responsive sign-in and admin shell, Better Auth email/password with public sign-up disabled, MySQL/TiDB schema and versioned migrations, school memberships and role-permission authorization, a secure non-production administrator seed, school profile editing, audited settings changes, database-backed dashboard counts, and private object-storage adapters for Vercel Blob and S3-compatible services.
 
-Phase 2 includes tenant-scoped student and staff directories, admission review, student document uploads, and an academic structure for branches, school years, terms and exam periods, holidays, classes, year-specific streams/sections, capacities, class teachers, theory and practical subjects, compulsory and optional class subjects, teacher assignments, classrooms, and weekly class routines. Academic setup records can be edited in place, with creation and management actions above their corresponding record lists. Class and subject records are branch-scoped; routines validate class, teacher, and room schedule conflicts and can be filtered by branch, class, and section. Student placements, class rosters, promotion, repetition, in-school transfers, transfers out, graduation, and dated enrollment history are recorded as audited academic events. Human Resources includes expanded staff profiles, optional links to existing school accounts, department and designation catalogs, daily attendance, date-range attendance reports, per-staff annual leave entitlements and request approvals, and payroll records with period totals and payment status. Payroll does not calculate tax, deductions, benefits, or take-home pay. The fees module supports fee groups/types, branch/class/year fee structures, one-time and yearly student discounts, invoice generation from enrollments, partial payments, late fines, date/class/section reports, and printable receipts. Administrator and Accountant roles receive fee-management and payment permissions; external payment-gateway integrations are not included. Authorized users can create school-specific roles, grant permissions, and assign roles to existing active accounts; linking a staff profile to an account does not create that account or assign its roles. Guardian relationships, student attendance, examination results, and other operational modules are not implemented yet.
+Phase 2 includes tenant-scoped student and staff directories, admission review, student document uploads, and an academic structure for branches, school years, terms and exam periods, holidays, classes, year-specific streams/sections, capacities, class teachers, theory and practical subjects, compulsory and optional class subjects, teacher assignments, classrooms, and weekly class routines. Academic setup records can be edited in place, with creation and management actions above their corresponding record lists. Class and subject records are branch-scoped; routines validate class, teacher, and room schedule conflicts and can be filtered by branch, class, and section. Student placements, class rosters, promotion, repetition, in-school transfers, transfers out, graduation, and dated enrollment history are recorded as audited academic events. Human Resources includes expanded staff profiles, optional links to existing school accounts, department and designation catalogs, daily attendance, date-range attendance reports, per-staff annual leave entitlements and request approvals, and payroll records with period totals and payment status. Payroll does not calculate tax, deductions, benefits, or take-home pay. The fees module supports fee groups/types, branch/class/year fee structures, one-time and yearly student discounts, invoice generation from enrollments, partial payments, late fines, date/class/section reports, and printable receipts. Fee forms and collection filters have searchable selectors; invoice generation can target a selected student or all eligible students, and the collection list searches student names as you type. Administrator and Accountant roles receive fee-management and payment permissions; external payment-gateway integrations are not included. Authorized users can create school-specific roles, grant permissions, and assign roles to existing active accounts; linking a staff profile to an account does not create that account or assign its roles. Guardian relationships, student attendance, examination results, and other operational modules are not implemented yet.
 
 ## Requirements
 
@@ -66,7 +66,19 @@ Phase 2 includes tenant-scoped student and staff directories, admission review, 
 
    Demo seeding is blocked in production and on Vercel, runs against a local database by default, adds visibly labeled sample records without changing existing records, and is safe to repeat. Only set `ALLOW_DEMO_SEED_REMOTE=true` when intentionally targeting a separate non-production remote database.
 
-7. Start the app:
+7. To add fee-module test records to the existing `SchoolOS Demo School` enrollments:
+
+   ```powershell
+   $env:ALLOW_FEE_DEMO_SEED = "true"
+   $env:ALLOW_DEMO_SEED_REMOTE = "true"
+   npm run db:seed-fees-demo
+   Remove-Item Env:\ALLOW_FEE_DEMO_SEED
+   Remove-Item Env:\ALLOW_DEMO_SEED_REMOTE
+   ```
+
+   Fee demo seeding is blocked in production and on Vercel, requires explicit opt-in, and only permits remote writes to the verified SchoolOS demo database. It reuses existing eligible students, is safe to repeat, and creates visibly labeled test invoices and payments; the seeded payments are not real money received.
+
+8. Start the app:
 
    ```powershell
    npm run dev
@@ -87,6 +99,7 @@ Phase 2 includes tenant-scoped student and staff directories, admission review, 
 | `npm run db:migrate` | Apply migrations explicitly |
 | `npm run db:seed` | Provision initial non-production school administrator |
 | `npm run db:seed-demo` | Add clearly labeled sample academic, student, teacher, and staff data |
+| `npm run db:seed-fees-demo` | Add clearly labeled test fees to existing demo students |
 
 ## Configuration
 

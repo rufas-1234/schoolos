@@ -334,6 +334,9 @@ export async function generateStudentFeeInvoices(
   const context = await requireSchoolPermission("fees.manage");
   const structureId = idField.safeParse(value(formData, "feeStructureId"));
   if (!structureId.success) return { error: "Select a valid fee structure." };
+  const requestedStudent = value(formData, "studentId");
+  const studentId = requestedStudent ? idField.safeParse(requestedStudent) : null;
+  if (studentId && !studentId.success) return { error: "Select a valid student." };
   const result = await db.transaction(async (tx) => {
     const [structure] = await tx.select().from(feeStructures)
       .where(and(eq(feeStructures.id, structureId.data), eq(feeStructures.schoolId, context.schoolId)))
@@ -370,8 +373,13 @@ export async function generateStudentFeeInvoices(
         eq(classSections.classLevelId, structure.classLevelId),
         eq(students.branchId, structure.branchId),
         inArray(students.status, ["admitted", "active"]),
+        ...(studentId?.success ? [eq(students.id, studentId.data)] : []),
       ));
-    if (!eligible.length) return { created: 0 };
+    if (!eligible.length) {
+      return studentId?.success
+        ? { error: "The selected student is not eligible for this fee structure; they must be admitted or active and enrolled in the matching class and year." }
+        : { created: 0 };
+    }
     const alreadyInvoiced = await tx.select({ enrollmentId: studentFeeInvoices.enrollmentId })
       .from(studentFeeInvoices)
       .where(and(

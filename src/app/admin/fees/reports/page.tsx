@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, lt, lte, sum } from "drizzle-orm";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { db } from "@/db";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 import {
   academicYears,
   classLevels,
@@ -23,7 +24,6 @@ import {
   feeInvoiceStatus,
   parseMoneyToMinorUnits,
 } from "@/lib/fees-policy";
-import type { FeeOption } from "../fee-forms";
 
 type SearchParams = {
   from?: string | string[];
@@ -109,15 +109,21 @@ export default async function FeeReportsPage({
   const requestedSection = typeof params.sectionId === "string" && /^\d+$/.test(params.sectionId)
     ? Number(params.sectionId)
     : null;
-  const branchOptions: FeeOption[] = branches.map((branch) => ({ id: branch.id, label: branch.name }));
-  const classOptions: FeeOption[] = classes.map((item) => ({
-    id: item.id,
-    label: `${item.branchName} — ${item.name}`,
-  }));
-  const sectionOptions: FeeOption[] = sections.map((section) => ({
-    id: section.id,
-    label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
-  }));
+  const branchOptions: SearchableSelectOption[] = [
+    { value: "", label: "All branches" },
+    ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+  ];
+  const classOptions: SearchableSelectOption[] = [
+    { value: "", label: "All classes" },
+    ...classes.map((item) => ({ value: String(item.id), label: `${item.branchName} — ${item.name}` })),
+  ];
+  const sectionOptions: SearchableSelectOption[] = [
+    { value: "", label: "All sections" },
+    ...sections.map((section) => ({
+      value: String(section.id),
+      label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
+    })),
+  ];
   const dateRange = feePaymentDateRangeInTimezone(from, to, school?.timezone ?? "UTC");
   if (!dateRange) throw new Error("The requested fee report date range is invalid.");
   const [payments, dueInvoices, paymentTotals] = await Promise.all([
@@ -326,24 +332,27 @@ export default async function FeeReportsPage({
         <label className="text-sm font-medium text-slate-700">To
           <input type="date" name="to" defaultValue={to} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
-        <label className="text-sm font-medium text-slate-700">Branch
-          <select name="branchId" defaultValue={requestedBranch ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All branches</option>
-            {branchOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">Class
-          <select name="classLevelId" defaultValue={requestedClass ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All classes</option>
-            {classOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">Section
-          <select name="sectionId" defaultValue={requestedSection ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All sections</option>
-            {sectionOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        </label>
+        <SearchableSelect
+          label="Branch"
+          name="branchId"
+          options={branchOptions}
+          defaultValue={requestedBranch === null ? "" : String(requestedBranch)}
+          placeholder="Search branches..."
+        />
+        <SearchableSelect
+          label="Class"
+          name="classLevelId"
+          options={classOptions}
+          defaultValue={requestedClass === null ? "" : String(requestedClass)}
+          placeholder="Search classes..."
+        />
+        <SearchableSelect
+          label="Section"
+          name="sectionId"
+          options={sectionOptions}
+          defaultValue={requestedSection === null ? "" : String(requestedSection)}
+          placeholder="Search sections..."
+        />
         <div className="flex items-end">
           <button className="w-full rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
         </div>
