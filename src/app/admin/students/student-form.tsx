@@ -115,6 +115,7 @@ export function StudentForm({
   return (
     <form
       action={formAction}
+      noValidate
       onSubmit={(event) => {
         if (record) return;
         const formData = new FormData(event.currentTarget);

@@ -487,7 +487,8 @@ export async function createStaffMember(
     if (isDuplicateEntryError(error)) {
       return { error: "That employee code, email, or linked account is already used by this school." };
     }
-    throw error;
+    console.error("Staff profile creation failed; transaction rolled back.", error);
+    return { error: "Staff profile could not be created. No changes were saved; check the details and try again." };
   }
 
   revalidatePath("/admin/staff");
@@ -652,7 +653,8 @@ export async function updateStaffMember(
     if (isDuplicateEntryError(error)) {
       return { error: "That employee code, email, or linked account is already used by this school." };
     }
-    throw error;
+    console.error("Staff profile update failed; transaction rolled back.", error);
+    return { error: "Staff profile could not be saved. No changes were made; check the details and try again." };
   }
 
   revalidatePath("/admin/staff");

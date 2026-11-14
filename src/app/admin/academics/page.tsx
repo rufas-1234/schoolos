@@ -43,7 +43,6 @@ import {
   SubjectForm,
 } from "./academic-forms";
 import {
-  deleteClassLevel,
   deleteClassSection,
   deleteClassSubject,
   deleteSubject,
@@ -63,6 +62,7 @@ import {
   SectionAssignmentForm,
   StudentPlacementForm,
   SubjectTeacherForm,
+  ClassLevelDeleteForm,
 } from "./management-forms";
 import { AttendanceWorkspace } from "./attendance-workspace";
 import { isAttendanceStatus } from "@/lib/attendance-policy";
@@ -75,6 +75,7 @@ export default async function AcademicStructurePage({
     search?: string | string[];
     attendanceSectionId?: string | string[];
     attendanceDate?: string | string[];
+    notice?: string | string[];
   }>;
 }) {
   const {
@@ -82,12 +83,14 @@ export default async function AcademicStructurePage({
     search: requestedSearch,
     attendanceSectionId: requestedAttendanceSectionId,
     attendanceDate: requestedAttendanceDate,
+    notice: requestedNotice,
   } = await searchParams;
   const sectionId =
     typeof requestedSection === "string" && isAcademicSectionId(requestedSection)
       ? requestedSection
       : undefined;
   const academicSearch = typeof requestedSearch === "string" ? requestedSearch.slice(0, 160) : "";
+  const notice = requestedNotice === "class-deleted" ? "Class and its unused academic setup were permanently deleted." : null;
   const selectedSection = academicSections.find((section) => section.id === sectionId);
   const context = await requireSchoolPermission("school.settings.manage");
   const canManageEnrollments = context.grantedPermissions.includes("students.update");
@@ -625,6 +628,11 @@ export default async function AcademicStructurePage({
         </p>
       </div>
       <AcademicQuickSearch options={academicSearchOptions} />
+      {notice && (
+        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          {notice}
+        </p>
+      )}
 
       {!selectedSection ? (
         <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
@@ -776,10 +784,7 @@ export default async function AcademicStructurePage({
                     />
                   ),
                   deleteForm: (
-                    <form action={deleteClassLevel}>
-                      <input type="hidden" name="recordId" value={classLevel.id} />
-                      <AdminDeleteButton label="Delete class" />
-                    </form>
+                    <ClassLevelDeleteForm classLevelId={classLevel.id} />
                   ),
                 }))}
                 filters={branchFilters}
@@ -889,9 +894,17 @@ export default async function AcademicStructurePage({
                   ]}
                   empty="No subjects yet."
                   toolbarActions={
-                    <AdminActionDialog label="Add subject" title="Add subject">
-                      <SubjectForm branches={branchOptions} />
-                    </AdminActionDialog>
+                    <>
+                      <Link
+                        href="/admin/academics/subjects/print"
+                        className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Print subjects
+                      </Link>
+                      <AdminActionDialog label="Add subject" title="Add subject">
+                        <SubjectForm branches={branchOptions} />
+                      </AdminActionDialog>
+                    </>
                   }
                   records={schoolSubjects.map((subject) => ({
                     id: subject.id,

@@ -135,18 +135,19 @@ export function AdminRecordDialog({
   );
 }
 
-export function AdminDeleteButton({ label }: { label: string }) {
+export function AdminDeleteButton({ label, disabled = false }: { label: string; disabled?: boolean }) {
   return (
     <button
       type="submit"
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={(event) => {
         if (!window.confirm(`${label}? This action cannot be undone.`)) {
           event.preventDefault();
         }
       }}
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Trash2 size={16} aria-hidden="true" />
     </button>

@@ -1,8 +1,9 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, or } from "drizzle-orm";
+import { and, count, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -14,7 +15,9 @@ import {
   classLevels,
   classSections,
   classSubjects,
+  feeStructures,
   studentAcademicEvents,
+  studentAttendance,
   studentEnrollments,
   schools,
   schoolBranches,
@@ -1062,46 +1065,114 @@ export async function assignSubjectToClass(
   return { success: true };
 }
 
-export async function deleteClassLevel(formData: FormData): Promise<void> {
+export async function deleteClassLevel(
+  _previousState: AcademicActionState,
+  formData: FormData,
+): Promise<AcademicActionState> {
   const context = await requireSchoolPermission("school.settings.manage");
   const recordId = readRecordId(formData);
-  if (recordId === null || recordId === undefined) throw new Error("Invalid class deletion request.");
+  if (recordId === null || recordId === undefined) return { error: "Invalid class deletion request." };
 
-  const outcome = await db.transaction(async (tx) => {
-    const [classLevel] = await tx
-      .select({ id: classLevels.id, publicId: classLevels.publicId })
-      .from(classLevels)
-      .where(and(eq(classLevels.id, recordId), eq(classLevels.schoolId, context.schoolId)))
-      .for("update")
-      .limit(1);
-    if (!classLevel) return "not-found";
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const [classLevel] = await tx
+        .select({ id: classLevels.id, publicId: classLevels.publicId })
+        .from(classLevels)
+        .where(and(eq(classLevels.id, recordId), eq(classLevels.schoolId, context.schoolId)))
+        .for("update")
+        .limit(1);
+      if (!classLevel) return "not-found";
 
-    const [[sectionCount], [subjectCount]] = await Promise.all([
-      tx
-        .select({ total: count() })
-        .from(classSections)
-        .where(and(eq(classSections.schoolId, context.schoolId), eq(classSections.classLevelId, recordId))),
-      tx
-        .select({ total: count() })
-        .from(classSubjects)
-        .where(and(eq(classSubjects.schoolId, context.schoolId), eq(classSubjects.classLevelId, recordId))),
-    ]);
-    if (Number(sectionCount.total) + Number(subjectCount.total) > 0) return "in-use";
+      const [sectionRecords, subjectRecords, [feeStructureCount]] = await Promise.all([
+        tx.select({ id: classSections.id, publicId: classSections.publicId })
+          .from(classSections)
+          .where(and(eq(classSections.schoolId, context.schoolId), eq(classSections.classLevelId, recordId))),
+        tx.select({ id: classSubjects.id, publicId: classSubjects.publicId })
+          .from(classSubjects)
+          .where(and(eq(classSubjects.schoolId, context.schoolId), eq(classSubjects.classLevelId, recordId))),
+        tx.select({ total: count() })
+          .from(feeStructures)
+          .where(and(eq(feeStructures.schoolId, context.schoolId), eq(feeStructures.classLevelId, recordId))),
+      ]);
+      const sectionIds = sectionRecords.map((section) => section.id);
+      if (Number(feeStructureCount.total) > 0) return "has-fee-structures";
 
-    await tx
-      .delete(classLevels)
-      .where(and(eq(classLevels.id, classLevel.id), eq(classLevels.schoolId, context.schoolId)));
-    await writeAudit(tx, context, "academic.class_level.deleted", "class_level", classLevel.publicId, [
-      "deleted",
-    ]);
-    return "deleted";
-  });
-  if (outcome === "not-found") throw new Error("Class was not found in this school.");
-  if (outcome === "in-use") {
-    throw new Error("This class has sections or subject assignments. Remove those records before deleting the class.");
+      if (sectionIds.length > 0) {
+        const [enrollments, attendance, events] = await Promise.all([
+          tx.select({ total: count() }).from(studentEnrollments).where(and(
+            eq(studentEnrollments.schoolId, context.schoolId),
+            inArray(studentEnrollments.classSectionId, sectionIds),
+          )),
+          tx.select({ total: count() }).from(studentAttendance).where(and(
+            eq(studentAttendance.schoolId, context.schoolId),
+            inArray(studentAttendance.classSectionId, sectionIds),
+          )),
+          tx.select({ total: count() }).from(studentAcademicEvents).where(and(
+            eq(studentAcademicEvents.schoolId, context.schoolId),
+            or(
+              inArray(studentAcademicEvents.fromClassSectionId, sectionIds),
+              inArray(studentAcademicEvents.toClassSectionId, sectionIds),
+            ),
+          )),
+        ]);
+        if (Number(enrollments[0].total) + Number(attendance[0].total) + Number(events[0].total) > 0) {
+          return "has-student-history";
+        }
+      }
+
+      const routineConditions = [];
+      if (sectionIds.length > 0) routineConditions.push(inArray(classRoutines.classSectionId, sectionIds));
+      if (subjectRecords.length > 0) {
+        routineConditions.push(inArray(classRoutines.classSubjectId, subjectRecords.map((subject) => subject.id)));
+      }
+      const routines = routineConditions.length > 0
+        ? await tx.select({ id: classRoutines.id, publicId: classRoutines.publicId })
+            .from(classRoutines)
+            .where(and(eq(classRoutines.schoolId, context.schoolId), or(...routineConditions)))
+        : [];
+      for (const routine of routines) {
+        await tx.delete(classRoutines).where(and(
+          eq(classRoutines.id, routine.id),
+          eq(classRoutines.schoolId, context.schoolId),
+        ));
+        await writeAudit(tx, context, "academic.class_routine.deleted_with_class", "class_routine", routine.publicId, ["deleted"]);
+      }
+      for (const subject of subjectRecords) {
+        await tx.delete(classSubjects).where(and(
+          eq(classSubjects.id, subject.id),
+          eq(classSubjects.schoolId, context.schoolId),
+        ));
+        await writeAudit(tx, context, "academic.subject.class_assignment.deleted_with_class", "class_subject", subject.publicId, ["deleted"]);
+      }
+      for (const section of sectionRecords) {
+        await tx.delete(classSections).where(and(
+          eq(classSections.id, section.id),
+          eq(classSections.schoolId, context.schoolId),
+        ));
+        await writeAudit(tx, context, "academic.section.deleted_with_class", "class_section", section.publicId, ["deleted"]);
+      }
+      await tx.delete(classLevels).where(and(
+        eq(classLevels.id, classLevel.id),
+        eq(classLevels.schoolId, context.schoolId),
+      ));
+      await writeAudit(tx, context, "academic.class_level.deleted", "class_level", classLevel.publicId, ["deleted"]);
+      return "deleted";
+    });
+
+    if (outcome === "not-found") return { error: "Class was not found in this school." };
+    if (outcome === "has-fee-structures") {
+      return { error: "This class has fee structures. Reassign or remove those records before deletion; no data was changed." };
+    }
+    if (outcome === "has-student-history") {
+      return { error: "This class has student enrollments, attendance, or academic history. That history is preserved, so the class cannot be deleted." };
+    }
+  } catch (error) {
+    console.error("Class deletion failed; transaction rolled back.", error);
+    return { error: "The class could not be deleted. No changes were saved; check linked records and try again." };
   }
 
   revalidatePath("/admin/academics");
+  redirect("/admin/academics?section=classes&notice=class-deleted");
 }
 
 export async function deleteSubject(formData: FormData): Promise<void> {

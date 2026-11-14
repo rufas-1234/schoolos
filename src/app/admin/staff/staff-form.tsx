@@ -77,7 +77,7 @@ export function StaffForm({ record, accounts, branches, departments, designation
   const designationOptions = branchCatalogOptions(designations, selectedBranchId, record?.jobTitle);
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} noValidate className="space-y-5">
       {record && <input type="hidden" name="publicId" value={record.publicId} />}
       <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6" role="tablist" aria-label="Staff profile sections">
         {tabs.map((tab) => (

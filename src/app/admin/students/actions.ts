@@ -542,9 +542,13 @@ export async function updateStudent(
     return "updated";
   }).catch((error: unknown) => {
     if (isDuplicateEntryError(error)) return "duplicate-admission-number" as const;
-    throw error;
+    console.error("Student profile update failed; transaction rolled back.", error);
+    return "update-failed" as const;
   });
 
+  if (outcome === "update-failed") {
+    return { error: "Student record could not be saved. No changes were made; check the details and try again." };
+  }
   if (outcome === "student-not-found") return { error: "Student record was not found in this school." };
   if (outcome === "branch-mismatch") {
     return { error: "An assigned student cannot be moved to another branch by editing the profile." };

@@ -223,7 +223,7 @@ export default async function StaffDirectoryPage() {
         <div className="print:hidden flex gap-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
           <BriefcaseBusiness size={18} className="mt-0.5 shrink-0 text-violet-700" />
           <p className="text-sm leading-6 text-slate-600">
-            Staff may be linked to an existing school account, but this directory does not create accounts or assign roles. Academic teacher assignments are managed separately.
+            Staff may be linked to an existing school account, but this directory does not create accounts or assign permissions. Staff with the Teacher role are available for academic assignments.
           </p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import {
   AdminActionDialog,
   AdminDeleteButton,
@@ -9,6 +9,7 @@ import {
   type AdminTableFilter,
 } from "@/components/admin-data-table";
 import { RequiredMark } from "@/components/required-mark";
+import { deleteClassLevel, type AcademicActionState } from "./actions";
 import {
   ActionForm,
   Field,
@@ -30,6 +31,19 @@ import {
   updateSectionAssignment,
   updateSubjectTeacher,
 } from "./management-actions";
+
+export function ClassLevelDeleteForm({ classLevelId }: { classLevelId: number }) {
+  const [state, formAction, pending] = useActionState<AcademicActionState, FormData>(deleteClassLevel, {});
+
+  return (
+    <form action={formAction} className="flex flex-col items-start gap-1">
+      <input type="hidden" name="recordId" value={classLevelId} />
+      <AdminDeleteButton label="Delete class" disabled={pending} />
+      {state.error && <p role="alert" className="max-w-64 text-xs text-rose-700">{state.error}</p>}
+      {pending && <span role="status" className="text-xs text-slate-500">Deleting class...</span>}
+    </form>
+  );
+}
 
 export function ClassLevelStatusForm({
   classLevelId,
