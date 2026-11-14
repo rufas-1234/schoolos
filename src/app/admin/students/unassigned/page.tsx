@@ -36,6 +36,7 @@ export default async function UnassignedStudentsPage() {
         db
           .select({
             id: classSections.id,
+            branchId: schoolBranches.id,
             className: classLevels.name,
             sectionName: classSections.name,
             branchName: schoolBranches.name,
@@ -93,7 +94,12 @@ export default async function UnassignedStudentsPage() {
   const canUpdate = context.grantedPermissions.includes("students.update");
   const sectionOptions = sections.map((section) => ({
     id: section.id,
-    label: `${section.branchName} · ${section.className} ${section.sectionName}`,
+    branchId: section.branchId,
+    label: `${section.className} ${section.sectionName}`,
+  }));
+  const branchOptions = branches.map((branch) => ({
+    id: branch.id,
+    label: branch.name,
   }));
   const studentOptions = unassignedStudents.map((student) => ({
     id: student.id,
@@ -149,7 +155,11 @@ export default async function UnassignedStudentsPage() {
         requireSearchCriteria
         toolbarActions={canUpdate && studentOptions.length > 0 && sectionOptions.length > 0 ? (
           <AdminActionDialog label="Place student" title="Place an unassigned student">
-            <StudentPlacementForm students={studentOptions} sections={sectionOptions} />
+            <StudentPlacementForm
+              branches={branchOptions}
+              students={studentOptions}
+              sections={sectionOptions}
+            />
           </AdminActionDialog>
         ) : null}
         emptyMessage={activeYear

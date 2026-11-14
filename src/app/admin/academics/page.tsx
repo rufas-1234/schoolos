@@ -469,10 +469,10 @@ export default async function AcademicStructurePage({
 
   const branchOptions = branches
     .filter((branch) => branch.status === "active")
-    .map((branch) => ({ id: branch.id, label: `${branch.name} · ${branch.code}` }));
+    .map((branch) => ({ id: branch.id, label: branch.name }));
   const allBranchOptions = branches.map((branch) => ({
     id: branch.id,
-    label: `${branch.name} · ${branch.code}${branch.status === "inactive" ? " · inactive" : ""}`,
+    label: `${branch.name}${branch.status === "inactive" ? " · inactive" : ""}`,
   }));
   const yearOptions = years
     .filter((year) => year.status !== "archived")
@@ -480,34 +480,46 @@ export default async function AcademicStructurePage({
   const allYearOptions = years.map((year) => ({ id: year.id, label: `${year.name} · ${year.status}` }));
   const classOptions = classes.filter((classLevel) => classLevel.status === "active").map((classLevel) => ({
     id: classLevel.id,
-    label: `${classLevel.branchName} · ${classLevel.name} (${classLevel.code})`,
+    branchId: classLevel.branchId,
+    label: classLevel.name,
   }));
   const subjectOptions = schoolSubjects.map((subject) => ({
     id: subject.id,
-    label: `${subject.branchName} · ${subject.name} (${subject.code}) · ${subject.subjectType}`,
+    branchId: subject.branchId,
+    label: subject.name,
   }));
   const teacherOptions = schoolTeachers
     .filter((teacher) => teacher.status === "active")
     .map((teacher) => ({
       id: teacher.id,
-      label: `${teacher.branchName} · ${teacher.firstName} ${teacher.lastName}${teacher.employeeCode ? ` · ${teacher.employeeCode}` : ""}`,
+      branchId: teacher.branchId,
+      label: `${teacher.firstName} ${teacher.lastName}`,
     }));
   const sectionOptions = sections.filter((section) => section.classStatus === "active").map((section) => ({
     id: section.id,
-    label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
+    branchId: section.branchId,
+    classLevelId: section.classLevelId,
+    label: `${section.className} ${section.name} · ${section.yearName}`,
   }));
   const assignmentOptions = subjectAssignments.map((assignment) => ({
     id: assignment.id,
-    label: `${assignment.branchName} · ${assignment.className} · ${assignment.subjectName} (${assignment.subjectCode})`,
+    branchId: assignment.branchId,
+    label: `${assignment.className} · ${assignment.subjectName}`,
+  }));
+  const routineAssignmentOptions = subjectAssignments.map((assignment) => ({
+    id: assignment.id,
+    classLevelId: assignment.classLevelId,
+    label: assignment.subjectName,
   }));
   const roomOptions = rooms.map((room) => ({
     id: room.id,
-    label: `${room.branchName} · ${room.roomNumber} · capacity ${room.capacity}`,
+    branchId: room.branchId,
+    label: room.roomNumber,
   }));
   const classFilterOptions = classes.filter((classLevel) => classLevel.status === "active").map((classLevel) => ({
     id: classLevel.id,
     branchId: classLevel.branchId,
-    label: `${classLevel.branchName} · ${classLevel.name}`,
+    label: classLevel.name,
   }));
   const branchFilters: AdminTableFilter[] = [{
     key: "branchId",
@@ -551,13 +563,14 @@ export default async function AcademicStructurePage({
     id: section.id,
     branchId: section.branchId,
     classLevelId: section.classLevelId,
-    label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
+    label: `${section.className} ${section.name} · ${section.yearName}`,
   }));
   const activeSectionOptions = sections
     .filter((section) => section.yearStatus === "active" && section.classStatus === "active")
     .map((section) => ({
       id: section.id,
-      label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
+      branchId: section.branchId,
+      label: `${section.className} ${section.name}`,
     }));
   const eligibleStudentOptions = eligibleStudents.map((student) => ({
     id: student.id,
@@ -792,10 +805,10 @@ export default async function AcademicStructurePage({
                 toolbarActions={
                   <>
                     <AdminActionDialog label="Add sections" title="Add class sections">
-                      <ClassSectionsForm years={yearOptions} classes={classOptions} />
+                      <ClassSectionsForm branches={branchOptions} years={yearOptions} classes={classOptions} />
                     </AdminActionDialog>
                     <AdminActionDialog label="Assign section capacity or teacher" title="Update section assignments">
-                      <SectionAssignmentForm sections={sectionOptions} teachers={teacherOptions} />
+                      <SectionAssignmentForm branches={branchOptions} sections={sectionOptions} teachers={teacherOptions} />
                     </AdminActionDialog>
                   </>
                 }
@@ -826,8 +839,14 @@ export default async function AcademicStructurePage({
                   ),
                   editForm: (
                     <div className="space-y-3">
-                      <ClassSectionForm years={allYearOptions} classes={classOptions} record={section} />
+                      <ClassSectionForm
+                        branches={allBranchOptions}
+                        years={allYearOptions}
+                        classes={classOptions}
+                        record={section}
+                      />
                       <SectionAssignmentForm
+                        branches={allBranchOptions}
                         sections={sectionOptions}
                         teachers={teacherOptions}
                         record={{
@@ -908,10 +927,14 @@ export default async function AcademicStructurePage({
                   toolbarActions={
                     <>
                       <AdminActionDialog label="Assign subject to class" title="Assign subject to class">
-                        <ClassSubjectForm classes={classOptions} subjects={subjectOptions} />
+                        <ClassSubjectForm branches={branchOptions} classes={classOptions} subjects={subjectOptions} />
                       </AdminActionDialog>
                       <AdminActionDialog label="Assign subject teacher" title="Assign subject teacher">
-                        <SubjectTeacherForm assignments={assignmentOptions} teachers={teacherOptions} />
+                        <SubjectTeacherForm
+                          branches={branchOptions}
+                          assignments={assignmentOptions}
+                          teachers={teacherOptions}
+                        />
                       </AdminActionDialog>
                     </>
                   }
@@ -931,11 +954,13 @@ export default async function AcademicStructurePage({
                     editForm: (
                       <div className="space-y-3">
                         <ClassSubjectForm
+                          branches={allBranchOptions}
                           classes={classOptions}
                           subjects={subjectOptions}
                           record={assignment}
                         />
                         <SubjectTeacherForm
+                          branches={allBranchOptions}
                           assignments={assignmentOptions}
                           teachers={teacherOptions}
                           record={{ assignmentId: assignment.id, teacherId: assignment.teacherId }}
@@ -966,6 +991,7 @@ export default async function AcademicStructurePage({
                 toolbarActions={
                   <AdminActionDialog label="Assign optional subject" title="Assign optional subject">
                     <ClassSubjectForm
+                      branches={branchOptions}
                       classes={classOptions}
                       subjects={subjectOptions}
                       defaultCompulsory={false}
@@ -989,11 +1015,13 @@ export default async function AcademicStructurePage({
                     editForm: (
                       <div className="space-y-3">
                         <ClassSubjectForm
+                          branches={allBranchOptions}
                           classes={classOptions}
                           subjects={subjectOptions}
                           record={assignment}
                         />
                         <SubjectTeacherForm
+                          branches={allBranchOptions}
                           assignments={assignmentOptions}
                           teachers={teacherOptions}
                           record={{ assignmentId: assignment.id, teacherId: assignment.teacherId }}
@@ -1071,13 +1099,14 @@ export default async function AcademicStructurePage({
                 branches={branchOptions}
                 classes={classFilterOptions}
                 sections={sectionFilterOptions}
-                assignments={assignmentOptions}
+                assignments={routineAssignmentOptions}
                 rooms={roomOptions}
                 toolbarActions={
                   <AdminActionDialog label="Add routine" title="Add class routine">
                     <ClassRoutineForm
+                      branches={branchOptions}
                       sections={sectionOptions}
-                      assignments={assignmentOptions}
+                      assignments={routineAssignmentOptions}
                       rooms={roomOptions}
                     />
                   </AdminActionDialog>
@@ -1152,19 +1181,30 @@ export default async function AcademicStructurePage({
                     <>
                       {canManageEnrollments && (
                         <AdminActionDialog label="Place student" title="Place student in a class">
-                          <StudentPlacementForm students={eligibleStudentOptions} sections={activeSectionOptions} />
+                          <StudentPlacementForm
+                            branches={branchOptions}
+                            students={eligibleStudentOptions}
+                            sections={activeSectionOptions}
+                          />
                         </AdminActionDialog>
                       )}
                       {canManageEnrollments && (
                         <AdminActionDialog label="Manage enrollment" title="Manage student enrollment">
                           <EnrollmentOperationForm
+                            branches={branchOptions}
                             enrollments={enrollmentOptions}
                             years={yearOptions}
                             sections={sections
-                              .filter((section) => section.yearStatus !== "archived")
+                              .filter(
+                                (section) =>
+                                  section.yearStatus !== "archived" &&
+                                  section.classStatus === "active",
+                              )
                               .map((section) => ({
                                 id: section.id,
-                                label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
+                                branchId: section.branchId,
+                                academicYearId: section.academicYearId,
+                                label: `${section.className} ${section.name}`,
                               }))}
                           />
                         </AdminActionDialog>

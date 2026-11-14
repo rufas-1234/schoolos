@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { RequiredMark } from "@/components/required-mark";
 import {
   createAcademicTerm,
@@ -121,14 +121,22 @@ export function ClassLevelForm({
 }
 
 export function ClassSectionForm({
+  branches,
   years,
   classes,
   record,
 }: {
+  branches: Option[];
   years: Option[];
-  classes: Option[];
+  classes: (Option & { branchId: number })[];
   record?: { id: number; academicYearId: number; classLevelId: number; name: string };
 }) {
+  const [branchId, setBranchId] = useState(
+    String(classes.find((classLevel) => classLevel.id === record?.classLevelId)?.branchId ?? ""),
+  );
+  const [classLevelId, setClassLevelId] = useState(String(record?.classLevelId ?? ""));
+  const availableClasses = classes.filter((classLevel) => String(classLevel.branchId) === branchId);
+
   return (
     <ActionForm
       title={record ? "Edit class section" : "Add class section"}
@@ -137,7 +145,42 @@ export function ClassSectionForm({
       recordId={record?.id}
     >
       <SelectField label="Academic year" name="academicYearId" options={years} defaultValue={record?.academicYearId} />
-      <SelectField label="Class" name="classLevelId" options={classes} defaultValue={record?.classLevelId} />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch <RequiredMark />
+        <select
+          required
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setClassLevelId("");
+          }}
+          disabled={branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Class <RequiredMark />
+        <select
+          name="classLevelId"
+          required
+          value={classLevelId}
+          onChange={(event) => setClassLevelId(event.target.value)}
+          disabled={!branchId || availableClasses.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!branchId ? "Choose a branch first" : "No classes available for this branch"}
+          </option>
+          {availableClasses.map((classLevel) => (
+            <option key={classLevel.id} value={classLevel.id}>{classLevel.label}</option>
+          ))}
+        </select>
+      </label>
       <Field label="Section name" name="name" placeholder="Section 1" defaultValue={record?.name} />
       <p className="text-xs text-slate-500">
         For example, create Section 1, Section 2, and Section 3 under P1.
@@ -147,12 +190,18 @@ export function ClassSectionForm({
 }
 
 export function ClassSectionsForm({
+  branches,
   years,
   classes,
 }: {
+  branches: Option[];
   years: Option[];
-  classes: Option[];
+  classes: (Option & { branchId: number })[];
 }) {
+  const [branchId, setBranchId] = useState("");
+  const [classLevelId, setClassLevelId] = useState("");
+  const availableClasses = classes.filter((classLevel) => String(classLevel.branchId) === branchId);
+
   return (
     <ActionForm
       title="Add class sections"
@@ -160,7 +209,42 @@ export function ClassSectionsForm({
       submitLabel="Create sections"
     >
       <SelectField label="Academic year" name="academicYearId" options={years} />
-      <SelectField label="Class" name="classLevelId" options={classes} />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch <RequiredMark />
+        <select
+          required
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setClassLevelId("");
+          }}
+          disabled={branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Class <RequiredMark />
+        <select
+          name="classLevelId"
+          required
+          value={classLevelId}
+          onChange={(event) => setClassLevelId(event.target.value)}
+          disabled={!branchId || availableClasses.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!branchId ? "Choose a branch first" : "No classes available for this branch"}
+          </option>
+          {availableClasses.map((classLevel) => (
+            <option key={classLevel.id} value={classLevel.id}>{classLevel.label}</option>
+          ))}
+        </select>
+      </label>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Section names <RequiredMark />
         <textarea
@@ -211,16 +295,26 @@ export function SubjectForm({
 }
 
 export function ClassSubjectForm({
+  branches,
   classes,
   subjects,
   defaultCompulsory = true,
   record,
 }: {
-  classes: Option[];
-  subjects: Option[];
+  branches: Option[];
+  classes: (Option & { branchId: number })[];
+  subjects: (Option & { branchId: number })[];
   defaultCompulsory?: boolean;
   record?: { id: number; classLevelId: number; subjectId: number; isCompulsory: boolean };
 }) {
+  const [branchId, setBranchId] = useState(
+    String(classes.find((classLevel) => classLevel.id === record?.classLevelId)?.branchId ?? ""),
+  );
+  const [classLevelId, setClassLevelId] = useState(String(record?.classLevelId ?? ""));
+  const [subjectId, setSubjectId] = useState(String(record?.subjectId ?? ""));
+  const availableClasses = classes.filter((classLevel) => String(classLevel.branchId) === branchId);
+  const availableSubjects = subjects.filter((subject) => String(subject.branchId) === branchId);
+
   return (
     <ActionForm
       title={record ? "Edit class subject" : "Assign subject to class"}
@@ -228,8 +322,64 @@ export function ClassSubjectForm({
       submitLabel={record ? "Save changes" : "Assign subject"}
       recordId={record?.id}
     >
-      <SelectField label="Class" name="classLevelId" options={classes} defaultValue={record?.classLevelId} />
-      <SelectField label="Subject" name="subjectId" options={subjects} defaultValue={record?.subjectId} />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch <RequiredMark />
+        <select
+          required
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setClassLevelId("");
+            setSubjectId("");
+          }}
+          disabled={branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Class <RequiredMark />
+        <select
+          name="classLevelId"
+          required
+          value={classLevelId}
+          onChange={(event) => {
+            setClassLevelId(event.target.value);
+            setSubjectId("");
+          }}
+          disabled={!branchId || availableClasses.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!branchId ? "Choose a branch first" : "No classes available for this branch"}
+          </option>
+          {availableClasses.map((classLevel) => (
+            <option key={classLevel.id} value={classLevel.id}>{classLevel.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Subject <RequiredMark />
+        <select
+          name="subjectId"
+          required
+          value={availableSubjects.some((subject) => String(subject.id) === subjectId) ? subjectId : ""}
+          onChange={(event) => setSubjectId(event.target.value)}
+          disabled={!classLevelId || availableSubjects.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!classLevelId ? "Choose a class first" : "No subjects available for this branch"}
+          </option>
+          {availableSubjects.map((subject) => (
+            <option key={subject.id} value={subject.id}>{subject.label}</option>
+          ))}
+        </select>
+      </label>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Requirement <RequiredMark />
         <select

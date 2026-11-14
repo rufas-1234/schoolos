@@ -169,16 +169,19 @@ export function ClassRoomForm({
 }
 
 export function ClassRoutineForm({
+  branches,
   sections,
   assignments,
   rooms,
   record,
 }: {
-  sections: Option[];
-  assignments: Option[];
-  rooms: Option[];
+  branches: Option[];
+  sections: (Option & { branchId: number; classLevelId: number })[];
+  assignments: (Option & { classLevelId: number })[];
+  rooms: (Option & { branchId: number })[];
   record?: {
     id: number;
+    branchId: number;
     classSectionId: number;
     classSubjectId: number;
     classRoomId: number | null;
@@ -187,6 +190,19 @@ export function ClassRoutineForm({
     endsAt: string;
   };
 }) {
+  const [branchId, setBranchId] = useState(String(record?.branchId ?? ""));
+  const [sectionId, setSectionId] = useState(String(record?.classSectionId ?? ""));
+  const [assignmentId, setAssignmentId] = useState(String(record?.classSubjectId ?? ""));
+  const [roomId, setRoomId] = useState(String(record?.classRoomId ?? ""));
+  const availableSections = sections.filter((section) => String(section.branchId) === branchId);
+  const selectedSection = availableSections.find((section) => String(section.id) === sectionId);
+  const availableAssignments = selectedSection
+    ? assignments.filter((assignment) => assignment.classLevelId === selectedSection.classLevelId)
+    : [];
+  const availableRooms = selectedSection
+    ? rooms.filter((room) => room.branchId === selectedSection.branchId)
+    : [];
+
   return (
     <ActionForm
       title={record ? "Edit class routine" : "Add class routine"}
@@ -194,17 +210,84 @@ export function ClassRoutineForm({
       submitLabel={record ? "Save changes" : "Add to routine"}
       recordId={record?.id}
     >
-      <SelectField label="Class section" name="sectionId" options={sections} defaultValue={record?.classSectionId} />
-      <SelectField label="Class subject" name="classSubjectId" options={assignments} defaultValue={record?.classSubjectId} />
-      <SelectField
-        label="Classroom (optional)"
-        name="classRoomId"
-        options={rooms}
-        required={false}
-        allowEmpty
-        emptyLabel="No room assigned"
-        defaultValue={record?.classRoomId}
-      />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch <RequiredMark />
+        <select
+          required
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setSectionId("");
+            setAssignmentId("");
+            setRoomId("");
+          }}
+          disabled={branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Class section <RequiredMark />
+        <select
+          name="sectionId"
+          required
+          value={sectionId}
+          onChange={(event) => {
+            setSectionId(event.target.value);
+            setAssignmentId("");
+            setRoomId("");
+          }}
+          disabled={!branchId || availableSections.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!branchId ? "Choose a branch first" : "No class sections available for this branch"}
+          </option>
+          {availableSections.map((section) => (
+            <option key={section.id} value={section.id}>{section.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Subject for this class <RequiredMark />
+        <select
+          name="classSubjectId"
+          required
+          value={availableAssignments.some((assignment) => String(assignment.id) === assignmentId) ? assignmentId : ""}
+          onChange={(event) => setAssignmentId(event.target.value)}
+          disabled={availableAssignments.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!selectedSection ? "Choose a class section first" : "No subjects assigned to this class"}
+          </option>
+          {availableAssignments.map((assignment) => (
+            <option key={assignment.id} value={assignment.id}>{assignment.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Classroom (optional)
+        <select
+          name="classRoomId"
+          value={availableRooms.some((room) => String(room.id) === roomId) ? roomId : ""}
+          onChange={(event) => setRoomId(event.target.value)}
+          disabled={!selectedSection || availableRooms.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">No room assigned</option>
+          {availableRooms.map((room) => (
+            <option key={room.id} value={room.id}>{room.label}</option>
+          ))}
+        </select>
+      </label>
+      <p className="text-xs text-slate-500">
+        Choose a branch and section first; only subjects assigned to that class and classrooms at that branch are available.
+      </p>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Day <RequiredMark />
         <select
@@ -368,8 +451,8 @@ export function ClassRoutineList({
   branches: Option[];
   classes: { id: number; branchId: number; label: string }[];
   sections: { id: number; branchId: number; classLevelId: number; label: string }[];
-  assignments: Option[];
-  rooms: Option[];
+  assignments: (Option & { classLevelId: number })[];
+  rooms: (Option & { branchId: number })[];
   routines: {
     id: number;
     publicId: string;
@@ -409,6 +492,12 @@ export function ClassRoutineList({
 
   return (
     <div className="space-y-4">
+      <div className="rounded-2xl border border-violet-100 bg-violet-50/60 px-4 py-3">
+        <p className="text-sm font-semibold text-slate-800">Build the weekly timetable</p>
+        <p className="mt-1 text-sm text-slate-600">
+          Select a branch, class, and section to view its routine. The list updates as you choose each filter.
+        </p>
+      </div>
       <div className="print:hidden grid gap-3 sm:grid-cols-3">
         <RoutineFilter
           label="Branch"
@@ -465,6 +554,7 @@ export function ClassRoutineList({
             actions: <div className="flex items-center gap-3">
                 <AdminRecordDialog title="Edit class routine">
                   <ClassRoutineForm
+                    branches={branches}
                     sections={sections}
                     assignments={assignments}
                     rooms={rooms}
@@ -484,7 +574,7 @@ export function ClassRoutineList({
           }
           toolbarActions={toolbarActions}
           requireSearchCriteria
-          searchCriteriaSelected={Boolean(branchId || classLevelId || classSectionId)}
+          searchCriteriaSelected={Boolean(branchId && classLevelId && classSectionId)}
       />
     </div>
   );
@@ -565,77 +655,227 @@ export function AcademicHolidayForm({
 }
 
 export function SectionAssignmentForm({
+  branches,
   sections,
   teachers,
   record,
 }: {
-  sections: Option[];
-  teachers: Option[];
+  branches: Option[];
+  sections: (Option & { branchId: number })[];
+  teachers: (Option & { branchId: number })[];
   record?: { sectionId: number; capacity: number | null; teacherId: number | null };
 }) {
+  const [branchId, setBranchId] = useState(
+    String(sections.find((section) => section.id === record?.sectionId)?.branchId ?? ""),
+  );
+  const [sectionId, setSectionId] = useState(String(record?.sectionId ?? ""));
+  const [teacherId, setTeacherId] = useState(String(record?.teacherId ?? ""));
+  const availableSections = sections.filter((section) => String(section.branchId) === branchId);
+  const availableTeachers = teachers.filter((teacher) => String(teacher.branchId) === branchId);
+
   return (
     <ActionForm
       title="Set class capacity and class teacher"
       action={updateSectionAssignment}
       submitLabel="Save class assignment"
     >
-      <SelectField label="Class section / stream" name="sectionId" options={sections} defaultValue={record?.sectionId} />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch <RequiredMark />
+        <select
+          required
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setSectionId("");
+            setTeacherId("");
+          }}
+          disabled={branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Class section / stream <RequiredMark />
+        <select
+          name="sectionId"
+          required
+          value={sectionId}
+          onChange={(event) => {
+            setSectionId(event.target.value);
+            setTeacherId("");
+          }}
+          disabled={!branchId || availableSections.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!branchId ? "Choose a branch first" : "No class sections available for this branch"}
+          </option>
+          {availableSections.map((section) => (
+            <option key={section.id} value={section.id}>{section.label}</option>
+          ))}
+        </select>
+      </label>
       <Field label="Student capacity (leave blank for unlimited)" name="capacity" type="number" required={false} defaultValue={record?.capacity} />
-      <SelectField
-        label="Class teacher (optional)"
-        name="teacherId"
-        options={teachers}
-        required={false}
-        allowEmpty
-        emptyLabel="Unassigned"
-        defaultValue={record?.teacherId}
-      />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Class teacher (optional)
+        <select
+          name="teacherId"
+          value={availableTeachers.some((teacher) => String(teacher.id) === teacherId) ? teacherId : ""}
+          onChange={(event) => setTeacherId(event.target.value)}
+          disabled={!sectionId || availableTeachers.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">Unassigned</option>
+          {availableTeachers.map((teacher) => (
+            <option key={teacher.id} value={teacher.id}>{teacher.label}</option>
+          ))}
+        </select>
+      </label>
     </ActionForm>
   );
 }
 
 export function SubjectTeacherForm({
+  branches,
   assignments,
   teachers,
   record,
 }: {
-  assignments: Option[];
-  teachers: Option[];
+  branches: Option[];
+  assignments: (Option & { branchId: number })[];
+  teachers: (Option & { branchId: number })[];
   record?: { assignmentId: number; teacherId: number | null };
 }) {
+  const [branchId, setBranchId] = useState(
+    String(assignments.find((assignment) => assignment.id === record?.assignmentId)?.branchId ?? ""),
+  );
+  const [assignmentId, setAssignmentId] = useState(String(record?.assignmentId ?? ""));
+  const [teacherId, setTeacherId] = useState(String(record?.teacherId ?? ""));
+  const availableAssignments = assignments.filter((assignment) => String(assignment.branchId) === branchId);
+  const availableTeachers = teachers.filter((teacher) => String(teacher.branchId) === branchId);
+
   return (
     <ActionForm
       title="Assign a subject teacher"
       action={updateSubjectTeacher}
       submitLabel="Save subject teacher"
     >
-      <SelectField label="Class subject" name="assignmentId" options={assignments} defaultValue={record?.assignmentId} />
-      <SelectField
-        label="Teacher"
-        name="teacherId"
-        options={teachers}
-        required={false}
-        allowEmpty
-        emptyLabel="Unassigned"
-        defaultValue={record?.teacherId}
-      />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch <RequiredMark />
+        <select
+          required
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setAssignmentId("");
+            setTeacherId("");
+          }}
+          disabled={branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Class subject <RequiredMark />
+        <select
+          name="assignmentId"
+          required
+          value={assignmentId}
+          onChange={(event) => {
+            setAssignmentId(event.target.value);
+            setTeacherId("");
+          }}
+          disabled={!branchId || availableAssignments.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!branchId ? "Choose a branch first" : "No class subjects available for this branch"}
+          </option>
+          {availableAssignments.map((assignment) => (
+            <option key={assignment.id} value={assignment.id}>{assignment.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Teacher
+        <select
+          name="teacherId"
+          value={availableTeachers.some((teacher) => String(teacher.id) === teacherId) ? teacherId : ""}
+          onChange={(event) => setTeacherId(event.target.value)}
+          disabled={!assignmentId || availableTeachers.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">Unassigned</option>
+          {availableTeachers.map((teacher) => (
+            <option key={teacher.id} value={teacher.id}>{teacher.label}</option>
+          ))}
+        </select>
+      </label>
     </ActionForm>
   );
 }
 
 export function StudentPlacementForm({
+  branches,
   students,
   sections,
 }: {
+  branches: Option[];
   students: Option[];
-  sections: Option[];
+  sections: (Option & { branchId: number })[];
 }) {
   const [eventType, setEventType] = useState("initial_placement");
+  const [branchId, setBranchId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const availableSections = sections.filter((section) => String(section.branchId) === branchId);
 
   return (
     <ActionForm title="Place a student in a class" action={placeStudent} submitLabel="Place student">
       <SelectField label="Admitted / active student" name="studentId" options={students} />
-      <SelectField label="Active-year class section" name="sectionId" options={sections} />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch <RequiredMark />
+        <select
+          required
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setSectionId("");
+          }}
+          disabled={branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Active-year class section <RequiredMark />
+        <select
+          name="sectionId"
+          required
+          value={sectionId}
+          onChange={(event) => setSectionId(event.target.value)}
+          disabled={!branchId || availableSections.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            {!branchId ? "Choose a branch first" : "No class sections available for this branch"}
+          </option>
+          {availableSections.map((section) => (
+            <option key={section.id} value={section.id}>{section.label}</option>
+          ))}
+        </select>
+      </label>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Placement type <RequiredMark />
         <select
@@ -661,16 +901,26 @@ export function StudentPlacementForm({
 }
 
 export function EnrollmentOperationForm({
+  branches,
   enrollments,
   years,
   sections,
 }: {
+  branches: Option[];
   enrollments: Option[];
   years: Option[];
-  sections: Option[];
+  sections: (Option & { branchId: number; academicYearId: number })[];
 }) {
   const [operation, setOperation] = useState("promote");
   const needsDestination = operation !== "transfer_out" && operation !== "graduate";
+  const [yearId, setYearId] = useState("");
+  const [branchId, setBranchId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const availableSections = sections.filter(
+    (section) =>
+      String(section.academicYearId) === yearId &&
+      String(section.branchId) === branchId,
+  );
 
   return (
     <ActionForm
@@ -695,22 +945,65 @@ export function EnrollmentOperationForm({
           <option value="graduate">Graduate</option>
         </select>
       </label>
-      <SelectField
-        label="Destination academic year (not needed for transfer-out / graduation)"
-        name="targetYearId"
-        options={years}
-        required={needsDestination}
-        allowEmpty
-        emptyLabel="No destination year"
-      />
-      <SelectField
-        label="Destination class section (not needed for transfer-out / graduation)"
-        name="targetSectionId"
-        options={sections}
-        required={needsDestination}
-        allowEmpty
-        emptyLabel="No destination section"
-      />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Destination academic year (not needed for transfer-out / graduation) {needsDestination && <RequiredMark />}
+        <select
+          name="targetYearId"
+          required={needsDestination}
+          value={yearId}
+          onChange={(event) => {
+            setYearId(event.target.value);
+            setSectionId("");
+          }}
+          disabled={!needsDestination || years.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">{needsDestination ? "Choose a destination year" : "No destination year"}</option>
+          {years.map((year) => (
+            <option key={year.id} value={year.id}>{year.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Destination branch {needsDestination && <RequiredMark />}
+        <select
+          required={needsDestination}
+          value={branchId}
+          onChange={(event) => {
+            setBranchId(event.target.value);
+            setSectionId("");
+          }}
+          disabled={!needsDestination || branches.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">{needsDestination ? "Choose a branch" : "No destination branch"}</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Destination class section (not needed for transfer-out / graduation) {needsDestination && <RequiredMark />}
+        <select
+          name="targetSectionId"
+          required={needsDestination}
+          value={sectionId}
+          onChange={(event) => setSectionId(event.target.value)}
+          disabled={!needsDestination || !yearId || !branchId || availableSections.length === 0}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">
+            {!needsDestination
+              ? "No destination section"
+              : !yearId || !branchId
+                ? "Choose a year and branch first"
+                : "No class sections for this year and branch"}
+          </option>
+          {availableSections.map((section) => (
+            <option key={section.id} value={section.id}>{section.label}</option>
+          ))}
+        </select>
+      </label>
       <Field
         label="Destination school"
         name="externalInstitution"

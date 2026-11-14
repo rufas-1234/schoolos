@@ -9,6 +9,7 @@ import {
   academicYears,
   classLevels,
   classSections,
+  schoolBranches,
   studentAcademicEvents,
   studentEnrollments,
   students,
@@ -19,15 +20,22 @@ import { EnrollmentOperationForm } from "../../academics/management-forms";
 export default async function StudentPromotionPage() {
   const context = await requireSchoolPermission("students.view");
   const canUpdate = context.grantedPermissions.includes("students.update");
-  const [years, sections, enrollments, events] = await Promise.all([
+  const [years, branches, sections, enrollments, events] = await Promise.all([
     db
       .select({ id: academicYears.id, name: academicYears.name, status: academicYears.status })
       .from(academicYears)
       .where(and(eq(academicYears.schoolId, context.schoolId), ne(academicYears.status, "archived")))
       .orderBy(asc(academicYears.startDate)),
     db
+      .select({ id: schoolBranches.id, name: schoolBranches.name })
+      .from(schoolBranches)
+      .where(eq(schoolBranches.schoolId, context.schoolId))
+      .orderBy(asc(schoolBranches.name)),
+    db
       .select({
         id: classSections.id,
+        academicYearId: classSections.academicYearId,
+        branchId: classLevels.branchId,
         yearName: academicYears.name,
         yearStatus: academicYears.status,
         className: classLevels.name,
@@ -104,7 +112,13 @@ export default async function StudentPromotionPage() {
   }));
   const sectionOptions = sections.map((section) => ({
     id: section.id,
-    label: `${section.className} ${section.sectionName} · ${section.yearName}`,
+    branchId: section.branchId,
+    academicYearId: section.academicYearId,
+    label: `${section.className} ${section.sectionName}`,
+  }));
+  const branchOptions = branches.map((branch) => ({
+    id: branch.id,
+    label: branch.name,
   }));
   const eventFilters: AdminTableFilter[] = [{
     key: "eventType",
@@ -130,6 +144,7 @@ export default async function StudentPromotionPage() {
         {canUpdate && enrollmentOptions.length > 0 && (
           <AdminActionDialog label="Record operation" title="Promote or transfer students">
             <EnrollmentOperationForm
+              branches={branchOptions}
               enrollments={enrollmentOptions}
               years={yearOptions}
               sections={sectionOptions}
