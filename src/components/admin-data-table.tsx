@@ -188,6 +188,7 @@ export function AdminDataTable({
   initialQuery = "",
   emptyMessage,
   hideDefaultView = false,
+  showRowNumber = true,
 }: {
   title: string;
   columns: AdminTableColumn[];
@@ -200,6 +201,7 @@ export function AdminDataTable({
   initialQuery?: string;
   emptyMessage: string;
   hideDefaultView?: boolean;
+  showRowNumber?: boolean;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -283,9 +285,9 @@ export function AdminDataTable({
       return `"${safeValue.replaceAll('"', '""')}"`;
     };
     const csvRows = [
-      ["No.", ...columns.map((column) => column.label)],
+      [...(showRowNumber ? ["No."] : []), ...columns.map((column) => column.label)],
       ...filteredRows.map((row, index) => [
-        String(index + 1),
+        ...(showRowNumber ? [String(index + 1)] : []),
         ...columns.map((column) => row.values[column.key] ?? ""),
       ]),
     ];
@@ -401,7 +403,9 @@ export function AdminDataTable({
             <table className="w-full min-w-max border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold">No.</th>
+                  {showRowNumber && (
+                    <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold">No.</th>
+                  )}
                   {columns.map((column) => (
                     <th scope="col" key={column.key} className="whitespace-nowrap px-4 py-3 font-semibold">
                       <button
@@ -425,9 +429,11 @@ export function AdminDataTable({
               <tbody className="divide-y divide-slate-100">
                 {(printAll ? visibleRows : pageRows).map((row, index) => (
                   <tr key={row.id} className="align-top text-slate-700 hover:bg-violet-50/40">
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-500">
-                      {(printAll ? 0 : firstRowNumber - 1) + index + 1}
-                    </td>
+                    {showRowNumber && (
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-500">
+                        {(printAll ? 0 : firstRowNumber - 1) + index + 1}
+                      </td>
+                    )}
                     {columns.map((column) => (
                       <td key={column.key} className="px-4 py-3">
                         {row.values[column.key] || <span className="text-slate-400">—</span>}

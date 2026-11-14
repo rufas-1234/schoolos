@@ -161,10 +161,7 @@ export default async function StudentsPage({
       group.classes.set(record.classLevelId, record.className);
     }
     if (record.classSectionId !== null && record.sectionName) {
-      group.sections.set(
-        record.classSectionId,
-        `${record.sectionName} · ${record.academicYearName ?? "Academic year"}`,
-      );
+      group.sections.set(record.classSectionId, record.sectionName);
     }
     if (record.academicYearName) group.years.add(record.academicYearName);
     if (record.rollNumber) group.rollNumbers.add(record.rollNumber);
@@ -354,27 +351,21 @@ export default async function StudentsPage({
           key={tableInitialSearch}
           title="Student directory"
           columns={[
-            { key: "studentId", label: "Student ID" },
-            { key: "admissionNumber", label: "Admission number" },
-            { key: "name", label: "Student name" },
-            { key: "fatherName", label: "Father / guardian" },
-            { key: "rollNumber", label: "Roll number" },
+            { key: "admissionNumber", label: "Admission No" },
+            { key: "name", label: "Name" },
+            { key: "fatherName", label: "Father Name" },
+            { key: "dateOfBirth", label: "Date Of Birth" },
+            { key: "classSection", label: "Class (Sec.)" },
             { key: "gender", label: "Gender" },
-            { key: "dateOfBirth", label: "Date of birth" },
-            { key: "email", label: "Email" },
+            { key: "type", label: "Type" },
             { key: "phone", label: "Phone" },
-            { key: "branch", label: "Branch" },
-            { key: "category", label: "Category" },
-            { key: "class", label: "Class" },
-            { key: "section", label: "Class section" },
-            { key: "status", label: "Admission status" },
-            { key: "createdAt", label: "Date added" },
           ]}
           filters={filters}
           requireSearchCriteria
           initialQuery={tableInitialSearch}
           showAllRecordsLabel="Show all sections"
           hideDefaultView
+          showRowNumber={false}
           toolbarActions={canCreate ? (
             <AdminActionDialog
               label="Add student"
@@ -404,8 +395,12 @@ export default async function StudentsPage({
               phone: record.phone ?? "",
               branch: record.branchName ?? "Unassigned",
               category: record.categoryName ?? "",
+              type: record.categoryName ?? "",
               categoryFilter: record.categoryId === null ? "__uncategorized__" : String(record.categoryId),
               class: record.className ?? "Unassigned",
+              classSection: record.sectionName
+                ? `${record.className ?? "Unassigned"} (${record.sectionName})`
+                : record.className ?? "Unassigned",
               section: record.sectionName
                 ? `${record.sectionName} · ${record.academicYearName}`
                 : "Unassigned",
