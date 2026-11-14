@@ -1,8 +1,15 @@
 import { isValidDateRange } from "./academic-policy";
+import { staffRoles } from "./staff-policy";
 
 export const staffAttendanceStatuses = ["present", "absent", "late", "excused"] as const;
 export const staffLeaveRequestStatuses = ["pending", "approved", "rejected"] as const;
 export const staffPayrollStatuses = ["recorded", "paid"] as const;
+export type StaffRoleFilter = (typeof staffRoles)[number] | "all" | "unassigned";
+
+export function parseStaffRoleFilter(value: string): StaffRoleFilter {
+  if (value === "unassigned") return value;
+  return staffRoles.find((role) => role === value) ?? "all";
+}
 
 export function inclusiveCalendarDays(startDate: string, endDate: string): number | null {
   if (!isValidDateRange(startDate, endDate)) return null;

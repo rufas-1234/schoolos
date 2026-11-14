@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { schools, staffAttendance, staffMembers } from "@/db/schema";
+import { schoolBranches, schools, staffAttendance, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { isValidStaffReportRange, staffAttendanceStatuses } from "@/lib/hr-policy";
+import { isValidStaffReportRange, parseStaffRoleFilter, staffAttendanceStatuses } from "@/lib/hr-policy";
+import { staffRoles } from "@/lib/staff-policy";
 import { PrintReportButton } from "./print-report-button";
 
 type AttendanceTotals = Record<(typeof staffAttendanceStatuses)[number], number>;
@@ -11,21 +12,53 @@ type AttendanceTotals = Record<(typeof staffAttendanceStatuses)[number], number>
 export default async function StaffReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ start?: string | string[]; end?: string | string[] }>;
+  searchParams: Promise<{ start?: string | string[]; end?: string | string[]; branchId?: string | string[]; role?: string | string[] }>;
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
-  const [school] = await db.select({ timezone: schools.timezone })
-    .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
+  const [schoolResult, branches, params] = await Promise.all([
+    db.select({ timezone: schools.timezone })
+      .from(schools).where(eq(schools.id, context.schoolId)).limit(1),
+    db.select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
+      .from(schoolBranches)
+      .where(and(
+        eq(schoolBranches.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
+      ))
+      .orderBy(asc(schoolBranches.name)),
+    searchParams,
+  ]);
+  const school = schoolResult[0];
   if (!school) throw new Error("School settings could not be loaded.");
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: school.timezone }).format(new Date());
   const defaultStart = `${today.slice(0, 7)}-01`;
-  const params = await searchParams;
+  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
+  const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
+  const branchId = branch?.id;
+  const requestedRole = typeof params.role === "string" ? params.role : "";
+  const selectedRole = parseStaffRoleFilter(requestedRole);
   const startCandidate = typeof params.start === "string" ? params.start : "";
   const endCandidate = typeof params.end === "string" ? params.end : "";
   const requestedRangeValid = isValidStaffReportRange(startCandidate, endCandidate);
   const startDate = requestedRangeValid ? startCandidate : defaultStart;
   const endDate = requestedRangeValid ? endCandidate : today;
 
+  const staffConditions = [
+    eq(staffMembers.schoolId, context.schoolId),
+    eq(staffMembers.branchId, branchId ?? 0),
+  ];
+  const markConditions = [
+    eq(staffAttendance.schoolId, context.schoolId),
+    gte(staffAttendance.attendanceDate, startDate),
+    lte(staffAttendance.attendanceDate, endDate),
+    eq(staffMembers.branchId, branchId ?? 0),
+  ];
+  if (selectedRole === "unassigned") {
+    staffConditions.push(isNull(staffMembers.personnelRole));
+    markConditions.push(isNull(staffMembers.personnelRole));
+  } else if (selectedRole !== "all") {
+    staffConditions.push(eq(staffMembers.personnelRole, selectedRole));
+    markConditions.push(eq(staffMembers.personnelRole, selectedRole));
+  }
   const [staff, marks] = await Promise.all([
     db.select({
       id: staffMembers.id,
@@ -34,19 +67,20 @@ export default async function StaffReportsPage({
       employeeCode: staffMembers.employeeCode,
       department: staffMembers.department,
       jobTitle: staffMembers.jobTitle,
+      personnelRole: staffMembers.personnelRole,
       status: staffMembers.status,
     }).from(staffMembers)
-      .where(eq(staffMembers.schoolId, context.schoolId))
+      .where(and(...staffConditions))
       .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db.select({
       staffId: staffAttendance.staffId,
       status: staffAttendance.status,
     }).from(staffAttendance)
-      .where(and(
-        eq(staffAttendance.schoolId, context.schoolId),
-        gte(staffAttendance.attendanceDate, startDate),
-        lte(staffAttendance.attendanceDate, endDate),
-      )),
+      .innerJoin(staffMembers, and(
+        eq(staffAttendance.staffId, staffMembers.id),
+        eq(staffMembers.schoolId, context.schoolId),
+      ))
+      .where(and(...markConditions)),
   ]);
 
   const zeroTotals = (): AttendanceTotals => ({ present: 0, absent: 0, late: 0, excused: 0 });
@@ -85,12 +119,29 @@ export default async function StaffReportsPage({
 
       <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Branch
+          <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <option value="" disabled>Select a branch</option>
+            {branches.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.code})</option>)}
+          </select>
+        </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           From
           <input type="date" name="start" defaultValue={startDate} required className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           To
           <input type="date" name="end" defaultValue={endDate} required className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
+        </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Staff role
+          <select name="role" defaultValue={selectedRole} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <option value="all">All roles</option>
+            {staffRoles.map((role) => (
+              <option key={role} value={role}>{role[0].toUpperCase() + role.slice(1)}</option>
+            ))}
+            <option value="unassigned">Unassigned role</option>
+          </select>
         </label>
         <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View report</button>
         {!requestedRangeValid && (startCandidate || endCandidate) && (
@@ -108,7 +159,7 @@ export default async function StaffReportsPage({
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-900">Attendance by staff member</h2>
-          <p className="mt-1 text-sm text-slate-500">{startDate} to {endDate} · {staff.length} staff members</p>
+          <p className="mt-1 text-sm text-slate-500">{branch ? `${branch.name} · ` : ""}{startDate} to {endDate} · {staff.length} staff members</p>
         </div>
         {staff.length === 0 ? (
           <p className="p-7 text-center text-sm text-slate-500">No staff records are available.</p>
@@ -119,6 +170,7 @@ export default async function StaffReportsPage({
                 <tr>
                   <th className="px-5 py-3 font-semibold">Staff member</th>
                   <th className="px-4 py-3 font-semibold">Department</th>
+                  <th className="px-4 py-3 font-semibold">Role</th>
                   <th className="px-4 py-3 font-semibold">Present</th>
                   <th className="px-4 py-3 font-semibold">Absent</th>
                   <th className="px-4 py-3 font-semibold">Late</th>
@@ -137,6 +189,7 @@ export default async function StaffReportsPage({
                         </p>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{member.department}</td>
+                      <td className="px-4 py-3 capitalize text-slate-600">{member.personnelRole ?? "Unassigned"}</td>
                       <td className="px-4 py-3 text-slate-600">{totals.present}</td>
                       <td className="px-4 py-3 text-slate-600">{totals.absent}</td>
                       <td className="px-4 py-3 text-slate-600">{totals.late}</td>

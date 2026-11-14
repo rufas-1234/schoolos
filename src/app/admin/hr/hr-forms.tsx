@@ -17,11 +17,13 @@ type Option = { value: string; label: string };
 
 export function AttendanceForm({
   staffId,
+  branchId,
   attendanceDate,
   status,
   note,
 }: {
   staffId: number;
+  branchId: number;
   attendanceDate: string;
   status?: string;
   note?: string | null;
@@ -30,6 +32,7 @@ export function AttendanceForm({
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="staffId" value={staffId} />
+      <input type="hidden" name="branchId" value={branchId} />
       <input type="hidden" name="attendanceDate" value={attendanceDate} />
       <select
         name="status"
@@ -63,20 +66,38 @@ export function AttendanceForm({
   );
 }
 
-export function LeaveTypeForm() {
+export function LeaveTypeForm({
+  branches,
+  branchId,
+}: {
+  branches: { id: number; name: string; code: string }[];
+  branchId: number;
+}) {
   const [state, action, pending] = useActionState(createStaffLeaveType, {});
   return (
     <HrForm title="Add leave type" action={action} pending={pending} submitLabel="Add leave type" state={state}>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Branch
+        <select name="branchId" required defaultValue={branchId.toString()} className={inputClass}>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>
+          ))}
+        </select>
+      </label>
       <Field label="Leave type name" name="name" placeholder="Annual leave" />
     </HrForm>
   );
 }
 
 export function LeaveBalanceForm({
+  branchId,
+  branchName,
   staffOptions,
   leaveTypeOptions,
   leaveYear,
 }: {
+  branchId: number;
+  branchName: string;
   staffOptions: Option[];
   leaveTypeOptions: Option[];
   leaveYear: number;
@@ -84,6 +105,8 @@ export function LeaveBalanceForm({
   const [state, action, pending] = useActionState(assignStaffLeaveBalance, {});
   return (
     <HrForm title="Assign leave entitlement" action={action} pending={pending} submitLabel="Save entitlement" state={state}>
+      <input type="hidden" name="branchId" value={branchId} />
+      <p className="text-xs text-slate-500">Branch: {branchName}</p>
       <SelectField label="Staff member" name="staffId" options={staffOptions} />
       <SelectField label="Leave type" name="leaveTypeId" options={leaveTypeOptions} />
       <Field label="Leave year" name="leaveYear" type="number" min="2000" max="9999" defaultValue={String(leaveYear)} />
@@ -93,15 +116,21 @@ export function LeaveBalanceForm({
 }
 
 export function LeaveRequestForm({
+  branchId,
+  branchName,
   staffOptions,
   leaveTypeOptions,
 }: {
+  branchId: number;
+  branchName: string;
   staffOptions: Option[];
   leaveTypeOptions: Option[];
 }) {
   const [state, action, pending] = useActionState(createStaffLeaveRequest, {});
   return (
     <HrForm title="Create leave request" action={action} pending={pending} submitLabel="Submit request" state={state}>
+      <input type="hidden" name="branchId" value={branchId} />
+      <p className="text-xs text-slate-500">Branch: {branchName}</p>
       <SelectField label="Staff member" name="staffId" options={staffOptions} />
       <SelectField label="Leave type" name="leaveTypeId" options={leaveTypeOptions} />
       <Field label="Start date" name="startDate" type="date" />
@@ -148,10 +177,14 @@ export function LeaveReviewForm({ publicId }: { publicId: string }) {
 }
 
 export function PayrollForm({
+  branchId,
+  branchName,
   staffOptions,
   currency,
   payPeriod,
 }: {
+  branchId: number;
+  branchName: string;
   staffOptions: Option[];
   currency: string;
   payPeriod: string;
@@ -159,6 +192,8 @@ export function PayrollForm({
   const [state, action, pending] = useActionState(recordStaffPayroll, {});
   return (
     <HrForm title="Record payroll payment" action={action} pending={pending} submitLabel="Save payroll record" state={state}>
+      <input type="hidden" name="branchId" value={branchId} />
+      <p className="text-xs text-slate-500">Branch: {branchName}</p>
       <SelectField label="Staff member" name="staffId" options={staffOptions} />
       <Field label="Pay period" name="payPeriod" type="month" defaultValue={payPeriod} />
       <Field label={`Amount (${currency})`} name="amount" type="number" min="0.01" step="0.01" />

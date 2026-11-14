@@ -134,6 +134,13 @@
       "when": 1794646582451,
       "tag": "0018_steady_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1794652840118,
+      "tag": "0019_groovy_reavers",
+      "breakpoints": true
     }
   ]
 }

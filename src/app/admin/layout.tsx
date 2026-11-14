@@ -10,7 +10,13 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     redirect("/login");
   }
 
-  const context = await requireSchoolPermission(["dashboard.view", "staff.manage", "roles.manage"]);
+  const context = await requireSchoolPermission([
+    "dashboard.view",
+    "staff.manage",
+    "roles.manage",
+    "fees.manage",
+    "payments.record",
+  ]);
   return (
     <AdminShell
       schoolName={context.schoolName}

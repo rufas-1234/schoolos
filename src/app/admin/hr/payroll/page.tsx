@@ -1,6 +1,6 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { schools, staffMembers, staffPayrollRecords } from "@/db/schema";
+import { schoolBranches, schools, staffMembers, staffPayrollRecords } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { MarkPayrollPaidForm, PayrollForm } from "../hr-forms";
 
@@ -11,15 +11,28 @@ function isPayPeriod(value: string): boolean {
 export default async function StaffPayrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string | string[] }>;
+  searchParams: Promise<{ period?: string | string[]; branchId?: string | string[] }>;
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const params = await searchParams;
-  const [school] = await db.select({
-    currency: schools.currency,
-    timezone: schools.timezone,
-  }).from(schools).where(eq(schools.id, context.schoolId)).limit(1);
+  const [schoolResult, branches] = await Promise.all([
+    db.select({
+      currency: schools.currency,
+      timezone: schools.timezone,
+    }).from(schools).where(eq(schools.id, context.schoolId)).limit(1),
+    db.select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
+      .from(schoolBranches)
+      .where(and(
+        eq(schoolBranches.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
+      ))
+      .orderBy(asc(schoolBranches.name)),
+  ]);
+  const school = schoolResult[0];
   if (!school) throw new Error("School settings could not be loaded.");
+  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
+  const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
+  const branchId = branch?.id;
   const currentPeriod = new Intl.DateTimeFormat("en-CA", { timeZone: school.timezone })
     .format(new Date()).slice(0, 7);
   const payPeriod = typeof params.period === "string" && isPayPeriod(params.period)
@@ -31,7 +44,11 @@ export default async function StaffPayrollPage({
       firstName: staffMembers.firstName,
       lastName: staffMembers.lastName,
     }).from(staffMembers)
-      .where(and(eq(staffMembers.schoolId, context.schoolId), eq(staffMembers.status, "active")))
+      .where(and(
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.status, "active"),
+        eq(staffMembers.branchId, branchId ?? 0),
+      ))
       .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db.select({
       publicId: staffPayrollRecords.publicId,
@@ -52,6 +69,7 @@ export default async function StaffPayrollPage({
       .where(and(
         eq(staffPayrollRecords.schoolId, context.schoolId),
         eq(staffPayrollRecords.payPeriod, payPeriod),
+        eq(staffMembers.branchId, branchId ?? 0),
       ))
       .orderBy(desc(staffPayrollRecords.createdAt), asc(staffMembers.lastName)),
   ]);
@@ -80,18 +98,37 @@ export default async function StaffPayrollPage({
         <SummaryCard label="Marked paid" value={`${paidCount} of ${records.length}`} />
       </section>
 
+      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Branch
+          <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <option value="" disabled>Select a branch</option>
+            {branches.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.code})</option>)}
+          </select>
+        </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Pay period
+          <input type="month" name="period" defaultValue={payPeriod} required className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" />
+        </label>
+        <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View report</button>
+      </form>
+
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.5fr)]">
-        <PayrollForm staffOptions={staffOptions} currency={currency} payPeriod={payPeriod} />
+        {branch ? (
+          <PayrollForm
+            branchId={branch.id}
+            branchName={`${branch.name} (${branch.code})`}
+            staffOptions={staffOptions}
+            currency={currency}
+            payPeriod={payPeriod}
+          />
+        ) : (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Create an active branch before recording payroll.</p>
+        )}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 p-5">
             <h2 className="font-semibold text-slate-900">Payroll report</h2>
-            <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
-              <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-                Pay period
-                <input type="month" name="period" defaultValue={payPeriod} required className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" />
-              </label>
-              <button className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View report</button>
-            </form>
+            <p className="mt-2 text-sm text-slate-500">{branch ? `${branch.name} · ` : ""}{payPeriod}</p>
           </div>
           {records.length === 0 ? (
             <p className="p-7 text-center text-sm text-slate-500">No payroll records for {payPeriod}.</p>

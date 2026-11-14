@@ -3,6 +3,7 @@ import {
   canReviewLeaveRequest,
   fitsLeaveEntitlement,
   inclusiveCalendarDays,
+  parseStaffRoleFilter,
   isValidStaffReportRange,
   staffAttendanceStatuses,
   staffLeaveRequestStatuses,
@@ -14,6 +15,13 @@ describe("human resources policies", () => {
     expect(staffAttendanceStatuses).toEqual(["present", "absent", "late", "excused"]);
     expect(staffLeaveRequestStatuses).toEqual(["pending", "approved", "rejected"]);
     expect(staffPayrollStatuses).toEqual(["recorded", "paid"]);
+  });
+
+  it("normalizes the staff role filter and safely defaults invalid values", () => {
+    expect(parseStaffRoleFilter("teacher")).toBe("teacher");
+    expect(parseStaffRoleFilter("unassigned")).toBe("unassigned");
+    expect(parseStaffRoleFilter("principal")).toBe("all");
+    expect(parseStaffRoleFilter("")).toBe("all");
   });
 
   it("counts inclusive calendar days and rejects invalid ranges", () => {

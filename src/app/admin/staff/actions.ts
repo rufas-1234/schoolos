@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -152,15 +152,35 @@ async function validateStaffExtras(
   schoolId: number,
   schoolPublicId: string,
 ) {
-  const [branch] = await db.select({ id: schoolBranches.id })
-    .from(schoolBranches)
-    .where(and(
-      eq(schoolBranches.id, staff.branchId),
-      eq(schoolBranches.schoolId, schoolId),
-      eq(schoolBranches.status, "active"),
-    ))
-    .limit(1);
-  if (!branch) return "Choose an active branch belonging to this school.";
+  const [branch, department, designation] = await Promise.all([
+    db.select({ id: schoolBranches.id })
+      .from(schoolBranches)
+      .where(and(
+        eq(schoolBranches.id, staff.branchId),
+        eq(schoolBranches.schoolId, schoolId),
+        eq(schoolBranches.status, "active"),
+      ))
+      .limit(1),
+    db.select({ id: staffDepartments.id })
+      .from(staffDepartments)
+      .where(and(
+        eq(staffDepartments.schoolId, schoolId),
+        eq(staffDepartments.name, staff.department),
+        or(eq(staffDepartments.branchId, staff.branchId), isNull(staffDepartments.branchId)),
+      ))
+      .limit(1),
+    db.select({ id: staffDesignations.id })
+      .from(staffDesignations)
+      .where(and(
+        eq(staffDesignations.schoolId, schoolId),
+        eq(staffDesignations.name, staff.jobTitle),
+        or(eq(staffDesignations.branchId, staff.branchId), isNull(staffDesignations.branchId)),
+      ))
+      .limit(1),
+  ]);
+  if (!branch.length) return "Choose an active branch belonging to this school.";
+  if (!department.length) return "Choose a department assigned to the selected branch.";
+  if (!designation.length) return "Choose a designation assigned to the selected branch.";
 
   const prefix = `${schoolPublicId}/`;
   const documents = staffDocuments(staff);
@@ -211,16 +231,6 @@ export async function createStaffMember(
   const publicId = randomUUID();
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(staffDepartments).values({
-        publicId: randomUUID(),
-        schoolId: context.schoolId,
-        name: staff.department,
-      }).onDuplicateKeyUpdate({ set: { name: staff.department } });
-      await tx.insert(staffDesignations).values({
-        publicId: randomUUID(),
-        schoolId: context.schoolId,
-        name: staff.jobTitle,
-      }).onDuplicateKeyUpdate({ set: { name: staff.jobTitle } });
       await tx.insert(staffMembers).values({
         publicId,
         schoolId: context.schoolId,
@@ -366,16 +376,6 @@ export async function updateStaffMember(
         .limit(1);
       if (!existing) return false;
 
-      await tx.insert(staffDepartments).values({
-        publicId: randomUUID(),
-        schoolId: context.schoolId,
-        name: staff.department,
-      }).onDuplicateKeyUpdate({ set: { name: staff.department } });
-      await tx.insert(staffDesignations).values({
-        publicId: randomUUID(),
-        schoolId: context.schoolId,
-        name: staff.jobTitle,
-      }).onDuplicateKeyUpdate({ set: { name: staff.jobTitle } });
       await tx
         .update(staffMembers)
         .set({

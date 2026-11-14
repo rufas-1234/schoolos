@@ -7,6 +7,7 @@ import {
   BookOpen,
   BriefcaseBusiness,
   CalendarDays,
+  CircleDollarSign,
   ChevronDown,
   GraduationCap,
   LayoutDashboard,
@@ -64,14 +65,35 @@ const navigation: NavigationItem[] = [
     permission: "school.settings.manage",
     permissionAlternatives: ["staff.manage"],
     children: [
-      { id: "overview", label: "HR overview", href: "/admin/hr" },
+      { id: "departments", label: "Departments", href: "/admin/hr/departments" },
+      { id: "designations", label: "Designations", href: "/admin/hr/designations" },
+      { id: "staff", label: "Staff directory", href: "/admin/staff" },
       { id: "attendance", label: "Staff attendance", href: "/admin/hr/attendance" },
       { id: "leave", label: "Leave management", href: "/admin/hr/leave" },
       { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll" },
       { id: "reports", label: "Staff reports", href: "/admin/hr/reports" },
-      { id: "departments", label: "Departments", href: "/admin/hr/departments" },
-      { id: "designations", label: "Designations", href: "/admin/hr/designations" },
+      { id: "overview", label: "HR overview", href: "/admin/hr" },
     ],
+  },
+  {
+    href: "/admin/fees",
+    label: "Fee setup",
+    icon: CircleDollarSign,
+    permission: "fees.manage",
+  },
+  {
+    href: "/admin/fees/collection",
+    label: "Fee collection",
+    icon: CircleDollarSign,
+    permission: "fees.manage",
+    permissionAlternatives: ["payments.record"],
+  },
+  {
+    href: "/admin/fees/reports",
+    label: "Fee reports",
+    icon: CircleDollarSign,
+    permission: "fees.manage",
+    permissionAlternatives: ["payments.record"],
   },
   {
     href: "/admin/settings",
@@ -145,7 +167,9 @@ export function AdminShell({
     ? "/admin/dashboard"
     : permissions.includes("staff.manage")
       ? "/admin/hr"
-      : "/admin/settings/roles";
+      : permissions.includes("fees.manage") || permissions.includes("payments.record")
+        ? "/admin/fees/collection"
+        : "/admin/settings/roles";
   const schoolMonogram =
     schoolName
       .split(/\s+/)

@@ -1,12 +1,13 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import {
   auditLogs,
+  schoolBranches,
   schools,
   staffAttendance,
   staffLeaveBalances,
@@ -70,11 +71,13 @@ export async function recordStaffAttendance(
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const result = z.object({
     staffId: idField,
+    branchId: idField,
     attendanceDate: dateField,
     status: z.enum(staffAttendanceStatuses),
     note: z.string().trim().max(500),
   }).safeParse({
     staffId: value(formData, "staffId"),
+    branchId: value(formData, "branchId"),
     attendanceDate: value(formData, "attendanceDate"),
     status: value(formData, "status"),
     note: value(formData, "note"),
@@ -92,6 +95,7 @@ export async function recordStaffAttendance(
       .from(staffMembers).where(and(
         eq(staffMembers.id, result.data.staffId),
         eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.branchId, result.data.branchId),
         eq(staffMembers.status, "active"),
       )).for("update").limit(1);
     if (!staff) return "not-found";
@@ -138,14 +142,31 @@ export async function createStaffLeaveType(
   formData: FormData,
 ): Promise<HrActionState> {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
-  const name = z.string().trim().min(2).max(100).safeParse(value(formData, "name"));
-  if (!name.success) return { error: "Enter a leave type name between 2 and 100 characters." };
+  const result = z.object({
+    name: z.string().trim().min(2).max(100),
+    branchId: idField,
+  }).safeParse({
+    name: value(formData, "name"),
+    branchId: value(formData, "branchId"),
+  });
+  if (!result.success) return { error: "Choose a branch and enter a leave type name." };
+  const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
+    eq(schoolBranches.id, result.data.branchId),
+    eq(schoolBranches.schoolId, context.schoolId),
+    eq(schoolBranches.status, "active"),
+  )).limit(1);
+  if (!branch) return { error: "Choose an active branch belonging to this school." };
   const publicId = randomUUID();
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(staffLeaveTypes).values({ publicId, schoolId: context.schoolId, name: name.data });
+      await tx.insert(staffLeaveTypes).values({
+        publicId,
+        schoolId: context.schoolId,
+        branchId: branch.id,
+        name: result.data.name,
+      });
       await writeAudit(tx, context.schoolId, context.user.id, "staff.leave_type.created",
-        "staff_leave_type", publicId, ["name"]);
+        "staff_leave_type", publicId, ["branchId", "name"]);
     });
   } catch (error) {
     if (isDuplicateError(error)) return { error: "A leave type with that name already exists." };
@@ -162,12 +183,14 @@ export async function assignStaffLeaveBalance(
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const result = z.object({
     staffId: idField,
+    branchId: idField,
     leaveTypeId: idField,
     leaveYear: z.string().regex(/^\d{4}$/).transform(Number).pipe(z.number().int().min(2000).max(9999)),
     entitlementDays: z.string().regex(/^\d{1,3}(\.\d{1,2})?$/).transform(Number)
       .refine((days) => days >= 0 && days <= 366),
   }).safeParse({
     staffId: value(formData, "staffId"),
+    branchId: value(formData, "branchId"),
     leaveTypeId: value(formData, "leaveTypeId"),
     leaveYear: value(formData, "leaveYear"),
     entitlementDays: value(formData, "entitlementDays"),
@@ -176,11 +199,19 @@ export async function assignStaffLeaveBalance(
 
   const [staff] = await db.select({ id: staffMembers.id })
     .from(staffMembers)
-    .where(and(eq(staffMembers.id, result.data.staffId), eq(staffMembers.schoolId, context.schoolId)))
+    .where(and(
+      eq(staffMembers.id, result.data.staffId),
+      eq(staffMembers.schoolId, context.schoolId),
+      eq(staffMembers.branchId, result.data.branchId),
+    ))
     .limit(1);
   const [leaveType] = await db.select({ id: staffLeaveTypes.id })
     .from(staffLeaveTypes)
-    .where(and(eq(staffLeaveTypes.id, result.data.leaveTypeId), eq(staffLeaveTypes.schoolId, context.schoolId)))
+    .where(and(
+      eq(staffLeaveTypes.id, result.data.leaveTypeId),
+      eq(staffLeaveTypes.schoolId, context.schoolId),
+      or(eq(staffLeaveTypes.branchId, result.data.branchId), isNull(staffLeaveTypes.branchId)),
+    ))
     .limit(1);
   if (!staff || !leaveType) return { error: "Choose records belonging to this school." };
 
@@ -189,6 +220,7 @@ export async function assignStaffLeaveBalance(
       .from(staffMembers).where(and(
         eq(staffMembers.id, staff.id),
         eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.branchId, result.data.branchId),
       )).for("update").limit(1);
     if (!staffRecord) return false;
     const requests = await tx.select({
@@ -226,12 +258,14 @@ export async function createStaffLeaveRequest(
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const result = z.object({
     staffId: idField,
+    branchId: idField,
     leaveTypeId: idField,
     startDate: dateField,
     endDate: dateField,
     reason: z.string().trim().min(3).max(1000),
   }).safeParse({
     staffId: value(formData, "staffId"),
+    branchId: value(formData, "branchId"),
     leaveTypeId: value(formData, "leaveTypeId"),
     startDate: value(formData, "startDate"),
     endDate: value(formData, "endDate"),
@@ -250,9 +284,17 @@ export async function createStaffLeaveRequest(
       .from(staffMembers).where(and(
         eq(staffMembers.id, result.data.staffId),
         eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.branchId, result.data.branchId),
         eq(staffMembers.status, "active"),
       )).for("update").limit(1);
     if (!staff) return "no-balance";
+    const [leaveType] = await tx.select({ id: staffLeaveTypes.id })
+      .from(staffLeaveTypes).where(and(
+        eq(staffLeaveTypes.id, result.data.leaveTypeId),
+        eq(staffLeaveTypes.schoolId, context.schoolId),
+        or(eq(staffLeaveTypes.branchId, result.data.branchId), isNull(staffLeaveTypes.branchId)),
+      )).limit(1);
+    if (!leaveType) return "invalid-leave-type";
     const [balance] = await tx.select({
       staffId: staffLeaveBalances.staffId,
       leaveTypeId: staffLeaveBalances.leaveTypeId,
@@ -260,7 +302,7 @@ export async function createStaffLeaveRequest(
     }).from(staffLeaveBalances).where(and(
       eq(staffLeaveBalances.schoolId, context.schoolId),
       eq(staffLeaveBalances.staffId, staff.id),
-      eq(staffLeaveBalances.leaveTypeId, result.data.leaveTypeId),
+      eq(staffLeaveBalances.leaveTypeId, leaveType.id),
       eq(staffLeaveBalances.leaveYear, leaveYear),
     )).for("update").limit(1);
     if (!balance) return "no-balance";
@@ -282,7 +324,7 @@ export async function createStaffLeaveRequest(
     )) return "overlap";
 
     const reservedDays = existing
-      .filter((request) => request.leaveTypeId === result.data.leaveTypeId)
+      .filter((request) => request.leaveTypeId === leaveType.id)
       .reduce((sum, request) => sum + request.requestedDays, 0);
     if (!fitsLeaveEntitlement(Number(balance.entitlementDays), reservedDays, requestedDays)) return "over-balance";
 
@@ -304,6 +346,7 @@ export async function createStaffLeaveRequest(
     return "created";
   });
   if (outcome === "no-balance") return { error: "Assign this staff member a leave entitlement before requesting leave." };
+  if (outcome === "invalid-leave-type") return { error: "Choose a leave type available to this branch." };
   if (outcome === "overlap") return { error: "This staff member already has a pending or approved leave request during those dates." };
   if (outcome === "over-balance") return { error: "This request exceeds the available leave entitlement." };
   revalidateHr();
@@ -407,6 +450,7 @@ export async function recordStaffPayroll(
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const result = z.object({
     staffId: idField,
+    branchId: idField,
     payPeriod: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
     amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/).refine((amount) => Number(amount) > 0),
     status: z.enum(staffPayrollStatuses),
@@ -414,6 +458,7 @@ export async function recordStaffPayroll(
     notes: z.string().trim().max(1000),
   }).safeParse({
     staffId: value(formData, "staffId"),
+    branchId: value(formData, "branchId"),
     payPeriod: value(formData, "payPeriod"),
     amount: value(formData, "amount"),
     status: value(formData, "status"),
@@ -427,6 +472,7 @@ export async function recordStaffPayroll(
     .from(staffMembers).where(and(
       eq(staffMembers.id, result.data.staffId),
       eq(staffMembers.schoolId, context.schoolId),
+      eq(staffMembers.branchId, result.data.branchId),
     )).limit(1);
   const [school] = await db.select({ currency: schools.currency })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);

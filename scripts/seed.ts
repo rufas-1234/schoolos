@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, pool } from "../src/db";
 import {
@@ -196,6 +196,9 @@ async function seed() {
       "students.update",
       "students.delete",
       "staff.manage",
+      "fees.manage",
+      "payments.record",
+      "reports.export",
     ];
     const rolePermissionIds = new Set(
       (
@@ -242,6 +245,32 @@ async function seed() {
         roleId: hrRole.id,
         permissionId: staffPermission.id,
       });
+    }
+
+    const [accountantRole] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.schoolId, school.id), eq(roles.name, "Accountant")))
+      .limit(1);
+    const financePermissions = await tx
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(inArray(permissions.key, ["fees.manage", "payments.record", "reports.export"]));
+    if (!accountantRole || financePermissions.length !== 3) {
+      throw new Error("The Accountant role or finance permissions could not be created.");
+    }
+    const existingAccountantPermissions = new Set(
+      (
+        await tx
+          .select({ permissionId: rolePermissions.permissionId })
+          .from(rolePermissions)
+          .where(eq(rolePermissions.roleId, accountantRole.id))
+      ).map(({ permissionId }) => permissionId),
+    );
+    for (const permission of financePermissions) {
+      if (!existingAccountantPermissions.has(permission.id)) {
+        await tx.insert(rolePermissions).values({ roleId: accountantRole.id, permissionId: permission.id });
+      }
     }
   });
 

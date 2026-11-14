@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, sum } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sum } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  schoolBranches,
   staffLeaveBalances,
   staffLeaveRequests,
   staffLeaveTypes,
@@ -9,21 +10,49 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { LeaveBalanceForm, LeaveRequestForm, LeaveReviewForm, LeaveTypeForm } from "../hr-forms";
 
-export default async function StaffLeavePage() {
+export default async function StaffLeavePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ branchId?: string | string[] }>;
+}) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const [branches, params] = await Promise.all([
+    db.select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
+      .from(schoolBranches)
+      .where(and(
+        eq(schoolBranches.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
+      ))
+      .orderBy(asc(schoolBranches.name)),
+    searchParams,
+  ]);
+  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
+  const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
+  const branchId = branch?.id;
+  const branchName = branch ? `${branch.name} (${branch.code})` : "No active branch";
   const [staff, types, balances, usage, requests] = await Promise.all([
     db.select({
       id: staffMembers.id,
       firstName: staffMembers.firstName,
       lastName: staffMembers.lastName,
     }).from(staffMembers)
-      .where(and(eq(staffMembers.schoolId, context.schoolId), eq(staffMembers.status, "active")))
+      .where(and(
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.status, "active"),
+        ...(branchId ? [eq(staffMembers.branchId, branchId)] : []),
+      ))
       .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db.select({
       id: staffLeaveTypes.id,
       name: staffLeaveTypes.name,
     }).from(staffLeaveTypes)
-      .where(eq(staffLeaveTypes.schoolId, context.schoolId))
+      .where(and(
+        eq(staffLeaveTypes.schoolId, context.schoolId),
+        ...(branchId ? [or(
+          eq(staffLeaveTypes.branchId, branchId),
+          isNull(staffLeaveTypes.branchId),
+        )] : []),
+      ))
       .orderBy(asc(staffLeaveTypes.name)),
     db.select({
       id: staffLeaveBalances.id,
@@ -43,7 +72,11 @@ export default async function StaffLeavePage() {
         eq(staffLeaveBalances.leaveTypeId, staffLeaveTypes.id),
         eq(staffLeaveTypes.schoolId, context.schoolId),
       ))
-      .where(eq(staffLeaveBalances.schoolId, context.schoolId))
+      .where(and(
+        eq(staffLeaveBalances.schoolId, context.schoolId),
+        ...(branchId ? [eq(staffMembers.branchId, branchId)] : []),
+        ...(branchId ? [or(eq(staffLeaveTypes.branchId, branchId), isNull(staffLeaveTypes.branchId))] : []),
+      ))
       .orderBy(asc(staffMembers.lastName), asc(staffLeaveTypes.name)),
     db.select({
       staffId: staffLeaveRequests.staffId,
@@ -52,7 +85,14 @@ export default async function StaffLeavePage() {
       status: staffLeaveRequests.status,
       days: sum(staffLeaveRequests.requestedDays),
     }).from(staffLeaveRequests)
-      .where(eq(staffLeaveRequests.schoolId, context.schoolId))
+      .innerJoin(staffMembers, and(
+        eq(staffLeaveRequests.staffId, staffMembers.id),
+        eq(staffMembers.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(staffLeaveRequests.schoolId, context.schoolId),
+        ...(branchId ? [eq(staffMembers.branchId, branchId)] : []),
+      ))
       .groupBy(staffLeaveRequests.staffId, staffLeaveRequests.leaveTypeId, staffLeaveRequests.leaveYear, staffLeaveRequests.status),
     db.select({
       publicId: staffLeaveRequests.publicId,
@@ -74,7 +114,11 @@ export default async function StaffLeavePage() {
         eq(staffLeaveRequests.leaveTypeId, staffLeaveTypes.id),
         eq(staffLeaveTypes.schoolId, context.schoolId),
       ))
-      .where(eq(staffLeaveRequests.schoolId, context.schoolId))
+      .where(and(
+        eq(staffLeaveRequests.schoolId, context.schoolId),
+        ...(branchId ? [eq(staffMembers.branchId, branchId)] : []),
+        ...(branchId ? [or(eq(staffLeaveTypes.branchId, branchId), isNull(staffLeaveTypes.branchId))] : []),
+      ))
       .orderBy(desc(staffLeaveRequests.createdAt))
       .limit(100),
   ]);
@@ -105,11 +149,25 @@ export default async function StaffLeavePage() {
         </p>
       </header>
 
-      <section className="grid gap-5 lg:grid-cols-3">
-        <LeaveTypeForm />
-        <LeaveBalanceForm staffOptions={staffOptions} leaveTypeOptions={leaveTypeOptions} leaveYear={currentLeaveYear} />
-        <LeaveRequestForm staffOptions={staffOptions} leaveTypeOptions={leaveTypeOptions} />
-      </section>
+      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Branch
+          <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <option value="" disabled>Select a branch</option>
+            {branches.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.code})</option>)}
+          </select>
+        </label>
+        <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View branch</button>
+      </form>
+
+      {!branch && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Create an active branch before managing leave.</p>}
+      {branch && (
+        <section className="grid gap-5 lg:grid-cols-3">
+          <LeaveTypeForm branches={branches} branchId={branch.id} />
+          <LeaveBalanceForm branchId={branch.id} branchName={branchName} staffOptions={staffOptions} leaveTypeOptions={leaveTypeOptions} leaveYear={currentLeaveYear} />
+          <LeaveRequestForm branchId={branch.id} branchName={branchName} staffOptions={staffOptions} leaveTypeOptions={leaveTypeOptions} />
+        </section>
+      )}
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">

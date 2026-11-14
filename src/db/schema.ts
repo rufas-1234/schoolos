@@ -599,12 +599,19 @@ export const staffDepartments = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(
+      () => schoolBranches.id,
+    ),
     name: varchar("name", { length: 120 }).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("staff_departments_school_name_uq").on(table.schoolId, table.name),
+    uniqueIndex("staff_departments_school_branch_name_uq").on(
+      table.schoolId,
+      table.branchId,
+      table.name,
+    ),
     index("staff_departments_school_idx").on(table.schoolId),
   ],
 );
@@ -617,12 +624,19 @@ export const staffDesignations = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(
+      () => schoolBranches.id,
+    ),
     name: varchar("name", { length: 120 }).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("staff_designations_school_name_uq").on(table.schoolId, table.name),
+    uniqueIndex("staff_designations_school_branch_name_uq").on(
+      table.schoolId,
+      table.branchId,
+      table.name,
+    ),
     index("staff_designations_school_idx").on(table.schoolId),
   ],
 );
@@ -669,12 +683,19 @@ export const staffLeaveTypes = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(
+      () => schoolBranches.id,
+    ),
     name: varchar("name", { length: 100 }).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("staff_leave_types_school_name_uq").on(table.schoolId, table.name),
+    uniqueIndex("staff_leave_types_school_branch_name_uq").on(
+      table.schoolId,
+      table.branchId,
+      table.name,
+    ),
     index("staff_leave_types_school_idx").on(table.schoolId),
   ],
 );
@@ -1012,6 +1033,225 @@ export const studentAttendance = mysqlTable(
       table.classSectionId,
       table.attendanceDate,
     ),
+  ],
+);
+
+export const feeGroups = mysqlTable(
+  "fee_groups",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: varchar("description", { length: 1000 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("fee_groups_school_name_uq").on(table.schoolId, table.name),
+    index("fee_groups_school_idx").on(table.schoolId),
+  ],
+);
+
+export const feeTypes = mysqlTable(
+  "fee_types",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    feeGroupId: bigint("feeGroupId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => feeGroups.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: varchar("description", { length: 1000 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("fee_types_school_name_uq").on(table.schoolId, table.name),
+    index("fee_types_school_group_idx").on(table.schoolId, table.feeGroupId),
+  ],
+);
+
+export const feeDiscounts = mysqlTable(
+  "fee_discounts",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    code: varchar("code", { length: 40 }).notNull(),
+    description: varchar("description", { length: 1000 }),
+    discountType: varchar("discountType", { length: 20 }).notNull(),
+    value: decimal("value", { precision: 10, scale: 2 }).notNull(),
+    frequency: varchar("frequency", { length: 20 }).notNull().default("yearly"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("fee_discounts_school_name_uq").on(table.schoolId, table.name),
+    uniqueIndex("fee_discounts_school_code_uq").on(table.schoolId, table.code),
+    index("fee_discounts_school_idx").on(table.schoolId),
+  ],
+);
+
+export const studentFeeDiscounts = mysqlTable(
+  "student_fee_discounts",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => students.id),
+    feeTypeId: bigint("feeTypeId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => feeTypes.id),
+    discountId: bigint("discountId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => feeDiscounts.id),
+    note: varchar("note", { length: 500 }),
+    assignedBy: varchar("assignedBy", { length: 36 })
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("student_fee_discounts_school_student_type_uq").on(
+      table.schoolId,
+      table.studentId,
+      table.feeTypeId,
+    ),
+    index("student_fee_discounts_school_discount_idx").on(table.schoolId, table.discountId),
+  ],
+);
+
+export const feeStructures = mysqlTable(
+  "fee_structures",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schoolBranches.id),
+    academicYearId: bigint("academicYearId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => academicYears.id),
+    classLevelId: bigint("classLevelId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => classLevels.id),
+    feeGroupId: bigint("feeGroupId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => feeGroups.id),
+    feeTypeId: bigint("feeTypeId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => feeTypes.id),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    dueDate: date("dueDate", { mode: "string" }).notNull(),
+    fineType: varchar("fineType", { length: 20 }).notNull().default("none"),
+    fineValue: decimal("fineValue", { precision: 10, scale: 2 }).notNull().default("0"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("fee_structures_school_year_class_group_type_uq").on(
+      table.schoolId,
+      table.academicYearId,
+      table.classLevelId,
+      table.feeGroupId,
+      table.feeTypeId,
+    ),
+    index("fee_structures_school_branch_year_idx").on(
+      table.schoolId,
+      table.branchId,
+      table.academicYearId,
+    ),
+  ],
+);
+
+export const studentFeeInvoices = mysqlTable(
+  "student_fee_invoices",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => students.id),
+    enrollmentId: bigint("enrollmentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => studentEnrollments.id),
+    feeStructureId: bigint("feeStructureId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => feeStructures.id),
+    discountId: bigint("discountId", { mode: "number", unsigned: true })
+      .references(() => feeDiscounts.id),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    discountAmount: decimal("discountAmount", { precision: 12, scale: 2 }).notNull().default("0"),
+    fineType: varchar("fineType", { length: 20 }).notNull().default("none"),
+    fineValue: decimal("fineValue", { precision: 10, scale: 2 }).notNull().default("0"),
+    dueDate: date("dueDate", { mode: "string" }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("unpaid"),
+    generatedBy: varchar("generatedBy", { length: 36 })
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("student_fee_invoices_school_enrollment_structure_uq").on(
+      table.schoolId,
+      table.enrollmentId,
+      table.feeStructureId,
+    ),
+    index("student_fee_invoices_school_status_due_idx").on(
+      table.schoolId,
+      table.status,
+      table.dueDate,
+    ),
+    index("student_fee_invoices_school_student_idx").on(table.schoolId, table.studentId),
+  ],
+);
+
+export const feePayments = mysqlTable(
+  "fee_payments",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    invoiceId: bigint("invoiceId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => studentFeeInvoices.id),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    fineAmount: decimal("fineAmount", { precision: 12, scale: 2 }).notNull().default("0"),
+    paymentMethod: varchar("paymentMethod", { length: 30 }).notNull(),
+    reference: varchar("reference", { length: 120 }),
+    notes: varchar("notes", { length: 500 }),
+    paidAt: timestamp("paidAt").notNull().defaultNow(),
+    recordedBy: varchar("recordedBy", { length: 36 })
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("fee_payments_school_paid_at_idx").on(table.schoolId, table.paidAt),
+    index("fee_payments_school_invoice_idx").on(table.schoolId, table.invoiceId),
   ],
 );
 

@@ -52,8 +52,8 @@ type StaffFormProps = {
   record?: StaffEditRecord;
   accounts: { id: string; name: string; email: string }[];
   branches: { id: number; name: string; code: string }[];
-  departmentOptions: string[];
-  designationOptions: string[];
+  departments: { id: number; name: string; branchId: number | null }[];
+  designations: { id: number; name: string; branchId: number | null }[];
 };
 
 const tabs = [
@@ -66,12 +66,15 @@ const tabs = [
 ] as const;
 type Tab = (typeof tabs)[number];
 
-export function StaffForm({ record, accounts, branches, departmentOptions, designationOptions }: StaffFormProps) {
+export function StaffForm({ record, accounts, branches, departments, designations }: StaffFormProps) {
   const action = record ? updateStaffMember : createStaffMember;
   const [state, formAction, pending] = useActionState<StaffActionState, FormData>(action, {});
   const [activeTab, setActiveTab] = useState<Tab>(tabs[0]);
   const [pendingUploads, setPendingUploads] = useState(0);
+  const [selectedBranchId, setSelectedBranchId] = useState(record?.branchId?.toString() ?? "");
   const customField = (index: number) => record?.customFields?.[index];
+  const departmentOptions = branchCatalogOptions(departments, selectedBranchId, record?.department);
+  const designationOptions = branchCatalogOptions(designations, selectedBranchId, record?.jobTitle);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -107,13 +110,17 @@ export function StaffForm({ record, accounts, branches, departmentOptions, desig
             <Field label="Department">
               <select name="department" defaultValue={record?.department ?? ""} required className={inputClass}>
                 <option value="">Select department</option>
-                {selectOptions(departmentOptions, record?.department).map((value) => <option key={value} value={value}>{value}</option>)}
+                {departmentOptions.map((option) => (
+                  <option key={option.id} value={option.name}>{option.name}{option.branchId === null ? " (All branches)" : ""}</option>
+                ))}
               </select>
             </Field>
             <Field label="Designation">
               <select name="jobTitle" defaultValue={record?.jobTitle ?? ""} required className={inputClass}>
                 <option value="">Select designation</option>
-                {selectOptions(designationOptions, record?.jobTitle).map((value) => <option key={value} value={value}>{value}</option>)}
+                {designationOptions.map((option) => (
+                  <option key={option.id} value={option.name}>{option.name}{option.branchId === null ? " (All branches)" : ""}</option>
+                ))}
               </select>
             </Field>
             <Field label="First name"><input name="firstName" required minLength={2} maxLength={120} defaultValue={record?.firstName ?? ""} className={inputClass} /></Field>
@@ -140,7 +147,13 @@ export function StaffForm({ record, accounts, branches, departmentOptions, desig
             <Field label="Emergency contact name"><input name="emergencyContactName" maxLength={160} defaultValue={record?.emergencyContactName ?? ""} className={inputClass} /></Field>
             <Field label="Driving license"><input name="drivingLicense" maxLength={80} defaultValue={record?.drivingLicense ?? ""} className={inputClass} /></Field>
             <Field label="Branch" required>
-              <select name="branchId" required defaultValue={record?.branchId?.toString() ?? ""} className={inputClass}>
+              <select
+                name="branchId"
+                required
+                value={selectedBranchId}
+                onChange={(event) => setSelectedBranchId(event.target.value)}
+                className={inputClass}
+              >
                 <option value="">Select branch</option>
                 {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
               </select>
@@ -348,8 +361,18 @@ function Field({
 
 const inputClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100";
 
-function selectOptions(options: string[], current?: string | null) {
-  return [...new Set([...options, ...(current ? [current] : [])])];
+function branchCatalogOptions(
+  options: { id: number; name: string; branchId: number | null }[],
+  selectedBranchId: string,
+  current?: string | null,
+) {
+  const applicable = options.filter((option) =>
+    option.branchId === null || option.branchId.toString() === selectedBranchId,
+  );
+  if (current && !applicable.some((option) => option.name === current)) {
+    applicable.push({ id: -1, name: current, branchId: null });
+  }
+  return applicable;
 }
 
 function titleCase(value: string) {

@@ -99,17 +99,27 @@ export default async function StaffDirectoryPage() {
         eq(schoolBranches.status, "active"),
       ))
       .orderBy(asc(schoolBranches.name)),
-    db.select({ name: staffDepartments.name }).from(staffDepartments)
+    db.select({
+      id: staffDepartments.id,
+      name: staffDepartments.name,
+      branchId: staffDepartments.branchId,
+    }).from(staffDepartments)
       .where(eq(staffDepartments.schoolId, context.schoolId))
       .orderBy(asc(staffDepartments.name)),
-    db.select({ name: staffDesignations.name }).from(staffDesignations)
+    db.select({
+      id: staffDesignations.id,
+      name: staffDesignations.name,
+      branchId: staffDesignations.branchId,
+    }).from(staffDesignations)
       .where(eq(staffDesignations.schoolId, context.schoolId))
       .orderBy(asc(staffDesignations.name)),
   ]);
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
+  const branchNameById = new Map(branches.map((branch) => [branch.id, `${branch.name} (${branch.code})`]));
   const filters: AdminTableFilter[] = [
+    { key: "branch", label: "branch", options: uniqueOptions(branches.map((branch) => `${branch.name} (${branch.code})`)) },
     { key: "department", label: "department", options: uniqueOptions(records.map((record) => record.department)) },
     {
       key: "employmentType",
@@ -145,6 +155,7 @@ export default async function StaffDirectoryPage() {
             { key: "name", label: "Staff member" },
             { key: "jobTitle", label: "Job title" },
             { key: "department", label: "Department" },
+            { key: "branch", label: "Branch" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
             { key: "account", label: "Account" },
@@ -159,8 +170,8 @@ export default async function StaffDirectoryPage() {
               <StaffForm
                 accounts={accounts}
                 branches={branches}
-                departmentOptions={departments.map((entry) => entry.name)}
-                designationOptions={designations.map((entry) => entry.name)}
+                departments={departments}
+                designations={designations}
               />
             </AdminActionDialog>
           }
@@ -171,6 +182,7 @@ export default async function StaffDirectoryPage() {
               name: `${record.firstName} ${record.lastName}`,
               jobTitle: record.jobTitle,
               department: record.department,
+              branch: record.branchId ? branchNameById.get(record.branchId) ?? "" : "",
               email: record.email ?? "",
               phone: record.phone ?? "",
               account: record.linkedUserId ? "Linked" : "Not linked",
@@ -185,8 +197,8 @@ export default async function StaffDirectoryPage() {
                     record={record}
                     accounts={accounts}
                     branches={branches}
-                    departmentOptions={departments.map((entry) => entry.name)}
-                    designationOptions={designations.map((entry) => entry.name)}
+                    departments={departments}
+                    designations={designations}
                   />
                 </AdminRecordDialog>
                 <form action={transitionStaffStatus}>

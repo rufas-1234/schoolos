@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { auditLogs, staffDepartments, staffDesignations, staffMembers } from "@/db/schema";
+import { auditLogs, schoolBranches, staffDepartments, staffDesignations, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 
@@ -14,6 +14,7 @@ export type HrCatalogKind = "department" | "designation";
 
 const catalogKind = z.enum(["department", "designation"]);
 const entryId = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe());
+const branchIdField = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe());
 
 function value(formData: FormData, key: string): string {
   const field = formData.get(key);
@@ -33,10 +34,17 @@ export async function createStaffCatalogEntry(
 ): Promise<HrCatalogActionState> {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const kind = catalogKind.safeParse(value(formData, "kind"));
+  const branchId = branchIdField.safeParse(value(formData, "branchId"));
   const name = z.string().trim().min(2).max(120).safeParse(value(formData, "name"));
-  if (!kind.success || !name.success) {
+  if (!kind.success || !branchId.success || !name.success) {
     return { error: "Enter a valid name between 2 and 120 characters." };
   }
+  const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
+    eq(schoolBranches.id, branchId.data),
+    eq(schoolBranches.schoolId, context.schoolId),
+    eq(schoolBranches.status, "active"),
+  )).limit(1);
+  if (!branch) return { error: "Choose an active branch belonging to this school." };
 
   const publicId = randomUUID();
   try {
@@ -45,12 +53,14 @@ export async function createStaffCatalogEntry(
         await tx.insert(staffDepartments).values({
           publicId,
           schoolId: context.schoolId,
+          branchId: branch.id,
           name: name.data,
         });
       } else {
         await tx.insert(staffDesignations).values({
           publicId,
           schoolId: context.schoolId,
+          branchId: branch.id,
           name: name.data,
         });
       }
@@ -60,7 +70,7 @@ export async function createStaffCatalogEntry(
         action: `staff.${kind.data}.created`,
         resourceType: `staff_${kind.data}`,
         resourcePublicId: publicId,
-        changedFields: ["name"],
+        changedFields: ["branchId", "name"],
       });
     });
   } catch (error) {
@@ -93,6 +103,7 @@ export async function updateStaffCatalogEntry(
           id: staffDepartments.id,
           publicId: staffDepartments.publicId,
           name: staffDepartments.name,
+          branchId: staffDepartments.branchId,
         }).from(staffDepartments).where(and(
           eq(staffDepartments.id, id.data),
           eq(staffDepartments.schoolId, context.schoolId),
@@ -101,6 +112,7 @@ export async function updateStaffCatalogEntry(
         await tx.update(staffMembers).set({ department: name.data }).where(and(
           eq(staffMembers.schoolId, context.schoolId),
           eq(staffMembers.department, existing.name),
+          ...(existing.branchId === null ? [] : [eq(staffMembers.branchId, existing.branchId)]),
         ));
         await tx.update(staffDepartments).set({ name: name.data }).where(eq(staffDepartments.id, existing.id));
         await tx.insert(auditLogs).values({
@@ -116,6 +128,7 @@ export async function updateStaffCatalogEntry(
           id: staffDesignations.id,
           publicId: staffDesignations.publicId,
           name: staffDesignations.name,
+          branchId: staffDesignations.branchId,
         }).from(staffDesignations).where(and(
           eq(staffDesignations.id, id.data),
           eq(staffDesignations.schoolId, context.schoolId),
@@ -124,6 +137,7 @@ export async function updateStaffCatalogEntry(
         await tx.update(staffMembers).set({ jobTitle: name.data }).where(and(
           eq(staffMembers.schoolId, context.schoolId),
           eq(staffMembers.jobTitle, existing.name),
+          ...(existing.branchId === null ? [] : [eq(staffMembers.branchId, existing.branchId)]),
         ));
         await tx.update(staffDesignations).set({ name: name.data }).where(eq(staffDesignations.id, existing.id));
         await tx.insert(auditLogs).values({
@@ -164,6 +178,7 @@ export async function deleteStaffCatalogEntry(
         id: staffDepartments.id,
         publicId: staffDepartments.publicId,
         name: staffDepartments.name,
+        branchId: staffDepartments.branchId,
       }).from(staffDepartments).where(and(
         eq(staffDepartments.id, id.data),
         eq(staffDepartments.schoolId, context.schoolId),
@@ -172,6 +187,7 @@ export async function deleteStaffCatalogEntry(
       const [staff] = await tx.select({ id: staffMembers.id }).from(staffMembers).where(and(
         eq(staffMembers.schoolId, context.schoolId),
         eq(staffMembers.department, existing.name),
+        ...(existing.branchId === null ? [] : [eq(staffMembers.branchId, existing.branchId)]),
       )).limit(1);
       if (staff) return "in-use";
       await tx.delete(staffDepartments).where(eq(staffDepartments.id, existing.id));
@@ -188,6 +204,7 @@ export async function deleteStaffCatalogEntry(
         id: staffDesignations.id,
         publicId: staffDesignations.publicId,
         name: staffDesignations.name,
+        branchId: staffDesignations.branchId,
       }).from(staffDesignations).where(and(
         eq(staffDesignations.id, id.data),
         eq(staffDesignations.schoolId, context.schoolId),
@@ -196,6 +213,7 @@ export async function deleteStaffCatalogEntry(
       const [staff] = await tx.select({ id: staffMembers.id }).from(staffMembers).where(and(
         eq(staffMembers.schoolId, context.schoolId),
         eq(staffMembers.jobTitle, existing.name),
+        ...(existing.branchId === null ? [] : [eq(staffMembers.branchId, existing.branchId)]),
       )).limit(1);
       if (staff) return "in-use";
       await tx.delete(staffDesignations).where(eq(staffDesignations.id, existing.id));

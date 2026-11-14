@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
 import Link from "next/link";
 import { ArrowUpRight, BriefcaseBusiness, Users } from "lucide-react";
 import { db } from "@/db";
-import { staffMembers } from "@/db/schema";
+import { schoolBranches, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 
 const employmentTypeLabels: Record<string, string> = {
@@ -12,24 +12,44 @@ const employmentTypeLabels: Record<string, string> = {
   temporary: "Temporary",
 };
 
-export default async function HumanResourcesPage() {
+export default async function HumanResourcesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ branchId?: string | string[] }>;
+}) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const [branches, params] = await Promise.all([
+    db.select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
+      .from(schoolBranches)
+      .where(and(
+        eq(schoolBranches.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
+      ))
+      .orderBy(asc(schoolBranches.name)),
+    searchParams,
+  ]);
+  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
+  const selectedBranch = branches.find((branch) => branch.id === requestedBranchId);
+  const staffFilter = and(
+    eq(staffMembers.schoolId, context.schoolId),
+    ...(selectedBranch ? [eq(staffMembers.branchId, selectedBranch.id)] : []),
+  );
   const [statusCounts, departments, employmentTypes, recentHires] = await Promise.all([
     db
       .select({ status: staffMembers.status, total: count() })
       .from(staffMembers)
-      .where(eq(staffMembers.schoolId, context.schoolId))
+      .where(staffFilter)
       .groupBy(staffMembers.status),
     db
       .select({ department: staffMembers.department, total: count() })
       .from(staffMembers)
-      .where(eq(staffMembers.schoolId, context.schoolId))
+      .where(staffFilter)
       .groupBy(staffMembers.department)
       .orderBy(asc(staffMembers.department)),
     db
       .select({ employmentType: staffMembers.employmentType, total: count() })
       .from(staffMembers)
-      .where(eq(staffMembers.schoolId, context.schoolId))
+      .where(staffFilter)
       .groupBy(staffMembers.employmentType)
       .orderBy(asc(staffMembers.employmentType)),
     db
@@ -42,7 +62,7 @@ export default async function HumanResourcesPage() {
         startDate: staffMembers.startDate,
       })
       .from(staffMembers)
-      .where(and(eq(staffMembers.schoolId, context.schoolId), isNotNull(staffMembers.startDate)))
+      .where(and(staffFilter, isNotNull(staffMembers.startDate)))
       .orderBy(desc(staffMembers.startDate), asc(staffMembers.lastName))
       .limit(5),
   ]);
@@ -77,16 +97,27 @@ export default async function HumanResourcesPage() {
         <SummaryCard label="Inactive" value={inactiveCount} />
       </section>
 
+      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Branch
+          <select name="branchId" defaultValue={selectedBranch?.id.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <option value="">All branches</option>
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
+          </select>
+        </label>
+        <button className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View branch</button>
+      </form>
+
       <section>
         <h2 className="mb-3 text-base font-semibold text-slate-900">HR tools</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ToolCard href="/admin/hr/departments" title="Departments" detail="Organize staff by department and keep directory names consistent." />
+          <ToolCard href="/admin/hr/designations" title="Designations" detail="Manage the job titles used for staff members." />
           <ToolCard href="/admin/staff" title="Staff directory" detail="Manage staff profiles, employment details, and school account links." />
           <ToolCard href="/admin/hr/attendance" title="Staff attendance" detail="Record daily present, absent, late, and excused marks." />
           <ToolCard href="/admin/hr/leave" title="Leave management" detail="Set leave types and per-person entitlement; review requests." />
           <ToolCard href="/admin/hr/payroll" title="Payroll records" detail="Record paid or outstanding amounts and view period totals." />
           <ToolCard href="/admin/hr/reports" title="Staff reports" detail="Review attendance totals for a selected date range and print the report." />
-          <ToolCard href="/admin/hr/departments" title="Departments" detail="Organize staff by department and keep directory names consistent." />
-          <ToolCard href="/admin/hr/designations" title="Designations" detail="Manage the job titles used for staff members." />
         </div>
       </section>
 
