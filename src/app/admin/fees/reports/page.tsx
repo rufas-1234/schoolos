@@ -3,7 +3,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { db } from "@/db";
 import { PrintButton } from "@/components/print-button";
-import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
+import { FeeReportFilters } from "./fee-report-filters";
+import type { SearchableSelectOption } from "@/components/searchable-select";
 import {
   academicYears,
   classLevels,
@@ -418,12 +419,30 @@ export default async function FeeReportsPage({
     const payment = paidByInvoice.get(invoice.id) ?? { paid: 0, fine: 0 };
     const totalDue = amount - discount + dueFine;
     const balance = Math.max(0, totalDue - payment.paid);
-    return { ...invoice, paid: payment.paid, balance, status: feeInvoiceStatus(totalDue, payment.paid) ?? "unpaid" };
+    return {
+      ...invoice,
+      amountDue: totalDue,
+      paid: payment.paid,
+      balance,
+      status: feeInvoiceStatus(totalDue, payment.paid) ?? "unpaid",
+    };
   });
   const filteredInvoices = invoicesWithStatus.filter((invoice) =>
     !requestedStatus || invoice.status === requestedStatus
   );
   const outstandingInvoices = invoicesWithStatus.filter((invoice) => invoice.balance > 0);
+  const feeTypeRows = filteredInvoices.reduce((groups, invoice) => {
+    const row = groups.get(invoice.feeTypeName) ?? { count: 0, due: 0, paid: 0, balance: 0 };
+    row.count += 1;
+    row.due += invoice.amountDue;
+    row.paid += invoice.paid;
+    row.balance += invoice.balance;
+    groups.set(invoice.feeTypeName, row);
+    return groups;
+  }, new Map<string, { count: number; due: number; paid: number; balance: number }>());
+  const feeTypeSummary = [...feeTypeRows.entries()].sort(([first], [second]) =>
+    first.localeCompare(second)
+  );
   const totalCollected =
     (parseMoneyToMinorUnits(paymentTotals?.amount ?? "0") ?? 0) -
     (parseMoneyToMinorUnits(reversalTotals?.amount ?? "0") ?? 0);
@@ -444,45 +463,18 @@ export default async function FeeReportsPage({
         <PrintButton label="Print report" />
       </header>
 
-      <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-7">
-        <label className="text-sm font-medium text-slate-700">From
-          <input type="date" name="from" defaultValue={from} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
-        </label>
-        <label className="text-sm font-medium text-slate-700">To
-          <input type="date" name="to" defaultValue={to} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
-        </label>
-        <SearchableSelect
-          label="Branch"
-          name="branchId"
-          options={branchOptions}
-          defaultValue={requestedBranch === null ? "" : String(requestedBranch)}
-          placeholder="Search branches..."
-        />
-        <SearchableSelect
-          label="Class"
-          name="classLevelId"
-          options={classOptions}
-          defaultValue={requestedClass === null ? "" : String(requestedClass)}
-          placeholder="Search classes..."
-        />
-        <SearchableSelect
-          label="Section"
-          name="sectionId"
-          options={sectionOptions}
-          defaultValue={requestedSection === null ? "" : String(requestedSection)}
-          placeholder="Search sections..."
-        />
-        <SearchableSelect
-          label="Payment status"
-          name="status"
-          options={statusOptions}
-          defaultValue={requestedStatus}
-          placeholder="Search statuses..."
-        />
-        <div className="flex items-end">
-          <button className="w-full rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
-        </div>
-      </form>
+      <FeeReportFilters
+        from={from}
+        to={to}
+        branches={branchOptions}
+        classes={classOptions}
+        sections={sectionOptions}
+        statuses={statusOptions}
+        selectedBranch={requestedBranch === null ? "" : String(requestedBranch)}
+        selectedClass={requestedClass === null ? "" : String(requestedClass)}
+        selectedSection={requestedSection === null ? "" : String(requestedSection)}
+        selectedStatus={requestedStatus}
+      />
 
       <section className="grid gap-4 sm:grid-cols-3 print:grid-cols-3">
         <SummaryCard label="Collected in period" value={`${currency} ${money(totalCollected)}`} />
@@ -545,6 +537,23 @@ export default async function FeeReportsPage({
             {` · ${filteredInvoices.length} invoice${filteredInvoices.length === 1 ? "" : "s"}`}
           </p>
         </header>
+        <ReportTable
+          title="Invoice totals by fee type"
+          description="Totals for invoices matching the current date, branch, class, section and payment-status filters."
+          empty="No invoices match the selected filters."
+          headings={["Fee type", "Invoices", "Amount due", "Amount paid", "Balance"]}
+          hasRows={feeTypeSummary.length > 0}
+        >
+          {feeTypeSummary.map(([feeType, totals]) => (
+            <tr key={feeType} className="border-t border-slate-100">
+              <td className="px-4 py-3 font-medium">{feeType}</td>
+              <td className="px-4 py-3">{totals.count}</td>
+              <td className="px-4 py-3">{currency} {money(totals.due)}</td>
+              <td className="px-4 py-3">{currency} {money(totals.paid)}</td>
+              <td className="px-4 py-3 font-semibold">{currency} {money(totals.balance)}</td>
+            </tr>
+          ))}
+        </ReportTable>
         <ReportTable
           title="Invoice payment status report"
           description={`Invoices due ${from} through ${to}${requestedStatus ? ` with ${requestedStatus === "paid" ? "full payment" : requestedStatus === "partial" ? "partial payment" : "no payment"}` : " across all payment statuses"}; balance includes applicable late fines.`}
