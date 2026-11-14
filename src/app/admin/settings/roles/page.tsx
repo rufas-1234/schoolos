@@ -10,6 +10,7 @@ import {
   userRoles,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { canEditRole } from "@/lib/role-policy";
 import {
   AccountRolesForm,
   CreateRoleForm,
@@ -47,15 +48,16 @@ export default async function UserRolesPage() {
       ))
       .orderBy(asc(user.name)),
   ]);
-  const assignedRoles = accounts.length
+  const assignedRoles = schoolRoles.length
     ? await db.select({
       membershipId: userRoles.membershipId,
       roleId: userRoles.roleId,
     }).from(userRoles)
       .innerJoin(roles, eq(userRoles.roleId, roles.id))
+      .innerJoin(schoolMemberships, eq(userRoles.membershipId, schoolMemberships.id))
       .where(and(
-        inArray(userRoles.membershipId, accounts.map((account) => account.membershipId)),
         eq(roles.schoolId, context.schoolId),
+        eq(schoolMemberships.schoolId, context.schoolId),
       ))
     : [];
   const roleIdsByMembership = new Map<number, number[]>();
@@ -111,7 +113,7 @@ export default async function UserRolesPage() {
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="font-semibold text-slate-900">Roles in {context.schoolName}</h2>
-            <p className="mt-1 text-sm text-slate-500">View any role; edit and delete custom roles. Unassign a role from accounts before deleting it.</p>
+            <p className="mt-1 text-sm text-slate-500">Edit unassigned system roles or any custom role. System roles cannot be deleted; unassign custom roles before deleting them.</p>
           </div>
           <ul className="divide-y divide-slate-100">
             {schoolRoles.map((role) => (
@@ -128,7 +130,7 @@ export default async function UserRolesPage() {
                     {(permissionsByRole.get(role.id) ?? []).join(" · ") || "No permissions assigned"}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {assignedCountByRole.get(role.id) ?? 0} active account{assignedCountByRole.get(role.id) === 1 ? "" : "s"}
+                    {assignedCountByRole.get(role.id) ?? 0} account assignment{assignedCountByRole.get(role.id) === 1 ? "" : "s"}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -140,10 +142,16 @@ export default async function UserRolesPage() {
                       </div>
                       <div>
                         <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role type</dt>
-                        <dd className="mt-1 text-sm text-slate-800">{role.isSystem ? "System role (read-only)" : "Custom role"}</dd>
+                        <dd className="mt-1 text-sm text-slate-800">
+                          {role.isSystem
+                            ? canEditRole(role.isSystem, assignedCountByRole.get(role.id) ?? 0)
+                              ? "System role (editable until assigned)"
+                              : "System role (assigned; read-only)"
+                            : "Custom role"}
+                        </dd>
                       </div>
                       <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active account assignments</dt>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Account assignments</dt>
                         <dd className="mt-1 text-sm text-slate-800">{assignedCountByRole.get(role.id) ?? 0}</dd>
                       </div>
                       <div>
@@ -163,20 +171,18 @@ export default async function UserRolesPage() {
                       </div>
                     </dl>
                   </AdminRecordDialog>
-                  {!role.isSystem && (
-                    <>
-                      <AdminRecordDialog title={`Edit ${role.name}`}>
-                        <EditRoleForm
-                          role={{
-                            ...role,
-                            permissionIds: permissionIdsByRole.get(role.id) ?? [],
-                          }}
-                          permissions={availablePermissions}
-                        />
-                      </AdminRecordDialog>
-                      <DeleteRoleForm roleId={role.id} roleName={role.name} />
-                    </>
+                  {canEditRole(role.isSystem, assignedCountByRole.get(role.id) ?? 0) && (
+                    <AdminRecordDialog title={`Edit ${role.name}`}>
+                      <EditRoleForm
+                        role={{
+                          ...role,
+                          permissionIds: permissionIdsByRole.get(role.id) ?? [],
+                        }}
+                        permissions={availablePermissions}
+                      />
+                    </AdminRecordDialog>
                   )}
+                  {!role.isSystem && <DeleteRoleForm roleId={role.id} roleName={role.name} />}
                 </div>
               </li>
             ))}
