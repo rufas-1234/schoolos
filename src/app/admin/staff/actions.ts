@@ -5,7 +5,14 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { auditLogs, schoolMemberships, staffMembers, user } from "@/db/schema";
+import {
+  auditLogs,
+  schoolMemberships,
+  staffDepartments,
+  staffDesignations,
+  staffMembers,
+  user,
+} from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
@@ -70,6 +77,16 @@ export async function createStaffMember(
   const publicId = randomUUID();
   try {
     await db.transaction(async (tx) => {
+      await tx.insert(staffDepartments).values({
+        publicId: randomUUID(),
+        schoolId: context.schoolId,
+        name: staff.department,
+      }).onDuplicateKeyUpdate({ set: { name: staff.department } });
+      await tx.insert(staffDesignations).values({
+        publicId: randomUUID(),
+        schoolId: context.schoolId,
+        name: staff.jobTitle,
+      }).onDuplicateKeyUpdate({ set: { name: staff.jobTitle } });
       await tx.insert(staffMembers).values({
         publicId,
         schoolId: context.schoolId,
@@ -126,6 +143,9 @@ export async function createStaffMember(
   revalidatePath("/admin/hr/attendance");
   revalidatePath("/admin/hr/leave");
   revalidatePath("/admin/hr/payroll");
+  revalidatePath("/admin/hr/departments");
+  revalidatePath("/admin/hr/designations");
+  revalidatePath("/admin/hr/reports");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
@@ -175,6 +195,16 @@ export async function updateStaffMember(
         .limit(1);
       if (!existing) return false;
 
+      await tx.insert(staffDepartments).values({
+        publicId: randomUUID(),
+        schoolId: context.schoolId,
+        name: staff.department,
+      }).onDuplicateKeyUpdate({ set: { name: staff.department } });
+      await tx.insert(staffDesignations).values({
+        publicId: randomUUID(),
+        schoolId: context.schoolId,
+        name: staff.jobTitle,
+      }).onDuplicateKeyUpdate({ set: { name: staff.jobTitle } });
       await tx
         .update(staffMembers)
         .set({
@@ -238,6 +268,9 @@ export async function updateStaffMember(
   revalidatePath("/admin/hr/attendance");
   revalidatePath("/admin/hr/leave");
   revalidatePath("/admin/hr/payroll");
+  revalidatePath("/admin/hr/departments");
+  revalidatePath("/admin/hr/designations");
+  revalidatePath("/admin/hr/reports");
   revalidatePath("/admin/dashboard");
   return { success: true };
 }

@@ -68,6 +68,9 @@ const navigation: NavigationItem[] = [
       { id: "attendance", label: "Staff attendance", href: "/admin/hr/attendance" },
       { id: "leave", label: "Leave management", href: "/admin/hr/leave" },
       { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll" },
+      { id: "reports", label: "Staff reports", href: "/admin/hr/reports" },
+      { id: "departments", label: "Departments", href: "/admin/hr/departments" },
+      { id: "designations", label: "Designations", href: "/admin/hr/designations" },
     ],
   },
   {
@@ -75,6 +78,12 @@ const navigation: NavigationItem[] = [
     label: "School profile",
     icon: School,
     permission: "school.settings.manage",
+  },
+  {
+    href: "/admin/settings/roles",
+    label: "User roles",
+    icon: ShieldCheck,
+    permission: "roles.manage",
   },
   {
     href: "/admin/staff",
@@ -132,7 +141,11 @@ export function AdminShell({
     (item.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false)
   );
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
-  const homeHref = permissions.includes("dashboard.view") ? "/admin/dashboard" : "/admin/hr";
+  const homeHref = permissions.includes("dashboard.view")
+    ? "/admin/dashboard"
+    : permissions.includes("staff.manage")
+      ? "/admin/hr"
+      : "/admin/settings/roles";
   const schoolMonogram =
     schoolName
       .split(/\s+/)

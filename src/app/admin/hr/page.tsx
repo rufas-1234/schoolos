@@ -79,10 +79,14 @@ export default async function HumanResourcesPage() {
 
       <section>
         <h2 className="mb-3 text-base font-semibold text-slate-900">HR tools</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ToolCard href="/admin/staff" title="Staff directory" detail="Manage staff profiles, employment details, and school account links." />
           <ToolCard href="/admin/hr/attendance" title="Staff attendance" detail="Record daily present, absent, late, and excused marks." />
           <ToolCard href="/admin/hr/leave" title="Leave management" detail="Set leave types and per-person entitlement; review requests." />
           <ToolCard href="/admin/hr/payroll" title="Payroll records" detail="Record paid or outstanding amounts and view period totals." />
+          <ToolCard href="/admin/hr/reports" title="Staff reports" detail="Review attendance totals for a selected date range and print the report." />
+          <ToolCard href="/admin/hr/departments" title="Departments" detail="Organize staff by department and keep directory names consistent." />
+          <ToolCard href="/admin/hr/designations" title="Designations" detail="Manage the job titles used for staff members." />
         </div>
       </section>
 
@@ -181,7 +185,6 @@ export default async function HumanResourcesPage() {
     </div>
   );
 }
-
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -190,7 +193,6 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
     </article>
   );
 }
-
 function EmptyMessage({ message }: { message: string }) {
   return (
     <p className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">

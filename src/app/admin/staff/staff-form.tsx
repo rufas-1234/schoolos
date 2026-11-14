@@ -27,9 +27,13 @@ type StaffAccountOption = { id: string; name: string; email: string };
 export function StaffForm({
   record,
   accounts = [],
+  departmentOptions = [],
+  designationOptions = [],
 }: {
   record?: StaffEditRecord;
   accounts?: StaffAccountOption[];
+  departmentOptions?: string[];
+  designationOptions?: string[];
 } = {}) {
   const [state, formAction, pending] = useActionState(
     record ? updateStaffMember : createStaffMember,
@@ -57,8 +61,22 @@ export function StaffForm({
         <Field label="First name" name="firstName" required defaultValue={record?.firstName} />
         <Field label="Last name" name="lastName" required defaultValue={record?.lastName} />
         <Field label="Employee code" name="employeeCode" defaultValue={record?.employeeCode ?? ""} />
-        <Field label="Job title" name="jobTitle" required placeholder="e.g. Mathematics teacher" defaultValue={record?.jobTitle} />
-        <Field label="Department" name="department" required placeholder="e.g. Academics" defaultValue={record?.department} />
+        <CatalogField
+          label="Job title"
+          name="jobTitle"
+          options={designationOptions}
+          required
+          placeholder="e.g. Mathematics teacher"
+          defaultValue={record?.jobTitle}
+        />
+        <CatalogField
+          label="Department"
+          name="department"
+          options={departmentOptions}
+          required
+          placeholder="e.g. Academics"
+          defaultValue={record?.department}
+        />
         <Field label="Email address" name="email" type="email" defaultValue={record?.email ?? ""} />
         <Field label="Phone number" name="phone" type="tel" defaultValue={record?.phone ?? ""} />
         <Field label="Date of birth (optional)" name="dateOfBirth" type="date" defaultValue={record?.dateOfBirth ?? ""} />
@@ -115,6 +133,40 @@ export function StaffForm({
         {pending ? "Saving..." : record ? "Save changes" : "Add staff member"}
       </button>
     </form>
+  );
+}
+
+function CatalogField({
+  label,
+  name,
+  options,
+  required = false,
+  placeholder,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  options: string[];
+  required?: boolean;
+  placeholder?: string;
+  defaultValue?: string;
+}) {
+  const listId = `staff-${name}-options`;
+  return (
+    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+      {label} {required && <RequiredMark />}
+      <input
+        name={name}
+        required={required}
+        list={listId}
+        placeholder={placeholder}
+        defaultValue={defaultValue}
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+      />
+      <datalist id={listId}>
+        {options.map((option) => <option key={option} value={option} />)}
+      </datalist>
+    </label>
   );
 }
 

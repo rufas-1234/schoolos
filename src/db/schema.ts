@@ -555,6 +555,42 @@ export const staffMembers = mysqlTable(
   ],
 );
 
+export const staffDepartments = mysqlTable(
+  "staff_departments",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("staff_departments_school_name_uq").on(table.schoolId, table.name),
+    index("staff_departments_school_idx").on(table.schoolId),
+  ],
+);
+
+export const staffDesignations = mysqlTable(
+  "staff_designations",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("staff_designations_school_name_uq").on(table.schoolId, table.name),
+    index("staff_designations_school_idx").on(table.schoolId),
+  ],
+);
+
 export const staffAttendance = mysqlTable(
   "staff_attendance",
   {

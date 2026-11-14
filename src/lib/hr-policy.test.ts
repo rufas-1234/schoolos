@@ -3,6 +3,7 @@ import {
   canReviewLeaveRequest,
   fitsLeaveEntitlement,
   inclusiveCalendarDays,
+  isValidStaffReportRange,
   staffAttendanceStatuses,
   staffLeaveRequestStatuses,
   staffPayrollStatuses,
@@ -20,6 +21,14 @@ describe("human resources policies", () => {
     expect(inclusiveCalendarDays("2024-03-01", "2024-03-01")).toBe(1);
     expect(inclusiveCalendarDays("2024-03-02", "2024-03-01")).toBeNull();
     expect(inclusiveCalendarDays("2023-02-29", "2023-03-01")).toBeNull();
+  });
+
+  it("limits staff reports to valid date ranges of at most 367 days", () => {
+    expect(isValidStaffReportRange("2024-01-01", "2024-01-01")).toBe(true);
+    expect(isValidStaffReportRange("2024-01-01", "2024-12-31")).toBe(true);
+    expect(isValidStaffReportRange("2024-01-01", "2025-01-02")).toBe(false);
+    expect(isValidStaffReportRange("2024-02-30", "2024-03-01")).toBe(false);
+    expect(isValidStaffReportRange("2024-03-02", "2024-03-01")).toBe(false);
   });
 
   it("keeps leave reservations within assigned entitlements", () => {

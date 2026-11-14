@@ -11,6 +11,11 @@ export function inclusiveCalendarDays(startDate: string, endDate: string): numbe
   ) + 1;
 }
 
+export function isValidStaffReportRange(startDate: string, endDate: string): boolean {
+  const days = inclusiveCalendarDays(startDate, endDate);
+  return days !== null && days <= 367;
+}
+
 export function fitsLeaveEntitlement(
   entitlementDays: number,
   reservedDays: number,

@@ -7,7 +7,13 @@ import {
   type AdminTableFilter,
 } from "@/components/admin-data-table";
 import { db } from "@/db";
-import { schoolMemberships, staffMembers, user } from "@/db/schema";
+import {
+  schoolMemberships,
+  staffDepartments,
+  staffDesignations,
+  staffMembers,
+  user,
+} from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { transitionStaffStatus } from "./actions";
 import { StaffForm } from "./staff-form";
@@ -22,7 +28,7 @@ const employmentTypeLabels: Record<string, string> = {
 export default async function StaffDirectoryPage() {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
 
-  const [records, totals, accounts] = await Promise.all([
+  const [records, totals, accounts, departments, designations] = await Promise.all([
     db
       .select({
         id: staffMembers.id,
@@ -60,6 +66,12 @@ export default async function StaffDirectoryPage() {
         eq(user.isActive, true),
       ))
       .orderBy(asc(user.name)),
+    db.select({ name: staffDepartments.name }).from(staffDepartments)
+      .where(eq(staffDepartments.schoolId, context.schoolId))
+      .orderBy(asc(staffDepartments.name)),
+    db.select({ name: staffDesignations.name }).from(staffDesignations)
+      .where(eq(staffDesignations.schoolId, context.schoolId))
+      .orderBy(asc(staffDesignations.name)),
   ]);
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
@@ -111,7 +123,11 @@ export default async function StaffDirectoryPage() {
           requireSearchCriteria
           toolbarActions={
             <AdminActionDialog label="Add staff member" title="Add staff member">
-              <StaffForm accounts={accounts} />
+              <StaffForm
+                accounts={accounts}
+                departmentOptions={departments.map((entry) => entry.name)}
+                designationOptions={designations.map((entry) => entry.name)}
+              />
             </AdminActionDialog>
           }
           rows={records.map((record) => ({
@@ -131,7 +147,12 @@ export default async function StaffDirectoryPage() {
             actions: (
               <div className="flex min-w-36 flex-wrap items-center gap-2">
                 <AdminRecordDialog title={`Edit ${record.firstName} ${record.lastName}`}>
-                  <StaffForm record={record} accounts={accounts} />
+                  <StaffForm
+                    record={record}
+                    accounts={accounts}
+                    departmentOptions={departments.map((entry) => entry.name)}
+                    designationOptions={designations.map((entry) => entry.name)}
+                  />
                 </AdminRecordDialog>
                 <form action={transitionStaffStatus}>
                   <input type="hidden" name="publicId" value={record.publicId} />
