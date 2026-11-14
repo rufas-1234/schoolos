@@ -117,7 +117,7 @@ export default async function StaffPayrollPage({
         {branch ? (
           <PayrollForm
             branchId={branch.id}
-            branchName={`${branch.name} (${branch.code})`}
+            branchName={branch.name}
             staffOptions={staffOptions}
             currency={currency}
             payPeriod={payPeriod}

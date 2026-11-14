@@ -470,6 +470,10 @@ export const teachers = mysqlTable(
     branchId: bigint("branchId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schoolBranches.id),
+    staffMemberId: bigint("staffMemberId", { mode: "number", unsigned: true }).references(
+      () => staffMembers.id,
+      { onDelete: "set null" },
+    ),
     firstName: varchar("firstName", { length: 120 }).notNull(),
     lastName: varchar("lastName", { length: 120 }).notNull(),
     employeeCode: varchar("employeeCode", { length: 40 }),
@@ -480,6 +484,7 @@ export const teachers = mysqlTable(
     updatedAt: updatedAt(),
   },
   (table) => [
+    uniqueIndex("teachers_staff_member_uq").on(table.staffMemberId),
     uniqueIndex("teachers_school_employee_code_uq").on(table.schoolId, table.employeeCode),
     uniqueIndex("teachers_school_email_uq").on(table.schoolId, table.email),
     index("teachers_school_status_name_idx").on(

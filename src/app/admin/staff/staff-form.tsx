@@ -155,7 +155,7 @@ export function StaffForm({ record, accounts, branches, departments, designation
                 className={inputClass}
               >
                 <option value="">Select branch</option>
-                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
+                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
               </select>
             </Field>
             <Field label="Profile photo">

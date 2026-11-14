@@ -38,7 +38,7 @@ export default async function DisabledStudentsPage() {
     label: "branch",
     options: branches.map((branch) => ({
       value: String(branch.id),
-      label: `${branch.name} · ${branch.code}`,
+      label: branch.name,
     })),
   }];
 

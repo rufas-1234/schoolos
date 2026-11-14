@@ -219,7 +219,7 @@ export default async function MultiClassStudentsPage({
             Branch <span className="text-rose-600" aria-hidden="true">*</span>
             <select name="branchId" required defaultValue={branchValue ?? ""} className={inputClass}>
               <option value="" disabled>Select branch</option>
-              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} · {branch.code}</option>)}
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select>
           </label>
           <label className="space-y-1.5 text-sm font-medium text-slate-700">

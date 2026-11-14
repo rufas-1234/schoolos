@@ -36,7 +36,7 @@ export function CreateCatalogEntryForm({
         <select name="branchId" required defaultValue="" className={fieldClass}>
           <option value="" disabled>Select a branch</option>
           {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>
+            <option key={branch.id} value={branch.id}>{branch.name}</option>
           ))}
         </select>
       </label>

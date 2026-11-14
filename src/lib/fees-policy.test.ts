@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDiscountMinorUnits,
   calculateFineMinorUnits,
+  feeDisplayName,
   feePaymentDateRangeInTimezone,
   feeInvoiceStatus,
   isPayDateOnOrAfterDueDate,
@@ -9,6 +10,13 @@ import {
 } from "./fees-policy";
 
 describe("fees policies", () => {
+  it("shows concise catalog names without demo prefixes", () => {
+    expect(feeDisplayName("DEMO TEST - Tuition")).toBe("Tuition");
+    expect(feeDisplayName("DEMO - Fee group")).toBe("Fee group");
+    expect(feeDisplayName("Tuition")).toBe("Tuition");
+    expect(feeDisplayName("DEMO TEST - ")).toBe("DEMO TEST - ");
+  });
+
   it("parses money exactly to minor units", () => {
     expect(parseMoneyToMinorUnits("125")).toBe(12500);
     expect(parseMoneyToMinorUnits("12.3")).toBe(1230);

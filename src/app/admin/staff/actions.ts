@@ -1,17 +1,20 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, count, eq, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import {
   auditLogs,
+  classSections,
+  classSubjects,
   schoolBranches,
   schoolMemberships,
   staffDepartments,
   staffDesignations,
   staffMembers,
+  teachers,
   uploadedFiles,
   user,
 } from "@/db/schema";
@@ -30,6 +33,141 @@ import {
 } from "@/lib/staff-policy";
 
 export type StaffActionState = { error?: string; success?: boolean };
+
+type StaffTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type TeacherStaffData = {
+  id: number;
+  branchId: number | null;
+  firstName: string;
+  lastName: string;
+  employeeCode: string;
+  personnelRole: string;
+  email: string;
+  phone: string;
+  status: string;
+};
+
+class TeacherSyncError extends Error {}
+
+async function syncAcademicTeacher(
+  tx: StaffTransaction,
+  schoolId: number,
+  actorUserId: string,
+  staff: TeacherStaffData,
+) {
+  let teacher: {
+    id: number;
+    publicId: string;
+    branchId: number;
+    staffMemberId: number | null;
+  } | undefined;
+  [teacher] = await tx
+    .select({
+      id: teachers.id,
+      publicId: teachers.publicId,
+      branchId: teachers.branchId,
+      staffMemberId: teachers.staffMemberId,
+    })
+    .from(teachers)
+    .where(and(eq(teachers.schoolId, schoolId), eq(teachers.staffMemberId, staff.id)))
+    .for("update")
+    .limit(1);
+
+  if (!teacher && staff.personnelRole === "teacher") {
+    const identifiers = [];
+    if (staff.employeeCode) identifiers.push(eq(teachers.employeeCode, staff.employeeCode));
+    if (staff.email) identifiers.push(eq(teachers.email, staff.email));
+    if (identifiers.length) {
+      const matches = await tx
+        .select({
+          id: teachers.id,
+          publicId: teachers.publicId,
+          branchId: teachers.branchId,
+          staffMemberId: teachers.staffMemberId,
+        })
+        .from(teachers)
+        .where(and(eq(teachers.schoolId, schoolId), or(...identifiers)))
+        .for("update");
+      if (matches.length > 1) {
+        throw new TeacherSyncError("This staff member matches more than one existing academic teacher. Resolve the duplicate teacher records first.");
+      }
+      teacher = matches[0];
+      if (teacher?.staffMemberId !== null && teacher?.staffMemberId !== undefined) {
+        throw new TeacherSyncError("This academic teacher is already linked to another staff member.");
+      }
+    }
+  }
+
+  if (staff.personnelRole !== "teacher") {
+    if (teacher?.id) {
+      await tx
+        .update(teachers)
+        .set({ status: "inactive" })
+        .where(and(eq(teachers.id, teacher.id), eq(teachers.schoolId, schoolId)));
+    }
+    return;
+  }
+
+  if (!staff.branchId) {
+    throw new TeacherSyncError("Choose a branch for this teacher in Human Resources.");
+  }
+
+  if (teacher && teacher.branchId !== staff.branchId) {
+    const [[sectionCount], [subjectCount]] = await Promise.all([
+      tx.select({ total: count() }).from(classSections).where(and(
+        eq(classSections.schoolId, schoolId),
+        eq(classSections.classTeacherId, teacher.id),
+      )),
+      tx.select({ total: count() }).from(classSubjects).where(and(
+        eq(classSubjects.schoolId, schoolId),
+        eq(classSubjects.teacherId, teacher.id),
+      )),
+    ]);
+    if (Number(sectionCount.total) + Number(subjectCount.total) > 0) {
+      throw new TeacherSyncError("A teacher's branch cannot be changed while they are assigned to a class or subject.");
+    }
+  }
+
+  const teacherValues = {
+    staffMemberId: staff.id,
+    branchId: staff.branchId,
+    firstName: staff.firstName,
+    lastName: staff.lastName,
+    employeeCode: staff.employeeCode || null,
+    email: staff.email || null,
+    phone: staff.phone || null,
+    status: staff.status === "active" ? "active" : "inactive",
+  };
+  if (teacher) {
+    await tx
+      .update(teachers)
+      .set(teacherValues)
+      .where(and(eq(teachers.id, teacher.id), eq(teachers.schoolId, schoolId)));
+  } else {
+    const publicId = randomUUID();
+    await tx.insert(teachers).values({
+      publicId,
+      schoolId,
+      ...teacherValues,
+    });
+    const [created] = await tx
+      .select({ id: teachers.id, publicId: teachers.publicId })
+      .from(teachers)
+      .where(and(eq(teachers.schoolId, schoolId), eq(teachers.staffMemberId, staff.id)))
+      .limit(1);
+    teacher = created ? { ...created, branchId: staff.branchId, staffMemberId: staff.id } : undefined;
+  }
+
+  if (!teacher) throw new Error("Unable to load the academic teacher linked to this staff member.");
+  await tx.insert(auditLogs).values({
+    schoolId,
+    actorUserId,
+    action: "academic.teacher.synced_from_staff",
+    resourceType: "teacher",
+    resourcePublicId: teacher.publicId,
+    changedFields: ["staffMemberId", "branchId", "firstName", "lastName", "employeeCode", "email", "phone", "status"],
+  });
+}
 
 const optionalDate = z.union([z.literal(""), z.string().refine(isCalendarDate)]);
 const optionalUrl = z.union([z.literal(""), z.string().url().max(2048)]);
@@ -275,6 +413,25 @@ export async function createStaffMember(
         status: "active",
         startDate: staff.startDate || null,
       });
+      if (staff.personnelRole === "teacher") {
+        const [createdStaff] = await tx
+          .select({ id: staffMembers.id })
+          .from(staffMembers)
+          .where(and(eq(staffMembers.schoolId, context.schoolId), eq(staffMembers.publicId, publicId)))
+          .limit(1);
+        if (!createdStaff) throw new Error("Unable to load the newly created staff record.");
+        await syncAcademicTeacher(tx, context.schoolId, context.user.id, {
+          id: createdStaff.id,
+          branchId: staff.branchId,
+          firstName: staff.firstName,
+          lastName: staff.lastName,
+          employeeCode: staff.employeeCode,
+          personnelRole: staff.personnelRole,
+          email: staff.email,
+          phone: staff.phone,
+          status: "active",
+        });
+      }
       await tx.insert(auditLogs).values({
         schoolId: context.schoolId,
         actorUserId: context.user.id,
@@ -326,6 +483,7 @@ export async function createStaffMember(
       });
     });
   } catch (error) {
+    if (error instanceof TeacherSyncError) return { error: error.message };
     if (isDuplicateEntryError(error)) {
       return { error: "That employee code, email, or linked account is already used by this school." };
     }
@@ -341,6 +499,7 @@ export async function createStaffMember(
   revalidatePath("/admin/hr/designations");
   revalidatePath("/admin/hr/reports");
   revalidatePath("/admin/dashboard");
+  revalidatePath("/admin/academics");
   return { success: true };
 }
 
@@ -364,7 +523,7 @@ export async function updateStaffMember(
   try {
     const outcome = await db.transaction(async (tx) => {
       const [existing] = await tx
-        .select({ id: staffMembers.id })
+        .select({ id: staffMembers.id, status: staffMembers.status })
         .from(staffMembers)
         .where(
           and(
@@ -425,6 +584,17 @@ export async function updateStaffMember(
             eq(staffMembers.schoolId, context.schoolId),
           ),
         );
+      await syncAcademicTeacher(tx, context.schoolId, context.user.id, {
+        id: existing.id,
+        branchId: staff.branchId,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        employeeCode: staff.employeeCode,
+        personnelRole: staff.personnelRole,
+        email: staff.email,
+        phone: staff.phone,
+        status: existing.status,
+      });
       await tx.insert(auditLogs).values({
         schoolId: context.schoolId,
         actorUserId: context.user.id,
@@ -478,6 +648,7 @@ export async function updateStaffMember(
 
     if (!outcome) return { error: "Staff record was not found in this school." };
   } catch (error) {
+    if (error instanceof TeacherSyncError) return { error: error.message };
     if (isDuplicateEntryError(error)) {
       return { error: "That employee code, email, or linked account is already used by this school." };
     }
@@ -493,6 +664,7 @@ export async function updateStaffMember(
   revalidatePath("/admin/hr/designations");
   revalidatePath("/admin/hr/reports");
   revalidatePath("/admin/dashboard");
+  revalidatePath("/admin/academics");
   return { success: true };
 }
 
@@ -530,6 +702,13 @@ export async function transitionStaffStatus(formData: FormData): Promise<void> {
         id: staffMembers.id,
         publicId: staffMembers.publicId,
         status: staffMembers.status,
+        branchId: staffMembers.branchId,
+        firstName: staffMembers.firstName,
+        lastName: staffMembers.lastName,
+        employeeCode: staffMembers.employeeCode,
+        personnelRole: staffMembers.personnelRole,
+        email: staffMembers.email,
+        phone: staffMembers.phone,
       })
       .from(staffMembers)
       .where(
@@ -550,6 +729,17 @@ export async function transitionStaffStatus(formData: FormData): Promise<void> {
       .update(staffMembers)
       .set({ status: result.data.nextStatus })
       .where(and(eq(staffMembers.id, staff.id), eq(staffMembers.schoolId, context.schoolId)));
+    await syncAcademicTeacher(tx, context.schoolId, context.user.id, {
+      id: staff.id,
+      branchId: staff.branchId,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      employeeCode: staff.employeeCode ?? "",
+      personnelRole: staff.personnelRole ?? "",
+      email: staff.email ?? "",
+      phone: staff.phone ?? "",
+      status: result.data.nextStatus,
+    });
     await tx.insert(auditLogs).values({
       schoolId: context.schoolId,
       actorUserId: context.user.id,
@@ -569,4 +759,5 @@ export async function transitionStaffStatus(formData: FormData): Promise<void> {
   revalidatePath("/admin/staff");
   revalidatePath("/admin/hr");
   revalidatePath("/admin/hr/attendance");
+  revalidatePath("/admin/academics");
 }

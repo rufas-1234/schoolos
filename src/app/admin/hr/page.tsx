@@ -102,7 +102,7 @@ export default async function HumanResourcesPage({
           Branch
           <select name="branchId" defaultValue={selectedBranch?.id.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <option value="">All branches</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
         </label>
         <button className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View branch</button>

@@ -29,7 +29,7 @@ export default async function StaffLeavePage({
   const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
   const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
   const branchId = branch?.id;
-  const branchName = branch ? `${branch.name} (${branch.code})` : "No active branch";
+  const branchName = branch?.name ?? "No active branch";
   const [staff, types, balances, usage, requests] = await Promise.all([
     db.select({
       id: staffMembers.id,

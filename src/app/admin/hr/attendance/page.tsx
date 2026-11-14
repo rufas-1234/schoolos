@@ -96,7 +96,7 @@ export default async function StaffAttendancePage({
           Branch
           <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <option value="" disabled>Select a branch</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
         </label>
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">

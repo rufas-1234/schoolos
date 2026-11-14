@@ -5,6 +5,11 @@ export const feeFineTypes = ["none", "fixed", "percentage"] as const;
 export const feePaymentMethods = ["cash", "bank_transfer", "card", "mobile_money", "cheque", "other"] as const;
 export const feeInvoiceStatuses = ["unpaid", "partial", "paid"] as const;
 
+export function feeDisplayName(name: string): string {
+  const displayName = name.replace(/^(?:demo(?:\s+test)?\s*[-:]\s*)+/i, "").trim();
+  return displayName || name;
+}
+
 function parseDecimalToMinorUnits(value: string | number): number | null {
   const text = typeof value === "number" && Number.isFinite(value) ? String(value) : value;
   if (typeof text !== "string" || !/^\d{1,8}(\.\d{1,2})?$/.test(text)) return null;

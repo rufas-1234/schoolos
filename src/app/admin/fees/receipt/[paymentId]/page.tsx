@@ -19,7 +19,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { ReceiptActions } from "../../receipt-actions";
 import { FeePaymentReversalForm } from "../../fee-forms";
-import { parseMoneyToMinorUnits } from "@/lib/fees-policy";
+import { feeDisplayName, parseMoneyToMinorUnits } from "@/lib/fees-policy";
 
 export default async function FeeReceiptPage({
   params,
@@ -128,7 +128,7 @@ export default async function FeeReceiptPage({
         <ReceiptField label="Student" value={`${receipt.studentName} ${receipt.studentLastName}`} />
         <ReceiptField label="Admission / roll number" value={`${receipt.admissionNumber || "—"} / ${receipt.rollNumber || "—"}`} />
         <ReceiptField label="Branch / class / section" value={`${receipt.branchName} / ${receipt.className} / ${receipt.sectionName}`} />
-        <ReceiptField label="Fee" value={`${receipt.groupName} / ${receipt.feeTypeName}`} />
+        <ReceiptField label="Fee" value={feeDisplayName(receipt.feeTypeName)} />
         <ReceiptField label="Invoice" value={receipt.invoiceNumber} />
         <ReceiptField label="Payment date" value={receipt.paidAt.toISOString().replace("T", " ").slice(0, 16)} />
         <ReceiptField label="Payment method" value={receipt.paymentMethod.replace("_", " ")} />

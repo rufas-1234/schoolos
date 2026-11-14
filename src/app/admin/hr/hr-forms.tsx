@@ -80,7 +80,7 @@ export function LeaveTypeForm({
         Branch
         <select name="branchId" required defaultValue={branchId.toString()} className={inputClass}>
           {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>
+            <option key={branch.id} value={branch.id}>{branch.name}</option>
           ))}
         </select>
       </label>

@@ -21,6 +21,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import {
   calculateFineMinorUnits,
+  feeDisplayName,
   feeInvoiceStatus,
   parseMoneyToMinorUnits,
 } from "@/lib/fees-policy";
@@ -225,13 +226,13 @@ export default async function FeeCollectionPage({
   ];
   const classOptions: SearchableSelectOption[] = [
     { value: "", label: "All classes" },
-    ...classes.map((item) => ({ value: String(item.id), label: `${item.branchName} — ${item.name}` })),
+    ...classes.map((item) => ({ value: String(item.id), label: item.name })),
   ];
   const sectionOptions: SearchableSelectOption[] = [
     { value: "", label: "All sections" },
     ...sections.map((section) => ({
       value: String(section.id),
-      label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
+      label: `${section.className} / ${section.name} (${section.yearName})`,
     })),
   ];
   const totalOutstanding = rows.reduce((total, invoice) => total + Math.max(0, invoice.balance), 0);
@@ -296,7 +297,7 @@ export default async function FeeCollectionPage({
                 <p className="mt-1 text-sm text-slate-500">
                   Admission {invoice.admissionNumber || "—"} · Roll {invoice.rollNumber || "—"} · {invoice.branchName} / {invoice.className} / {invoice.sectionName}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">{invoice.groupName} / {invoice.typeName}{invoice.termName ? ` · ${invoice.termName}` : ""} · due {invoice.dueDate}</p>
+                <p className="mt-1 text-sm text-slate-500">{feeDisplayName(invoice.typeName)}{invoice.termName ? ` · ${invoice.termName}` : ""} · due {invoice.dueDate}</p>
                 <p className="mt-2 text-xs text-slate-400">Invoice {invoice.invoiceNumber} · {invoice.createdAt.toISOString().slice(0, 10)}</p>
                 <div className="mt-2 flex gap-3 text-xs font-semibold text-violet-700">
                   <Link href={`/admin/fees/invoices/print?invoiceId=${invoice.publicId}`}>Print invoice</Link>

@@ -117,9 +117,9 @@ export default async function StaffDirectoryPage() {
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
-  const branchNameById = new Map(branches.map((branch) => [branch.id, `${branch.name} (${branch.code})`]));
+  const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]));
   const filters: AdminTableFilter[] = [
-    { key: "branch", label: "branch", options: uniqueOptions(branches.map((branch) => `${branch.name} (${branch.code})`)) },
+    { key: "branch", label: "branch", options: uniqueOptions(branches.map((branch) => branch.name)) },
     { key: "department", label: "department", options: uniqueOptions(records.map((record) => record.department)) },
     {
       key: "employmentType",

@@ -19,7 +19,7 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { calculateFineMinorUnits, feeInvoiceStatus, parseMoneyToMinorUnits } from "@/lib/fees-policy";
+import { calculateFineMinorUnits, feeDisplayName, feeInvoiceStatus, parseMoneyToMinorUnits } from "@/lib/fees-policy";
 
 type SearchParams = {
   invoiceId?: string | string[];
@@ -212,7 +212,7 @@ export default async function FeeInvoicePrintPage({
             <table className="fee-invoice-items w-full border-collapse text-left text-sm">
               <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-2 font-semibold">Fee item</th><th className="px-3 py-2 text-right font-semibold">Amount</th></tr></thead>
               <tbody>
-                <tr className="border-b border-slate-200"><td className="px-3 py-2">{invoice.groupName} / {invoice.typeName}</td><td className="px-3 py-2 text-right">{school.currency} {money(amount)}</td></tr>
+                <tr className="border-b border-slate-200"><td className="px-3 py-2">{feeDisplayName(invoice.typeName)}</td><td className="px-3 py-2 text-right">{school.currency} {money(amount)}</td></tr>
                 {discount > 0 && <tr><td className="px-3 py-2">Discount</td><td className="px-3 py-2 text-right">− {school.currency} {money(discount)}</td></tr>}
                 {fine > 0 && <tr><td className="px-3 py-2">Late fine</td><td className="px-3 py-2 text-right">{school.currency} {money(fine)}</td></tr>}
               </tbody>

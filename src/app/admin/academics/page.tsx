@@ -63,7 +63,6 @@ import {
   SectionAssignmentForm,
   StudentPlacementForm,
   SubjectTeacherForm,
-  TeacherForm,
 } from "./management-forms";
 import { AttendanceWorkspace } from "./attendance-workspace";
 import { isAttendanceStatus } from "@/lib/attendance-policy";
@@ -592,21 +591,21 @@ export default async function AcademicStructurePage({
     ...branches.map((branch) => ({
       id: `branch-${branch.id}`,
       type: "Branch" as const,
-      label: `${branch.name} · ${branch.code}`,
+      label: branch.name,
       searchText: `${branch.name} ${branch.code}`,
       section: "branches" as const,
     })),
     ...classes.map((classLevel) => ({
       id: `class-${classLevel.id}`,
       type: "Class" as const,
-      label: `${classLevel.branchName} · ${classLevel.name} (${classLevel.code})`,
+      label: classLevel.name,
       searchText: `${classLevel.branchName} ${classLevel.name} ${classLevel.code}`,
       section: "classes" as const,
     })),
     ...sections.map((section) => ({
       id: `section-${section.id}`,
       type: "Class section" as const,
-      label: `${section.branchName} · ${section.className} ${section.name} · ${section.yearName}`,
+      label: `${section.className} ${section.name} · ${section.yearName}`,
       searchText: `${section.branchName} ${section.className} ${section.name} ${section.yearName}`,
       section: "sections" as const,
     })),
@@ -1047,11 +1046,14 @@ export default async function AcademicStructurePage({
                   { key: "email", label: "Email" },
                   { key: "status", label: "Status" },
                 ]}
-                empty="No teachers have been added yet."
+                empty="No teachers are linked yet. Add a staff member in Human Resources and set their staff role to Teacher."
                 toolbarActions={
-                  <AdminActionDialog label="Add teacher" title="Add teacher">
-                    <TeacherForm branches={branchOptions} />
-                  </AdminActionDialog>
+                  <Link
+                    href="/admin/staff"
+                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Manage staff in Human Resources
+                  </Link>
                 }
                 records={schoolTeachers.map((teacher) => ({
                   id: teacher.id,
@@ -1063,12 +1065,6 @@ export default async function AcademicStructurePage({
                     status: teacher.status,
                     branchId: String(teacher.branchId),
                   },
-                  editForm: (
-                    <TeacherForm
-                      branches={allBranchOptions}
-                      record={teacher}
-                    />
-                  ),
                 }))}
                 filters={branchFilters}
               />

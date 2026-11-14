@@ -23,6 +23,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import {
   calculateFineMinorUnits,
+  feeDisplayName,
   feePaymentDateRangeInTimezone,
   feeInvoiceStatus,
   parseMoneyToMinorUnits,
@@ -131,18 +132,18 @@ export default async function FeeReportsPage({
   ];
   const classOptions: SearchableSelectOption[] = [
     { value: "", label: "All classes" },
-    ...classes.map((item) => ({ value: String(item.id), label: `${item.branchName} — ${item.name}` })),
+    ...classes.map((item) => ({ value: String(item.id), label: item.name })),
   ];
   const sectionOptions: SearchableSelectOption[] = [
     { value: "", label: "All sections" },
     ...sections.map((section) => ({
       value: String(section.id),
-      label: `${section.branchName} — ${section.className} / ${section.name} (${section.yearName})`,
+      label: `${section.className} / ${section.name} (${section.yearName})`,
     })),
   ];
   const feeTypeOptions: SearchableSelectOption[] = [
     { value: "", label: "All fee types" },
-    ...feeTypesList.map((feeType) => ({ value: String(feeType.id), label: feeType.name })),
+    ...feeTypesList.map((feeType) => ({ value: String(feeType.id), label: feeDisplayName(feeType.name) })),
   ];
   const statusOptions: SearchableSelectOption[] = [
     { value: "", label: "All statuses" },

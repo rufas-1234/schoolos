@@ -111,7 +111,7 @@ export default async function UnassignedStudentsPage() {
     options: [
       ...branches.map((branch) => ({
         value: String(branch.id),
-        label: `${branch.name} · ${branch.code}`,
+        label: branch.name,
       })),
       ...(unassignedStudents.some((student) => student.branchId === null)
         ? [{ value: "none", label: "No branch assigned" }]

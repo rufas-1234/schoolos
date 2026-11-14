@@ -40,7 +40,7 @@ export default async function StudentCategoriesPage() {
   ]);
   const branchOptions = branches.map((branch) => ({
     id: branch.id,
-    label: `${branch.name} · ${branch.code}`,
+    label: branch.name,
   }));
   const filters: AdminTableFilter[] = [{
     key: "branchFilter",

@@ -20,7 +20,6 @@ import {
   createClassRoom,
   createClassRoutine,
   createSchoolBranch,
-  createTeacher,
   deleteClassRoom,
   deleteClassRoutine,
   placeStudent,
@@ -107,42 +106,6 @@ export function SchoolBranchForm({
       <Field label="Contact number (optional)" name="contactNumber" type="tel" required={false} defaultValue={record?.contactNumber} />
       <Field label="Email (optional)" name="email" type="email" required={false} defaultValue={record?.email} />
       <Field label="Address (optional)" name="address" required={false} defaultValue={record?.address} />
-    </ActionForm>
-  );
-}
-
-export function TeacherForm({
-  branches,
-  record,
-}: {
-  branches: Option[];
-  record?: {
-    id: number;
-    branchId: number;
-    firstName: string;
-    lastName: string;
-    employeeCode: string | null;
-    email: string | null;
-    phone: string | null;
-  };
-}) {
-  return (
-    <ActionForm
-      title={record ? "Edit teacher" : "Add teacher"}
-      action={createTeacher}
-      submitLabel={record ? "Save changes" : "Add teacher"}
-      recordId={record?.id}
-    >
-      <SelectField label="Branch" name="branchId" options={branches} defaultValue={record?.branchId} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="First name" name="firstName" defaultValue={record?.firstName} />
-        <Field label="Last name" name="lastName" defaultValue={record?.lastName} />
-      </div>
-      <Field label="Employee code (optional)" name="employeeCode" required={false} defaultValue={record?.employeeCode} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Email (optional)" name="email" type="email" required={false} defaultValue={record?.email} />
-        <Field label="Phone (optional)" name="phone" type="tel" required={false} defaultValue={record?.phone} />
-      </div>
     </ActionForm>
   );
 }

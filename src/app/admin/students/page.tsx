@@ -242,13 +242,13 @@ export default async function StudentsPage({
   ]);
   const branchOptions = branches.map((branch) => ({
     id: branch.id,
-    label: `${branch.name} · ${branch.code}`,
+    label: branch.name,
   }));
   const yearOptions = years.map((year) => ({ id: year.id, label: year.name }));
   const classOptions = classes.map((classLevel) => ({
     id: classLevel.id,
     branchId: classLevel.branchId,
-    label: `${classLevel.branchName} · ${classLevel.name} (${classLevel.code})`,
+    label: classLevel.name,
   }));
   const sectionOptions = sections.map((section) => ({
     id: section.id,
