@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   canReviewLeaveRequest,
+  calculatePayrollAmounts,
   fitsLeaveEntitlement,
+  formatPayrollMinorUnits,
   inclusiveCalendarDays,
+  parsePayrollMoneyToMinorUnits,
   parseStaffRoleFilter,
   isValidStaffReportRange,
   staffAttendanceStatuses,
@@ -50,5 +53,27 @@ describe("human resources policies", () => {
     expect(canReviewLeaveRequest("pending")).toBe(true);
     expect(canReviewLeaveRequest("approved")).toBe(false);
     expect(canReviewLeaveRequest("rejected")).toBe(false);
+  });
+
+  it("calculates payroll gross and net values in exact minor units", () => {
+    const salary = parsePayrollMoneyToMinorUnits("1250.10");
+    const allowance = parsePayrollMoneyToMinorUnits("49.90");
+    const deduction = parsePayrollMoneyToMinorUnits("100");
+    expect(salary).not.toBeNull();
+    expect(allowance).not.toBeNull();
+    expect(deduction).not.toBeNull();
+    expect(calculatePayrollAmounts(salary!, allowance!, deduction!)).toEqual({
+      gross: 130000,
+      net: 120000,
+    });
+    expect(formatPayrollMinorUnits(120005)).toBe("1200.05");
+  });
+
+  it("rejects malformed or out-of-range payroll amounts", () => {
+    expect(parsePayrollMoneyToMinorUnits("1.234")).toBeNull();
+    expect(parsePayrollMoneyToMinorUnits("-1")).toBeNull();
+    expect(calculatePayrollAmounts(10000, 0, 10001)).toBeNull();
+    expect(calculatePayrollAmounts(0, 0, 0)).toBeNull();
+    expect(calculatePayrollAmounts(999_999_999_999, 1, 0)).toBeNull();
   });
 });

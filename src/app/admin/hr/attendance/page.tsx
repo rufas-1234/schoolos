@@ -6,6 +6,7 @@ import { isCalendarDate } from "@/lib/academic-policy";
 import { parseStaffRoleFilter } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
 import { AttendanceForm } from "../hr-forms";
+import { PrintReportButton } from "../reports/print-report-button";
 
 export default async function StaffAttendancePage({
   searchParams,
@@ -82,16 +83,19 @@ export default async function StaffAttendancePage({
   }
 
   return (
-    <div className="space-y-7">
-      <header>
+    <div className="space-y-7 print-report-page">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
         <p className="text-sm font-medium text-violet-700">Human resources</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Staff attendance</h1>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Staff attendance records</h1>
         <p className="mt-2 text-sm text-slate-500">
           Record daily attendance for active staff. A saved mark can be updated for that date.
         </p>
+        </div>
+        <PrintReportButton />
       </header>
 
-      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Branch
           <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
@@ -161,6 +165,47 @@ export default async function StaffAttendancePage({
             })}
           </ul>
         )}
+      </section>
+
+      <section className="attendance-print-only print-report-content space-y-5">
+        <header className="print-report-heading">
+          <p className="print-report-kicker">Human resources · Attendance register</p>
+          <h2>Staff attendance records</h2>
+          <p>
+            {branches.find((branch) => branch.id === branchId)?.name ?? "All branches"} · {attendanceDate}
+            {selectedRole !== "all" ? ` · ${selectedRole === "unassigned" ? "Unassigned role" : selectedRole}` : " · All staff roles"}
+          </p>
+        </header>
+        <section className="print-report-panel overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <table className="print-report-table w-full text-left text-sm">
+            <thead>
+              <tr>
+                <th className="px-4 py-3">Staff member</th>
+                <th className="px-4 py-3">Employee ID</th>
+                <th className="px-4 py-3">Role / department</th>
+                <th className="px-4 py-3">Attendance status</th>
+                <th className="px-4 py-3">Note</th>
+                <th className="px-4 py-3">Signature</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staff.map((member) => {
+                const mark = byStaff.get(member.id);
+                return (
+                  <tr key={member.id}>
+                    <td className="px-4 py-3 font-medium">{member.firstName} {member.lastName}</td>
+                    <td className="px-4 py-3">{member.employeeCode ?? "—"}</td>
+                    <td className="px-4 py-3">{[member.personnelRole, member.department].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="px-4 py-3 capitalize">{mark?.status ?? "Not recorded"}</td>
+                    <td className="px-4 py-3">{mark?.note ?? "—"}</td>
+                    <td className="px-4 py-3"><span className="block h-6 min-w-24 border-b border-slate-400" /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {staff.length === 0 && <p className="p-6 text-center text-sm">No staff members match these filters.</p>}
+        </section>
       </section>
     </div>
   );

@@ -789,6 +789,9 @@ export const staffPayrollRecords = mysqlTable(
       .notNull()
       .references(() => staffMembers.id),
     payPeriod: varchar("payPeriod", { length: 7 }).notNull(),
+    baseSalary: decimal("baseSalary", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    allowances: decimal("allowances", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    deductions: decimal("deductions", { precision: 12, scale: 2 }).notNull().default("0.00"),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     currency: varchar("currency", { length: 3 }).notNull(),
     paidDate: date("paidDate", { mode: "string" }),

@@ -70,7 +70,14 @@ export default async function FeeInvoicePrintPage({
     (params.classLevelId && !classLevelId) ||
     (params.sectionId && !sectionId)) notFound();
 
-  const [school] = await db.select({ name: schools.name, currency: schools.currency, timezone: schools.timezone })
+  const [school] = await db.select({
+    name: schools.name,
+    email: schools.email,
+    phone: schools.phone,
+    address: schools.address,
+    currency: schools.currency,
+    timezone: schools.timezone,
+  })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   if (!school) notFound();
   const invoices = await db.select({
@@ -87,6 +94,11 @@ export default async function FeeInvoicePrintPage({
     studentName: students.firstName,
     studentLastName: students.lastName,
     admissionNumber: students.admissionNumber,
+    guardianName: students.guardianName,
+    guardianAddress: students.guardianAddress,
+    guardianPhone: students.guardianPhone,
+    fatherName: students.fatherName,
+    fatherPhone: students.fatherPhone,
     rollNumber: studentEnrollments.rollNumber,
     branchName: schoolBranches.name,
     className: classLevels.name,
@@ -171,7 +183,7 @@ export default async function FeeInvoicePrintPage({
 
   return (
     <main className="fee-invoice-page mx-auto max-w-5xl space-y-6 p-6 text-slate-900 print:max-w-none print:p-0">
-      <header className="fee-invoice-overview flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 print:border-0 print:border-b print:border-slate-300 print:p-0 print:pb-5">
+      <header className="fee-invoice-overview flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 print:hidden">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Student finances</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee invoice{invoices.length === 1 ? "" : "s"}</h1>
@@ -194,35 +206,91 @@ export default async function FeeInvoicePrintPage({
         const total = amount - discount + fine;
         const balance = Math.max(0, total - paid);
         const status = feeInvoiceStatus(total, paid) ?? "unpaid";
+        const billToName = invoice.guardianName || invoice.fatherName || `${invoice.studentName} ${invoice.studentLastName}`;
+        const billToPhone = invoice.guardianPhone || invoice.fatherPhone;
         return (
-          <article key={invoice.id} className="fee-invoice-card break-inside-avoid space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-            <header className="fee-invoice-card-header flex justify-between gap-4 border-b border-slate-100 pb-4">
+          <article key={invoice.id} className="fee-invoice-card space-y-5 rounded-2xl border border-slate-200 bg-white p-7">
+            <header className="fee-invoice-title-row flex flex-wrap items-start justify-between gap-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Invoice</p>
-                <h2 className="mt-1 text-xl font-bold text-slate-900">{invoice.invoiceNumber}</h2>
-                <p className="mt-2 text-sm font-semibold text-slate-800">{invoice.studentName} {invoice.studentLastName}</p>
-                <p className="text-xs text-slate-500">Admission {invoice.admissionNumber || "—"} · Roll {invoice.rollNumber || "—"}</p>
-                <p className="mt-1 text-xs text-slate-600">{invoice.branchName} / {invoice.className} / {invoice.sectionName} · {invoice.yearName}{invoice.termName ? ` · ${invoice.termName}` : ""}</p>
+                <h2 className="fee-invoice-title">INVOICE</h2>
+                <p className="mt-2 text-base font-bold text-slate-900">{school.name}</p>
+                {[school.address, school.email, school.phone].filter(Boolean).map((detail, index) => (
+                  <p key={`${index}-${detail}`} className="mt-1 text-sm text-slate-600">{detail}</p>
+                ))}
               </div>
-              <div className="shrink-0 text-right text-xs text-slate-500">
-                <p>Issued <span className="font-medium text-slate-700">{invoice.createdAt.toISOString().slice(0, 10)}</span></p>
-                <p className="mt-1">Due <span className="font-semibold text-slate-900">{invoice.dueDate}</span></p>
+              <div className="fee-invoice-number-block">
+                <span>Invoice #</span>
+                <strong>{invoice.invoiceNumber}</strong>
               </div>
             </header>
+
+            <section className="fee-invoice-parties grid gap-5 sm:grid-cols-2">
+              <div>
+                <h3>BILL TO</h3>
+                <p className="font-semibold">{billToName}</p>
+                {invoice.guardianAddress && <p>{invoice.guardianAddress}</p>}
+                {billToPhone && <p>{billToPhone}</p>}
+                {invoice.guardianName && <p>Parent / guardian of {invoice.studentName} {invoice.studentLastName}</p>}
+              </div>
+              <div>
+                <h3>STUDENT</h3>
+                <p className="font-semibold">{invoice.studentName} {invoice.studentLastName}</p>
+                <p>Admission No. {invoice.admissionNumber || "—"} · Roll {invoice.rollNumber || "—"}</p>
+                <p>{invoice.branchName} · {invoice.className} ({invoice.sectionName})</p>
+              </div>
+            </section>
+
+            <dl className="fee-invoice-meta grid grid-cols-2 gap-x-5 gap-y-2 sm:grid-cols-4">
+              <div><dt>Invoice date</dt><dd>{invoice.createdAt.toISOString().slice(0, 10)}</dd></div>
+              <div><dt>Academic year</dt><dd>{invoice.yearName}</dd></div>
+              <div><dt>Term</dt><dd>{invoice.termName || "—"}</dd></div>
+              <div><dt>Due date</dt><dd>{invoice.dueDate}</dd></div>
+            </dl>
+
+            <div className="fee-invoice-divider" aria-hidden="true">★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★</div>
+
             <table className="fee-invoice-items w-full border-collapse text-left text-sm">
-              <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-2 font-semibold">Fee item</th><th className="px-3 py-2 text-right font-semibold">Amount</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Qty</th>
+                  <th>Description</th>
+                  <th className="text-right">Unit price</th>
+                  <th className="text-right">Amount</th>
+                </tr>
+              </thead>
               <tbody>
-                <tr className="border-b border-slate-200"><td className="px-3 py-2">{feeDisplayName(invoice.typeName)}</td><td className="px-3 py-2 text-right">{school.currency} {money(amount)}</td></tr>
-                {discount > 0 && <tr><td className="px-3 py-2">Discount</td><td className="px-3 py-2 text-right">− {school.currency} {money(discount)}</td></tr>}
-                {fine > 0 && <tr><td className="px-3 py-2">Late fine</td><td className="px-3 py-2 text-right">{school.currency} {money(fine)}</td></tr>}
+                <tr>
+                  <td>1</td>
+                  <td>{feeDisplayName(invoice.typeName)}</td>
+                  <td className="text-right">{school.currency} {money(amount)}</td>
+                  <td className="text-right">{school.currency} {money(amount)}</td>
+                </tr>
+                {discount > 0 && <tr><td></td><td>Discount</td><td></td><td className="text-right">− {school.currency} {money(discount)}</td></tr>}
+                {fine > 0 && <tr><td></td><td>Late fine</td><td></td><td className="text-right">{school.currency} {money(fine)}</td></tr>}
               </tbody>
             </table>
-            <div className="fee-invoice-totals ml-auto grid max-w-sm grid-cols-2 gap-x-6 gap-y-2 rounded-xl bg-slate-50 p-4 text-right text-sm">
-              <span className="text-slate-600">Total amount</span><strong>{school.currency} {money(total)}</strong>
-              <span className="text-slate-600">Amount paid</span><strong>{school.currency} {money(paid)}</strong>
-              <span className="font-semibold text-slate-800">Outstanding balance</span><strong className="text-base text-slate-900">{school.currency} {money(balance)}</strong>
-              <span className="text-slate-600">Payment status</span><strong className="fee-invoice-status capitalize">{status}</strong>
+
+            <div className="fee-invoice-totals ml-auto grid max-w-sm grid-cols-2 gap-x-6 gap-y-2 text-right text-sm">
+              <span>Subtotal</span><strong>{school.currency} {money(amount)}</strong>
+              {discount > 0 && <><span>Discount</span><strong>− {school.currency} {money(discount)}</strong></>}
+              {fine > 0 && <><span>Late fine</span><strong>{school.currency} {money(fine)}</strong></>}
+              <span className="fee-invoice-total-label">Total</span><strong className="fee-invoice-total-amount">{school.currency} {money(total)}</strong>
+              <span>Amount paid</span><strong>{school.currency} {money(paid)}</strong>
+              <span className="font-semibold">Amount due</span><strong className="fee-invoice-balance">{school.currency} {money(balance)}</strong>
+              <span>Payment status</span><strong className="fee-invoice-status capitalize">{status}</strong>
             </div>
+
+            <footer className="fee-invoice-footer grid gap-5 border-t border-slate-200 pt-5 sm:grid-cols-[1fr_auto] sm:items-end">
+              <div>
+                <p className="fee-invoice-thank-you">Thank you</p>
+                <p className="mt-1 text-sm text-slate-600">We appreciate your timely payment.</p>
+              </div>
+              <div className="sm:text-right">
+                <h3>PAYMENT INFORMATION</h3>
+                <p>Use invoice number <strong>{invoice.invoiceNumber}</strong> as your payment reference.</p>
+                <p>Please keep this invoice for your records.</p>
+              </div>
+            </footer>
           </article>
         );
       })}

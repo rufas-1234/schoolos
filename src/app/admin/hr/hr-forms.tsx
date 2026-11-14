@@ -196,7 +196,9 @@ export function PayrollForm({
       <p className="text-xs text-slate-500">Branch: {branchName}</p>
       <SelectField label="Staff member" name="staffId" options={staffOptions} />
       <Field label="Pay period" name="payPeriod" type="month" defaultValue={payPeriod} />
-      <Field label={`Amount (${currency})`} name="amount" type="number" min="0.01" step="0.01" />
+      <Field label={`Base salary (${currency})`} name="baseSalary" type="number" min="0.01" step="0.01" />
+      <Field label={`Allowances (${currency})`} name="allowances" type="number" min="0" step="0.01" defaultValue="0" />
+      <Field label={`Deductions (${currency})`} name="deductions" type="number" min="0" step="0.01" defaultValue="0" />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Payment status <RequiredMark />
         <select name="status" required defaultValue="recorded" className={inputClass}>
@@ -207,7 +209,7 @@ export function PayrollForm({
       <Field label="Paid date (required if marked paid)" name="paidDate" type="date" required={false} />
       <Field label="Notes (optional)" name="notes" maxLength={1000} required={false} />
       <p className="text-xs leading-5 text-slate-500">
-        Records only; this does not calculate tax, deductions, benefits, or take-home pay.
+        Gross pay is base salary plus allowances. Net pay is gross pay minus deductions; enter any applicable statutory deductions manually.
       </p>
     </HrForm>
   );

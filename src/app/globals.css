@@ -77,6 +77,130 @@ h6 {
   display: none;
 }
 
+.attendance-print-only {
+  display: none;
+}
+
+.fee-invoice-title {
+  margin: 0;
+  color: #20294b;
+  font-family: var(--font-display), "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(2.8rem, 8vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: -0.07em;
+  line-height: 0.95;
+}
+
+.fee-invoice-number-block {
+  display: grid;
+  gap: 5px;
+  min-width: 10rem;
+  border-left: 3px solid #d64545;
+  padding: 5px 0 5px 14px;
+}
+
+.fee-invoice-number-block span,
+.fee-invoice-parties h3,
+.fee-invoice-footer h3 {
+  color: #d64545;
+  font-family: var(--font-display), "Arial Narrow", Arial, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.fee-invoice-number-block strong {
+  color: #20294b;
+  font-size: 1.15rem;
+}
+
+.fee-invoice-parties {
+  color: #20294b;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.fee-invoice-parties h3,
+.fee-invoice-footer h3 {
+  margin: 0 0 7px;
+}
+
+.fee-invoice-meta {
+  border-block: 1px solid #dbe0e9;
+  padding: 12px 0;
+}
+
+.fee-invoice-meta dt {
+  color: #596579;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fee-invoice-meta dd {
+  margin-top: 3px;
+  color: #20294b;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.fee-invoice-divider {
+  overflow: hidden;
+  border-bottom: 1px solid #d64545;
+  color: #20294b;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.fee-invoice-items thead {
+  border-bottom: 2px solid #d64545;
+  color: #20294b;
+  font-family: var(--font-display), "Arial Narrow", Arial, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fee-invoice-items th,
+.fee-invoice-items td {
+  padding: 10px 8px;
+}
+
+.fee-invoice-totals {
+  color: #596579;
+}
+
+.fee-invoice-totals strong {
+  color: #20294b;
+}
+
+.fee-invoice-total-label,
+.fee-invoice-total-amount {
+  border-top: 1px solid #dbe0e9;
+  padding-top: 8px;
+  color: #20294b !important;
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fee-invoice-balance {
+  font-size: 1rem;
+}
+
+.fee-invoice-thank-you {
+  color: #20294b;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.7rem, 5vw, 2.8rem);
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
 @media print {
   @page {
     size: auto;
@@ -89,6 +213,10 @@ h6 {
     color: #172033;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  .attendance-print-only {
+    display: block !important;
   }
 
   .admin-print-header {
@@ -297,8 +425,22 @@ h6 {
   }
 
   .fee-invoice-page {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
     max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
     color: #172033;
+  }
+
+  body:has(.fee-invoice-page) * {
+    visibility: hidden !important;
+  }
+
+  body:has(.fee-invoice-page) .fee-invoice-page,
+  body:has(.fee-invoice-page) .fee-invoice-page * {
+    visibility: visible !important;
   }
 
   .fee-invoice-overview {
@@ -315,9 +457,36 @@ h6 {
     break-inside: avoid;
   }
 
-  .fee-invoice-card-header {
-    border-bottom: 1px solid #d8deea;
-    padding-bottom: 3mm;
+  .fee-invoice-card:not(:last-child) {
+    break-after: page;
+  }
+
+  .fee-invoice-title {
+    font-size: 42pt;
+  }
+
+  .fee-invoice-number-block {
+    min-width: 42mm;
+  }
+
+  .fee-invoice-parties {
+    font-size: 8pt;
+  }
+
+  .fee-invoice-meta {
+    padding: 3mm 0;
+  }
+
+  .fee-invoice-meta dt {
+    font-size: 6.5pt;
+  }
+
+  .fee-invoice-meta dd {
+    font-size: 8pt;
+  }
+
+  .fee-invoice-divider {
+    font-size: 7pt;
   }
 
   .fee-invoice-items {
@@ -335,9 +504,18 @@ h6 {
   }
 
   .fee-invoice-totals {
-    border: 1px solid #e3deef;
-    background: #f7f5fc !important;
-    print-color-adjust: exact;
+    max-width: 90mm;
+    background: white !important;
+    font-size: 8pt;
+  }
+
+  .fee-invoice-footer {
+    margin-top: 12mm;
+    break-inside: avoid;
+  }
+
+  .fee-invoice-thank-you {
+    font-size: 30pt;
     -webkit-print-color-adjust: exact;
   }
 

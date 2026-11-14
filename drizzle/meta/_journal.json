@@ -176,6 +176,13 @@
       "when": 1794697049932,
       "tag": "0024_modern_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1794699255937,
+      "tag": "0025_payroll_breakdown",
+      "breakpoints": true
     }
   ]
 }

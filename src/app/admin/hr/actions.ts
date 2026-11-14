@@ -20,8 +20,11 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import {
   canReviewLeaveRequest,
+  calculatePayrollAmounts,
   fitsLeaveEntitlement,
+  formatPayrollMinorUnits,
   inclusiveCalendarDays,
+  parsePayrollMoneyToMinorUnits,
   staffAttendanceStatuses,
   staffPayrollStatuses,
 } from "@/lib/hr-policy";
@@ -58,6 +61,7 @@ async function writeAudit(
 function revalidateHr() {
   revalidatePath("/admin/hr");
   revalidatePath("/admin/hr/attendance");
+  revalidatePath("/admin/hr/reports");
   revalidatePath("/admin/hr/leave");
   revalidatePath("/admin/hr/payroll");
   revalidatePath("/admin/staff");
@@ -452,7 +456,9 @@ export async function recordStaffPayroll(
     staffId: idField,
     branchId: idField,
     payPeriod: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
-    amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/).refine((amount) => Number(amount) > 0),
+    baseSalary: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
+    allowances: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
+    deductions: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
     status: z.enum(staffPayrollStatuses),
     paidDate: z.union([z.literal(""), dateField]),
     notes: z.string().trim().max(1000),
@@ -460,14 +466,24 @@ export async function recordStaffPayroll(
     staffId: value(formData, "staffId"),
     branchId: value(formData, "branchId"),
     payPeriod: value(formData, "payPeriod"),
-    amount: value(formData, "amount"),
+    baseSalary: value(formData, "baseSalary"),
+    allowances: value(formData, "allowances"),
+    deductions: value(formData, "deductions"),
     status: value(formData, "status"),
     paidDate: value(formData, "paidDate"),
     notes: value(formData, "notes"),
   });
   if (!result.success || (result.data.status === "paid" && !result.data.paidDate)) {
-    return { error: "Enter a valid staff member, pay period, amount, and payment date for paid records." };
+    return { error: "Enter valid payroll amounts and a payment date for paid records." };
   }
+  const baseSalary = parsePayrollMoneyToMinorUnits(result.data.baseSalary);
+  const allowances = parsePayrollMoneyToMinorUnits(result.data.allowances);
+  const deductions = parsePayrollMoneyToMinorUnits(result.data.deductions);
+  if (baseSalary === null || allowances === null || deductions === null) {
+    return { error: "Enter payroll amounts with no more than two decimal places." };
+  }
+  const payroll = calculatePayrollAmounts(baseSalary, allowances, deductions);
+  if (!payroll) return { error: "Base salary must be positive and deductions cannot exceed gross pay." };
   const [staff] = await db.select({ id: staffMembers.id })
     .from(staffMembers).where(and(
       eq(staffMembers.id, result.data.staffId),
@@ -486,7 +502,10 @@ export async function recordStaffPayroll(
         schoolId: context.schoolId,
         staffId: staff.id,
         payPeriod: result.data.payPeriod,
-        amount: Number(result.data.amount).toFixed(2),
+        baseSalary: formatPayrollMinorUnits(baseSalary),
+        allowances: formatPayrollMinorUnits(allowances),
+        deductions: formatPayrollMinorUnits(deductions),
+        amount: formatPayrollMinorUnits(payroll.net),
         currency: school.currency,
         paidDate: result.data.paidDate || null,
         status: result.data.status,
@@ -495,7 +514,7 @@ export async function recordStaffPayroll(
       });
       await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.recorded",
         "staff_payroll_record", publicId,
-        ["staffId", "payPeriod", "amount", "currency", "paidDate", "status", "notes"]);
+        ["staffId", "payPeriod", "baseSalary", "allowances", "deductions", "amount", "currency", "paidDate", "status", "notes"]);
     });
   } catch (error) {
     if (isDuplicateError(error)) return { error: "A payroll record already exists for this staff member and period." };
