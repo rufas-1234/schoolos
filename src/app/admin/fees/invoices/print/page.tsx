@@ -170,13 +170,13 @@ export default async function FeeInvoicePrintPage({
   }, 0);
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6 text-slate-900 print:max-w-none print:p-0">
-      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5 print:border-black">
+    <main className="fee-invoice-page mx-auto max-w-5xl space-y-6 p-6 text-slate-900 print:max-w-none print:p-0">
+      <header className="fee-invoice-overview flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 print:border-0 print:border-b print:border-slate-300 print:p-0 print:pb-5">
         <div>
-          <p className="text-sm font-semibold text-violet-700 print:text-black">{school.name}</p>
-          <h1 className="mt-1 text-2xl font-bold">Fee invoices</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {invoices.length} invoice{invoices.length === 1 ? "" : "s"} · Outstanding {school.currency} {money(totalOutstanding)}
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Student finances</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee invoice{invoices.length === 1 ? "" : "s"}</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            {invoices.length} invoice{invoices.length === 1 ? "" : "s"} · Total outstanding {school.currency} {money(totalOutstanding)}
           </p>
         </div>
         <div className="flex items-center gap-3 print:hidden">
@@ -195,28 +195,33 @@ export default async function FeeInvoicePrintPage({
         const balance = Math.max(0, total - paid);
         const status = feeInvoiceStatus(total, paid) ?? "unpaid";
         return (
-          <article key={invoice.id} className="break-inside-avoid space-y-4 border-b border-slate-300 pb-6">
-            <header className="flex justify-between gap-4">
+          <article key={invoice.id} className="fee-invoice-card break-inside-avoid space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+            <header className="fee-invoice-card-header flex justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
-                <h2 className="text-lg font-bold">Invoice {invoice.invoiceNumber}</h2>
-                <p className="text-sm">{invoice.studentName} {invoice.studentLastName} · Admission {invoice.admissionNumber || "—"}</p>
-                <p className="text-sm">{invoice.branchName} / {invoice.className} / {invoice.sectionName} · {invoice.yearName}{invoice.termName ? ` · ${invoice.termName}` : ""}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Invoice</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">{invoice.invoiceNumber}</h2>
+                <p className="mt-2 text-sm font-semibold text-slate-800">{invoice.studentName} {invoice.studentLastName}</p>
+                <p className="text-xs text-slate-500">Admission {invoice.admissionNumber || "—"} · Roll {invoice.rollNumber || "—"}</p>
+                <p className="mt-1 text-xs text-slate-600">{invoice.branchName} / {invoice.className} / {invoice.sectionName} · {invoice.yearName}{invoice.termName ? ` · ${invoice.termName}` : ""}</p>
               </div>
-              <p className="text-sm">Issued {invoice.createdAt.toISOString().slice(0, 10)}<br />Due {invoice.dueDate}</p>
+              <div className="shrink-0 text-right text-xs text-slate-500">
+                <p>Issued <span className="font-medium text-slate-700">{invoice.createdAt.toISOString().slice(0, 10)}</span></p>
+                <p className="mt-1">Due <span className="font-semibold text-slate-900">{invoice.dueDate}</span></p>
+              </div>
             </header>
-            <table className="w-full border-collapse text-left text-sm">
-              <thead><tr className="border-y border-slate-300"><th className="px-3 py-2">Fee item</th><th className="px-3 py-2 text-right">Amount</th></tr></thead>
+            <table className="fee-invoice-items w-full border-collapse text-left text-sm">
+              <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-2 font-semibold">Fee item</th><th className="px-3 py-2 text-right font-semibold">Amount</th></tr></thead>
               <tbody>
                 <tr className="border-b border-slate-200"><td className="px-3 py-2">{invoice.groupName} / {invoice.typeName}</td><td className="px-3 py-2 text-right">{school.currency} {money(amount)}</td></tr>
                 {discount > 0 && <tr><td className="px-3 py-2">Discount</td><td className="px-3 py-2 text-right">− {school.currency} {money(discount)}</td></tr>}
                 {fine > 0 && <tr><td className="px-3 py-2">Late fine</td><td className="px-3 py-2 text-right">{school.currency} {money(fine)}</td></tr>}
               </tbody>
             </table>
-            <div className="ml-auto grid max-w-sm grid-cols-2 gap-2 text-right text-sm">
-              <span>Total amount</span><strong>{school.currency} {money(total)}</strong>
-              <span>Amount paid</span><strong>{school.currency} {money(paid)}</strong>
-              <span>Outstanding balance</span><strong>{school.currency} {money(balance)}</strong>
-              <span>Payment status</span><strong className="capitalize">{status}</strong>
+            <div className="fee-invoice-totals ml-auto grid max-w-sm grid-cols-2 gap-x-6 gap-y-2 rounded-xl bg-slate-50 p-4 text-right text-sm">
+              <span className="text-slate-600">Total amount</span><strong>{school.currency} {money(total)}</strong>
+              <span className="text-slate-600">Amount paid</span><strong>{school.currency} {money(paid)}</strong>
+              <span className="font-semibold text-slate-800">Outstanding balance</span><strong className="text-base text-slate-900">{school.currency} {money(balance)}</strong>
+              <span className="text-slate-600">Payment status</span><strong className="fee-invoice-status capitalize">{status}</strong>
             </div>
           </article>
         );

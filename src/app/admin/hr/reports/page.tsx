@@ -100,7 +100,7 @@ export default async function StaffReportsPage({
   }, 0);
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-7 print-report-page">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm font-medium text-violet-700">Human resources</p>
@@ -149,58 +149,69 @@ export default async function StaffReportsPage({
         )}
       </form>
 
-      <section aria-label="Attendance totals" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {staffAttendanceStatuses.map((status) => (
-          <SummaryCard key={status} label={status} value={overall[status]} />
-        ))}
-        <SummaryCard label="Total marks" value={markedCount} />
-      </section>
+      <section className="print-report-content space-y-5">
+        <header className="print-report-heading">
+          <p className="print-report-kicker">Human resources · Attendance</p>
+          <h2>Staff attendance report</h2>
+          <p>
+            {branch ? `${branch.name} · ` : ""}{startDate} through {endDate}
+            {selectedRole !== "all" ? ` · ${selectedRole === "unassigned" ? "Unassigned role" : selectedRole}` : " · All staff roles"}
+            {` · ${staff.length} staff members`}
+          </p>
+        </header>
+        <section aria-label="Attendance totals" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {staffAttendanceStatuses.map((status) => (
+            <SummaryCard key={status} label={status} value={overall[status]} />
+          ))}
+          <SummaryCard label="Total marks" value={markedCount} />
+        </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">Attendance by staff member</h2>
-          <p className="mt-1 text-sm text-slate-500">{branch ? `${branch.name} · ` : ""}{startDate} to {endDate} · {staff.length} staff members</p>
-        </div>
-        {staff.length === 0 ? (
-          <p className="p-7 text-center text-sm text-slate-500">No staff records are available.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Staff member</th>
-                  <th className="px-4 py-3 font-semibold">Department</th>
-                  <th className="px-4 py-3 font-semibold">Role</th>
-                  <th className="px-4 py-3 font-semibold">Present</th>
-                  <th className="px-4 py-3 font-semibold">Absent</th>
-                  <th className="px-4 py-3 font-semibold">Late</th>
-                  <th className="px-4 py-3 font-semibold">Excused</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {staff.map((member) => {
-                  const totals = totalsByStaff.get(member.id) ?? zeroTotals();
-                  return (
-                    <tr key={member.id}>
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-slate-800">{member.firstName} {member.lastName}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {[member.employeeCode, member.jobTitle, member.status].filter(Boolean).join(" · ")}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{member.department}</td>
-                      <td className="px-4 py-3 capitalize text-slate-600">{member.personnelRole ?? "Unassigned"}</td>
-                      <td className="px-4 py-3 text-slate-600">{totals.present}</td>
-                      <td className="px-4 py-3 text-slate-600">{totals.absent}</td>
-                      <td className="px-4 py-3 text-slate-600">{totals.late}</td>
-                      <td className="px-4 py-3 text-slate-600">{totals.excused}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <section className="print-report-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="font-semibold text-slate-900">Attendance by staff member</h2>
+            <p className="mt-1 text-sm text-slate-500">{branch ? `${branch.name} · ` : ""}{startDate} to {endDate} · {staff.length} staff members</p>
           </div>
-        )}
+          {staff.length === 0 ? (
+            <p className="p-7 text-center text-sm text-slate-500">No staff records are available.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="print-report-table w-full min-w-[46rem] text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">Staff member</th>
+                    <th className="px-4 py-3 font-semibold">Department</th>
+                    <th className="px-4 py-3 font-semibold">Role</th>
+                    <th className="px-4 py-3 font-semibold">Present</th>
+                    <th className="px-4 py-3 font-semibold">Absent</th>
+                    <th className="px-4 py-3 font-semibold">Late</th>
+                    <th className="px-4 py-3 font-semibold">Excused</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {staff.map((member) => {
+                    const totals = totalsByStaff.get(member.id) ?? zeroTotals();
+                    return (
+                      <tr key={member.id}>
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-slate-800">{member.firstName} {member.lastName}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {[member.employeeCode, member.jobTitle, member.status].filter(Boolean).join(" · ")}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{member.department}</td>
+                        <td className="px-4 py-3 capitalize text-slate-600">{member.personnelRole ?? "Unassigned"}</td>
+                        <td className="px-4 py-3 text-slate-600">{totals.present}</td>
+                        <td className="px-4 py-3 text-slate-600">{totals.absent}</td>
+                        <td className="px-4 py-3 text-slate-600">{totals.late}</td>
+                        <td className="px-4 py-3 text-slate-600">{totals.excused}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </section>
     </div>
   );

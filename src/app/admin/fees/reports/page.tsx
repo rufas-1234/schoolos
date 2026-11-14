@@ -434,7 +434,7 @@ export default async function FeeReportsPage({
   const currency = school?.currency ?? "";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-report-page">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-violet-700 print:text-black">Finance</p>
@@ -484,7 +484,6 @@ export default async function FeeReportsPage({
         </div>
       </form>
 
-      <p className="hidden text-sm text-slate-600 print:block">Reporting period: {from} through {to}</p>
       <section className="grid gap-4 sm:grid-cols-3 print:grid-cols-3">
         <SummaryCard label="Collected in period" value={`${currency} ${money(totalCollected)}`} />
         <SummaryCard label="Fines collected" value={`${currency} ${money(totalFines)}`} />
@@ -533,25 +532,39 @@ export default async function FeeReportsPage({
         ))}
       </ReportTable>
 
-      <ReportTable
-        title="Invoice payment status report"
-        description={`Invoices due ${from} through ${to}${requestedStatus ? ` with ${requestedStatus === "paid" ? "full payment" : requestedStatus === "partial" ? "partial payment" : "no payment"}` : " across all payment statuses"}; balance includes applicable late fines.`}
-        empty={`No ${requestedStatus ? `${requestedStatus} ` : ""}invoices are due in this date range.`}
-        headings={["Student", "Class / section", "Fee type", "Due date", "Paid", "Balance", "Status"]}
-        hasRows={filteredInvoices.length > 0}
-      >
-        {filteredInvoices.map((invoice) => (
-          <tr key={invoice.id} className="border-t border-slate-100">
-            <td className="px-4 py-3">{invoice.studentName} {invoice.studentLastName}<span className="block text-xs text-slate-500">{invoice.admissionNumber || "—"} · {invoice.rollNumber || "—"}</span></td>
-            <td className="px-4 py-3">{invoice.branchName} / {invoice.className} / {invoice.sectionName}</td>
-            <td className="px-4 py-3">{invoice.feeTypeName}</td>
-            <td className="px-4 py-3">{invoice.dueDate}</td>
-            <td className="px-4 py-3">{currency} {money(invoice.paid)}</td>
-            <td className="px-4 py-3 font-semibold">{currency} {money(invoice.balance)}</td>
-            <td className="px-4 py-3 capitalize">{invoice.status}</td>
-          </tr>
-        ))}
-      </ReportTable>
+      <section className="print-report-content">
+        <header className="print-report-heading">
+          <p className="print-report-kicker">Student finances · Fee report</p>
+          <h2>Invoice payment status</h2>
+          <p>
+            Due {from} through {to}
+            {requestedStatus ? ` · ${requestedStatus === "paid" ? "Fully paid" : requestedStatus === "partial" ? "Partially paid" : "Unpaid"}` : " · All payment statuses"}
+            {requestedBranch ? ` · ${branches.find((branch) => branch.id === requestedBranch)?.name ?? "Selected branch"}` : ""}
+            {requestedClass ? ` · ${classes.find((item) => item.id === requestedClass)?.name ?? "Selected class"}` : ""}
+            {requestedSection ? ` · ${sections.find((section) => section.id === requestedSection)?.name ?? "Selected section"}` : ""}
+            {` · ${filteredInvoices.length} invoice${filteredInvoices.length === 1 ? "" : "s"}`}
+          </p>
+        </header>
+        <ReportTable
+          title="Invoice payment status report"
+          description={`Invoices due ${from} through ${to}${requestedStatus ? ` with ${requestedStatus === "paid" ? "full payment" : requestedStatus === "partial" ? "partial payment" : "no payment"}` : " across all payment statuses"}; balance includes applicable late fines.`}
+          empty={`No ${requestedStatus ? `${requestedStatus} ` : ""}invoices are due in this date range.`}
+          headings={["Student", "Class / section", "Fee type", "Due date", "Paid", "Balance", "Status"]}
+          hasRows={filteredInvoices.length > 0}
+        >
+          {filteredInvoices.map((invoice) => (
+            <tr key={invoice.id} className="border-t border-slate-100">
+              <td className="px-4 py-3">{invoice.studentName} {invoice.studentLastName}<span className="block text-xs text-slate-500">{invoice.admissionNumber || "—"} · {invoice.rollNumber || "—"}</span></td>
+              <td className="px-4 py-3">{invoice.branchName} / {invoice.className} / {invoice.sectionName}</td>
+              <td className="px-4 py-3">{invoice.feeTypeName}</td>
+              <td className="px-4 py-3">{invoice.dueDate}</td>
+              <td className="px-4 py-3">{currency} {money(invoice.paid)}</td>
+              <td className="px-4 py-3 font-semibold">{currency} {money(invoice.balance)}</td>
+              <td className="px-4 py-3 capitalize">{invoice.status}</td>
+            </tr>
+          ))}
+        </ReportTable>
+      </section>
     </div>
   );
 }
@@ -581,7 +594,7 @@ function ReportTable({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white print:overflow-visible print:break-inside-avoid">
+    <section className="print-report-panel overflow-hidden rounded-2xl border border-slate-200 bg-white print:overflow-visible print:break-inside-avoid">
       <div className="p-5">
         <h2 className="font-semibold text-slate-900">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{description}</p>
