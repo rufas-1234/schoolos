@@ -6,6 +6,56 @@ export type GradeBand = {
   performanceRemark: string;
 };
 
+export type ExamComponent = { title: string; maxMarks: number };
+
+export function parseExamComponents(
+  value: string,
+  system: "single" | "multi",
+): ExamComponent[] | null {
+  const rows = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if ((system === "single" && rows.length !== 1) || (system === "multi" && rows.length < 2)) {
+    return null;
+  }
+  const components: ExamComponent[] = [];
+  for (const row of rows) {
+    const [title, rawMaxMarks, ...extra] = row.split("|").map((part) => part.trim());
+    const maxMarks = Number(rawMaxMarks);
+    if (
+      extra.length > 0 ||
+      !title ||
+      title.length > 120 ||
+      !/^\d{1,6}(\.\d{1,2})?$/.test(rawMaxMarks ?? "") ||
+      !Number.isFinite(maxMarks) ||
+      maxMarks <= 0
+    ) return null;
+    components.push({ title, maxMarks });
+  }
+  if (new Set(components.map((component) => component.title.toLocaleLowerCase())).size !== components.length) {
+    return null;
+  }
+  return components;
+}
+
+export function calculateComponentTotal(
+  components: Array<{ marks: number | null; maxMarks: number }>,
+): { marks: number; maxMarks: number } | null {
+  if (
+    components.length === 0 ||
+    components.some((component) =>
+      component.marks === null ||
+      !Number.isFinite(component.marks) ||
+      !Number.isFinite(component.maxMarks) ||
+      component.marks < 0 ||
+      component.maxMarks <= 0 ||
+      component.marks > component.maxMarks,
+    )
+  ) return null;
+  return {
+    marks: Math.round(components.reduce((total, component) => total + component.marks!, 0) * 100) / 100,
+    maxMarks: Math.round(components.reduce((total, component) => total + component.maxMarks, 0) * 100) / 100,
+  };
+}
+
 export function validateGradeBands(bands: GradeBand[]): string | null {
   if (bands.length === 0) return "Add at least one grade band.";
   const sorted = [...bands].sort((a, b) => a.minPercent - b.minPercent);

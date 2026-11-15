@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateComponentTotal,
   calculateWeightedAverage,
   gradeForPercentage,
+  parseExamComponents,
   rankScores,
   validateGradeBands,
   type GradeBand,
@@ -32,6 +34,25 @@ describe("examination policy", () => {
       { marks: 20, maxMarks: 100, weight: 3 },
     ])).toEqual({ totalMarks: 60, maxMarks: 150, percentage: 35 });
     expect(calculateWeightedAverage([{ marks: 51, maxMarks: 50, weight: 1 }])).toBeNull();
+  });
+
+  it("validates single and multi-exam mark distributions and sums complete component marks", () => {
+    expect(parseExamComponents("Exam | 100", "single")).toEqual([{ title: "Exam", maxMarks: 100 }]);
+    expect(parseExamComponents("Paper 1 | 50\nPaper 2 | 50", "multi")).toEqual([
+      { title: "Paper 1", maxMarks: 50 },
+      { title: "Paper 2", maxMarks: 50 },
+    ]);
+    expect(parseExamComponents("Paper 1 | 50", "multi")).toBeNull();
+    expect(parseExamComponents("Paper | 50\npaper | 50", "multi")).toBeNull();
+    expect(calculateComponentTotal([
+      { marks: 35, maxMarks: 50 },
+      { marks: 42, maxMarks: 50 },
+    ])).toEqual({ marks: 77, maxMarks: 100 });
+    expect(calculateComponentTotal([
+      { marks: 35, maxMarks: 50 },
+      { marks: null, maxMarks: 50 },
+    ])).toBeNull();
+    expect(calculateComponentTotal([{ marks: 51, maxMarks: 50 }])).toBeNull();
   });
 
   it("uses competition ranking for tied scores", () => {

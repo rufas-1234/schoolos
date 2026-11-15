@@ -1117,6 +1117,9 @@ export const examTypes = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(
+      () => schoolBranches.id,
+    ),
     name: varchar("name", { length: 120 }).notNull(),
     averagePassing: boolean("averagePassing").notNull().default(false),
     averageMark: decimal("averageMark", { precision: 8, scale: 2 }).notNull().default("0"),
@@ -1125,8 +1128,8 @@ export const examTypes = mysqlTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("exam_types_school_name_uq").on(table.schoolId, table.name),
-    index("exam_types_school_created_idx").on(table.schoolId, table.createdAt),
+    uniqueIndex("exam_types_school_branch_name_uq").on(table.schoolId, table.branchId, table.name),
+    index("exam_types_school_branch_created_idx").on(table.schoolId, table.branchId, table.createdAt),
   ],
 );
 
@@ -1159,6 +1162,9 @@ export const examinations = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(
+      () => schoolBranches.id,
+    ),
     academicYearId: bigint("academicYearId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => academicYears.id),
@@ -1169,6 +1175,7 @@ export const examinations = mysqlTable(
     gradingScaleId: bigint("gradingScaleId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => examGradingScales.id),
+    examSystem: varchar("examSystem", { length: 10 }).notNull().default("single"),
     name: varchar("name", { length: 120 }).notNull(),
     startDate: date("startDate", { mode: "string" }).notNull(),
     endDate: date("endDate", { mode: "string" }).notNull(),
@@ -1182,6 +1189,7 @@ export const examinations = mysqlTable(
   (table) => [
     uniqueIndex("examinations_school_name_year_uq").on(table.schoolId, table.academicYearId, table.name),
     index("examinations_school_year_status_idx").on(table.schoolId, table.academicYearId, table.status),
+    index("examinations_school_branch_year_idx").on(table.schoolId, table.branchId, table.academicYearId),
   ],
 );
 
@@ -1242,6 +1250,29 @@ export const examSubjects = mysqlTable(
   ],
 );
 
+export const examComponents = mysqlTable(
+  "exam_components",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examSubjectId: bigint("examSubjectId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examSubjects.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 120 }).notNull(),
+    maxMarks: decimal("maxMarks", { precision: 8, scale: 2 }).notNull(),
+    sortOrder: int("sortOrder", { unsigned: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_components_subject_order_uq").on(table.examSubjectId, table.sortOrder),
+    uniqueIndex("exam_components_subject_title_uq").on(table.examSubjectId, table.title),
+    index("exam_components_school_subject_idx").on(table.schoolId, table.examSubjectId),
+  ],
+);
+
 export const examMarks = mysqlTable(
   "exam_marks",
   {
@@ -1265,6 +1296,31 @@ export const examMarks = mysqlTable(
   (table) => [
     uniqueIndex("exam_marks_school_subject_enrollment_uq").on(table.schoolId, table.examSubjectId, table.enrollmentId),
     index("exam_marks_school_enrollment_idx").on(table.schoolId, table.enrollmentId),
+  ],
+);
+
+export const examComponentMarks = mysqlTable(
+  "exam_component_marks",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examMarkId: bigint("examMarkId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examMarks.id, { onDelete: "cascade" }),
+    examComponentId: bigint("examComponentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examComponents.id, { onDelete: "cascade" }),
+    marks: decimal("marks", { precision: 8, scale: 2 }),
+    updatedBy: varchar("updatedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_component_marks_mark_component_uq").on(table.schoolId, table.examMarkId, table.examComponentId),
+    index("exam_component_marks_school_component_idx").on(table.schoolId, table.examComponentId),
   ],
 );
 
@@ -1353,6 +1409,8 @@ export const examMarkAudits = mysqlTable(
     examMarkId: bigint("examMarkId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => examMarks.id),
+    examComponentId: bigint("examComponentId", { mode: "number", unsigned: true })
+      .references(() => examComponents.id),
     previousMarks: decimal("previousMarks", { precision: 8, scale: 2 }),
     updatedMarks: decimal("updatedMarks", { precision: 8, scale: 2 }),
     action: varchar("action", { length: 30 }).notNull(),

@@ -45,6 +45,7 @@ export default async function ReportCardPage({
     examinationName: examinations.name,
     examinationStatus: examinations.status,
     academicYearId: examinations.academicYearId,
+    branchId: examinations.branchId,
     termId: examinations.academicTermId,
     scaleId: examGradingScales.id,
     scaleName: examGradingScales.name,
@@ -65,6 +66,7 @@ export default async function ReportCardPage({
     studentPublicId: students.publicId,
     studentFirstName: students.firstName,
     studentLastName: students.lastName,
+    studentBranchId: students.branchId,
     admissionNumber: students.admissionNumber,
     profilePhoto: students.additionalDetails,
     sectionName: classSections.name,
@@ -97,7 +99,7 @@ export default async function ReportCardPage({
       eq(examinations.status, "published"),
     ))
     .limit(1);
-  if (!record) notFound();
+  if (!record || record.branchId !== null && record.branchId !== record.studentBranchId) notFound();
 
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");

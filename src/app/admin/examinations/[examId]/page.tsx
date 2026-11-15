@@ -12,6 +12,7 @@ import {
   examSubjects,
   examTypes,
   examinations,
+  schoolBranches,
   staffMembers,
   studentEnrollments,
   students,
@@ -42,6 +43,8 @@ export default async function ExaminationDetailPage({
     id: examinations.id,
     name: examinations.name,
     examTypeName: examTypes.name,
+    branchName: schoolBranches.name,
+    examSystem: examinations.examSystem,
     status: examinations.status,
     startDate: examinations.startDate,
     endDate: examinations.endDate,
@@ -57,6 +60,7 @@ export default async function ExaminationDetailPage({
       eq(examTypes.id, examinations.examTypeId!),
       eq(examTypes.schoolId, context.schoolId),
     ))
+    .leftJoin(schoolBranches, eq(schoolBranches.id, examinations.branchId!))
     .where(and(eq(examinations.id, examId), eq(examinations.schoolId, context.schoolId)))
     .limit(1);
   if (!exam) notFound();
@@ -158,7 +162,7 @@ export default async function ExaminationDetailPage({
           <Link href="/admin/examinations" className="text-sm font-semibold text-violet-700">← Examinations</Link>
           <p className="mt-4 text-sm font-semibold text-violet-700">{context.schoolName} · {exam.yearName}</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{exam.name}</h1>
-          <p className="mt-2 text-sm text-slate-600">{exam.examTypeName ? `${exam.examTypeName} · ` : ""}{exam.startDate} – {exam.endDate} · {overallStatus}</p>
+          <p className="mt-2 text-sm text-slate-600">{exam.examTypeName ? `${exam.examTypeName} · ` : ""}{exam.branchName ?? "All branches"} · {exam.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · {exam.startDate} – {exam.endDate} · {overallStatus}</p>
         </div>
         {canReview && exam.status === "open" && <PublishExaminationForm examinationId={exam.id} />}
       </header>
@@ -209,7 +213,7 @@ export default async function ExaminationDetailPage({
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${subject.status === "published" || subject.status === "approved" ? "bg-emerald-100 text-emerald-800" : subject.status === "submitted" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-700"}`}>{subject.status}</span>
                     </div>
                     {canConfigure && exam.status === "open" && subject.status === "draft" && (
-                      <SubjectSettingsForm examSubjectId={subject.id} examDate={subject.examDate} maxMarks={subject.maxMarks} weight={subject.weight} />
+                      <SubjectSettingsForm examSubjectId={subject.id} examDate={subject.examDate} weight={subject.weight} />
                     )}
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       <Link href={`/admin/examinations/${exam.id}/subjects/${subject.id}`} className="text-sm font-semibold text-violet-700 hover:text-violet-900">

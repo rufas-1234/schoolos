@@ -7,6 +7,8 @@ import {
   classSections,
   classLevels,
   examClasses,
+  examComponentMarks,
+  examComponents,
   examGradeBands,
   examGradingScales,
   examMarkAudits,
@@ -57,6 +59,8 @@ export default async function SubjectMarksPage({
     examStatus: examinations.status,
     examPublicId: examinations.publicId,
     yearId: examinations.academicYearId,
+    branchId: examinations.branchId,
+    examSystem: examinations.examSystem,
     scaleId: examGradingScales.id,
     scaleName: examGradingScales.name,
     classLevelId: examClasses.classLevelId,
@@ -131,8 +135,37 @@ export default async function SubjectMarksPage({
       eq(examStudentRemarks.enrollmentId, studentEnrollments.id),
       eq(examStudentRemarks.schoolId, context.schoolId),
     ))
-    .where(and(eq(examMarks.examSubjectId, subject.id), eq(examMarks.schoolId, context.schoolId)))
+    .where(and(
+      eq(examMarks.examSubjectId, subject.id),
+      eq(examMarks.schoolId, context.schoolId),
+      subject.branchId ? eq(students.branchId, subject.branchId) : undefined,
+    ))
     .orderBy(asc(students.lastName), asc(students.firstName));
+  const componentRows = roster.length
+    ? await db.select({
+      markId: examComponentMarks.examMarkId,
+      componentId: examComponents.id,
+      title: examComponents.title,
+      maxMarks: examComponents.maxMarks,
+      marks: examComponentMarks.marks,
+      sortOrder: examComponents.sortOrder,
+    }).from(examComponentMarks)
+      .innerJoin(examComponents, and(
+        eq(examComponents.id, examComponentMarks.examComponentId),
+        eq(examComponents.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(examComponentMarks.schoolId, context.schoolId),
+        inArray(examComponentMarks.examMarkId, roster.map((row) => row.markId)),
+      ))
+      .orderBy(asc(examComponents.sortOrder))
+    : [];
+  const componentsByMark = new Map<number, typeof componentRows>();
+  for (const component of componentRows) {
+    const current = componentsByMark.get(component.markId) ?? [];
+    current.push(component);
+    componentsByMark.set(component.markId, current);
+  }
   const gradeBands = await db.select({
     minPercent: examGradeBands.minPercent,
     maxPercent: examGradeBands.maxPercent,
@@ -143,15 +176,18 @@ export default async function SubjectMarksPage({
   const audits = roster.length
     ? await db.select({
       examMarkId: examMarkAudits.examMarkId,
+      componentTitle: examComponents.title,
       previousMarks: examMarkAudits.previousMarks,
       updatedMarks: examMarkAudits.updatedMarks,
       action: examMarkAudits.action,
       reason: examMarkAudits.reason,
       createdAt: examMarkAudits.createdAt,
-    }).from(examMarkAudits).where(and(
-      eq(examMarkAudits.schoolId, context.schoolId),
-      inArray(examMarkAudits.examMarkId, roster.map((row) => row.markId)),
-    ))
+    }).from(examMarkAudits)
+      .leftJoin(examComponents, eq(examComponents.id, examMarkAudits.examComponentId))
+      .where(and(
+        eq(examMarkAudits.schoolId, context.schoolId),
+        inArray(examMarkAudits.examMarkId, roster.map((row) => row.markId)),
+      ))
       .orderBy(asc(examMarkAudits.createdAt))
     : [];
   const corrections = roster.length
@@ -170,11 +206,18 @@ export default async function SubjectMarksPage({
   const editable = subject.examStatus === "open" && subject.status === "draft" && (canConfigure || canReview || assignedTeacher);
   const canRequestCorrection = subject.examStatus === "published" && context.grantedPermissions.includes("results.enter") && assignedTeacher;
   const studentRows = roster.map((row) => ({
+    markId: row.markId,
     enrollmentId: row.enrollmentId,
     name: `${row.firstName} ${row.lastName}`,
     admissionNumber: row.admissionNumber,
     marks: row.marks,
     teacherRemark: row.teacherRemark,
+    components: (componentsByMark.get(row.markId) ?? []).map((component) => ({
+      id: component.componentId,
+      title: component.title,
+      maxMarks: component.maxMarks,
+      marks: component.marks,
+    })),
   }));
   const [myTeacher] = context.grantedPermissions.includes("results.enter")
     ? await db.select({ id: teachers.id }).from(teachers)
@@ -194,7 +237,7 @@ export default async function SubjectMarksPage({
           <Link href={`/admin/examinations/${examId}`} className="text-sm font-semibold text-violet-700">← {subject.examName}</Link>
           <p className="mt-4 text-sm font-semibold text-violet-700">{context.schoolName} · {subject.scaleName}</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{subject.subjectName} marks</h1>
-          <p className="mt-2 text-sm text-slate-600">{subject.className} · {subject.subjectCode} · Exam date {subject.examDate} · Maximum {subject.maxMarks} · Weight {subject.weight} · {subject.status}</p>
+          <p className="mt-2 text-sm text-slate-600">{subject.className} · {subject.subjectCode} · {subject.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · Exam date {subject.examDate} · Maximum {subject.maxMarks} · Weight {subject.weight} · {subject.status}</p>
         </div>
         <PrintButton label="Print mark list" />
       </header>
@@ -202,17 +245,17 @@ export default async function SubjectMarksPage({
       <section id="exam-mark-list" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="print-report-heading">
           <h2 className="text-xl font-bold">{subject.className} · {subject.subjectName} — marks roster</h2>
-          <p className="text-sm text-slate-600">{roster.length} enrolled students · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
+          <p className="text-sm text-slate-600">{roster.length} enrolled students · {subject.examSystem === "multi" ? "component marks are summed" : "single component"} · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
         </div>
         {editable && <SaveMarksForm examSubjectId={subject.id} maxMarks={subject.maxMarks} students={studentRows} editable />}
         {!editable && (
           <div className="overflow-x-auto">
             <table className="print-report-table w-full min-w-[600px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Marks / {subject.maxMarks}</th><th className="p-3">Grade</th><th className="p-3">Teacher remark</th></tr></thead>
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th>{(componentsByMark.get(roster[0]?.markId ?? -1) ?? []).map((component) => <th key={component.componentId} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Total / {subject.maxMarks}</th><th className="p-3">Grade</th><th className="p-3">Teacher remark</th></tr></thead>
               <tbody>{roster.map((row) => {
                 const percentage = row.marks === null ? null : Number(row.marks) / Number(subject.maxMarks) * 100;
                 const grade = percentage === null ? null : gradeBands.find((band) => percentage >= Number(band.minPercent) && (percentage < Number(band.maxPercent) || Number(band.maxPercent) === 100));
-                return <tr key={row.markId} className="border-t"><td className="p-3">{row.firstName} {row.lastName}</td><td className="p-3">{row.admissionNumber ?? "—"}</td><td className="p-3">{row.marks ?? "Not entered"}</td><td className="p-3">{grade?.grade ?? "—"}</td><td className="p-3">{row.teacherRemark ?? "—"}</td></tr>;
+                return <tr key={row.markId} className="border-t"><td className="p-3">{row.firstName} {row.lastName}</td><td className="p-3">{row.admissionNumber ?? "—"}</td>{(componentsByMark.get(row.markId) ?? []).map((component) => <td key={component.componentId} className="p-3">{component.marks ?? "Not entered"}</td>)}<td className="p-3">{row.marks ?? "Incomplete"}</td><td className="p-3">{grade?.grade ?? "—"}</td><td className="p-3">{row.teacherRemark ?? "—"}</td></tr>;
               })}</tbody>
             </table>
           </div>
@@ -272,7 +315,7 @@ export default async function SubjectMarksPage({
               ) : <p className="mt-2 text-sm text-slate-600">{row.classTeacherRemark ?? "No class teacher remark."}</p>}
               <div className="mt-3 space-y-1 border-t pt-3 text-xs text-slate-500">
                 {audits.filter((audit) => audit.examMarkId === row.markId).map((audit, index) => (
-                  <p key={`${audit.examMarkId}-${index}`}>Mark history: {audit.action} · {audit.previousMarks ?? "—"} → {audit.updatedMarks ?? "—"}{audit.reason ? ` · ${audit.reason}` : ""}</p>
+                  <p key={`${audit.examMarkId}-${index}`}>{audit.componentTitle ? `${audit.componentTitle} history` : "Total mark history"}: {audit.action} · {audit.previousMarks ?? "—"} → {audit.updatedMarks ?? "—"}{audit.reason ? ` · ${audit.reason}` : ""}</p>
                 ))}
               </div>
               {subject.examStatus === "published" && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   createExamType,
   createExamination,
@@ -38,17 +38,28 @@ function SubmitButton({ children, pending }: { children: string; pending: boolea
 export function CreateExaminationForm({
   years,
   terms,
+  branches,
   examTypes,
   scales,
   classes,
 }: {
   years: Array<{ id: number; name: string }>;
   terms: Array<{ id: number; academicYearId: number; name: string }>;
-  examTypes: Array<{ id: number; name: string }>;
+  branches: Array<{ id: number; name: string }>;
+  examTypes: Array<{ id: number; name: string; branchId: number | null }>;
   scales: Array<{ id: number; name: string; isDefault: boolean }>;
-  classes: Array<{ id: number; name: string }>;
+  classes: Array<{ id: number; name: string; branchId: number; branchName: string }>;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createExamination, {});
+  const [branchId, setBranchId] = useState("");
+  const [examSystem, setExamSystem] = useState<"single" | "multi">("single");
+  const [components, setComponents] = useState("Exam | 100");
+  const visibleClasses = branchId
+    ? classes.filter((classLevel) => classLevel.branchId === Number(branchId))
+    : classes;
+  const visibleTypes = examTypes.filter((type) =>
+    !branchId ? type.branchId === null : type.branchId === null || type.branchId === Number(branchId),
+  );
   return (
     <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <h2 className="text-lg font-bold text-slate-900">Create examination</h2>
@@ -56,10 +67,32 @@ export function CreateExaminationForm({
         <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="Term 1 examinations" />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm font-medium">Branch
+          <select name="branchId" value={branchId} onChange={(event) => {
+            setBranchId(event.target.value);
+          }} className="mt-1 w-full rounded-lg border p-2.5">
+            <option value="">All branches</option>
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
+        </label>
         <label className="text-sm font-medium">Exam type
           <select required name="examTypeId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
             <option value="" disabled>Select type</option>
-            {examTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+            {visibleTypes.map((type) => <option key={type.id} value={type.id}>{type.name}{type.branchId === null ? " (all branches)" : ""}</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-medium">Exam system
+          <select name="examSystem" value={examSystem} onChange={(event) => {
+            const nextSystem = event.target.value === "multi" ? "multi" : "single";
+            setExamSystem(nextSystem);
+            if (nextSystem === "multi" && components.split(/\r?\n/).filter(Boolean).length < 2) {
+              setComponents("Paper 1 | 50\nPaper 2 | 50");
+            } else if (nextSystem === "single" && components.split(/\r?\n/).filter(Boolean).length > 1) {
+              setComponents("Exam | 100");
+            }
+          }} className="mt-1 w-full rounded-lg border p-2.5">
+            <option value="single">Single Exam</option>
+            <option value="multi">Multi Exam</option>
           </select>
         </label>
         <label className="text-sm font-medium">Academic year
@@ -89,30 +122,45 @@ export function CreateExaminationForm({
           </label>
         </div>
       </div>
+      <label className="block text-sm font-medium">Mark distribution
+        <textarea required name="components" rows={examSystem === "single" ? 2 : 4} className="mt-1 w-full rounded-lg border p-2.5 font-mono text-sm" value={components} onChange={(event) => setComponents(event.target.value)} />
+      </label>
+      <p className="text-xs text-slate-500">
+        {examSystem === "single"
+          ? "Single Exam uses exactly one component."
+          : "Multi Exam combines two or more components into each subject's total."}
+        {" "}Enter one component per line as title | maximum marks. Marks are summed; subject weights control the overall average.
+      </p>
       <fieldset>
         <legend className="mb-2 text-sm font-semibold">Classes (all assigned subjects will be included)</legend>
         <div className="grid max-h-40 grid-cols-2 gap-2 overflow-auto rounded-lg border p-3 sm:grid-cols-3">
-          {classes.map((classLevel) => (
+          {visibleClasses.map((classLevel) => (
             <label key={classLevel.id} className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="classLevelIds" value={classLevel.id} />
-              {classLevel.name}
+              {classLevel.name}{!branchId && ` · ${classLevel.branchName}`}
             </label>
           ))}
-          {classes.length === 0 && <p className="col-span-full text-sm text-slate-500">Add active classes and subject assignments first.</p>}
+          {visibleClasses.length === 0 && <p className="col-span-full text-sm text-slate-500">Add active classes and subject assignments first.</p>}
         </div>
       </fieldset>
-      <p className="text-xs text-slate-500">Each enrolled student is added to the selected class rosters. New subjects start with a 100-mark maximum and weight 1; adjust each before entering marks.</p>
+      <p className="text-xs text-slate-500">Only students enrolled in the selected branch are added to branch examinations. Each subject uses the component maximum total and starts with assessment weight 1.</p>
       <SubmitButton pending={pending}>Create examination</SubmitButton>
       <Feedback state={state} />
     </form>
   );
 }
 
-export function CreateExamTypeForm() {
+export function CreateExamTypeForm({ branches }: { branches: Array<{ id: number; name: string }> }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createExamType, {});
   return (
     <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <h2 className="text-lg font-bold text-slate-900">Create exam type</h2>
+      <label className="block text-sm font-medium">Branch
+        <select name="branchId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
+          <option value="">All branches</option>
+          {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+        </select>
+      </label>
       <label className="block text-sm font-medium">Exam name
         <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="First Term" />
       </label>
@@ -191,20 +239,17 @@ export function SaveExamAttendanceForm({
 export function SubjectSettingsForm({
   examSubjectId,
   examDate,
-  maxMarks,
   weight,
 }: {
   examSubjectId: number;
   examDate: string;
-  maxMarks: string;
   weight: string;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(updateExamSubjectSettings, {});
   return (
-    <form action={action} className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-4">
+    <form action={action} className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-3">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
       <label className="text-xs font-medium">Date<input required type="date" name="examDate" defaultValue={examDate} className="mt-1 w-full rounded border p-2" /></label>
-      <label className="text-xs font-medium">Maximum marks<input required type="number" step="0.01" min="0.01" name="maxMarks" defaultValue={maxMarks} className="mt-1 w-full rounded border p-2" /></label>
       <label className="text-xs font-medium">Weight<input required type="number" step="0.01" min="0.01" name="weight" defaultValue={weight} className="mt-1 w-full rounded border p-2" /></label>
       <div className="flex items-end"><SubmitButton pending={pending}>Update assessment</SubmitButton></div>
       <div className="sm:col-span-4"><Feedback state={state} /></div>
@@ -221,21 +266,29 @@ export function SaveMarksForm({
   examSubjectId: number;
   maxMarks: string;
   editable: boolean;
-  students: Array<{ enrollmentId: number; name: string; admissionNumber: string | null; marks: string | null; teacherRemark: string | null }>;
+  students: Array<{
+    markId: number;
+    enrollmentId: number;
+    name: string;
+    admissionNumber: string | null;
+    teacherRemark: string | null;
+    components: Array<{ id: number; title: string; maxMarks: string; marks: string | null }>;
+  }>;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamMarks, {});
   if (!editable) return null;
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
+      <p className="text-sm text-slate-600">Enter each component separately. The complete total is calculated as the sum of components, out of {maxMarks} marks.</p>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Marks / {maxMarks}</th><th className="p-3">Teacher remark</th></tr></thead>
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th>{students[0]?.components.map((component) => <th key={component.id} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Teacher remark</th></tr></thead>
           <tbody>{students.map((student) => (
             <tr key={student.enrollmentId} className="border-t">
               <td className="p-3 font-medium">{student.name}</td>
               <td className="p-3">{student.admissionNumber ?? "—"}</td>
-              <td className="p-3"><input aria-label={`Marks for ${student.name}`} type="number" name={`marks_${student.enrollmentId}`} min="0" max={maxMarks} step="0.01" defaultValue={student.marks ?? ""} className="w-28 rounded-lg border p-2" /></td>
+              {student.components.map((component) => <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={`component_${student.markId}_${component.id}`} min="0" max={component.maxMarks} step="0.01" defaultValue={component.marks ?? ""} className="w-28 rounded-lg border p-2" /></td>)}
               <td className="p-3"><input aria-label={`Teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} defaultValue={student.teacherRemark ?? ""} className="w-full min-w-48 rounded-lg border p-2" /></td>
             </tr>
           ))}</tbody>

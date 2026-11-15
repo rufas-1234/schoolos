@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -14,6 +14,8 @@ import {
   classSubjects,
   examAttendance,
   examClasses,
+  examComponentMarks,
+  examComponents,
   examGradeBands,
   examGradingScales,
   examMarkAudits,
@@ -23,14 +25,21 @@ import {
   examSubjects,
   examTypes,
   examinations,
+  schoolBranches,
   staffMembers,
   studentEnrollments,
+  students,
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate, isValidDateRange } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
-import { validateGradeBands, type GradeBand } from "@/lib/examination-policy";
+import {
+  calculateComponentTotal,
+  parseExamComponents,
+  validateGradeBands,
+  type GradeBand,
+} from "@/lib/examination-policy";
 
 export type ExaminationActionState = { error?: string; success?: boolean };
 const idField = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe());
@@ -153,22 +162,44 @@ export async function createExamType(
   const context = await requireSchoolPermission("examinations.create");
   const parsed = z.object({
     name: text(120),
+    branchId: z.union([z.literal(""), idField]),
     averageMark: numericField.pipe(z.number().nonnegative().max(100)),
   }).safeParse({
     name: value(formData, "name"),
+    branchId: value(formData, "branchId"),
     averageMark: value(formData, "averageMark"),
   });
   if (!parsed.success) return { error: "Enter an exam type name and a valid non-negative average mark." };
+  const branchId = parsed.data.branchId || null;
+  if (branchId) {
+    const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
+      eq(schoolBranches.id, branchId),
+      eq(schoolBranches.schoolId, context.schoolId),
+      eq(schoolBranches.status, "active"),
+    )).limit(1);
+    if (!branch) return { error: "Choose an active branch belonging to your school." };
+  }
+  const duplicate = await db.select({ id: examTypes.id }).from(examTypes).where(and(
+    eq(examTypes.schoolId, context.schoolId),
+    branchId ? eq(examTypes.branchId, branchId) : isNull(examTypes.branchId),
+    eq(examTypes.name, parsed.data.name),
+  )).limit(1);
+  if (duplicate.length) return { error: "An exam type with that name already exists for this branch." };
   const publicId = randomUUID();
   try {
     await db.transaction(async (tx) => {
       if (value(formData, "averagePassing") === "on") {
         await tx.update(examTypes).set({ averagePassing: false })
-          .where(and(eq(examTypes.schoolId, context.schoolId), eq(examTypes.averagePassing, true)));
+          .where(and(
+            eq(examTypes.schoolId, context.schoolId),
+            eq(examTypes.averagePassing, true),
+            branchId ? eq(examTypes.branchId, branchId) : isNull(examTypes.branchId),
+          ));
       }
       await tx.insert(examTypes).values({
         publicId,
         schoolId: context.schoolId,
+        branchId,
         name: parsed.data.name,
         averagePassing: value(formData, "averagePassing") === "on",
         averageMark: parsed.data.averageMark.toFixed(2),
@@ -180,7 +211,7 @@ export async function createExamType(
         action: "examination.type.created",
         resourceType: "exam_type",
         resourcePublicId: publicId,
-        changedFields: ["name", "averagePassing", "averageMark"],
+        changedFields: ["branchId", "name", "averagePassing", "averageMark"],
       });
     });
   } catch (error) {
@@ -199,25 +230,48 @@ export async function createExamination(
   const classValues = formData.getAll("classLevelIds");
   const parsed = z.object({
     name: text(120),
+    branchId: z.union([z.literal(""), idField]),
     academicYearId: idField,
     academicTermId: z.union([z.literal(""), idField]),
     examTypeId: idField,
     gradingScaleId: idField,
+    examSystem: z.enum(["single", "multi"]),
+    components: z.string().trim().min(1).max(4000),
     startDate: z.string().refine(isCalendarDate),
     endDate: z.string().refine(isCalendarDate),
     classLevelIds: z.array(idField).min(1),
   }).safeParse({
     name: value(formData, "name"),
+    branchId: value(formData, "branchId"),
     academicYearId: value(formData, "academicYearId"),
     academicTermId: value(formData, "academicTermId"),
     examTypeId: value(formData, "examTypeId"),
     gradingScaleId: value(formData, "gradingScaleId"),
+    examSystem: value(formData, "examSystem"),
+    components: value(formData, "components"),
     startDate: value(formData, "startDate"),
     endDate: value(formData, "endDate"),
     classLevelIds: classValues,
   });
   if (!parsed.success || !isValidDateRange(value(formData, "startDate"), value(formData, "endDate"))) {
-    return { error: "Enter a name, exam type, valid dates, academic year, grading scale, and at least one class." };
+    return { error: "Enter an exam name, branch, system, mark distribution, valid dates, academic year, grading scale, and at least one class." };
+  }
+  const componentDefinitions = parseExamComponents(parsed.data.components, parsed.data.examSystem);
+  if (!componentDefinitions) {
+    return { error: parsed.data.examSystem === "single"
+      ? "Single Exam requires exactly one valid unique component as title | maximum marks."
+      : "Multi Exam requires at least two valid unique components as title | maximum marks." };
+  }
+  const totalMaxMarks = componentDefinitions.reduce((total, component) => total + component.maxMarks, 0);
+  if (totalMaxMarks > 999999) return { error: "The total maximum marks across components cannot exceed 999,999." };
+  const branchId = parsed.data.branchId || null;
+  if (branchId) {
+    const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
+      eq(schoolBranches.id, branchId),
+      eq(schoolBranches.schoolId, context.schoolId),
+      eq(schoolBranches.status, "active"),
+    )).limit(1);
+    if (!branch) return { error: "Choose an active branch belonging to your school." };
   }
   const classIds = [...new Set(parsed.data.classLevelIds)];
   const [year] = await db.select({
@@ -229,11 +283,13 @@ export async function createExamination(
   const [scale] = await db.select({ id: examGradingScales.id }).from(examGradingScales)
     .where(and(eq(examGradingScales.id, parsed.data.gradingScaleId), eq(examGradingScales.schoolId, context.schoolId))).limit(1);
   if (!year || !scale) return { error: "Choose an academic year and grading scale belonging to your school." };
-  const [examType] = await db.select({ id: examTypes.id }).from(examTypes).where(and(
+  const [examType] = await db.select({ id: examTypes.id, branchId: examTypes.branchId }).from(examTypes).where(and(
     eq(examTypes.id, parsed.data.examTypeId),
     eq(examTypes.schoolId, context.schoolId),
   )).limit(1);
-  if (!examType) return { error: "Choose an examination type belonging to your school." };
+  if (!examType || examType.branchId !== null && examType.branchId !== branchId) {
+    return { error: "Choose an examination type for the selected branch or one shared across all branches." };
+  }
   if (parsed.data.startDate < year.startDate || parsed.data.endDate > year.endDate) {
     return { error: "Examination dates must fall within the selected academic year." };
   }
@@ -252,12 +308,15 @@ export async function createExamination(
       return { error: "Examination dates must fall within the selected term." };
     }
   }
-  const classes = await db.select({ id: classLevels.id }).from(classLevels).where(and(
+  const classes = await db.select({ id: classLevels.id, branchId: classLevels.branchId }).from(classLevels).where(and(
     eq(classLevels.schoolId, context.schoolId),
     inArray(classLevels.id, classIds),
     eq(classLevels.status, "active"),
   ));
   if (classes.length !== classIds.length) return { error: "Choose active classes belonging to your school." };
+  if (branchId && classes.some((classLevel) => classLevel.branchId !== branchId)) {
+    return { error: "Every selected class must belong to the examination branch." };
+  }
 
   const assignments = await db.select({
     classLevelId: classSubjects.classLevelId,
@@ -282,10 +341,12 @@ export async function createExamination(
     const [exam] = await tx.insert(examinations).values({
       publicId: examPublicId,
       schoolId: context.schoolId,
+      branchId,
       academicYearId: year.id,
       academicTermId: parsed.data.academicTermId || null,
       examTypeId: examType.id,
       gradingScaleId: scale.id,
+      examSystem: parsed.data.examSystem,
       name: parsed.data.name,
       startDate: parsed.data.startDate,
       endDate: parsed.data.endDate,
@@ -306,10 +367,20 @@ export async function createExamination(
         examClassId: examClass.id,
         classSubjectId: assignment.classSubjectId,
         examDate: parsed.data.startDate,
-        maxMarks: "100",
+        maxMarks: totalMaxMarks.toFixed(2),
         weight: "1",
         status: "draft",
       }))).$returningId();
+      await tx.insert(examComponents).values(newSubjects.flatMap((subject) =>
+        componentDefinitions.map((component, sortOrder) => ({
+          publicId: randomUUID(),
+          schoolId: context.schoolId,
+          examSubjectId: subject.id,
+          title: component.title,
+          maxMarks: component.maxMarks.toFixed(2),
+          sortOrder,
+        })),
+      ));
       const enrollments = await tx.select({ id: studentEnrollments.id })
         .from(studentEnrollments)
         .innerJoin(classSections, and(
@@ -318,10 +389,15 @@ export async function createExamination(
           eq(classSections.classLevelId, classLevelId),
           eq(classSections.academicYearId, year.id),
         ))
+        .innerJoin(students, and(
+          eq(students.id, studentEnrollments.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
         .where(and(
           eq(studentEnrollments.schoolId, context.schoolId),
           eq(studentEnrollments.academicYearId, year.id),
           eq(studentEnrollments.status, "enrolled"),
+          branchId ? eq(students.branchId, branchId) : undefined,
         ));
       if (enrollments.length) {
         await tx.insert(examMarks).values(newSubjects.flatMap((subject) => enrollments.map((enrollment) => ({
@@ -332,6 +408,34 @@ export async function createExamination(
           marks: null,
           updatedBy: context.user.id,
         }))));
+        const componentRows = await tx.select({
+          id: examComponents.id,
+          examSubjectId: examComponents.examSubjectId,
+        }).from(examComponents).where(and(
+          eq(examComponents.schoolId, context.schoolId),
+          inArray(examComponents.examSubjectId, newSubjects.map((subject) => subject.id)),
+        ));
+        const markRows = await tx.select({
+          id: examMarks.id,
+          examSubjectId: examMarks.examSubjectId,
+        }).from(examMarks).where(and(
+          eq(examMarks.schoolId, context.schoolId),
+          inArray(examMarks.examSubjectId, newSubjects.map((subject) => subject.id)),
+        ));
+        if (componentRows.length !== newSubjects.length * componentDefinitions.length ||
+          markRows.length !== newSubjects.length * enrollments.length) {
+          throw new Error("The new examination roster could not be initialized completely.");
+        }
+        await tx.insert(examComponentMarks).values(markRows.flatMap((mark) =>
+          componentRows.filter((component) => component.examSubjectId === mark.examSubjectId).map((component) => ({
+            publicId: randomUUID(),
+            schoolId: context.schoolId,
+            examMarkId: mark.id,
+            examComponentId: component.id,
+            marks: null,
+            updatedBy: context.user.id,
+          })),
+        ));
       }
     }
     await tx.insert(auditLogs).values({
@@ -340,7 +444,7 @@ export async function createExamination(
       action: "examination.created",
       resourceType: "examination",
       resourcePublicId: examPublicId,
-      changedFields: ["name", "examTypeId", "academicYearId", "academicTermId", "classes", "subjects", "dates"],
+      changedFields: ["name", "branchId", "examSystem", "components", "examTypeId", "academicYearId", "academicTermId", "classes", "subjects", "dates"],
     });
   }).catch((error: unknown) => {
     if (isDuplicateEntryError(error)) return "duplicate" as const;
@@ -361,15 +465,13 @@ export async function updateExamSubjectSettings(
   const parsed = z.object({
     examSubjectId: idField,
     examDate: z.string().refine(isCalendarDate),
-    maxMarks: numericField.pipe(z.number().positive().max(999999)),
     weight: numericField.pipe(z.number().positive().max(9999)),
   }).safeParse({
     examSubjectId: value(formData, "examSubjectId"),
     examDate: value(formData, "examDate"),
-    maxMarks: value(formData, "maxMarks"),
     weight: value(formData, "weight"),
   });
-  if (!parsed.success) return { error: "Enter a valid exam date, maximum marks, and positive assessment weight." };
+  if (!parsed.success) return { error: "Enter a valid exam date and positive assessment weight." };
   const outcome = await db.transaction(async (tx) => {
     const [record] = await tx.select({
       id: examSubjects.id,
@@ -393,16 +495,8 @@ export async function updateExamSubjectSettings(
       .limit(1);
     if (!record || record.status !== "draft" || record.examinationStatus !== "open") return "locked" as const;
     if (parsed.data.examDate < record.startDate || parsed.data.examDate > record.endDate) return "date-range" as const;
-    const existingMarks = await tx.select({ marks: examMarks.marks }).from(examMarks).where(and(
-      eq(examMarks.schoolId, context.schoolId),
-      eq(examMarks.examSubjectId, record.id),
-    )).for("update");
-    if (existingMarks.some((mark) => mark.marks !== null && Number(mark.marks) > parsed.data.maxMarks)) {
-      return "max-marks" as const;
-    }
     await tx.update(examSubjects).set({
       examDate: parsed.data.examDate,
-      maxMarks: parsed.data.maxMarks.toFixed(2),
       weight: parsed.data.weight.toFixed(2),
     }).where(and(eq(examSubjects.id, record.id), eq(examSubjects.schoolId, context.schoolId)));
     await tx.insert(auditLogs).values({
@@ -411,13 +505,12 @@ export async function updateExamSubjectSettings(
       action: "examination.subject.settings_updated",
       resourceType: "exam_subject",
       resourcePublicId: record.publicId,
-      changedFields: ["examDate", "maxMarks", "weight"],
+      changedFields: ["examDate", "weight"],
     });
     return record.examinationId;
   });
   if (outcome === "locked") return { error: "Only draft assessments in an open examination can be configured." };
   if (outcome === "date-range") return { error: "The subject exam date must fall within the examination date range." };
-  if (outcome === "max-marks") return { error: "The maximum mark cannot be lowered below a mark already entered." };
   revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
 }
@@ -456,29 +549,90 @@ export async function saveExamMarks(
     eq(examMarks.schoolId, context.schoolId),
     eq(examMarks.examSubjectId, record.id),
   ));
-  const markByEnrollment = new Map(currentMarks.map((mark) => [String(mark.enrollmentId), mark]));
-  const updates: Array<{ markId: number; enrollmentId: number; marks: number | null; remark: string | null }> = [];
-  const seenEnrollmentIds = new Set<number>();
-  for (const [key, raw] of formData.entries()) {
-    const match = /^marks_(\d+)$/.exec(key);
+  const componentDefinitions = await db.select({
+    id: examComponents.id,
+    title: examComponents.title,
+    maxMarks: examComponents.maxMarks,
+  }).from(examComponents).where(and(
+    eq(examComponents.schoolId, context.schoolId),
+    eq(examComponents.examSubjectId, record.id),
+  )).orderBy(asc(examComponents.sortOrder));
+  if (!componentDefinitions.length) return { error: "This assessment has no mark components; ask an administrator to repair its setup." };
+  if (!currentMarks.length) return { error: "This assessment has no enrolled students on its roster." };
+  const componentById = new Map(componentDefinitions.map((component) => [component.id, component]));
+  const componentRows = await db.select({
+    id: examComponentMarks.id,
+    examMarkId: examComponentMarks.examMarkId,
+    examComponentId: examComponentMarks.examComponentId,
+    marks: examComponentMarks.marks,
+  }).from(examComponentMarks).where(and(
+    eq(examComponentMarks.schoolId, context.schoolId),
+    inArray(examComponentMarks.examMarkId, currentMarks.map((mark) => mark.id)),
+  ));
+  const componentRowByKey = new Map(componentRows.map((row) => [`${row.examMarkId}:${row.examComponentId}`, row]));
+  const updates: Array<{
+    markId: number;
+    enrollmentId: number;
+    marks: number | null;
+    remark: string | null;
+    components: Array<{ id: number; componentId: number; marks: number | null }>;
+  }> = [];
+  const markById = new Map(currentMarks.map((mark) => [String(mark.id), mark]));
+  const seenComponentKeys = new Set<string>();
+  for (const [fieldName, raw] of formData.entries()) {
+    const match = /^component_(\d+)_(\d+)$/.exec(fieldName);
     if (!match || typeof raw !== "string") continue;
-    const enrollmentId = Number(match[1]);
-    if (seenEnrollmentIds.has(enrollmentId)) {
-      return { error: "Each student can appear only once in the submitted roster." };
+    const markId = Number(match[1]);
+    const componentId = Number(match[2]);
+    const existingMark = markById.get(String(markId));
+    const existingComponent = componentById.get(componentId);
+    const componentKey = `${markId}:${componentId}`;
+    if (!existingMark || !existingComponent || seenComponentKeys.has(componentKey)) {
+      return { error: "The submitted components do not match this assessment roster." };
     }
-    seenEnrollmentIds.add(enrollmentId);
-    const existing = markByEnrollment.get(String(enrollmentId));
-    if (!existing) return { error: "The submitted list contains a student outside this subject's examination roster." };
+    seenComponentKeys.add(componentKey);
     const parsedMark = raw.trim() === "" ? null : numericField.safeParse(raw.trim());
     if (parsedMark !== null && !parsedMark.success) return { error: "Marks must be valid non-negative numbers." };
     const marks = parsedMark === null ? null : parsedMark.data;
-    if (marks !== null && (marks < 0 || marks > Number(record.maxMarks))) {
-      return { error: `Marks must be between 0 and ${record.maxMarks}.` };
+    if (marks !== null && (marks < 0 || marks > Number(existingComponent.maxMarks))) {
+      return { error: `Marks for ${existingComponent.title} must be between 0 and ${existingComponent.maxMarks}.` };
     }
-    const rawRemark = formData.get(`remark_${enrollmentId}`);
+  }
+  if (seenComponentKeys.size !== currentMarks.length * componentDefinitions.length) {
+    return { error: "Submit every component for every student in this assessment roster." };
+  }
+  for (const mark of currentMarks) {
+    const components = componentDefinitions.map((component) => {
+      const current = componentRowByKey.get(`${mark.id}:${component.id}`);
+      const raw = formData.get(`component_${mark.id}_${component.id}`);
+      if (!current || typeof raw !== "string") return null;
+      const parsedMark = raw.trim() === "" ? null : numericField.safeParse(raw.trim());
+      if (parsedMark !== null && !parsedMark.success) return null;
+      return {
+        id: current.id,
+        componentId: component.id,
+        maxMarks: Number(component.maxMarks),
+        marks: parsedMark === null ? null : parsedMark.data,
+      };
+    });
+    if (components.some((component) => component === null)) {
+      return { error: "A component value or roster entry is invalid. Reload this assessment and try again." };
+    }
+    const componentUpdates = components.filter((component) => component !== null);
+    const total = calculateComponentTotal(componentUpdates.map((component) => ({
+      marks: component.marks,
+      maxMarks: component.maxMarks,
+    })));
+    const rawRemark = formData.get(`remark_${mark.enrollmentId}`);
     const remark = typeof rawRemark === "string" ? rawRemark.trim() : "";
     if (remark.length > 1000) return { error: "Teacher remarks must be 1,000 characters or fewer." };
-    updates.push({ markId: existing.id, enrollmentId, marks, remark: remark || null });
+    updates.push({
+      markId: mark.id,
+      enrollmentId: mark.enrollmentId,
+      marks: total?.marks ?? null,
+      remark: remark || null,
+      components: componentUpdates,
+    });
   }
   if (updates.length !== currentMarks.length) return { error: "Submit the complete student roster for this assessment." };
 
@@ -512,10 +666,25 @@ export async function saveExamMarks(
       eq(examMarks.schoolId, context.schoolId),
       eq(examMarks.examSubjectId, record.id),
     )).for("update");
+    const lockedComponents = await tx.select({
+      id: examComponentMarks.id,
+      examMarkId: examComponentMarks.examMarkId,
+      examComponentId: examComponentMarks.examComponentId,
+      marks: examComponentMarks.marks,
+    }).from(examComponentMarks).where(and(
+      eq(examComponentMarks.schoolId, context.schoolId),
+      inArray(examComponentMarks.examMarkId, lockedMarks.map((mark) => mark.id)),
+    )).for("update");
     if (
       lockedMarks.length !== updates.length ||
       updates.some((update) => !lockedMarks.some((mark) => mark.id === update.markId && mark.enrollmentId === update.enrollmentId))
     ) {
+      return "roster-changed" as const;
+    }
+    if (lockedComponents.length !== updates.length * componentDefinitions.length ||
+      updates.some((update) => update.components.some((component) =>
+        !lockedComponents.some((row) => row.id === component.id && row.examMarkId === update.markId && row.examComponentId === component.componentId),
+      ))) {
       return "roster-changed" as const;
     }
     if (updates.some((update) => update.marks !== null && update.marks > Number(lockedSubject.maxMarks))) {
@@ -523,6 +692,27 @@ export async function saveExamMarks(
     }
     for (const update of updates) {
       const previous = lockedMarks.find((mark) => mark.id === update.markId)?.marks ?? null;
+      for (const component of update.components) {
+        const previousComponent = lockedComponents.find((row) => row.id === component.id)?.marks ?? null;
+        await tx.update(examComponentMarks).set({
+          marks: component.marks === null ? null : component.marks.toFixed(2),
+          updatedBy: context.user.id,
+        }).where(and(
+          eq(examComponentMarks.id, component.id),
+          eq(examComponentMarks.schoolId, context.schoolId),
+        ));
+        if (String(previousComponent ?? "") !== String(component.marks ?? "")) {
+          await tx.insert(examMarkAudits).values({
+            schoolId: context.schoolId,
+            examMarkId: update.markId,
+            examComponentId: component.componentId,
+            previousMarks: previousComponent,
+            updatedMarks: component.marks === null ? null : component.marks.toFixed(2),
+            action: "component_marks_saved",
+            actorUserId: context.user.id,
+          });
+        }
+      }
       await tx.update(examMarks).set({
         marks: update.marks === null ? null : update.marks.toFixed(2),
         teacherRemark: update.remark,
@@ -532,6 +722,7 @@ export async function saveExamMarks(
         await tx.insert(examMarkAudits).values({
           schoolId: context.schoolId,
           examMarkId: update.markId,
+          examComponentId: null,
           previousMarks: previous,
           updatedMarks: update.marks === null ? null : update.marks.toFixed(2),
           action: "marks_saved",
