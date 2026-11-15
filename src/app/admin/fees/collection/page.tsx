@@ -82,7 +82,7 @@ export default async function FeeCollectionPage({
   const today = todayInTimezone(school?.timezone ?? "UTC");
   const paymentTotals = db.select({
     invoiceId: feePayments.invoiceId,
-    paid: sql<string>`COALESCE(SUM(${feePayments.amount} - ${feePayments.reversedAmount}), 0)`,
+    paid: sql<string>`COALESCE(SUM(${feePayments.amount} - ${feePayments.reversedAmount}), 0)`.as("paid"),
   })
     .from(feePayments)
     .where(eq(feePayments.schoolId, context.schoolId))
