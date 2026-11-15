@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { Save } from "lucide-react";
+import { CheckCheck, Save } from "lucide-react";
 import { attendanceStatuses, type AttendanceStatus } from "@/lib/attendance-policy";
 import { saveAttendance } from "./attendance-actions";
 import type { AcademicActionState } from "./actions";
@@ -44,6 +44,11 @@ export function AttendanceWorkspace({
     saveAttendance,
     {},
   );
+  const setAllStatuses = (status: AttendanceStatus) => {
+    setStatuses(Object.fromEntries(
+      roster.map((student) => [student.studentId, status]),
+    ) as Record<number, AttendanceStatus | "">);
+  };
   const totals = useMemo(
     () =>
       attendanceStatuses.reduce(
@@ -145,6 +150,23 @@ export function AttendanceWorkspace({
                       <th scope="col" className="px-4 py-3 font-semibold">Note</th>
                     </tr>
                   </thead>
+                  <caption className="caption-top px-4 py-3 text-left">
+                    <span className="mr-3 text-xs font-medium text-slate-500">Quick mark everyone:</span>
+                    <button
+                      type="button"
+                      onClick={() => setAllStatuses("present")}
+                      className="mr-2 inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+                    >
+                      <CheckCheck size={14} aria-hidden="true" /> All present
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAllStatuses("absent")}
+                      className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50"
+                    >
+                      <CheckCheck size={14} aria-hidden="true" /> All absent
+                    </button>
+                  </caption>
                   <tbody className="divide-y divide-slate-100">
                     {roster.map((student, index) => (
                       <tr key={student.studentId}>

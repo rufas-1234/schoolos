@@ -87,11 +87,13 @@ export function AdminRecordDialog({
   title,
   mode = "edit",
   wide = false,
+  showLabel = false,
   children,
 }: {
   title: string;
   mode?: "view" | "edit";
   wide?: boolean;
+  showLabel?: boolean;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -106,10 +108,10 @@ export function AdminRecordDialog({
         onClick={() => dialogRef.current?.showModal()}
         aria-label={`${actionLabel} ${title}`}
         title={`${actionLabel} ${title}`}
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${showLabel ? "px-2.5" : "w-9"}`}
       >
         <Icon size={16} aria-hidden="true" />
-        <span className="sr-only">{actionLabel}</span>
+        <span className={showLabel ? "" : "sr-only"}>{actionLabel}</span>
       </button>
       <dialog
         ref={dialogRef}
@@ -190,6 +192,7 @@ export function AdminDataTable({
   emptyMessage,
   hideDefaultView = false,
   showRowNumber = true,
+  showActionLabels = false,
 }: {
   title: string;
   columns: AdminTableColumn[];
@@ -203,6 +206,7 @@ export function AdminDataTable({
   emptyMessage: string;
   hideDefaultView?: boolean;
   showRowNumber?: boolean;
+  showActionLabels?: boolean;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -444,7 +448,7 @@ export function AdminDataTable({
                       <td className="px-4 py-3 print:hidden">
                         <div className="flex min-w-max items-center gap-2">
                           {!hideDefaultView && (
-                            <AdminRecordDialog mode="view" title={`View ${title.toLocaleLowerCase()} record`}>
+                            <AdminRecordDialog mode="view" showLabel={showActionLabels} title={`View ${title.toLocaleLowerCase()} record`}>
                               <RecordDetails columns={columns} values={row.values} />
                             </AdminRecordDialog>
                           )}

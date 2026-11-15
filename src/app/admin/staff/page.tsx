@@ -165,6 +165,7 @@ export default async function StaffDirectoryPage() {
           ]}
           filters={filters}
           requireSearchCriteria
+          showActionLabels
           toolbarActions={
             <AdminActionDialog label="Add staff member" title="Add staff member">
               <StaffForm
@@ -192,7 +193,7 @@ export default async function StaffDirectoryPage() {
             },
             actions: (
               <div className="flex min-w-36 flex-wrap items-center gap-2">
-                <AdminRecordDialog title={`Edit ${record.firstName} ${record.lastName}`}>
+                <AdminRecordDialog showLabel title={`Edit ${record.firstName} ${record.lastName}`}>
                   <StaffForm
                     record={record}
                     accounts={accounts}

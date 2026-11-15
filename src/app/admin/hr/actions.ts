@@ -141,6 +141,77 @@ export async function recordStaffAttendance(
   return { success: true };
 }
 
+export async function recordStaffAttendanceBulk(
+  _previousState: HrActionState,
+  formData: FormData,
+): Promise<HrActionState> {
+  const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const result = z.object({
+    staffIds: z.array(idField).min(1).max(500),
+    branchId: idField,
+    attendanceDate: dateField,
+    status: z.enum(staffAttendanceStatuses),
+  }).safeParse({
+    staffIds: formData.getAll("staffIds"),
+    branchId: value(formData, "branchId"),
+    attendanceDate: value(formData, "attendanceDate"),
+    status: value(formData, "status"),
+  });
+  if (!result.success || new Set(result.data.staffIds).size !== result.data.staffIds.length) {
+    return { error: "Select one or more staff members and choose a valid attendance status." };
+  }
+  const [school] = await db.select({ timezone: schools.timezone })
+    .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
+  if (!school) return { error: "School settings could not be loaded." };
+  if (result.data.attendanceDate > todayInTimezone(school.timezone)) {
+    return { error: "Staff attendance cannot be recorded for a future date." };
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    const staff = await tx.select({ id: staffMembers.id })
+      .from(staffMembers).where(and(
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.branchId, result.data.branchId),
+        eq(staffMembers.status, "active"),
+        inArray(staffMembers.id, result.data.staffIds),
+      )).for("update");
+    if (staff.length !== result.data.staffIds.length) return "staff-not-found";
+
+    const existingMarks = await tx.select({
+      staffId: staffAttendance.staffId,
+      publicId: staffAttendance.publicId,
+    }).from(staffAttendance).where(and(
+      eq(staffAttendance.schoolId, context.schoolId),
+      eq(staffAttendance.attendanceDate, result.data.attendanceDate),
+      inArray(staffAttendance.staffId, result.data.staffIds),
+    ));
+    const publicIdByStaffId = new Map(existingMarks.map((mark) => [mark.staffId, mark.publicId]));
+    for (const member of staff) {
+      const publicId = publicIdByStaffId.get(member.id) ?? randomUUID();
+      await tx.insert(staffAttendance).values({
+        publicId,
+        schoolId: context.schoolId,
+        staffId: member.id,
+        attendanceDate: result.data.attendanceDate,
+        status: result.data.status,
+        note: null,
+        recordedBy: context.user.id,
+      }).onDuplicateKeyUpdate({
+        set: { status: result.data.status, recordedBy: context.user.id },
+      });
+      await writeAudit(tx, context.schoolId, context.user.id,
+        publicIdByStaffId.has(member.id) ? "staff.attendance.updated" : "staff.attendance.recorded",
+        "staff_attendance", publicId, ["attendanceDate", "status"]);
+    }
+    return "saved";
+  });
+  if (outcome === "staff-not-found") {
+    return { error: "One or more selected staff records are no longer active in this branch. Reload the roster." };
+  }
+  revalidateHr();
+  return { success: true };
+}
+
 export async function createStaffLeaveType(
   _previousState: HrActionState,
   formData: FormData,

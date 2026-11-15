@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { RequiredMark } from "@/components/required-mark";
 import {
   assignStaffLeaveBalance,
   createStaffLeaveRequest,
   createStaffLeaveType,
   markStaffPayrollPaid,
+  recordStaffAttendanceBulk,
   recordStaffAttendance,
   recordStaffPayroll,
   reviewStaffLeaveRequest,
@@ -63,6 +64,61 @@ export function AttendanceForm({
       {state.error && <span role="alert" className="basis-full text-xs text-rose-600">{state.error}</span>}
       {state.success && <span role="status" className="basis-full text-xs text-emerald-700">Saved</span>}
     </form>
+  );
+}
+
+export function BulkAttendanceForm({
+  branchId,
+  attendanceDate,
+}: {
+  branchId: number;
+  attendanceDate: string;
+}) {
+  const [state, action, pending] = useActionState(recordStaffAttendanceBulk, {});
+  return (
+    <form id="staff-attendance-bulk-form" action={action} className="flex flex-wrap items-end gap-3">
+      <input type="hidden" name="branchId" value={branchId} />
+      <input type="hidden" name="attendanceDate" value={attendanceDate} />
+      <label className="space-y-1.5 text-sm font-medium text-slate-700">
+        Mark selected as
+        <select name="status" defaultValue="present" className="block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+          <option value="present">Present</option>
+          <option value="absent">Absent</option>
+          <option value="late">Late</option>
+          <option value="excused">Excused</option>
+        </select>
+      </label>
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+      >
+        {pending ? "Saving…" : "Apply to selected"}
+      </button>
+      {state.error && <span role="alert" className="basis-full text-xs text-rose-600">{state.error}</span>}
+      {state.success && <span role="status" className="basis-full text-xs text-emerald-700">Selected staff attendance saved.</span>}
+    </form>
+  );
+}
+
+export function StaffAttendanceSelectAll() {
+  const [selected, setSelected] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const nextSelected = !selected;
+        document.querySelectorAll<HTMLInputElement>(
+          'input[name="staffIds"][form="staff-attendance-bulk-form"]',
+        ).forEach((checkbox) => {
+          checkbox.checked = nextSelected;
+        });
+        setSelected(nextSelected);
+      }}
+      className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+    >
+      {selected ? "Clear staff selection" : "Select all staff"}
+    </button>
   );
 }
 

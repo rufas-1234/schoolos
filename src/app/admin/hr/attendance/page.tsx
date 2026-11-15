@@ -5,7 +5,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { parseStaffRoleFilter } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
-import { AttendanceForm } from "../hr-forms";
+import { AttendanceForm, BulkAttendanceForm, StaffAttendanceSelectAll } from "../hr-forms";
 import { PrintReportButton } from "../reports/print-report-button";
 
 export default async function StaffAttendancePage({
@@ -135,6 +135,13 @@ export default async function StaffAttendancePage({
             {selectedRole !== "all" && ` · ${selectedRole === "unassigned" ? "Unassigned role" : selectedRole}`}
           </h2>
           <p className="mt-1 text-sm text-slate-500">{staff.length} active staff members</p>
+          {branchId && staff.length > 0 && (
+            <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50/60 p-4 print:hidden">
+              <p className="mb-3 text-xs text-slate-600">Select one or more staff members below to bulk mark them present, absent, late, or excused.</p>
+              <StaffAttendanceSelectAll />
+              <BulkAttendanceForm branchId={branchId} attendanceDate={attendanceDate} />
+            </div>
+          )}
         </div>
         {staff.length === 0 ? (
           <p className="p-8 text-center text-sm text-slate-500">Add active staff members before recording attendance.</p>
@@ -143,7 +150,18 @@ export default async function StaffAttendancePage({
             {staff.map((member) => {
               const mark = byStaff.get(member.id);
               return (
-                <li key={member.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(12rem,1fr)_minmax(18rem,2fr)] sm:items-center">
+                <li key={member.id} className="grid gap-3 p-4 sm:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,2fr)] sm:items-center">
+                  <label className="flex items-center gap-2 text-xs text-slate-500 print:hidden">
+                    <input
+                      type="checkbox"
+                      name="staffIds"
+                      value={member.id}
+                      form="staff-attendance-bulk-form"
+                      aria-label={`Select ${member.firstName} ${member.lastName} for bulk attendance`}
+                      className="size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
+                    />
+                    <span className="sm:sr-only">Select</span>
+                  </label>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-800">
                       {member.firstName} {member.lastName}
