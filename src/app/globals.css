@@ -5,6 +5,12 @@
   --foreground: #20202a;
   --primary: #7027b8;
   --muted: #85828d;
+  --report-brand: #4f46a5;
+  --report-accent: #0f766e;
+  --report-ink: #1f2937;
+  --report-muted: #64748b;
+  --report-border: #cbd5e1;
+  --report-soft: #eef2ff;
 }
 
 @theme inline {
@@ -71,6 +77,43 @@ h6 {
 .admin-print-footer,
 .admin-table-print-title {
   display: none;
+}
+
+.print-report-heading,
+.exam-report-heading {
+  color: var(--report-ink);
+  text-align: center;
+}
+
+.print-report-heading {
+  border-color: var(--report-brand);
+}
+
+.print-report-heading h1,
+.print-report-heading h2,
+.exam-report-heading h1,
+.exam-report-heading h2 {
+  color: var(--report-brand);
+}
+
+.print-report-kicker {
+  color: var(--report-accent);
+}
+
+.print-report-content table th,
+.print-report-table th {
+  border-color: var(--report-border);
+  background-color: var(--report-soft);
+  color: var(--report-brand);
+}
+
+.print-report-content table td,
+.print-report-table td {
+  border-color: var(--report-border);
+}
+
+.a4-report-card {
+  border-color: var(--report-border);
 }
 
 .student-profile-print-only {
@@ -309,10 +352,21 @@ h6 {
     min-height: 20mm;
     margin: 0;
     padding-bottom: 2mm;
-    border-bottom: 2px solid #6d28d9;
+    border-bottom: 2px solid var(--report-brand);
     background: white;
     text-align: center;
     break-inside: avoid;
+  }
+
+  .admin-print-header .admin-print-identity {
+    text-align: center;
+  }
+
+  .admin-print-header .admin-print-contact {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 4mm;
   }
 
   .admin-print-crest {
@@ -322,9 +376,9 @@ h6 {
     flex: none;
     align-items: center;
     justify-content: center;
-    border: 1.5px solid #6d28d9;
+    border: 1.5px solid var(--report-brand);
     border-radius: 50%;
-    color: #5b21b6;
+    color: var(--report-brand);
   }
 
   .admin-print-crest span {
@@ -417,6 +471,23 @@ h6 {
     display: none !important;
   }
 
+  body.print-target-active::before {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 20;
+    color: var(--report-brand);
+    content: "SYSTEM GENERATED  •  SCHOOLOS";
+    font-family: var(--font-display), Arial, sans-serif;
+    font-size: 24pt;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    opacity: 0.075;
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translate(-50%, -50%) rotate(-32deg);
+  }
+
   body.print-target-active .admin-print-header,
   body.print-target-active .admin-print-footer,
   body.print-target-active .admin-print-header *,
@@ -443,9 +514,9 @@ h6 {
 
   .exam-report-document *,
   .student-report-document * {
-    color: #111 !important;
+    color: var(--report-ink) !important;
     background-color: transparent !important;
-    border-color: #333 !important;
+    border-color: var(--report-border) !important;
     box-shadow: none !important;
     text-shadow: none !important;
   }
@@ -471,7 +542,7 @@ h6 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    border-bottom: 1px solid #111 !important;
+    border-bottom: 1px solid var(--report-brand) !important;
     text-align: center;
   }
 
@@ -480,7 +551,7 @@ h6 {
   }
 
   .exam-report-document .exam-report-heading h2 {
-    color: #111 !important;
+    color: var(--report-brand) !important;
   }
 
   .exam-report-document .print-report-content table,
@@ -493,19 +564,19 @@ h6 {
   .exam-report-document .print-report-content td,
   .student-report-document th,
   .student-report-document td {
-    border: 1px solid #333 !important;
+    border: 1px solid var(--report-border) !important;
     padding: 2mm;
-    color: #111 !important;
+    color: var(--report-ink) !important;
   }
 
   .exam-report-document .print-report-content thead th,
   .student-report-document thead th {
-    background: #e8e8e8 !important;
-    color: #111 !important;
+    background: var(--report-soft) !important;
+    color: var(--report-brand) !important;
   }
 
   .exam-report-document .a4-report-card {
-    border: 1px solid #111 !important;
+    border: 1px solid var(--report-border) !important;
     padding: 4mm !important;
     font-size: 8pt !important;
   }
@@ -546,24 +617,26 @@ h6 {
 
   .print-report-heading {
     margin-bottom: 5mm;
-    border-bottom: 2px solid #6d28d9;
+    border-bottom: 2px solid var(--report-brand);
     padding-bottom: 4mm;
     break-inside: avoid;
+    text-align: center;
   }
 
   .exam-report-heading {
     margin-bottom: 3mm;
-    border-bottom: 4px solid #7f2524;
+    border-bottom: 4px solid var(--report-brand);
     padding-bottom: 3mm;
     break-inside: avoid;
+    text-align: center;
   }
 
   .exam-report-heading h2 {
-    color: #7f2524;
+    color: var(--report-brand);
   }
 
   .exam-report-heading p {
-    color: #30495f;
+    color: var(--report-muted);
   }
 
   .a4-report-card {
@@ -579,7 +652,7 @@ h6 {
   }
 
   .a4-report-card > table thead th {
-    background: #7f2524 !important;
+    background: var(--report-brand) !important;
     color: white !important;
   }
 
@@ -607,19 +680,19 @@ h6 {
 
   .print-report-panel {
     overflow: visible !important;
-    border: 1px solid #d8deea;
+    border: 1px solid var(--report-border);
     border-radius: 3mm;
     box-shadow: none !important;
     break-inside: auto !important;
   }
 
   .print-report-panel > div:first-child {
-    border-bottom: 1px solid #d8deea;
+    border-bottom: 1px solid var(--report-border);
     padding: 3mm 4mm;
   }
 
   .print-report-panel > div:first-child h2 {
-    color: #172033;
+    color: var(--report-brand);
     font-size: 10pt;
   }
 
@@ -645,9 +718,9 @@ h6 {
   .print-report-content td,
   .print-report-table th,
   .print-report-table td {
-    border: 1px solid #d8deea;
+    border: 1px solid var(--report-border);
     padding: 2.2mm 2mm;
-    color: #263247;
+    color: var(--report-ink);
     vertical-align: top;
   }
 
@@ -658,8 +731,8 @@ h6 {
 
   .print-report-content thead th,
   .print-report-table thead th {
-    background: #f2effa !important;
-    color: #3d3155;
+    background: var(--report-soft) !important;
+    color: var(--report-brand);
     font-size: 7pt;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -667,7 +740,7 @@ h6 {
 
   .print-report-content tbody tr:nth-child(even),
   .print-report-table tbody tr:nth-child(even) {
-    background: #f8f7fb !important;
+    background: #f8f9ff !important;
   }
 
   .print-report-content tbody tr,
