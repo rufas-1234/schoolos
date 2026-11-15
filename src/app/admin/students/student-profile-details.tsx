@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Printer } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom";
+type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams";
 type ProfileField = {
   label: string;
   value: string | null;
@@ -23,6 +24,7 @@ const tabs: { id: ProfileTab; label: string; emptyMessage?: string }[] = [
   },
   { id: "other", label: "Other Info", emptyMessage: "No additional student information has been added." },
   { id: "custom", label: "Custom Field", emptyMessage: "No custom student fields are configured." },
+  { id: "exams", label: "Exam Results", emptyMessage: "No published exam results are attached to this student." },
 ];
 
 export function StudentProfileDetails({
@@ -30,11 +32,20 @@ export function StudentProfileDetails({
   studentName,
   admissionNumber,
   photoUrl,
+  examHistory = [],
 }: {
   fields: ProfileField[];
   studentName: string;
   admissionNumber: string | null;
   photoUrl: string | null;
+  examHistory?: Array<{
+    enrollmentId: number;
+    examId: number;
+    examName: string;
+    yearName: string;
+    termName: string | null;
+    href: string | null;
+  }>;
 }) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
   const [printing, setPrinting] = useState(false);
@@ -106,6 +117,12 @@ export function StudentProfileDetails({
             </section>
           );
         })}
+        {examHistory.length > 0 && (
+          <section className="student-profile-print-section">
+            <h4>Published exam results</h4>
+            <ul>{examHistory.map((exam) => <li key={`${exam.examId}-${exam.enrollmentId}`}>{exam.examName} · {exam.termName ?? exam.yearName}</li>)}</ul>
+          </section>
+        )}
       </div>
       <div
         role="tablist"
@@ -137,7 +154,25 @@ export function StudentProfileDetails({
         aria-labelledby={`${id}-${activeTab}-tab`}
         className="student-profile-print-ui min-h-44"
       >
-        {visibleFields.length > 0 ? (
+        {activeTab === "exams" ? (
+          examHistory.length > 0 ? (
+            <div className="space-y-3">
+              {examHistory.map((exam) => (
+                <article key={`${exam.examId}-${exam.enrollmentId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                  <div>
+                    <h4 className="font-semibold text-slate-900">{exam.examName}</h4>
+                    <p className="mt-1 text-sm text-slate-500">{exam.termName ?? exam.yearName} · Published</p>
+                  </div>
+                  {exam.href && <Link href={exam.href} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50">Open report card</Link>}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              {activeTabDetails?.emptyMessage}
+            </p>
+          )
+        ) : visibleFields.length > 0 ? (
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             {visibleFields.map((field) => (
               <div key={field.label} className="min-w-0 border-b border-slate-100 pb-3">

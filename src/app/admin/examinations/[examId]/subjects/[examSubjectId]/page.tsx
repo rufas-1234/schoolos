@@ -28,6 +28,7 @@ import { PrintButton } from "@/components/print-button";
 import {
   ClassTeacherRemarkForm,
   CorrectionRequestForm,
+  SearchableStudentItems,
   SaveMarksForm,
   SubmitSubjectForm,
 } from "../../../examination-forms";
@@ -239,8 +240,40 @@ export default async function SubjectMarksPage({
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{subject.subjectName} marks</h1>
           <p className="mt-2 text-sm text-slate-600">{subject.className} · {subject.subjectCode} · {subject.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · Exam date {subject.examDate} · Maximum {subject.maxMarks} · Weight {subject.weight} · {subject.status}</p>
         </div>
-        <PrintButton label="Print mark list" />
+        <PrintButton label="Print marks-only sheet" targetId="exam-marks-only-sheet" pageOrientation="landscape" />
       </header>
+
+      <section id="exam-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
+        <header className="print-report-heading">
+          <p className="text-xs font-semibold uppercase tracking-wide">{context.schoolName}</p>
+          <h2 className="mt-1 text-xl font-bold">{subject.examName} — {subject.className} · {subject.subjectName}</h2>
+          <p className="mt-1 text-sm">{subject.examDate} · Maximum {subject.maxMarks}</p>
+        </header>
+        <div className="overflow-x-auto">
+          <table className="print-report-table w-full min-w-[700px] border-collapse text-left text-sm">
+            <thead>
+              <tr>
+                <th className="p-2">Student</th>
+                <th className="p-2">Admission no.</th>
+                {(componentsByMark.get(roster[0]?.markId ?? -1) ?? []).map((component) => (
+                  <th key={component.componentId} className="p-2">{component.title} / {component.maxMarks}</th>
+                ))}
+                <th className="p-2">Total / {subject.maxMarks}</th>
+              </tr>
+            </thead>
+            <tbody>{roster.map((row) => (
+              <tr key={row.markId}>
+                <td className="p-2">{row.firstName} {row.lastName}</td>
+                <td className="p-2">{row.admissionNumber ?? "—"}</td>
+                {(componentsByMark.get(row.markId) ?? []).map((component) => (
+                  <td key={component.componentId} className="p-2">{component.marks ?? "—"}</td>
+                ))}
+                <td className="p-2">{row.marks ?? "—"}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </section>
 
       <section id="exam-mark-list" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="print-report-heading">
@@ -306,26 +339,32 @@ export default async function SubjectMarksPage({
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-bold text-slate-950">Class teacher remarks</h2>
         <p className="mt-1 text-sm text-slate-600">These remarks appear on each student report card and can only be changed before publication.</p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {roster.map((row) => (
-            <article key={row.enrollmentId} className="rounded-xl border p-4">
-              <p className="font-semibold">{row.firstName} {row.lastName} <span className="text-xs font-normal text-slate-500">{row.admissionNumber}</span></p>
-              {subject.examStatus === "open" && (canConfigure || row.classTeacherId === myTeacher?.id) ? (
-                <ClassTeacherRemarkForm examClassId={subject.examClassId} enrollmentId={row.enrollmentId} remark={row.classTeacherRemark} />
-              ) : <p className="mt-2 text-sm text-slate-600">{row.classTeacherRemark ?? "No class teacher remark."}</p>}
-              <div className="mt-3 space-y-1 border-t pt-3 text-xs text-slate-500">
-                {audits.filter((audit) => audit.examMarkId === row.markId).map((audit, index) => (
-                  <p key={`${audit.examMarkId}-${index}`}>{audit.componentTitle ? `${audit.componentTitle} history` : "Total mark history"}: {audit.action} · {audit.previousMarks ?? "—"} → {audit.updatedMarks ?? "—"}{audit.reason ? ` · ${audit.reason}` : ""}</p>
-                ))}
-              </div>
-              {subject.examStatus === "published" && (
-                <Link href={`/admin/examinations/${examId}/report-cards/${row.enrollmentId}`} className="mt-3 inline-block text-sm font-semibold text-violet-700">Open report card →</Link>
-              )}
-              {subject.examStatus === "open" && subject.examName.startsWith("TEST DATA - ") && (canConfigure || canReview) && (
-                <Link href={`/admin/examinations/${examId}/report-cards/${row.enrollmentId}?preview=test`} className="mt-3 inline-block text-sm font-semibold text-amber-800">Preview draft test report →</Link>
-              )}
-            </article>
-          ))}
+        <div className="mt-4">
+          <SearchableStudentItems
+            items={roster.map((row) => ({
+              id: row.enrollmentId,
+              name: `${row.firstName} ${row.lastName}`,
+              admissionNumber: row.admissionNumber,
+              content: <article className="rounded-xl border p-4">
+                <p className="font-semibold">{row.firstName} {row.lastName} <span className="text-xs font-normal text-slate-500">{row.admissionNumber}</span></p>
+                {subject.examStatus === "open" && (canConfigure || row.classTeacherId === myTeacher?.id) ? (
+                  <ClassTeacherRemarkForm examClassId={subject.examClassId} enrollmentId={row.enrollmentId} remark={row.classTeacherRemark} />
+                ) : <p className="mt-2 text-sm text-slate-600">{row.classTeacherRemark ?? "No class teacher remark."}</p>}
+                <div className="mt-3 space-y-1 border-t pt-3 text-xs text-slate-500">
+                  {audits.filter((audit) => audit.examMarkId === row.markId).map((audit, index) => (
+                    <p key={`${audit.examMarkId}-${index}`}>{audit.componentTitle ? `${audit.componentTitle} history` : "Total mark history"}: {audit.action} · {audit.previousMarks ?? "—"} → {audit.updatedMarks ?? "—"}{audit.reason ? ` · ${audit.reason}` : ""}</p>
+                  ))}
+                </div>
+                {subject.examStatus === "published" && (
+                  <Link href={`/admin/examinations/${examId}/report-cards/${row.enrollmentId}`} className="mt-3 inline-block text-sm font-semibold text-violet-700">Open report card →</Link>
+                )}
+                {subject.examStatus === "open" && subject.examName.startsWith("TEST DATA - ") && (canConfigure || canReview) && (
+                  <Link href={`/admin/examinations/${examId}/report-cards/${row.enrollmentId}?preview=test`} className="mt-3 inline-block text-sm font-semibold text-amber-800">Preview draft test report →</Link>
+                )}
+              </article>,
+            }))}
+            emptyMessage="No students match this search."
+          />
         </div>
       </section>
     </main>

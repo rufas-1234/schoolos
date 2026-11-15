@@ -248,8 +248,42 @@ export default async function ClassMarksheetReportPage({
           <h1 className="mt-3 text-2xl font-bold text-slate-950">Class marksheet report</h1>
           <p className="mt-1 text-sm text-slate-600">{exam.name} · {exam.className} · {exam.termName ?? exam.yearName}</p>
         </div>
-        <PrintButton label="Print / save class report as PDF" targetId="class-marksheet-report" pageOrientation="landscape" />
+        <PrintButton label="Print marks-only sheet" targetId="class-marks-only-sheet" pageOrientation="landscape" />
       </header>
+
+      <section id="class-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
+        <header className="print-report-heading flex items-center gap-4">
+          {exam.schoolLogoUrl && <Image src={exam.schoolLogoUrl} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="h-14 w-14 object-contain" />}
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide">{exam.schoolName}</p>
+            <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className} marksheet</h2>
+            <p className="mt-1 text-sm">{exam.termName ?? exam.yearName}</p>
+          </div>
+        </header>
+        <div className="overflow-x-auto">
+          <table className="print-report-table w-full min-w-[700px] border-collapse text-left text-sm">
+            <thead>
+              <tr>
+                <th className="p-2">Student</th>
+                <th className="p-2">Admission no.</th>
+                <th className="p-2">Roll no.</th>
+                {assessmentRows.map((assessment) => <th key={assessment.id} className="p-2">{assessment.name} / {assessment.maxMarks}</th>)}
+              </tr>
+            </thead>
+            <tbody>{results.map((result) => (
+              <tr key={result.id}>
+                <td className="p-2">{result.firstName} {result.lastName}</td>
+                <td className="p-2">{result.admissionNumber ?? "—"}</td>
+                <td className="p-2">{result.rollNumber ?? "—"}</td>
+                {assessmentRows.map((assessment) => {
+                  const mark = result.marks.get(assessment.id);
+                  return <td key={assessment.id} className="p-2">{typeof mark === "number" ? mark : "—"}</td>;
+                })}
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </section>
 
       <section id="class-marksheet-report" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
         {draftPreview && <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-center text-sm font-bold uppercase text-amber-950 print:border-2">Draft test preview — not official; scores are synthetic</div>}

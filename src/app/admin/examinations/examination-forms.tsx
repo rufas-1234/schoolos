@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { AdminDeleteButton } from "@/components/admin-data-table";
 import {
   createExamType,
@@ -369,27 +369,85 @@ export function SaveMarksForm({
   }>;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamMarks, {});
+  const [search, setSearch] = useState("");
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const visibleCount = students.filter((student) =>
+    `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
+  ).length;
   if (!editable) return null;
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
       <p className="text-sm text-slate-600">Enter each component separately. The complete total is calculated as the sum of components, out of {maxMarks} marks.</p>
+      <label className="block max-w-lg text-sm font-medium text-slate-700">
+        Search students
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Name or admission number"
+          className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+        />
+      </label>
+      <p className="text-xs text-slate-500" aria-live="polite">Showing {visibleCount} of {students.length} students. All marks remain included when saved.</p>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th>{students[0]?.components.map((component) => <th key={component.id} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Teacher remark</th></tr></thead>
-          <tbody>{students.map((student) => (
-            <tr key={student.enrollmentId} className="border-t">
-              <td className="p-3 font-medium">{student.name}</td>
-              <td className="p-3">{student.admissionNumber ?? "—"}</td>
-              {student.components.map((component) => <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={`component_${student.markId}_${component.id}`} min="0" max={component.maxMarks} step="0.01" defaultValue={component.marks ?? ""} className="w-28 rounded-lg border p-2" /></td>)}
-              <td className="p-3"><input aria-label={`Teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} defaultValue={student.teacherRemark ?? ""} className="w-full min-w-48 rounded-lg border p-2" /></td>
-            </tr>
-          ))}</tbody>
+          <tbody>{students.map((student) => {
+            const matches = `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch);
+            return (
+              <tr key={student.enrollmentId} className={`border-t${matches ? "" : " hidden"}`}>
+                <td className="p-3 font-medium">{student.name}</td>
+                <td className="p-3">{student.admissionNumber ?? "—"}</td>
+                {student.components.map((component) => <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={`component_${student.markId}_${component.id}`} min="0" max={component.maxMarks} step="0.01" defaultValue={component.marks ?? ""} className="w-28 rounded-lg border p-2" /></td>)}
+                <td className="p-3"><input aria-label={`Teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} defaultValue={student.teacherRemark ?? ""} className="w-full min-w-48 rounded-lg border p-2" /></td>
+              </tr>
+            );
+          })}</tbody>
         </table>
       </div>
       <SubmitButton pending={pending}>Save draft marks</SubmitButton>
       <Feedback state={state} />
     </form>
+  );
+}
+
+export function SearchableStudentItems({
+  items,
+  emptyMessage,
+}: {
+  items: Array<{ id: number; name: string; admissionNumber: string | null; content: ReactNode }>;
+  emptyMessage: string;
+}) {
+  const [search, setSearch] = useState("");
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const visibleItems = items.filter((item) =>
+    `${item.name} ${item.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
+  );
+  return (
+    <div className="space-y-4">
+      <label className="block max-w-lg text-sm font-medium text-slate-700">
+        Search students
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Name or admission number"
+          className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+        />
+      </label>
+      <p className="text-xs text-slate-500" aria-live="polite">Showing {visibleItems.length} of {items.length} students.</p>
+      {visibleItems.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {items.map((item) => {
+            const matches = `${item.name} ${item.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch);
+            return <div key={item.id} className={matches ? "" : "hidden"}>{item.content}</div>;
+          })}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">{emptyMessage}</p>
+      )}
+    </div>
   );
 }
 

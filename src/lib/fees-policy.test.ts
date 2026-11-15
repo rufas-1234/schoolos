@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateDiscountMinorUnits,
   calculateFineMinorUnits,
+  calculateOutstandingInvoiceBalance,
   feeDisplayName,
   feePaymentDateRangeInTimezone,
   feeInvoiceStatus,
@@ -49,6 +50,36 @@ describe("fees policies", () => {
     expect(feeInvoiceStatus(1000, 1)).toBe("partial");
     expect(feeInvoiceStatus(1000, 1000)).toBe("paid");
     expect(feeInvoiceStatus(1000, 1001)).toBeNull();
+  });
+
+  it("calculates outstanding invoices after discounts, overdue fines, and net payments", () => {
+    expect(calculateOutstandingInvoiceBalance({
+      amount: "100.00",
+      discountAmount: "10.00",
+      fineType: "fixed",
+      fineValue: "5.00",
+      dueDate: "2026-11-01",
+      paidMinor: 6000,
+      today: "2026-11-15",
+    })).toBe(3500);
+    expect(calculateOutstandingInvoiceBalance({
+      amount: "100.00",
+      discountAmount: "10.00",
+      fineType: "fixed",
+      fineValue: "5.00",
+      dueDate: "2026-12-01",
+      paidMinor: 9000,
+      today: "2026-11-15",
+    })).toBe(0);
+    expect(calculateOutstandingInvoiceBalance({
+      amount: "100.00",
+      discountAmount: "101.00",
+      fineType: "none",
+      fineValue: "0",
+      dueDate: "2026-12-01",
+      paidMinor: 0,
+      today: "2026-11-15",
+    })).toBeNull();
   });
 
   it("validates the payment date before considering a late fee", () => {

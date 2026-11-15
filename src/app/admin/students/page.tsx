@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { db } from "@/db";
@@ -12,6 +12,11 @@ import {
   academicYears,
   classLevels,
   classSections,
+  academicTerms,
+  examClasses,
+  examMarks,
+  examSubjects,
+  examinations,
   schoolBranches,
   studentCategories,
   studentEnrollments,
@@ -183,6 +188,72 @@ export default async function StudentsPage({
     academicYearName: [...years].join(", ") || null,
     rollNumber: [...rollNumbers].join(", ") || null,
   }));
+  const studentIds = records.map((record) => record.id);
+  const publishedExamRows = studentIds.length
+    ? await db.select({
+      studentId: studentEnrollments.studentId,
+      enrollmentId: studentEnrollments.id,
+      examId: examinations.id,
+      examName: examinations.name,
+      yearName: academicYears.name,
+      termName: academicTerms.name,
+    }).from(examMarks)
+      .innerJoin(examSubjects, and(
+        eq(examSubjects.id, examMarks.examSubjectId),
+        eq(examSubjects.schoolId, context.schoolId),
+        eq(examSubjects.status, "published"),
+      ))
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+        eq(examinations.status, "published"),
+      ))
+      .innerJoin(studentEnrollments, and(
+        eq(studentEnrollments.id, examMarks.enrollmentId),
+        eq(studentEnrollments.schoolId, context.schoolId),
+      ))
+      .innerJoin(academicYears, and(
+        eq(academicYears.id, examinations.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+      ))
+      .leftJoin(academicTerms, and(
+        eq(academicTerms.id, examinations.academicTermId!),
+        eq(academicTerms.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        isNotNull(examMarks.marks),
+        inArray(studentEnrollments.studentId, studentIds),
+      ))
+      .groupBy(
+        studentEnrollments.studentId,
+        studentEnrollments.id,
+        examinations.id,
+        examinations.name,
+        academicYears.name,
+        academicTerms.name,
+      )
+      .orderBy(asc(academicYears.name), asc(examinations.name))
+    : [];
+  const examHistoryByStudent = new Map<number, Array<{
+    enrollmentId: number;
+    examId: number;
+    examName: string;
+    yearName: string;
+    termName: string | null;
+  }>>();
+  for (const row of publishedExamRows) {
+    const history = examHistoryByStudent.get(row.studentId) ?? [];
+    history.push(row);
+    examHistoryByStudent.set(row.studentId, history);
+  }
+  const canOpenReportCards = context.grantedPermissions.some((permission) =>
+    ["examinations.create", "results.enter", "results.publish"].includes(permission),
+  );
   const tableInitialSearch =
     /^\d+$/.test(initialSearch)
       ? records.find((record) => String(record.id) === initialSearch)?.publicId ?? initialSearch
@@ -453,6 +524,12 @@ export default async function StudentsPage({
                     photoUrl={record.additionalDetails?.profilePhoto?.objectKey
                       ? `/api/admin/students/${record.publicId}/photo`
                       : null}
+                    examHistory={(examHistoryByStudent.get(record.id) ?? []).map((exam) => ({
+                      ...exam,
+                      href: canOpenReportCards
+                        ? `/admin/examinations/${exam.examId}/report-cards/${exam.enrollmentId}`
+                        : null,
+                    }))}
                     fields={[
                       { tab: "personal", label: "Student ID", value: record.publicId },
                       { tab: "personal", label: "Admission number", value: record.admissionNumber },

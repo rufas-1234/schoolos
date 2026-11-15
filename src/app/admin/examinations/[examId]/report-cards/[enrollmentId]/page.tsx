@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import {
   academicTerms,
@@ -16,10 +16,12 @@ import {
   examStudentRemarks,
   examSubjects,
   examinations,
+  feePayments,
   schools,
   staffMembers,
   studentAttendance,
   studentEnrollments,
+  studentFeeInvoices,
   students,
   subjects,
   teachers,
@@ -33,8 +35,23 @@ import {
   rankScores,
   type GradeBand,
 } from "@/lib/examination-policy";
+import {
+  calculateOutstandingInvoiceBalance,
+  parseMoneyToMinorUnits,
+} from "@/lib/fees-policy";
 
 export const dynamic = "force-dynamic";
+
+function todayInTimezone(timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
 
 export default async function ReportCardPage({
   params,
@@ -81,6 +98,8 @@ export default async function ReportCardPage({
     classTeacherId: classSections.classTeacherId,
     schoolLogoUrl: schools.logoUrl,
     schoolName: schools.name,
+    schoolCurrency: schools.currency,
+    schoolTimezone: schools.timezone,
   }).from(examinations)
     .innerJoin(academicYears, and(eq(academicYears.id, examinations.academicYearId), eq(academicYears.schoolId, context.schoolId)))
     .leftJoin(academicTerms, and(eq(academicTerms.id, examinations.academicTermId!), eq(academicTerms.schoolId, context.schoolId)))
@@ -117,6 +136,55 @@ export default async function ReportCardPage({
     canManage,
   });
   if (record.examinationStatus !== "published" && !draftPreview) notFound();
+
+  const canViewFeeBalance = context.grantedPermissions.includes("payments.record") ||
+    context.grantedPermissions.includes("fees.manage");
+  let feeBalanceMinor = 0;
+  if (canViewFeeBalance) {
+    const invoices = await db.select({
+      id: studentFeeInvoices.id,
+      amount: studentFeeInvoices.amount,
+      discountAmount: studentFeeInvoices.discountAmount,
+      fineType: studentFeeInvoices.fineType,
+      fineValue: studentFeeInvoices.fineValue,
+      dueDate: studentFeeInvoices.dueDate,
+    }).from(studentFeeInvoices).where(and(
+      eq(studentFeeInvoices.schoolId, context.schoolId),
+      eq(studentFeeInvoices.studentId, record.studentId),
+    ));
+    const payments = invoices.length
+      ? await db.select({
+        invoiceId: feePayments.invoiceId,
+        amount: feePayments.amount,
+        reversedAmount: feePayments.reversedAmount,
+      }).from(feePayments).where(and(
+        eq(feePayments.schoolId, context.schoolId),
+        inArray(feePayments.invoiceId, invoices.map((invoice) => invoice.id)),
+      ))
+      : [];
+    const paidByInvoice = new Map<number, number>();
+    for (const payment of payments) {
+      const amount = parseMoneyToMinorUnits(payment.amount);
+      const reversed = parseMoneyToMinorUnits(payment.reversedAmount);
+      if (amount === null || reversed === null || reversed > amount) {
+        throw new Error("Stored fee payment or reversal amount is invalid.");
+      }
+      const netPaid = (paidByInvoice.get(payment.invoiceId) ?? 0) + amount - reversed;
+      if (!Number.isSafeInteger(netPaid)) throw new Error("Stored fee payment total exceeds the supported range.");
+      paidByInvoice.set(payment.invoiceId, netPaid);
+    }
+    const today = todayInTimezone(record.schoolTimezone);
+    for (const invoice of invoices) {
+      const invoiceBalance = calculateOutstandingInvoiceBalance({
+        ...invoice,
+        paidMinor: paidByInvoice.get(invoice.id) ?? 0,
+        today,
+      });
+      if (invoiceBalance === null) throw new Error("Stored fee invoice balance is invalid.");
+      feeBalanceMinor += invoiceBalance;
+      if (!Number.isSafeInteger(feeBalanceMinor)) throw new Error("Outstanding fee balance exceeds the supported range.");
+    }
+  }
 
   if (!canManage) {
     const assignment = await db.select({ id: classSubjects.id }).from(classSubjects)
@@ -275,18 +343,32 @@ export default async function ReportCardPage({
           {record.schoolLogoUrl && <Image src={record.schoolLogoUrl} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="h-16 w-16 rounded-lg object-contain" />}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold uppercase tracking-wide text-violet-700">{record.schoolName}</p>
-            <h2 className="mt-1 text-2xl font-bold">Student report card</h2>
+            <h2 className="mt-1 text-2xl font-bold">Academic report</h2>
             <p className="mt-1 text-sm text-slate-600">{record.examinationName} · {record.termName ?? record.yearName}</p>
           </div>
           {photoUrl && <Image src={photoUrl} unoptimized width={80} height={80} alt={`${record.studentFirstName} ${record.studentLastName}`} className="h-20 w-20 rounded-xl object-cover" />}
         </header>
-        <section className="grid gap-3 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
-          <p><span className="font-semibold">Student:</span> {record.studentFirstName} {record.studentLastName}</p>
-          <p><span className="font-semibold">Admission number:</span> {record.admissionNumber ?? "—"}</p>
-          <p><span className="font-semibold">Class:</span> {record.className} · {record.sectionName}</p>
-          <p><span className="font-semibold">Academic year:</span> {record.yearName}</p>
-          <p><span className="font-semibold">Term:</span> {record.termName ?? "Not specified"}</p>
-          {record.allowRanking && <p><span className="font-semibold">Class rank:</span> {classRank ?? "—"} of {classSize}</p>}
+        <section className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+          <p><span className="font-semibold text-slate-500">Student</span><br />{record.studentFirstName} {record.studentLastName}</p>
+          <p><span className="font-semibold text-slate-500">Admission number</span><br />{record.admissionNumber ?? "—"}</p>
+          <p><span className="font-semibold text-slate-500">Class / section</span><br />{record.className} · {record.sectionName}</p>
+          <p><span className="font-semibold text-slate-500">Academic year</span><br />{record.yearName}</p>
+          <p><span className="font-semibold text-slate-500">Term</span><br />{record.termName ?? "Not specified"}</p>
+          {record.allowRanking && <p><span className="font-semibold text-slate-500">Class position</span><br />{classRank ?? "—"} of {classSize}</p>}
+        </section>
+        <section className="grid gap-3 sm:grid-cols-2">
+          <article className="rounded-xl bg-violet-800 p-4 text-white">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">Overall performance</p>
+            <p className="mt-1 text-3xl font-bold">{overall.percentage.toFixed(2)}%</p>
+            <p className="mt-1 text-sm text-violet-100">{overall.totalMarks.toFixed(2)} of {overall.maxMarks.toFixed(2)} · Grade {overallGrade?.grade ?? "—"}{overallGrade?.description ? ` · ${overallGrade.description}` : ""}</p>
+          </article>
+          {canViewFeeBalance && (
+            <article className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Outstanding fee balance</p>
+              <p className="mt-1 text-2xl font-bold text-slate-950">{record.schoolCurrency} {(feeBalanceMinor / 100).toFixed(2)}</p>
+              <p className="mt-1 text-xs text-slate-600">Includes applicable overdue fines and payments net of reversals.</p>
+            </article>
+          )}
         </section>
         <section className="print-report-panel overflow-x-auto rounded-xl border border-slate-200">
           <table className="print-report-table w-full min-w-[640px] border-collapse text-left text-sm">

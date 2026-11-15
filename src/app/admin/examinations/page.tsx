@@ -43,6 +43,7 @@ export default async function ExaminationsPage({
     classLevelId?: string;
     sectionId?: string;
     subjectId?: string;
+    search?: string;
   }>;
 }) {
   const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
@@ -55,7 +56,10 @@ export default async function ExaminationsPage({
     classLevelId: rawClassLevelId,
     sectionId: rawSectionId,
     subjectId: rawSubjectId,
+    search: rawSearch,
   } = await searchParams;
+  const search = rawSearch?.trim().slice(0, 120) ?? "";
+  const normalizedSearch = search.toLocaleLowerCase();
   const branchFilter = rawBranchId && /^\d+$/.test(rawBranchId) ? Number(rawBranchId) : null;
   const examFilter = rawExamId && /^\d+$/.test(rawExamId) ? Number(rawExamId) : null;
   const editExamId = rawEditExamId && /^\d+$/.test(rawEditExamId) ? Number(rawEditExamId) : null;
@@ -387,6 +391,7 @@ export default async function ExaminationsPage({
     (!branchFilter || assessment.classBranchId === branchFilter) &&
     (!classFilter || assessment.classLevelId === classFilter) &&
     (!subjectFilter || assessment.subjectId === subjectFilter) &&
+    (!normalizedSearch || `${assessment.examName} ${assessment.className} ${assessment.subjectName} ${assessment.subjectCode ?? ""}`.toLocaleLowerCase().includes(normalizedSearch)) &&
     (!sectionFilter || sectionRows.some((classSection) =>
       classSection.id === sectionFilter &&
       classSection.classLevelId === assessment.classLevelId &&
@@ -449,6 +454,9 @@ export default async function ExaminationsPage({
   const assessmentFilterForm = (formSection: "schedule" | "attendance" | "marks") => (
     <form method="get" action="/admin/examinations" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
       <input type="hidden" name="section" value={formSection} />
+      <label className="text-sm font-medium">Search
+        <input type="search" name="search" defaultValue={search} maxLength={120} placeholder="Exam, class, subject" className="mt-1 w-full rounded-lg border p-2.5" />
+      </label>
       <label className="text-sm font-medium">Branch
         <select name="branchId" defaultValue={branchFilter?.toString() ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
           <option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}

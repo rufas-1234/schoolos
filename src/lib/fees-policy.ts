@@ -82,6 +82,35 @@ export function feeInvoiceStatus(totalMinor: number, paidMinor: number): "unpaid
   return paidMinor === 0 ? "unpaid" : "partial";
 }
 
+export function calculateOutstandingInvoiceBalance(input: {
+  amount: string;
+  discountAmount: string;
+  fineType: string;
+  fineValue: string;
+  dueDate: string;
+  paidMinor: number;
+  today: string;
+}): number | null {
+  const amount = parseMoneyToMinorUnits(input.amount);
+  const discount = parseMoneyToMinorUnits(input.discountAmount);
+  if (
+    amount === null ||
+    discount === null ||
+    discount > amount ||
+    !Number.isSafeInteger(input.paidMinor) ||
+    input.paidMinor < 0 ||
+    !isCalendarDate(input.dueDate) ||
+    !isCalendarDate(input.today)
+  ) return null;
+  const fine = input.today > input.dueDate
+    ? calculateFineMinorUnits(amount - discount, input.fineType, input.fineValue)
+    : 0;
+  if (fine === null) return null;
+  const totalDue = amount - discount + fine;
+  if (!Number.isSafeInteger(totalDue)) return null;
+  return Math.max(0, totalDue - input.paidMinor);
+}
+
 export function isPayDateOnOrAfterDueDate(paidDate: string, dueDate: string): boolean {
   return isCalendarDate(paidDate) && isCalendarDate(dueDate) && paidDate >= dueDate;
 }
