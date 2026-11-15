@@ -1,13 +1,20 @@
+import type { ReactNode } from "react";
 import { and, asc, desc, eq, like, or } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, schools, staffMembers, staffPayrollRecords } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { AdminRecordDialog } from "@/components/admin-data-table";
 import {
   parsePayrollMoneyToMinorUnits,
   parseStaffPayrollFilter,
 } from "@/lib/hr-policy";
 import { PrintButton } from "@/components/print-button";
-import { MarkPayrollPaidForm, PayrollForm } from "../hr-forms";
+import {
+  DeletePayrollForm,
+  MarkPayrollPaidForm,
+  PayrollForm,
+  PayrollRecordPrintButton,
+} from "../hr-forms";
 import { SearchableSelect } from "@/components/searchable-select";
 
 function isPayPeriod(value: string): boolean {
@@ -60,6 +67,7 @@ export default async function StaffPayrollPage({
       .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db.select({
       publicId: staffPayrollRecords.publicId,
+      staffId: staffPayrollRecords.staffId,
       staffName: staffMembers.firstName,
       staffLastName: staffMembers.lastName,
       employeeCode: staffMembers.employeeCode,
@@ -109,6 +117,15 @@ export default async function StaffPayrollPage({
     value: String(member.id),
     label: `${member.firstName} ${member.lastName}`,
   }));
+  const staffOptionsForEditing = [...staffOptions];
+  for (const record of records) {
+    if (!staffOptionsForEditing.some((option) => option.value === String(record.staffId))) {
+      staffOptionsForEditing.push({
+        value: String(record.staffId),
+        label: `${record.staffName} ${record.staffLastName}${record.employeeCode ? ` (${record.employeeCode})` : ""}`,
+      });
+    }
+  }
   const formatter = (amount: number | bigint, amountCurrency = currency) => {
     const minor = BigInt(amount);
     const hundred = BigInt(100);
@@ -116,7 +133,7 @@ export default async function StaffPayrollPage({
   };
 
   return (
-    <div className="space-y-7 print-report-page">
+    <div className="space-y-7 print-report-page payroll-report-page">
       <header>
         <p className="text-sm font-medium text-violet-700">Human resources</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Payroll records</h1>
@@ -210,7 +227,7 @@ export default async function StaffPayrollPage({
                     <th className="px-4 py-3 font-semibold">Net pay</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
                     <th className="px-4 py-3 font-semibold">Paid date</th>
-                    <th className="px-4 py-3 font-semibold print:hidden">Action</th>
+                    <th className="px-4 py-3 font-semibold print:hidden">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -233,7 +250,48 @@ export default async function StaffPayrollPage({
                       </td>
                       <td className="px-4 py-3 text-slate-600">{record.paidDate ?? "—"}</td>
                       <td className="px-4 py-3 print:hidden">
-                        {record.status === "recorded" ? <MarkPayrollPaidForm publicId={record.publicId} /> : "—"}
+                        <div className="flex min-w-64 flex-wrap items-center gap-1.5">
+                          <AdminRecordDialog title={`View payroll for ${record.staffName} ${record.staffLastName}`} mode="view">
+                            <dl className="grid gap-3 sm:grid-cols-2">
+                              <PayrollDetail label="Staff member">{record.staffName} {record.staffLastName}</PayrollDetail>
+                              <PayrollDetail label="Staff number">{record.employeeCode ?? "—"}</PayrollDetail>
+                              <PayrollDetail label="Pay period">{record.payPeriod}</PayrollDetail>
+                              <PayrollDetail label="Status">{record.status === "paid" ? "Paid" : "Recorded, not paid"}</PayrollDetail>
+                              <PayrollDetail label="Paid date">{record.paidDate ?? "—"}</PayrollDetail>
+                              <PayrollDetail label="Base salary">{formatter(minorUnits(record.baseSalary, "base salary"), record.currency)}</PayrollDetail>
+                              <PayrollDetail label="Allowances">{formatter(minorUnits(record.allowances, "allowances"), record.currency)}</PayrollDetail>
+                              <PayrollDetail label="Deductions">{formatter(minorUnits(record.deductions, "deductions"), record.currency)}</PayrollDetail>
+                              <PayrollDetail label="Net pay">{formatter(minorUnits(record.amount, "net pay"), record.currency)}</PayrollDetail>
+                              <PayrollDetail label="Notes">{record.notes ?? "—"}</PayrollDetail>
+                            </dl>
+                          </AdminRecordDialog>
+                          <AdminRecordDialog title={`Edit payroll for ${record.staffName} ${record.staffLastName}`} wide>
+                            <PayrollForm
+                              branchId={branchId ?? 0}
+                              branchName={branch?.name ?? ""}
+                              staffOptions={staffOptionsForEditing}
+                              currency={currency}
+                              payPeriod={payPeriod}
+                              record={record}
+                            />
+                          </AdminRecordDialog>
+                          <PayrollRecordPrintButton
+                            publicId={record.publicId}
+                            schoolName={context.schoolName}
+                            staffName={`${record.staffName} ${record.staffLastName}`}
+                            employeeCode={record.employeeCode}
+                            baseSalary={formatter(minorUnits(record.baseSalary, "base salary"), record.currency)}
+                            allowances={formatter(minorUnits(record.allowances, "allowances"), record.currency)}
+                            deductions={formatter(minorUnits(record.deductions, "deductions"), record.currency)}
+                            netPay={formatter(minorUnits(record.amount, "net pay"), record.currency)}
+                            payPeriod={record.payPeriod}
+                            paidDate={record.paidDate}
+                            status={record.status}
+                            notes={record.notes}
+                          />
+                          <DeletePayrollForm publicId={record.publicId} />
+                          {record.status === "recorded" && <MarkPayrollPaidForm publicId={record.publicId} />}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -249,6 +307,15 @@ export default async function StaffPayrollPage({
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-xl font-bold text-slate-900">{value}</p></article>;
+}
+
+function PayrollDetail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="border-b border-slate-100 pb-2">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words text-sm text-slate-900">{children}</dd>
+    </div>
+  );
 }
 
 function minorUnits(value: string, label: string): number {

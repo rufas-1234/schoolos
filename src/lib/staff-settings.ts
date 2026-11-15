@@ -78,7 +78,7 @@ export function normalizeVisibleStaffFields(fields: string[] | null | undefined)
 }
 
 export function getStaffRequiredFieldError(
-  values: Record<string, string | number | undefined>,
+  values: Record<string, string | number | boolean | undefined>,
   requiredFields: string[],
 ): string | null {
   for (const field of staffSettingFields) {

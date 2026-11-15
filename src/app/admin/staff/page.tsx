@@ -90,12 +90,16 @@ export default async function StaffDirectoryPage() {
       .from(staffMembers)
       .where(eq(staffMembers.schoolId, context.schoolId))
       .groupBy(staffMembers.status),
-    db.select({ id: user.id, name: user.name, email: user.email })
+    db.select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      membershipStatus: schoolMemberships.status,
+    })
       .from(schoolMemberships)
       .innerJoin(user, eq(schoolMemberships.userId, user.id))
       .where(and(
         eq(schoolMemberships.schoolId, context.schoolId),
-        eq(schoolMemberships.status, "active"),
         eq(user.isActive, true),
       ))
       .orderBy(asc(user.name)),
@@ -132,6 +136,10 @@ export default async function StaffDirectoryPage() {
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
   const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]));
+  const loginAccessByUserId = new Map(accounts.map((account) => [
+    account.id,
+    account.membershipStatus === "active",
+  ]));
   const filters: AdminTableFilter[] = [
     { key: "branch", label: "branch", options: uniqueOptions(branches.map((branch) => branch.name)) },
     { key: "department", label: "department", options: uniqueOptions(records.map((record) => record.department)) },
@@ -207,7 +215,9 @@ export default async function StaffDirectoryPage() {
               branch: record.branchId ? branchNameById.get(record.branchId) ?? "" : "",
               email: record.email ?? "",
               phone: record.phone ?? "",
-              account: record.linkedUserId ? "Linked" : "Not linked",
+              account: record.linkedUserId
+                ? loginAccessByUserId.get(record.linkedUserId) ? "Login enabled" : "Login disabled"
+                : "No account",
               employmentType: employmentTypeLabels[record.employmentType] ?? record.employmentType,
               startDate: record.startDate ?? "",
               status: record.status,
@@ -217,7 +227,12 @@ export default async function StaffDirectoryPage() {
               <div className="flex min-w-36 flex-wrap items-center gap-2">
                 <AdminRecordDialog showLabel title={`Edit ${record.firstName} ${record.lastName}`}>
                   <StaffForm
-                    record={record}
+                    record={{
+                      ...record,
+                      loginAccessEnabled: record.linkedUserId
+                        ? loginAccessByUserId.get(record.linkedUserId) ?? false
+                        : false,
+                    }}
                     accounts={accounts}
                     branches={branches}
                     departments={departments}
@@ -248,7 +263,7 @@ export default async function StaffDirectoryPage() {
         <div className="print:hidden flex gap-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
           <BriefcaseBusiness size={18} className="mt-0.5 shrink-0 text-violet-700" />
           <p className="text-sm leading-6 text-slate-600">
-            Staff may be linked to an existing school account, but this directory does not create accounts or assign permissions. Staff with the Teacher role are available for academic assignments.
+            Enable login access in a staff profile to reuse an account with the staff email or create a new password account. Assign the Teacher role and its permissions under User Roles before the teacher signs in.
           </p>
         </div>
       </div>

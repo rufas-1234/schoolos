@@ -595,6 +595,120 @@ export async function recordStaffPayroll(
   return { success: true };
 }
 
+export async function updateStaffPayroll(
+  _previousState: HrActionState,
+  formData: FormData,
+): Promise<HrActionState> {
+  const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const result = z.object({
+    publicId: z.string().uuid(),
+    staffId: idField,
+    branchId: idField,
+    payPeriod: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    baseSalary: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
+    allowances: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
+    deductions: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
+    status: z.enum(staffPayrollStatuses),
+    paidDate: z.union([z.literal(""), dateField]),
+    notes: z.string().trim().max(1000),
+  }).safeParse({
+    publicId: value(formData, "publicId"),
+    staffId: value(formData, "staffId"),
+    branchId: value(formData, "branchId"),
+    payPeriod: value(formData, "payPeriod"),
+    baseSalary: value(formData, "baseSalary"),
+    allowances: value(formData, "allowances"),
+    deductions: value(formData, "deductions"),
+    status: value(formData, "status"),
+    paidDate: value(formData, "paidDate"),
+    notes: value(formData, "notes"),
+  });
+  if (!result.success || (result.data.status === "paid" && !result.data.paidDate)) {
+    return { error: "Enter valid payroll amounts and a payment date for paid records." };
+  }
+  const baseSalary = parsePayrollMoneyToMinorUnits(result.data.baseSalary);
+  const allowances = parsePayrollMoneyToMinorUnits(result.data.allowances);
+  const deductions = parsePayrollMoneyToMinorUnits(result.data.deductions);
+  if (baseSalary === null || allowances === null || deductions === null) {
+    return { error: "Enter payroll amounts with no more than two decimal places." };
+  }
+  const payroll = calculatePayrollAmounts(baseSalary, allowances, deductions);
+  if (!payroll) return { error: "Base salary must be positive and deductions cannot exceed gross pay." };
+  const [staff] = await db.select({ id: staffMembers.id })
+    .from(staffMembers).where(and(
+      eq(staffMembers.id, result.data.staffId),
+      eq(staffMembers.schoolId, context.schoolId),
+      eq(staffMembers.branchId, result.data.branchId),
+    )).limit(1);
+  const [school] = await db.select({ currency: schools.currency })
+    .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
+  if (!staff || !school) return { error: "Choose a staff member belonging to this school." };
+
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const [existing] = await tx.select({ id: staffPayrollRecords.id })
+        .from(staffPayrollRecords).where(and(
+          eq(staffPayrollRecords.publicId, result.data.publicId),
+          eq(staffPayrollRecords.schoolId, context.schoolId),
+        )).for("update").limit(1);
+      if (!existing) return "not-found";
+      await tx.update(staffPayrollRecords).set({
+        staffId: staff.id,
+        payPeriod: result.data.payPeriod,
+        baseSalary: formatPayrollMinorUnits(baseSalary),
+        allowances: formatPayrollMinorUnits(allowances),
+        deductions: formatPayrollMinorUnits(deductions),
+        amount: formatPayrollMinorUnits(payroll.net),
+        currency: school.currency,
+        paidDate: result.data.status === "paid" ? result.data.paidDate : null,
+        status: result.data.status,
+        notes: result.data.notes || null,
+      }).where(and(
+        eq(staffPayrollRecords.id, existing.id),
+        eq(staffPayrollRecords.schoolId, context.schoolId),
+      ));
+      await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.updated",
+        "staff_payroll_record", result.data.publicId,
+        ["staffId", "payPeriod", "baseSalary", "allowances", "deductions", "amount", "currency", "paidDate", "status", "notes"]);
+      return "updated";
+    });
+    if (outcome === "not-found") return { error: "Payroll record was not found in this school." };
+  } catch (error) {
+    if (isDuplicateError(error)) return { error: "A payroll record already exists for this staff member and period." };
+    throw error;
+  }
+  revalidateHr();
+  return { success: true };
+}
+
+export async function deleteStaffPayrollRecord(
+  _previousState: HrActionState,
+  formData: FormData,
+): Promise<HrActionState> {
+  const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const publicId = z.string().uuid().safeParse(value(formData, "publicId"));
+  if (!publicId.success) return { error: "Choose a valid payroll record." };
+  const outcome = await db.transaction(async (tx) => {
+    const [record] = await tx.select({
+      id: staffPayrollRecords.id,
+    }).from(staffPayrollRecords).where(and(
+      eq(staffPayrollRecords.publicId, publicId.data),
+      eq(staffPayrollRecords.schoolId, context.schoolId),
+    )).for("update").limit(1);
+    if (!record) return "not-found";
+    await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.deleted",
+      "staff_payroll_record", publicId.data, ["staffId", "payPeriod", "amount", "status"]);
+    await tx.delete(staffPayrollRecords).where(and(
+      eq(staffPayrollRecords.id, record.id),
+      eq(staffPayrollRecords.schoolId, context.schoolId),
+    ));
+    return "deleted";
+  });
+  if (outcome === "not-found") return { error: "Payroll record was not found in this school." };
+  revalidateHr();
+  return { success: true };
+}
+
 export async function markStaffPayrollPaid(
   _previousState: HrActionState,
   formData: FormData,

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   canTransitionStaffStatus,
   employmentTypes,
+  getStaffLoginPasswordError,
   staffContractTypes,
   staffGenders,
+  staffLoginPasswordMinLength,
   staffMaritalStatuses,
   staffRoles,
   staffStatuses,
@@ -31,5 +33,14 @@ describe("staff directory policies", () => {
     expect(canTransitionStaffStatus("active", "active")).toBe(false);
     expect(canTransitionStaffStatus("inactive", "inactive")).toBe(false);
     expect(canTransitionStaffStatus("pending", "active")).toBe(false);
+  });
+
+  it("allows blank password fields for existing accounts and validates supplied passwords", () => {
+    expect(getStaffLoginPasswordError("", "")).toBeNull();
+    expect(getStaffLoginPasswordError("short", "short")).toContain("at least");
+    const password = "strong-staff-password";
+    expect(password.length).toBeGreaterThanOrEqual(staffLoginPasswordMinLength);
+    expect(getStaffLoginPasswordError(password, "different-password")).toBe("The passwords do not match.");
+    expect(getStaffLoginPasswordError(password, password)).toBeNull();
   });
 });

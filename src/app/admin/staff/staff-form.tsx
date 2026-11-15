@@ -54,13 +54,14 @@ type StaffEditRecord = {
   documents: StaffDocuments | null;
   customFields: StaffCustomField[] | null;
   linkedUserId: string | null;
+  loginAccessEnabled: boolean;
   employmentType: string;
   startDate: string | null;
 };
 
 type StaffFormProps = {
   record?: StaffEditRecord;
-  accounts: { id: string; name: string; email: string }[];
+  accounts: { id: string; name: string; email: string; membershipStatus: string }[];
   branches: { id: number; name: string; code: string }[];
   departments: { id: number; name: string; branchId: number | null }[];
   designations: { id: number; name: string; branchId: number | null }[];
@@ -96,12 +97,21 @@ export function StaffForm({
   const [pendingUploads, setPendingUploads] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
   const submittedValues = useRef<Map<string, string[]> | null>(null);
+  const accountPasswordRef = useRef<HTMLInputElement>(null);
+  const accountPasswordConfirmationRef = useRef<HTMLInputElement>(null);
   const [selectedBranchId, setSelectedBranchId] = useState(record?.branchId?.toString() ?? "");
+  const [loginAccessEnabled, setLoginAccessEnabled] = useState(record?.loginAccessEnabled ?? false);
   const customField = (index: number) => record?.customFields?.[index];
   const departmentOptions = branchCatalogOptions(departments, selectedBranchId, record?.department);
   const designationOptions = branchCatalogOptions(designations, selectedBranchId, record?.jobTitle);
 
   useEffect(() => {
+    if (state.success) {
+      if (accountPasswordRef.current) accountPasswordRef.current.value = "";
+      if (accountPasswordConfirmationRef.current) accountPasswordConfirmationRef.current.value = "";
+      submittedValues.current = null;
+      return;
+    }
     if (!state.error || !submittedValues.current || !formRef.current) return;
     for (const [name, values] of submittedValues.current) {
       const field = formRef.current.elements.namedItem(name);
@@ -157,6 +167,7 @@ export function StaffForm({
 
       <section role="tabpanel" aria-label={activeTab} className="grid gap-4 sm:grid-cols-2">
         <div hidden={activeTab !== "Basic Information"} className="contents">
+            <input type="hidden" name="loginAccessEnabled" value={loginAccessEnabled ? "true" : "false"} />
             <Field label="Staff number"><input name="employeeCode" defaultValue={record?.employeeCode ?? ""} maxLength={40} className={inputClass} /></Field>
             <Field label="Staff role">
               <select name="personnelRole" defaultValue={record?.personnelRole ?? ""} className={inputClass}>
@@ -190,7 +201,59 @@ export function StaffForm({
             <Field label="Last name"><input name="lastName" required minLength={2} maxLength={120} defaultValue={record?.lastName ?? ""} className={inputClass} /></Field>
             <Field label="Father's name"><input name="fatherName" maxLength={160} defaultValue={record?.fatherName ?? ""} className={inputClass} /></Field>
             <Field label="Mother's name"><input name="motherName" maxLength={160} defaultValue={record?.motherName ?? ""} className={inputClass} /></Field>
-            <Field label="Email"><input name="email" type="email" maxLength={320} defaultValue={record?.email ?? ""} className={inputClass} /></Field>
+            <Field label="Email" required={loginAccessEnabled} forceVisible={loginAccessEnabled}>
+              <input name="email" type="email" maxLength={320} defaultValue={record?.email ?? ""} className={inputClass} />
+            </Field>
+            <div className="sm:col-span-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <label className="flex items-start gap-3 text-sm font-medium text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={loginAccessEnabled}
+                  onChange={(event) => {
+                    setLoginAccessEnabled(event.currentTarget.checked);
+                    if (!event.currentTarget.checked) {
+                      if (accountPasswordRef.current) accountPasswordRef.current.value = "";
+                      if (accountPasswordConfirmationRef.current) accountPasswordConfirmationRef.current.value = "";
+                    }
+                  }}
+                  className="mt-1 accent-violet-700"
+                />
+                <span>
+                  Enable login access for this staff member
+                  <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">
+                    They sign in with the staff email above. New accounts need a password; matching existing accounts are reused.
+                  </span>
+                </span>
+              </label>
+              {loginAccessEnabled && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                    <span>Set or reset password <span className="font-normal text-slate-500">(leave blank to keep an existing password)</span></span>
+                    <input
+                      ref={accountPasswordRef}
+                      name="accountPassword"
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={12}
+                      maxLength={128}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                    <span>Confirm password</span>
+                    <input
+                      ref={accountPasswordConfirmationRef}
+                      name="accountPasswordConfirmation"
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={12}
+                      maxLength={128}
+                      className={inputClass}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
             <Field label="Gender">
               <select name="gender" defaultValue={record?.gender ?? ""} className={inputClass}>
                 <option value="">Select gender</option>
@@ -240,7 +303,10 @@ export function StaffForm({
               name="linkedUserId"
               options={[
                 { value: "", label: "No linked account" },
-                ...accounts.map((account) => ({ value: account.id, label: `${account.name} (${account.email})` })),
+                ...accounts.map((account) => ({
+                  value: account.id,
+                  label: `${account.name} (${account.email})${account.membershipStatus === "active" ? "" : " — access disabled"}`,
+                })),
               ]}
               defaultValue={record?.linkedUserId ?? ""}
               placeholder="Search school accounts..."
@@ -306,7 +372,11 @@ export function StaffForm({
       )}
       {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
       <div className="flex items-center justify-between border-t border-slate-100 pt-4">
-        {state.success && <p role="status" className="text-sm font-medium text-emerald-700">Staff profile saved.</p>}
+        {state.success && (
+          <p role="status" className="text-sm font-medium text-emerald-700">
+            Staff profile saved.{loginAccessEnabled ? " Assign the school role under User Roles before the staff member signs in." : ""}
+          </p>
+        )}
         {!state.success && <span />}
         <button
           type="submit"
@@ -410,12 +480,14 @@ function Field({
   label,
   required = false,
   full = false,
+  forceVisible = false,
   fieldName,
   children,
 }: {
   label: string;
   required?: boolean;
   full?: boolean;
+  forceVisible?: boolean;
   fieldName?: string;
   children: React.ReactNode;
 }) {
@@ -428,7 +500,7 @@ function Field({
     ? cloneElement(children, { required: requiredField })
     : children;
   return (
-    <label hidden={!visibleFields.has(name)} className={`space-y-1.5 text-sm font-medium text-slate-700 ${full ? "sm:col-span-2" : ""}`}>
+    <label hidden={!forceVisible && !visibleFields.has(name)} className={`space-y-1.5 text-sm font-medium text-slate-700 ${full ? "sm:col-span-2" : ""}`}>
       <span>{label}{requiredField ? " *" : ""}</span>
       {control}
     </label>

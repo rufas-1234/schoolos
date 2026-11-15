@@ -81,6 +81,74 @@ h6 {
   display: none;
 }
 
+.payroll-record-print {
+  display: none;
+}
+
+.payroll-record-print dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 24px 0;
+}
+
+.payroll-record-print dl div {
+  border-bottom: 1px solid #d8deea;
+  padding-bottom: 8px;
+}
+
+.payroll-record-print dt,
+.payroll-record-print-kicker {
+  color: #6d28d9;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.payroll-record-print dd {
+  margin: 4px 0 0;
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+.payroll-record-print h1 {
+  margin: 8px 0;
+  font-size: 22pt;
+}
+
+.payroll-record-print-period {
+  color: #596579;
+}
+
+.payroll-record-print table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payroll-record-print th,
+.payroll-record-print td {
+  border: 1px solid #d8deea;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.payroll-record-print td {
+  text-align: right;
+}
+
+.payroll-record-print-notes {
+  margin-top: 20px;
+}
+
+.payroll-record-print footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 64px;
+  border-top: 1px solid #d8deea;
+  padding-top: 10px;
+}
+
 .fee-invoice-title {
   margin: 0;
   color: #20294b;
@@ -326,6 +394,53 @@ h6 {
     display: block !important;
     color: #172033;
     font-size: 9pt;
+  }
+
+  body:has(.payroll-report-page) * {
+    visibility: hidden !important;
+  }
+
+  body:has(.payroll-report-page) .payroll-report-page .print-report-content,
+  body:has(.payroll-report-page) .payroll-report-page .print-report-content * {
+    visibility: visible !important;
+  }
+
+  body:has(.payroll-report-page) .payroll-report-page .print-report-content {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body:has(.payroll-record-printing) .payroll-report-page .print-report-content,
+  body:has(.payroll-record-printing) .payroll-report-page .print-report-content * {
+    visibility: hidden !important;
+  }
+
+  body:has(.payroll-record-printing) * {
+    visibility: hidden !important;
+  }
+
+  body:has(.payroll-record-printing) .payroll-report-page .payroll-record-print-target,
+  body:has(.payroll-record-printing) .payroll-report-page .payroll-record-print-target * {
+    visibility: visible !important;
+  }
+
+  body:has(.payroll-record-printing) .payroll-report-page td.print\:hidden:has(.payroll-record-print-target) {
+    display: table-cell !important;
+    visibility: visible !important;
+  }
+
+  body:has(.payroll-record-printing) .payroll-report-page .payroll-record-print-target {
+    position: fixed !important;
+    inset: 0 !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
   }
 
   .print-report-heading {

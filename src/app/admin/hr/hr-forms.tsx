@@ -8,10 +8,12 @@ import {
   createStaffLeaveRequest,
   createStaffLeaveType,
   markStaffPayrollPaid,
+  deleteStaffPayrollRecord,
   recordStaffAttendanceBulk,
   recordStaffAttendance,
   recordStaffPayroll,
   reviewStaffLeaveRequest,
+  updateStaffPayroll,
   type HrActionState,
 } from "./actions";
 
@@ -240,36 +242,164 @@ export function PayrollForm({
   staffOptions,
   currency,
   payPeriod,
+  record,
 }: {
   branchId: number;
   branchName: string;
   staffOptions: Option[];
   currency: string;
   payPeriod: string;
+  record?: {
+    publicId: string;
+    staffId: number;
+    baseSalary: string;
+    allowances: string;
+    deductions: string;
+    payPeriod: string;
+    paidDate: string | null;
+    status: string;
+    notes: string | null;
+  };
 }) {
-  const [state, action, pending] = useActionState(recordStaffPayroll, {});
+  const actionToRun = record ? updateStaffPayroll : recordStaffPayroll;
+  const [state, action, pending] = useActionState(actionToRun, {});
   return (
-    <HrForm title="Record payroll payment" action={action} pending={pending} submitLabel="Save payroll record" state={state}>
+    <HrForm
+      title={record ? "Edit payroll record" : "Record payroll payment"}
+      action={action}
+      pending={pending}
+      submitLabel={record ? "Save payroll changes" : "Save payroll record"}
+      state={state}
+    >
       <input type="hidden" name="branchId" value={branchId} />
+      {record && <input type="hidden" name="publicId" value={record.publicId} />}
       <p className="text-xs text-slate-500">Branch: {branchName}</p>
-      <SelectField label="Staff member" name="staffId" options={staffOptions} />
-      <Field label="Pay period" name="payPeriod" type="month" defaultValue={payPeriod} />
-      <Field label={`Base salary (${currency})`} name="baseSalary" type="number" min="0.01" step="0.01" />
-      <Field label={`Allowances (${currency})`} name="allowances" type="number" min="0" step="0.01" defaultValue="0" />
-      <Field label={`Deductions (${currency})`} name="deductions" type="number" min="0" step="0.01" defaultValue="0" />
+      <SearchableSelect
+        label="Staff member"
+        name="staffId"
+        options={staffOptions}
+        required
+        defaultValue={record?.staffId.toString() ?? ""}
+        placeholder={staffOptions.length ? "Search staff member..." : "No active staff"}
+        disabled={!staffOptions.length}
+      />
+      <Field label="Pay period" name="payPeriod" type="month" defaultValue={record?.payPeriod ?? payPeriod} />
+      <Field label={`Base salary (${currency})`} name="baseSalary" type="number" min="0.01" step="0.01" defaultValue={record?.baseSalary} />
+      <Field label={`Allowances (${currency})`} name="allowances" type="number" min="0" step="0.01" defaultValue={record?.allowances ?? "0"} />
+      <Field label={`Deductions (${currency})`} name="deductions" type="number" min="0" step="0.01" defaultValue={record?.deductions ?? "0"} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Payment status <RequiredMark />
-        <select name="status" required defaultValue="recorded" className={inputClass}>
+        <select name="status" required defaultValue={record?.status ?? "recorded"} className={inputClass}>
           <option value="recorded">Recorded, not paid</option>
           <option value="paid">Paid</option>
         </select>
       </label>
-      <Field label="Paid date (required if marked paid)" name="paidDate" type="date" required={false} />
-      <Field label="Notes (optional)" name="notes" maxLength={1000} required={false} />
+      <Field label="Paid date (required if marked paid)" name="paidDate" type="date" defaultValue={record?.paidDate ?? ""} required={false} />
+      <Field label="Notes (optional)" name="notes" maxLength={1000} defaultValue={record?.notes ?? ""} required={false} />
       <p className="text-xs leading-5 text-slate-500">
         Gross pay is base salary plus allowances. Net pay is gross pay minus deductions; enter any applicable statutory deductions manually.
       </p>
     </HrForm>
+  );
+}
+
+export function DeletePayrollForm({ publicId }: { publicId: string }) {
+  const [state, action, pending] = useActionState(deleteStaffPayrollRecord, {});
+  return (
+    <form
+      action={action}
+      onSubmit={(event) => {
+        if (!window.confirm("Delete this payroll record? This cannot be undone.")) {
+          event.preventDefault();
+        }
+      }}
+      className="flex flex-col gap-1"
+    >
+      <input type="hidden" name="publicId" value={publicId} />
+      <button
+        type="submit"
+        disabled={pending}
+        aria-label="Delete payroll record"
+        title="Delete payroll record"
+        className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+      >
+        {pending ? "Deleting..." : "Delete"}
+      </button>
+      {state.error && <span role="alert" className="max-w-40 text-xs text-rose-600">{state.error}</span>}
+      {state.success && <span role="status" className="text-xs text-emerald-700">Deleted</span>}
+    </form>
+  );
+}
+
+export function PayrollRecordPrintButton({
+  publicId,
+  schoolName,
+  staffName,
+  employeeCode,
+  baseSalary,
+  allowances,
+  deductions,
+  netPay,
+  payPeriod,
+  paidDate,
+  status,
+  notes,
+}: {
+  publicId: string;
+  schoolName: string;
+  staffName: string;
+  employeeCode: string | null;
+  baseSalary: string;
+  allowances: string;
+  deductions: string;
+  netPay: string;
+  payPeriod: string;
+  paidDate: string | null;
+  status: string;
+  notes: string | null;
+}) {
+  const targetId = `payroll-record-print-${publicId}`;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          const target = document.getElementById(targetId);
+          if (!target) return;
+          target.classList.add("payroll-record-print-target");
+          document.body.classList.add("payroll-record-printing");
+          window.addEventListener("afterprint", () => {
+            target.classList.remove("payroll-record-print-target");
+            document.body.classList.remove("payroll-record-printing");
+          }, { once: true });
+          window.print();
+        }}
+        className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+      >
+        Print
+      </button>
+      <article id={targetId} className="payroll-record-print">
+        <p className="payroll-record-print-kicker">Payroll statement</p>
+        <h1>{schoolName}</h1>
+        <p className="payroll-record-print-period">Pay period: {payPeriod}</p>
+        <dl>
+          <div><dt>Staff member</dt><dd>{staffName}</dd></div>
+          <div><dt>Staff number</dt><dd>{employeeCode || "—"}</dd></div>
+          <div><dt>Status</dt><dd>{status === "paid" ? "Paid" : "Recorded, not paid"}</dd></div>
+          <div><dt>Paid date</dt><dd>{paidDate || "—"}</dd></div>
+        </dl>
+        <table>
+          <tbody>
+            <tr><th>Base salary</th><td>{baseSalary}</td></tr>
+            <tr><th>Allowances</th><td>{allowances}</td></tr>
+            <tr><th>Deductions</th><td>{deductions}</td></tr>
+            <tr><th>Net pay</th><td>{netPay}</td></tr>
+          </tbody>
+        </table>
+        {notes && <p className="payroll-record-print-notes">Notes: {notes}</p>}
+        <footer><span>Prepared by: ____________________</span><span>Received by: ____________________</span></footer>
+      </article>
+    </>
   );
 }
 
