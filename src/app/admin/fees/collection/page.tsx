@@ -96,7 +96,7 @@ export default async function FeeCollectionPage({
     ELSE 0
   END`;
   const totalDueSql = sql`(${studentFeeInvoices.amount} - ${studentFeeInvoices.discountAmount} + ${fineDue})`;
-  const paidSql = sql`COALESCE(${paymentTotals.paid}, 0)`;
+  const paidSql = sql<string>`COALESCE(${paymentTotals.paid}, 0)`;
   const invoiceStatusSql = sql<string>`CASE
     WHEN ${paidSql} < 0 OR ${totalDueSql} < 0 OR ${paidSql} > ${totalDueSql} THEN 'unpaid'
     WHEN ${paidSql} = ${totalDueSql} THEN 'paid'
@@ -128,21 +128,21 @@ export default async function FeeCollectionPage({
     fineValue: studentFeeInvoices.fineValue,
     dueDate: studentFeeInvoices.dueDate,
     createdAt: studentFeeInvoices.createdAt,
-    studentId: students.id,
-    studentName: students.firstName,
-    studentLastName: students.lastName,
+    studentId: sql<number>`${students.id}`.as("studentId"),
+    studentName: sql<string>`${students.firstName}`.as("studentName"),
+    studentLastName: sql<string>`${students.lastName}`.as("studentLastName"),
     admissionNumber: students.admissionNumber,
     rollNumber: studentEnrollments.rollNumber,
-    className: classLevels.name,
-    sectionName: classSections.name,
-    branchId: schoolBranches.id,
-    branchName: schoolBranches.name,
-    yearName: academicYears.name,
-    termName: academicTerms.name,
-    groupName: feeGroups.name,
-    typeName: feeTypes.name,
-    paidAmount: paidSql,
-    status: invoiceStatusSql,
+    className: sql<string>`${classLevels.name}`.as("className"),
+    sectionName: sql<string>`${classSections.name}`.as("sectionName"),
+    branchId: sql<number>`${schoolBranches.id}`.as("branchId"),
+    branchName: sql<string>`${schoolBranches.name}`.as("branchName"),
+    yearName: sql<string>`${academicYears.name}`.as("yearName"),
+    termName: sql<string>`${academicTerms.name}`.as("termName"),
+    groupName: sql<string>`${feeGroups.name}`.as("groupName"),
+    typeName: sql<string>`${feeTypes.name}`.as("typeName"),
+    paidAmount: paidSql.as("paidAmount"),
+    status: invoiceStatusSql.as("status"),
   })
     .from(studentFeeInvoices)
     .innerJoin(students, and(
