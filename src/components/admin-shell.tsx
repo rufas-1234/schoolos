@@ -60,25 +60,34 @@ const navigation: NavigationItem[] = [
     })),
   },
   {
+    href: "/admin/students",
+    label: "Student Info",
+    icon: Users,
+    permission: "students.view",
+    children: studentSections,
+  },
+  {
     href: "/admin/hr",
     label: "Human resources",
     icon: BriefcaseBusiness,
     permission: "school.settings.manage",
-    permissionAlternatives: ["staff.manage"],
+    permissionAlternatives: ["staff.manage", "roles.manage"],
     children: [
-      { id: "departments", label: "Departments", href: "/admin/hr/departments" },
-      { id: "designations", label: "Designations", href: "/admin/hr/designations" },
-      { id: "staff", label: "Staff directory", href: "/admin/staff" },
-      { id: "attendance", label: "Staff attendance records", href: "/admin/hr/attendance" },
-      { id: "leave", label: "Leave management", href: "/admin/hr/leave" },
-      { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll" },
-      { id: "reports", label: "Staff attendance reports", href: "/admin/hr/reports" },
-      { id: "overview", label: "HR overview", href: "/admin/hr" },
+      { id: "departments", label: "Departments", href: "/admin/hr/departments", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "designations", label: "Designations", href: "/admin/hr/designations", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "staff", label: "Staff directory", href: "/admin/staff", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "user-roles", label: "User roles", href: "/admin/settings/roles", permission: "roles.manage" },
+      { id: "attendance", label: "Staff attendance records", href: "/admin/hr/attendance", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "leave", label: "Leave management", href: "/admin/hr/leave", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "reports", label: "Staff attendance reports", href: "/admin/hr/reports", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "settings", label: "HR settings", href: "/admin/hr/settings", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "overview", label: "HR overview", href: "/admin/hr", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
     ],
   },
   {
     href: "/admin/fees/collection",
-    label: "Student finances",
+    label: "Finances",
     icon: CircleDollarSign,
     permission: "fees.manage",
     permissionAlternatives: ["payments.record"],
@@ -105,26 +114,6 @@ const navigation: NavigationItem[] = [
     label: "School profile",
     icon: School,
     permission: "school.settings.manage",
-  },
-  {
-    href: "/admin/settings/roles",
-    label: "User roles",
-    icon: ShieldCheck,
-    permission: "roles.manage",
-  },
-  {
-    href: "/admin/staff",
-    label: "Staff",
-    icon: BriefcaseBusiness,
-    permission: "school.settings.manage",
-    permissionAlternatives: ["staff.manage"],
-  },
-  {
-    href: "/admin/students",
-    label: "Student Info",
-    icon: Users,
-    permission: "students.view",
-    children: studentSections,
   },
 ];
 
@@ -160,9 +149,9 @@ export function AdminShell({
     pathname.startsWith("/admin/students"),
   );
   const [humanResourcesOpen, setHumanResourcesOpen] = useState(() =>
-    pathname.startsWith("/admin/hr"),
+    pathname.startsWith("/admin/hr") || pathname === "/admin/settings/roles",
   );
-  const [studentFinancesOpen, setStudentFinancesOpen] = useState(() =>
+  const [financesOpen, setFinancesOpen] = useState(() =>
     pathname.startsWith("/admin/fees"),
   );
   const router = useRouter();
@@ -173,8 +162,10 @@ export function AdminShell({
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
   const homeHref = permissions.includes("dashboard.view")
     ? "/admin/dashboard"
-    : permissions.includes("staff.manage")
+    : permissions.includes("staff.manage") || permissions.includes("school.settings.manage")
       ? "/admin/hr"
+      : permissions.includes("roles.manage")
+        ? "/admin/settings/roles"
       : permissions.includes("fees.manage") || permissions.includes("payments.record")
         ? "/admin/fees/collection"
         : "/admin/settings/roles";
@@ -201,7 +192,7 @@ export function AdminShell({
     .find((item) => item.href === "/admin/hr")
     ?.children?.find((section) => section.href === pathname);
   const activeFinanceSection = navigation
-    .find((item) => item.label === "Student finances")
+    .find((item) => item.label === "Finances")
     ?.children?.find((section) => section.href === pathname);
   const pageLabel = pathname.startsWith("/admin/academics")
     ? activeSection?.label ?? "Academics"
@@ -209,8 +200,10 @@ export function AdminShell({
       ? activeStudentSection?.label ?? "Student Info"
       : pathname.startsWith("/admin/hr")
         ? activeHrSection?.label ?? "Human resources"
+        : pathname === "/admin/settings/roles"
+          ? activeHrSection?.label ?? "User roles"
         : pathname.startsWith("/admin/fees")
-          ? activeFinanceSection?.label ?? "Student finances"
+          ? activeFinanceSection?.label ?? "Finances"
       : visibleNavigation.find(
         (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
       )?.label ?? "Workspace";
@@ -261,7 +254,8 @@ export function AdminShell({
           const active =
             pathname === href ||
             (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
-            (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees"));
+            (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees")) ||
+            (href === "/admin/hr" && pathname === "/admin/settings/roles");
           if (children) {
             const visibleSections = children.filter(
               (section) =>
@@ -270,20 +264,20 @@ export function AdminShell({
             );
             const isStudentInfo = href === "/admin/students";
             const isHumanResources = href === "/admin/hr";
-            const isStudentFinances = href === "/admin/fees/collection";
+            const isFinances = href === "/admin/fees/collection";
             const sectionOpen = isStudentInfo
               ? studentInfoOpen
               : isHumanResources
                 ? humanResourcesOpen
-                : isStudentFinances
-                  ? studentFinancesOpen
+                : isFinances
+                  ? financesOpen
                   : academicsOpen;
             const setSectionOpen = isStudentInfo
               ? setStudentInfoOpen
               : isHumanResources
                 ? setHumanResourcesOpen
-                : isStudentFinances
-                  ? setStudentFinancesOpen
+                : isFinances
+                  ? setFinancesOpen
                   : setAcademicsOpen;
             const activeChild = visibleSections.find((section) => {
               if (!section.href) return false;

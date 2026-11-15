@@ -193,6 +193,7 @@ export function AdminDataTable({
   hideDefaultView = false,
   showRowNumber = true,
   showActionLabels = false,
+  printButtonLabel = "Print",
 }: {
   title: string;
   columns: AdminTableColumn[];
@@ -207,6 +208,7 @@ export function AdminDataTable({
   hideDefaultView?: boolean;
   showRowNumber?: boolean;
   showActionLabels?: boolean;
+  printButtonLabel?: string;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -389,7 +391,7 @@ export function AdminDataTable({
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Printer size={16} aria-hidden="true" />
-            Print
+            {printButtonLabel}
           </button>
         </div>
       </div>

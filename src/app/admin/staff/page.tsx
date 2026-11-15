@@ -13,9 +13,14 @@ import {
   staffDepartments,
   staffDesignations,
   staffMembers,
+  staffSettings,
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import {
+  defaultRequiredStaffFields,
+  normalizeRequiredStaffFields,
+} from "@/lib/staff-settings";
 import { transitionStaffStatus } from "./actions";
 import { StaffForm } from "./staff-form";
 
@@ -29,7 +34,7 @@ const employmentTypeLabels: Record<string, string> = {
 export default async function StaffDirectoryPage() {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
 
-  const [records, totals, accounts, branches, departments, designations] = await Promise.all([
+  const [records, totals, accounts, branches, departments, designations, settings] = await Promise.all([
     db
       .select({
         id: staffMembers.id,
@@ -113,7 +118,10 @@ export default async function StaffDirectoryPage() {
     }).from(staffDesignations)
       .where(eq(staffDesignations.schoolId, context.schoolId))
       .orderBy(asc(staffDesignations.name)),
+    db.select({ requiredFields: staffSettings.requiredFields })
+      .from(staffSettings).where(eq(staffSettings.schoolId, context.schoolId)).limit(1),
   ]);
+  const requiredFields = normalizeRequiredStaffFields(settings[0]?.requiredFields ?? defaultRequiredStaffFields);
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
@@ -173,6 +181,7 @@ export default async function StaffDirectoryPage() {
                 branches={branches}
                 departments={departments}
                 designations={designations}
+                requiredFields={requiredFields}
               />
             </AdminActionDialog>
           }
@@ -200,6 +209,7 @@ export default async function StaffDirectoryPage() {
                     branches={branches}
                     departments={departments}
                     designations={designations}
+                    requiredFields={requiredFields}
                   />
                 </AdminRecordDialog>
                 <form action={transitionStaffStatus}>

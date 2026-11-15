@@ -604,6 +604,20 @@ export const staffMembers = mysqlTable(
   ],
 );
 
+export const staffSettings = mysqlTable(
+  "staff_settings",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    requiredFields: json("requiredFields").$type<string[]>().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("staff_settings_school_uq").on(table.schoolId)],
+);
+
 export const staffDepartments = mysqlTable(
   "staff_departments",
   {

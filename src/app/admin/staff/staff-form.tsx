@@ -1,6 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import {
+  cloneElement,
+  createContext,
+  isValidElement,
+  useActionState,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { createStaffMember, updateStaffMember, type StaffActionState } from "./actions";
 import type { StaffCustomField, StaffDocuments, StaffStoredFile } from "@/db/schema";
 import { employmentTypes, staffContractTypes, staffGenders, staffMaritalStatuses, staffRoles } from "@/lib/staff-policy";
@@ -54,6 +63,7 @@ type StaffFormProps = {
   branches: { id: number; name: string; code: string }[];
   departments: { id: number; name: string; branchId: number | null }[];
   designations: { id: number; name: string; branchId: number | null }[];
+  requiredFields: string[];
 };
 
 const tabs = [
@@ -66,7 +76,9 @@ const tabs = [
 ] as const;
 type Tab = (typeof tabs)[number];
 
-export function StaffForm({ record, accounts, branches, departments, designations }: StaffFormProps) {
+const requiredStaffFieldsContext = createContext<ReadonlySet<string>>(new Set());
+
+export function StaffForm({ record, accounts, branches, departments, designations, requiredFields }: StaffFormProps) {
   const action = record ? updateStaffMember : createStaffMember;
   const [state, formAction, pending] = useActionState<StaffActionState, FormData>(action, {});
   const [activeTab, setActiveTab] = useState<Tab>(tabs[0]);
@@ -97,6 +109,7 @@ export function StaffForm({ record, accounts, branches, departments, designation
   }, [state]);
 
   return (
+    <requiredStaffFieldsContext.Provider value={new Set(requiredFields)}>
     <form
       ref={formRef}
       action={formAction}
@@ -190,7 +203,7 @@ export function StaffForm({ record, accounts, branches, departments, designation
                 {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
               </select>
             </Field>
-            <Field label="Profile photo">
+            <Field label="Profile photo" fieldName="profilePhotoFileName">
               <StaffFileField
                 purpose="profilePhoto"
                 staffPublicId={record?.publicId}
@@ -248,9 +261,9 @@ export function StaffForm({ record, accounts, branches, departments, designation
         </div>
 
         <div hidden={activeTab !== "Document Information"} className="contents">
-            <Field label="Resume"><StaffFileField purpose="resume" staffPublicId={record?.publicId} initialFile={record?.documents?.resume ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
-            <Field label="Joining letter"><StaffFileField purpose="joiningLetter" staffPublicId={record?.publicId} initialFile={record?.documents?.joiningLetter ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
-            <Field label="Other document"><StaffFileField purpose="otherDocument" staffPublicId={record?.publicId} initialFile={record?.documents?.otherDocument ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
+            <Field label="Resume" fieldName="resumeFileName"><StaffFileField purpose="resume" staffPublicId={record?.publicId} initialFile={record?.documents?.resume ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
+            <Field label="Joining letter" fieldName="joiningLetterFileName"><StaffFileField purpose="joiningLetter" staffPublicId={record?.publicId} initialFile={record?.documents?.joiningLetter ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
+            <Field label="Other document" fieldName="otherDocumentFileName"><StaffFileField purpose="otherDocument" staffPublicId={record?.publicId} initialFile={record?.documents?.otherDocument ?? null} onPendingChange={(delta) => setPendingUploads((count) => count + delta)} /></Field>
         </div>
 
         <div hidden={activeTab !== "Custom Fields"} className="contents">
@@ -285,6 +298,7 @@ export function StaffForm({ record, accounts, branches, departments, designation
         </button>
       </div>
     </form>
+    </requiredStaffFieldsContext.Provider>
   );
 }
 
@@ -376,17 +390,25 @@ function Field({
   label,
   required = false,
   full = false,
+  fieldName,
   children,
 }: {
   label: string;
   required?: boolean;
   full?: boolean;
+  fieldName?: string;
   children: React.ReactNode;
 }) {
+  const requiredFields = useContext(requiredStaffFieldsContext);
+  const childName = isValidElement<{ name?: string }>(children) ? children.props.name : undefined;
+  const requiredField = required || requiredFields.has(fieldName ?? childName ?? "");
+  const control = isValidElement<{ name?: string; required?: boolean }>(children) && (fieldName || childName)
+    ? cloneElement(children, { required: requiredField })
+    : children;
   return (
     <label className={`space-y-1.5 text-sm font-medium text-slate-700 ${full ? "sm:col-span-2" : ""}`}>
-      <span>{label}{required ? " *" : ""}</span>
-      {children}
+      <span>{label}{requiredField ? " *" : ""}</span>
+      {control}
     </label>
   );
 }

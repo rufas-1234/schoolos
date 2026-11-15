@@ -570,7 +570,7 @@ export default async function FeeReportsPage({
 
       <section className="print-report-content">
         <header className="print-report-heading">
-          <p className="print-report-kicker">Student finances · Fee report</p>
+          <p className="print-report-kicker">Finances · Fee report</p>
           <h2>Invoice payment status</h2>
           <p>
             Due {from} through {to}

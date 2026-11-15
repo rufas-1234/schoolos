@@ -14,6 +14,7 @@ import {
   staffDepartments,
   staffDesignations,
   staffMembers,
+  staffSettings,
   teachers,
   uploadedFiles,
   user,
@@ -22,6 +23,11 @@ import type { StaffDocuments } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import {
+  defaultRequiredStaffFields,
+  getStaffRequiredFieldError,
+  normalizeRequiredStaffFields,
+} from "@/lib/staff-settings";
 import {
   canTransitionStaffStatus,
   employmentTypes,
@@ -364,6 +370,13 @@ export async function createStaffMember(
   }
 
   const staff = result.data;
+  const [settings] = await db.select({ requiredFields: staffSettings.requiredFields })
+    .from(staffSettings).where(eq(staffSettings.schoolId, context.schoolId)).limit(1);
+  const requiredError = getStaffRequiredFieldError(
+    staff,
+    normalizeRequiredStaffFields(settings?.requiredFields ?? defaultRequiredStaffFields),
+  );
+  if (requiredError) return { error: requiredError };
   const extrasError = await validateStaffExtras(staff, context.schoolId, context.schoolPublicId);
   if (extrasError) return { error: extrasError };
   if (staff.linkedUserId && !(await isSchoolMember(staff.linkedUserId, context.schoolId))) {
@@ -520,6 +533,13 @@ export async function updateStaffMember(
   }
 
   const staff = result.data;
+  const [settings] = await db.select({ requiredFields: staffSettings.requiredFields })
+    .from(staffSettings).where(eq(staffSettings.schoolId, context.schoolId)).limit(1);
+  const requiredError = getStaffRequiredFieldError(
+    staff,
+    normalizeRequiredStaffFields(settings?.requiredFields ?? defaultRequiredStaffFields),
+  );
+  if (requiredError) return { error: requiredError };
   const extrasError = await validateStaffExtras(staff, context.schoolId, context.schoolPublicId);
   if (extrasError) return { error: extrasError };
   if (staff.linkedUserId && !(await isSchoolMember(staff.linkedUserId, context.schoolId))) {

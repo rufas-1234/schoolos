@@ -185,7 +185,7 @@ export default async function FeeInvoicePrintPage({
     <main className="fee-invoice-page mx-auto max-w-5xl space-y-6 p-6 text-slate-900 print:max-w-none print:p-0">
       <header className="fee-invoice-overview flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 print:hidden">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Student finances</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Finances</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee invoice{invoices.length === 1 ? "" : "s"}</h1>
           <p className="mt-2 text-sm text-slate-600">
             {invoices.length} invoice{invoices.length === 1 ? "" : "s"} · Total outstanding {school.currency} {money(totalOutstanding)}

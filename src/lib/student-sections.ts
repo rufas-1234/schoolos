@@ -59,12 +59,15 @@ export const studentSections = [
   {
     id: "export",
     label: "Student Export",
-    href: "/admin/students",
+    href: "/admin/students?action=export",
+    matchPath: "/admin/students",
+    matchQuery: { key: "action", value: "export" },
   },
   {
     id: "settings",
     label: "Student Settings",
     href: "/admin/students/settings",
     permission: "students.update",
+    permissionAlternatives: ["school.settings.manage"],
   },
 ] as const;

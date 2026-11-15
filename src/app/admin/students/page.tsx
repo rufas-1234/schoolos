@@ -48,6 +48,7 @@ export default async function StudentsPage({
 }) {
   const { action, search } = await searchParams;
   const openAddStudent = action === "add";
+  const exportMode = action === "export";
   const initialSearch = typeof search === "string" ? search.slice(0, 120) : "";
   const context = await requireSchoolPermission("students.view");
   const [savedStudentSettings] = await db.select({ fields: studentSettings.fields })
@@ -352,9 +353,15 @@ export default async function StudentsPage({
       </div>
 
       <div className="print:block">
+        {exportMode && (
+          <p className="print:hidden mb-3 rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+            Search or filter the student list, then select <strong>Print / Save PDF</strong>. In the print dialog, choose Save as PDF to export every matching student.
+          </p>
+        )}
         <AdminDataTable
           key={tableInitialSearch}
           title="Student directory"
+          printButtonLabel={exportMode ? "Print / Save PDF" : "Print"}
           columns={[
             { key: "admissionNumber", label: "Admission No" },
             { key: "name", label: "Name" },
