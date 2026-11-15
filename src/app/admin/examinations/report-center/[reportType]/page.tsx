@@ -242,8 +242,8 @@ function ProgressCard({
       </section>
       <section className="rounded-lg border border-slate-200 p-3 text-xs">
         <h3 className="font-bold">Comments</h3>
-        <p className="mt-1"><b>Class teacher:</b> {classRemark || "—"}</p>
-        <p className="mt-1"><b>Principal:</b> {principalRemark || overallGrade?.performanceRemark || "—"}</p>
+        <p className="mt-1"><b>Class teacher:</b> {classRemark || (overallGrade?.performanceRemark ? `Suggested from grade ${overallGrade.grade}: ${overallGrade.performanceRemark}` : "—")}</p>
+        <p className="mt-1"><b>Principal:</b> {principalRemark || "—"}</p>
       </section>
       <footer className="grid grid-cols-3 gap-3 pt-2 text-center text-[10px]">
         {["Parent / Guardian", "Class Teacher", "Principal"].map((label) => (
@@ -503,6 +503,7 @@ export default async function ExaminationReportPage({
       ))
       .orderBy(asc(classSections.name), asc(students.lastName), asc(students.firstName))
     : [];
+  const sectionSummary = [...new Set(resultRows.map((row) => row.sectionName))].join(", ");
   const canViewPhotos = context.grantedPermissions.includes("students.view");
   const [markRows, gradeRows, attendanceRows, remarksRows, dailyAttendanceRows] = resultRows.length && assessments.length
     ? await Promise.all([
@@ -851,12 +852,12 @@ export default async function ExaminationReportPage({
             <>
               {reportType === "merit-list" && (
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examDetails.name} · Merit List`} subtitle={`${examClass.className} · ${examDetails.yearName} · ${results.filter((row) => row.complete).length} complete results`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examDetails.name} · Merit List`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.yearName} · ${results.filter((row) => row.complete).length} complete results`} />
                   {!examDetails.allowRanking && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Ranking is disabled for this grading scale. Students are listed alphabetically.</p>}
                   <table className="print-report-table w-full border-collapse text-left text-sm">
-                    <thead><tr><th>Position</th><th>Student</th><th>Admission no.</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead>
+                    <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead>
                     <tbody>{[...results].filter((row) => row.complete).sort((a, b) => examDetails.allowRanking ? (ranking.get(a.enrollmentId) ?? 99999) - (ranking.get(b.enrollmentId) ?? 99999) : a.name.localeCompare(b.name)).map((row) => (
-                      <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.admissionNumber ?? "—"}</td><td>{row.overall?.totalMarks.toFixed(2)} / {row.overall?.maxMarks.toFixed(2)}</td><td>{row.overall?.percentage.toFixed(2)}%</td><td>{row.grade?.grade ?? "—"} {row.grade?.description}</td></tr>
+                      <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{row.overall?.totalMarks.toFixed(2)} / {row.overall?.maxMarks.toFixed(2)}</td><td>{row.overall?.percentage.toFixed(2)}%</td><td>{row.grade?.grade ?? "—"} {row.grade?.description}</td></tr>
                     ))}</tbody>
                   </table>
                 </section>
@@ -877,7 +878,8 @@ export default async function ExaminationReportPage({
                           const mark = activeResult.marks.get(item.id);
                           const percentage = typeof mark === "number" ? mark / Number(item.maxMarks) * 100 : null;
                           const band = percentage === null ? null : gradeForPercentage(percentage, bands);
-                          return <tr key={item.id}><td>{item.name}</td><td>{formatMarks(mark)} / {item.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td><td>{teacherRemarksByMark.get(`${activeResult.enrollmentId}:${item.id}`) ?? "—"}</td></tr>;
+                          const teacherRemark = teacherRemarksByMark.get(`${activeResult.enrollmentId}:${item.id}`);
+                          return <tr key={item.id}><td>{item.name}</td><td>{formatMarks(mark)} / {item.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td><td>{teacherRemark || (band?.performanceRemark ? `Suggested: ${band.performanceRemark}` : "—")}</td></tr>;
                         })}</tbody>
                         <tfoot><tr><td>Overall</td><td>{activeResult.overall ? `${activeResult.overall.totalMarks.toFixed(2)} / ${activeResult.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{activeResult.overall ? `${activeResult.overall.percentage.toFixed(2)}%` : "—"}</td><td>{activeResult.grade?.grade ?? "—"}</td><td>{activeResult.grade?.performanceRemark ?? ""}</td></tr></tfoot>
                       </table>
@@ -890,14 +892,14 @@ export default async function ExaminationReportPage({
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
                   {selectedSubject ? (
                     <>
-                      <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${selectedSubject.name} · Subject Marksheet`} subtitle={`${examDetails.name} · ${examClass.className} · Maximum ${selectedSubject.maxMarks}`} />
+                      <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${selectedSubject.name} · Subject Marksheet`} subtitle={`${examDetails.name} · ${examClass.className} · Sections: ${sectionSummary || "—"} · Maximum ${selectedSubject.maxMarks}`} />
                       <table className="print-report-table w-full border-collapse text-left text-sm">
-                        <thead><tr><th>Roll no.</th><th>Student</th><th>Admission no.</th><th>Marks</th><th>Percentage</th><th>Grade</th></tr></thead>
+                        <thead><tr><th>Roll no.</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Marks</th><th>Percentage</th><th>Grade</th></tr></thead>
                         <tbody>{results.map((row) => {
                           const mark = row.marks.get(selectedSubject.id);
                           const percentage = typeof mark === "number" ? mark / Number(selectedSubject.maxMarks) * 100 : null;
                           const band = percentage === null ? null : gradeForPercentage(percentage, bands);
-                          return <tr key={row.enrollmentId}><td>{row.rollNumber ?? "—"}</td><td>{row.name}</td><td>{row.admissionNumber ?? "—"}</td><td>{formatMarks(mark)} / {selectedSubject.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td></tr>;
+                          return <tr key={row.enrollmentId}><td>{row.rollNumber ?? "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{formatMarks(mark)} / {selectedSubject.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td></tr>;
                         })}</tbody>
                       </table>
                     </>
@@ -907,11 +909,11 @@ export default async function ExaminationReportPage({
 
               {reportType === "tabulation-sheet" && (
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examDetails.name} · Tabulation Sheet`} subtitle={`${examClass.className} · ${examDetails.termName ?? examDetails.yearName}`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examDetails.name} · Tabulation Sheet`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.termName ?? examDetails.yearName}`} />
                   <div className="overflow-x-auto">
                     <table className="print-report-table w-full border-collapse text-left text-xs">
-                      <thead><tr><th>Position</th><th>Student</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th></tr></thead>
-                      <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => <td key={item.id}>{formatMarks(row.marks.get(item.id))}</td>)}<td>{row.overall ? `${row.overall.totalMarks.toFixed(2)} / ${row.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{row.overall ? `${row.overall.percentage.toFixed(2)}%` : "—"}</td><td>{row.grade?.grade ?? "—"}</td></tr>)}</tbody>
+                      <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th></tr></thead>
+                      <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => <td key={item.id}>{formatMarks(row.marks.get(item.id))}</td>)}<td>{row.overall ? `${row.overall.totalMarks.toFixed(2)} / ${row.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{row.overall ? `${row.overall.percentage.toFixed(2)}%` : "—"}</td><td>{row.grade?.grade ?? "—"}</td></tr>)}</tbody>
                     </table>
                   </div>
                 </section>
@@ -976,12 +978,12 @@ export default async function ExaminationReportPage({
 
               {reportType === "previous-result" && (
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examClass.className} · Previous Results`} subtitle={`Published examinations before ${examDetails.name}`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examClass.className} · Previous Results`} subtitle={`Sections: ${sectionSummary || "—"} · Published examinations before ${examDetails.name}`} />
                   {previousExams.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="print-report-table w-full border-collapse text-left text-xs">
-                        <thead><tr><th>Student</th><th>Admission no.</th>{previousExams.map((item) => <th key={item.examId}>{item.name}<span className="block font-normal">{item.yearName}</span></th>)}</tr></thead>
-                        <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{row.name}</td><td>{row.admissionNumber ?? "—"}</td>{previousExams.map((item) => {
+                        <thead><tr><th>Student</th><th>Section</th><th>Admission no.</th>{previousExams.map((item) => <th key={item.examId}>{item.name}<span className="block font-normal">{item.yearName}</span></th>)}</tr></thead>
+                        <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{previousExams.map((item) => {
                           const scores = previousScores.get(`${item.examId}:${row.studentId}`) ?? [];
                           const overall = scores.length === previousSubjectCounts.get(item.examId)
                             ? calculateWeightedAverage(scores)

@@ -160,6 +160,8 @@ export default async function ClassMarksheetReportPage({
     ))
     .orderBy(asc(classSections.name), asc(students.lastName), asc(students.firstName));
   if (!roster.length) notFound();
+  const sectionNames = [...new Set(roster.map((student) => student.sectionName))];
+  const sectionSummary = sectionNames.join(", ");
 
   const enrollmentIds = roster.map((student) => student.id);
   const assessmentIds = assessmentRows.map((assessment) => assessment.id);
@@ -246,7 +248,7 @@ export default async function ClassMarksheetReportPage({
         <div>
           <Link href={`/admin/examinations/${examId}`} className="text-sm font-semibold text-violet-700">← Back to exam workflow</Link>
           <h1 className="mt-3 text-2xl font-bold text-slate-950">Class marksheet report</h1>
-          <p className="mt-1 text-sm text-slate-600">{exam.name} · {exam.className} · {exam.termName ?? exam.yearName}</p>
+          <p className="mt-1 text-sm text-slate-600">{exam.name} · {exam.className} · Sections: {sectionSummary} · {exam.termName ?? exam.yearName}</p>
         </div>
         <PrintButton label="Print marks-only sheet" targetId="class-marks-only-sheet" pageOrientation="landscape" pageSize="A4" />
       </header>
@@ -265,6 +267,7 @@ export default async function ClassMarksheetReportPage({
             <thead>
               <tr>
                 <th className="p-2">Student</th>
+                <th className="p-2">Section</th>
                 <th className="p-2">Admission no.</th>
                 <th className="p-2">Roll no.</th>
                 {assessmentRows.map((assessment) => <th key={assessment.id} className="p-2">{assessment.name} / {assessment.maxMarks}</th>)}
@@ -273,6 +276,7 @@ export default async function ClassMarksheetReportPage({
             <tbody>{results.map((result) => (
               <tr key={result.id}>
                 <td className="p-2">{result.firstName} {result.lastName}</td>
+                <td className="p-2">{result.sectionName}</td>
                 <td className="p-2">{result.admissionNumber ?? "—"}</td>
                 <td className="p-2">{result.rollNumber ?? "—"}</td>
                 {assessmentRows.map((assessment) => {
@@ -292,7 +296,7 @@ export default async function ClassMarksheetReportPage({
           <div className="flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">{exam.schoolName}</p>
             <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className}</h2>
-            <p className="mt-1 text-sm text-slate-600">{exam.termName ?? exam.yearName} · {results.length} students · {assessmentRows.length} subjects</p>
+            <p className="mt-1 text-sm text-slate-600">{exam.termName ?? exam.yearName} · Sections: {sectionSummary} · {results.length} students · {assessmentRows.length} subjects</p>
             <p className="mt-1 text-sm text-slate-600">Pass threshold: {passMark > 0 ? `${passMark.toFixed(2)}% overall` : "not configured"} · {exam.allowRanking ? "Ranked students are ordered by weighted overall percentage." : "Position is not calculated."}</p>
             <p className="mt-1 text-xs text-slate-600">Overall percentages are weighted by subject assessment weight. Subject grades use the selected grading scale. {exam.allowRanking ? "Class rank uses competition ranking; incomplete records are not ranked." : "Class ranking is disabled for this grading scale."}</p>
           </div>
@@ -304,6 +308,7 @@ export default async function ClassMarksheetReportPage({
               <tr>
                 <th className="p-2">Position</th>
                 <th className="p-2">Student</th>
+                <th className="p-2">Section</th>
                 <th className="p-2">Admission no.</th>
                 <th className="p-2">Roll no.</th>
                 {assessmentRows.map((assessment) => <th key={assessment.id} className="p-2">{assessment.name} / {assessment.maxMarks}</th>)}
@@ -324,6 +329,7 @@ export default async function ClassMarksheetReportPage({
                     {result.firstName} {result.lastName}
                     {!draftPreview && <Link href={reportHref} className="ml-1 text-violet-700 print:hidden">Report card</Link>}
                   </td>
+                  <td className="p-2">{result.sectionName}</td>
                   <td className="p-2">{result.admissionNumber ?? "—"}</td>
                   <td className="p-2">{result.rollNumber ?? "—"}</td>
                   {assessmentRows.map((assessment) => {
@@ -342,7 +348,7 @@ export default async function ClassMarksheetReportPage({
             })}</tbody>
           </table>
         </div>
-        <footer className="flex justify-between border-t pt-3 text-xs text-slate-500"><span>{exam.schoolName} · {exam.examTypeName ?? "Examination"}</span><span>{exam.name} · {exam.className}</span></footer>
+        <footer className="flex justify-between border-t pt-3 text-xs text-slate-500"><span>{exam.schoolName} · {exam.examTypeName ?? "Examination"}</span><span>{exam.name} · {exam.className} · {sectionSummary}</span></footer>
       </section>
     </main>
   );
