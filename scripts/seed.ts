@@ -263,6 +263,12 @@ async function seed() {
     if (!teacherRole || !resultsEnterPermission) {
       throw new Error("The Teacher role or results-entry permission could not be created.");
     }
+    await tx.update(roles).set({
+      description: "Access the Teacher Portal and enter marks for assigned subjects.",
+    }).where(and(
+      eq(roles.id, teacherRole.id),
+      eq(roles.isSystem, true),
+    ));
     const [teacherRolePermission] = await tx
       .select({ roleId: rolePermissions.roleId })
       .from(rolePermissions)

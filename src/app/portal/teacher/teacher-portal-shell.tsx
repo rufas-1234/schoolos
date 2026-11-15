@@ -1,0 +1,76 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
+import { GraduationCap, LogOut } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+
+export function TeacherPortalShell({
+  children,
+  schoolName,
+  teacherName,
+}: {
+  children: ReactNode;
+  schoolName: string;
+  teacherName: string;
+}) {
+  const router = useRouter();
+  const [signOutError, setSignOutError] = useState("");
+
+  async function signOut() {
+    setSignOutError("");
+    try {
+      const result = await authClient.signOut();
+      if (result.error) {
+        setSignOutError("Sign out failed. Please try again.");
+        return;
+      }
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      setSignOutError("Sign out failed. Please try again.");
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4">
+          <Link href="/portal/teacher" className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-700 text-white">
+              <GraduationCap size={24} aria-hidden="true" />
+            </span>
+            <span>
+              <span className="block font-bold text-slate-950">{schoolName}</span>
+              <span className="block text-xs text-slate-500">Teacher Portal</span>
+            </span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm font-medium text-slate-700 sm:inline">{teacherName}</span>
+            <Link
+              href="/admin/examinations?section=marks"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              School workspace
+            </Link>
+            <button
+              type="button"
+              onClick={signOut}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <LogOut size={16} aria-hidden="true" />
+              Sign out
+            </button>
+          </div>
+        </div>
+        {signOutError && (
+          <p role="alert" className="mx-auto max-w-7xl px-5 pb-3 text-sm text-rose-700">
+            {signOutError}
+          </p>
+        )}
+      </header>
+      {children}
+    </div>
+  );
+}

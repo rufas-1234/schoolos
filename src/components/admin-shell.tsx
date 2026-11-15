@@ -47,6 +47,7 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
+  { href: "/portal/teacher", label: "Teacher Portal", icon: GraduationCap, permission: "results.enter" },
   {
     href: "/admin/academics",
     label: "Academics",
@@ -182,15 +183,21 @@ export function AdminShell({
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
   const homeHref = permissions.includes("dashboard.view")
     ? "/admin/dashboard"
-    : permissions.includes("staff.manage") || permissions.includes("school.settings.manage")
-      ? "/admin/hr"
-      : permissions.includes("roles.manage")
+    : permissions.includes("roles.manage")
         ? "/admin/settings/roles"
-      : permissions.includes("examinations.create") || permissions.includes("results.enter") || permissions.includes("results.publish")
-      ? "/admin/examinations"
+      : permissions.includes("school.settings.manage")
+        ? "/admin/settings"
+      : permissions.includes("examinations.create") || permissions.includes("results.publish")
+        ? "/admin/examinations"
+      : permissions.includes("results.enter")
+        ? "/portal/teacher"
+      : permissions.includes("staff.manage")
+        ? "/admin/hr"
       : permissions.includes("fees.manage") || permissions.includes("payments.record")
         ? "/admin/fees/collection"
-        : "/admin/settings/roles";
+      : permissions.includes("students.view")
+        ? "/admin/students"
+        : "/unauthorized";
   const schoolMonogram =
     schoolName
       .split(/\s+/)

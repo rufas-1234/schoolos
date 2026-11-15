@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { LockKeyhole, Mail } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
+import { getSignedInWorkspacePath } from "./actions";
 
 export function LoginForm() {
   const router = useRouter();
@@ -26,7 +27,14 @@ export function LoginForm() {
         return;
       }
 
-      router.replace("/admin/dashboard");
+      let destination: string;
+      try {
+        destination = await getSignedInWorkspacePath();
+      } catch {
+        setError("You are signed in, but your school workspace could not be loaded. Refresh or contact your administrator.");
+        return;
+      }
+      router.replace(destination);
       router.refresh();
     } catch {
       setError("Sign-in failed. Check your credentials or contact your administrator.");

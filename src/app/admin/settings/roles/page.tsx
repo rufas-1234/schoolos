@@ -107,6 +107,9 @@ export default async function UserRolesPage() {
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
           Create school-specific roles, grant the least required permissions, and assign those roles to active school accounts.
         </p>
+        <p className="mt-3 max-w-3xl rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+          The system Teacher role opens the Teacher Portal and allows marks entry only for subjects assigned to the linked teacher profile. Link a staff account to an active teacher record before assigning this role.
+        </p>
       </header>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]">
@@ -114,7 +117,7 @@ export default async function UserRolesPage() {
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="font-semibold text-slate-900">Roles in {context.schoolName}</h2>
-            <p className="mt-1 text-sm text-slate-500">Edit unassigned system roles or any custom role. System roles cannot be deleted; unassign custom roles before deleting them.</p>
+            <p className="mt-1 text-sm text-slate-500">System roles come with least-privilege defaults and can be edited before assignment. Custom roles can be changed any time; unassign custom roles before deleting them.</p>
           </div>
           <ul className="divide-y divide-slate-100">
             {schoolRoles.map((role) => (
