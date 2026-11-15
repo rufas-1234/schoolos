@@ -452,33 +452,33 @@ export default async function ExaminationsPage({
     classSection.academicYearId === assessment.academicYearId,
   ));
   const assessmentFilterForm = (formSection: "schedule" | "attendance" | "marks") => (
-    <form method="get" action="/admin/examinations" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+    <form method="get" action="/admin/examinations" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       <input type="hidden" name="section" value={formSection} />
-      <label className="text-sm font-medium">Search
-        <input type="search" name="search" defaultValue={search} maxLength={120} placeholder="Exam, class, subject" className="mt-1 w-full rounded-lg border p-2.5" />
+      <label className="min-w-0 text-sm font-medium">Search
+        <input type="search" name="search" defaultValue={search} maxLength={120} placeholder="Exam, class, subject" className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
-      <label className="text-sm font-medium">Branch
-        <select name="branchId" defaultValue={branchFilter?.toString() ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+      <label className="min-w-0 text-sm font-medium">Branch
+        <select name="branchId" defaultValue={branchFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
           <option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
         </select>
       </label>
-      <label className="text-sm font-medium">Exam
-        <select name="examId" defaultValue={examFilter?.toString() ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+      <label className="min-w-0 text-sm font-medium">Exam
+        <select name="examId" defaultValue={examFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
           <option value="">All exams</option>{exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name}</option>)}
         </select>
       </label>
-      <label className="text-sm font-medium">Class
-        <select name="classLevelId" defaultValue={classFilter?.toString() ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+      <label className="min-w-0 text-sm font-medium">Class
+        <select name="classLevelId" defaultValue={classFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
           <option value="">All classes</option>{classOptions.map((classLevel) => <option key={classLevel.id} value={classLevel.id}>{classLevel.name}</option>)}
         </select>
       </label>
-      <label className="text-sm font-medium">Section
-        <select name="sectionId" defaultValue={sectionFilter?.toString() ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+      <label className="min-w-0 text-sm font-medium">Section
+        <select name="sectionId" defaultValue={sectionFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
           <option value="">All sections</option>{sectionOptions.filter((classSection) => !classFilter || classSection.classLevelId === classFilter).map((classSection) => <option key={classSection.id} value={classSection.id}>{classSection.name}</option>)}
         </select>
       </label>
-      <label className="text-sm font-medium">Subject
-        <select name="subjectId" defaultValue={subjectFilter?.toString() ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+      <label className="min-w-0 text-sm font-medium">Subject
+        <select name="subjectId" defaultValue={subjectFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
           <option value="">All subjects</option>{subjectOptions.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
         </select>
       </label>

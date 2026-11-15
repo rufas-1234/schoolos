@@ -92,18 +92,18 @@ export function CreateExaminationForm({
   };
   const componentPayload = components.map((component) => `${component.title}|${component.maxMarks}`).join("\n");
   return (
-    <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+    <form action={action} className="max-w-5xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <div>
         <h2 className="text-xl font-bold text-slate-900">{record ? "Edit Exam" : "Add Exam"}</h2>
         <p className="mt-1 text-sm text-slate-600">Choose the branch and exam system, then define the mark distributions for each subject.</p>
       </div>
       {record && <input type="hidden" name="examinationId" value={record.id} />}
-      <label className="block text-sm font-medium">Exam title *
-        <input required name="name" maxLength={120} defaultValue={record?.name ?? ""} className="mt-1 w-full rounded-lg border p-2.5" placeholder="First Term" />
+      <label className="block max-w-2xl text-sm font-medium">Exam title *
+        <input required name="name" maxLength={120} defaultValue={record?.name ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="First Term" />
       </label>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="text-sm font-medium">Select branch *
-          <select required={!record} name="branchId" value={branchId} onChange={(event) => setBranchId(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5">
+          <select required={!record} name="branchId" value={branchId} onChange={(event) => setBranchId(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
             {!record && <option value="" disabled>Select branch</option>}
             {record && <option value="">All branches</option>}
             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
@@ -118,7 +118,7 @@ export function CreateExaminationForm({
             } else if (nextSystem === "single" && components.length > 1) {
               setComponents([{ title: "Exam", maxMarks: "100" }]);
             }
-          }} className="mt-1 w-full rounded-lg border p-2.5">
+          }} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
             <option value="single">Single Exam</option>
             <option value="multi">Multi Exam</option>
           </select>
@@ -143,7 +143,7 @@ export function CreateExaminationForm({
             setAcademicTermId(String(nextTerm?.id ?? ""));
             setExamStartDate(nextTerm?.startDate ?? nextYear?.startDate ?? "");
             setExamEndDate(nextTerm?.endDate ?? nextYear?.endDate ?? "");
-          }} className="mt-1 w-full rounded-lg border p-2.5">
+          }} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
             <option value="" disabled>Select year</option>
             {years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.status === "active" ? " (active)" : ""}</option>)}
           </select>
@@ -156,26 +156,27 @@ export function CreateExaminationForm({
             setAcademicTermId(nextTermId);
             setExamStartDate(nextTerm?.startDate ?? year?.startDate ?? "");
             setExamEndDate(nextTerm?.endDate ?? year?.endDate ?? "");
-          }} className="mt-1 w-full rounded-lg border p-2.5">
+          }} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
             <option value="">No term</option>
             {visibleTerms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
           </select>
         </label>
         </>}
         <label className="text-sm font-medium">Start date *
-          <input required type="date" name="startDate" value={examStartDate} onChange={(event) => setExamStartDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
+          <input required type="date" name="startDate" value={examStartDate} onChange={(event) => setExamStartDate(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
         <label className="text-sm font-medium">End date *
-          <input required type="date" name="endDate" value={examEndDate} onChange={(event) => setExamEndDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
+          <input required type="date" name="endDate" value={examEndDate} onChange={(event) => setExamEndDate(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
         <label className="text-sm font-medium">Exam Mark *
-          <input readOnly value={totalMarks.toFixed(2)} className="mt-1 w-full rounded-lg border bg-slate-50 p-2.5" />
+          <input readOnly value={totalMarks.toFixed(2)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold tabular-nums text-slate-700" />
         </label>
       </div>
       <fieldset className="rounded-xl border border-slate-200 p-4">
         <legend className="px-1 text-sm font-semibold">Add Mark Distributions</legend>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full max-w-3xl table-fixed text-left text-sm">
+            <colgroup><col className="w-[58%]" /><col className="w-[24%]" /><col className="w-[18%]" /></colgroup>
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr><th className="p-3">Exam title</th><th className="p-3">Exam mark</th><th className="p-3">Action</th></tr>
             </thead>
@@ -183,11 +184,11 @@ export function CreateExaminationForm({
               <tr key={index} className="border-t">
                 <td className="p-2">
                   <label className="sr-only" htmlFor={`exam-component-title-${index}`}>Distribution title</label>
-                  <input id={`exam-component-title-${index}`} required maxLength={120} value={component.title} onChange={(event) => updateComponent(index, { title: event.target.value })} className="w-full rounded-lg border p-2.5" placeholder="First Term Exam" />
+                  <input id={`exam-component-title-${index}`} required maxLength={120} value={component.title} onChange={(event) => updateComponent(index, { title: event.target.value })} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="First Term Exam" />
                 </td>
                 <td className="p-2">
                   <label className="sr-only" htmlFor={`exam-component-marks-${index}`}>Distribution maximum marks</label>
-                  <input id={`exam-component-marks-${index}`} required type="number" min="0.01" max="999999" step="0.01" value={component.maxMarks} onChange={(event) => updateComponent(index, { maxMarks: event.target.value })} className="w-full rounded-lg border p-2.5" />
+                  <input id={`exam-component-marks-${index}`} required type="number" min="0.01" max="999999" step="0.01" value={component.maxMarks} onChange={(event) => updateComponent(index, { maxMarks: event.target.value })} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm tabular-nums outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
                 </td>
                 <td className="p-2">
                   <button type="button" disabled={examSystem === "single" || components.length <= 2} onClick={() => setComponents((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
@@ -246,20 +247,22 @@ export function DeleteExaminationForm({
 export function CreateExamTypeForm({ branches }: { branches: Array<{ id: number; name: string }> }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createExamType, {});
   return (
-    <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+    <form action={action} className="max-w-3xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <h2 className="text-lg font-bold text-slate-900">Create exam type</h2>
-      <label className="block text-sm font-medium">Branch
-        <select name="branchId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
-          <option value="">All branches</option>
-          {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-        </select>
-      </label>
-      <label className="block text-sm font-medium">Exam name
-        <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="First Term" />
-      </label>
-      <label className="block text-sm font-medium">Average passing mark
-        <input required type="number" min="0" max="100" step="0.01" name="averageMark" defaultValue="0" className="mt-1 w-full rounded-lg border p-2.5" />
-      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm font-medium">Branch
+          <select name="branchId" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" defaultValue="">
+            <option value="">All branches</option>
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm font-medium sm:col-span-2">Exam name
+          <input required name="name" maxLength={120} className="mt-1 h-10 w-full max-w-xl rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="First Term" />
+        </label>
+        <label className="block text-sm font-medium">Average passing mark
+          <input required type="number" min="0" max="100" step="0.01" name="averageMark" defaultValue="0" className="mt-1 h-10 w-full max-w-48 rounded-lg border border-slate-200 px-3 text-sm tabular-nums outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
+        </label>
+      </div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="averagePassing" /> Use as the school&apos;s average-passing examination</label>
       <p className="text-xs text-slate-500">Exam types are reusable labels such as First Term or Mid-year. This passing threshold is stored on the type; each examination still uses its selected grading scale for result grades.</p>
       <SubmitButton pending={pending}>Save exam type</SubmitButton>
@@ -271,13 +274,13 @@ export function CreateExamTypeForm({ branches }: { branches: Array<{ id: number;
 export function CreateGradingScaleForm() {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createGradingScale, {});
   return (
-    <form action={action} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+    <form action={action} className="max-w-3xl space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
       <h2 className="text-lg font-bold text-slate-900">Grading scales</h2>
-      <label className="block text-sm font-medium">Scale name
-        <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="Standard 0–100" />
+      <label className="block max-w-xl text-sm font-medium">Scale name
+        <input required name="name" maxLength={120} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="Standard 0–100" />
       </label>
       <label className="block text-sm font-medium">Grade bands
-        <textarea required name="bands" rows={5} className="mt-1 w-full rounded-lg border p-2.5 font-mono text-xs" defaultValue={"0|40|F|Needs improvement|Needs additional support\n40|70|C|Satisfactory|Good effort\n70|100|A|Excellent|Outstanding performance"} />
+        <textarea required name="bands" rows={4} className="mt-1 w-full rounded-lg border border-slate-200 p-3 font-mono text-xs leading-6 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" defaultValue={"0|40|F|Needs improvement|Needs additional support\n40|70|C|Satisfactory|Good effort\n70|100|A|Excellent|Outstanding performance"} />
       </label>
       <p className="text-xs text-slate-500">One row per band: minimum % | maximum % | grade | description | performance remark. Bands must cover 0–100 without gaps or overlaps. Lower bounds are inclusive; the 100% maximum is inclusive.</p>
       <div className="flex flex-wrap gap-4 text-sm">
@@ -318,7 +321,7 @@ export function SaveExamAttendanceForm({
               <td className="p-3 font-medium">{student.name}</td>
               <td className="p-3">{student.admissionNumber ?? "—"}</td>
               <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} defaultValue={student.status ?? ""} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></td>
-              <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} defaultValue={student.note ?? ""} className="w-full min-w-40 rounded-lg border p-2" /></td>
+              <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} defaultValue={student.note ?? ""} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
             </tr>
           ))}</tbody>
         </table>
@@ -340,10 +343,10 @@ export function SubjectSettingsForm({
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(updateExamSubjectSettings, {});
   return (
-    <form action={action} className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-3">
+    <form action={action} className="mt-3 grid max-w-2xl gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
-      <label className="text-xs font-medium">Date<input required type="date" name="examDate" defaultValue={examDate} className="mt-1 w-full rounded border p-2" /></label>
-      <label className="text-xs font-medium">Weight<input required type="number" step="0.01" min="0.01" name="weight" defaultValue={weight} className="mt-1 w-full rounded border p-2" /></label>
+      <label className="text-xs font-medium">Date<input required type="date" name="examDate" defaultValue={examDate} className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></label>
+      <label className="text-xs font-medium">Weight<input required type="number" step="0.01" min="0.01" name="weight" defaultValue={weight} className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm tabular-nums outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></label>
       <div className="flex items-end"><SubmitButton pending={pending}>Update assessment</SubmitButton></div>
       <div className="sm:col-span-4"><Feedback state={state} /></div>
     </form>
@@ -422,7 +425,7 @@ export function SaveMarksForm({
                   const name = `component_${student.markId}_${component.id}`;
                   return <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={name} min="0" max={component.maxMarks} step="0.01" value={values[name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} className="w-28 rounded-lg border p-2" /></td>;
                 })}
-                <td className="p-3"><input aria-label={`Optional teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} value={values[`remark_${student.enrollmentId}`] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [`remark_${student.enrollmentId}`]: event.target.value }))} className="w-full min-w-48 rounded-lg border p-2" /></td>
+                <td className="p-3"><input aria-label={`Optional teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} value={values[`remark_${student.enrollmentId}`] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [`remark_${student.enrollmentId}`]: event.target.value }))} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
               </tr>
             )) : <tr><td colSpan={(students[0]?.components.length ?? 0) + 3} className="p-4 text-center text-slate-500">No students match this search.</td></tr>}</tbody>
         </table>
@@ -549,7 +552,7 @@ export function ClassTeacherRemarkForm({
       <input type="hidden" name="examClassId" value={examClassId} />
       <input type="hidden" name="enrollmentId" value={enrollmentId} />
       <label className="block text-xs font-medium text-slate-600">Class teacher remark
-        <textarea name="remark" maxLength={1000} rows={2} defaultValue={remark ?? ""} className="mt-1 w-full rounded-lg border p-2" />
+        <textarea name="remark" maxLength={1000} rows={2} defaultValue={remark ?? ""} className="mt-1 w-full max-w-2xl rounded-lg border border-slate-200 p-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
       <button disabled={pending} className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-60">{pending ? "Saving..." : "Save remark"}</button>
       <Feedback state={state} />
@@ -569,7 +572,7 @@ export function PrincipalRemarkForm({
     <form action={action} className="rounded-xl border bg-white p-4">
       <input type="hidden" name="examClassId" value={examClassId} />
       <label className="block text-sm font-semibold">Principal remark for report cards
-        <textarea name="remark" maxLength={1000} rows={3} defaultValue={remark ?? ""} className="mt-2 w-full rounded-lg border p-2.5" />
+        <textarea name="remark" maxLength={1000} rows={3} defaultValue={remark ?? ""} className="mt-2 w-full max-w-2xl rounded-lg border border-slate-200 p-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
       <SubmitButton pending={pending}>Save principal remark</SubmitButton>
       <Feedback state={state} />
@@ -592,10 +595,10 @@ export function CorrectionRequestForm({
       <input type="hidden" name="examMarkId" value={examMarkId} />
       <p className="text-xs font-semibold text-amber-900">Published mark: {previousMarks}. Request changes with a reason; the published value remains until approved.</p>
       <label className="block text-xs font-medium">Requested marks
-        <input required type="number" min="0" max={maxMarks} step="0.01" name="requestedMarks" defaultValue={previousMarks} className="mt-1 w-full rounded border p-2" />
+        <input required type="number" min="0" max={maxMarks} step="0.01" name="requestedMarks" defaultValue={previousMarks} className="mt-1 h-9 w-full max-w-40 rounded-lg border border-slate-200 bg-white px-3 text-sm tabular-nums outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
       <label className="block text-xs font-medium">Reason
-        <textarea required name="reason" maxLength={1000} rows={2} className="mt-1 w-full rounded border p-2" />
+        <textarea required name="reason" maxLength={1000} rows={2} className="mt-1 w-full max-w-md rounded-lg border border-slate-200 bg-white p-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
       <SubmitButton pending={pending}>Request correction</SubmitButton>
       <Feedback state={state} />
@@ -608,8 +611,8 @@ export function ReviewCorrectionForm({ correctionId }: { correctionId: number })
   return (
     <form action={action} className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-amber-50 p-3 print:hidden">
       <input type="hidden" name="correctionId" value={correctionId} />
-      <label className="min-w-52 flex-1 text-xs font-medium">Review note
-        <input name="reviewNote" maxLength={1000} className="mt-1 w-full rounded border p-2" />
+      <label className="min-w-52 max-w-lg flex-1 text-xs font-medium">Review note
+        <input name="reviewNote" maxLength={1000} className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
       <button name="decision" value="approve" disabled={pending} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">Approve correction</button>
       <button name="decision" value="reject" disabled={pending} className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60">Reject</button>

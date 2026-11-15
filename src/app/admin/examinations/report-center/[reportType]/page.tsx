@@ -793,30 +793,30 @@ export default async function ExaminationReportPage({
         </section>
       ) : (
         <>
-          <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5 print:hidden">
-            <label className="text-sm font-medium">Examination
-              <select name="examId" defaultValue={exam?.id ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+          <form method="get" className="grid max-w-6xl gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5 print:hidden">
+            <label className="min-w-0 text-sm font-medium">Examination
+              <select name="examId" defaultValue={exam?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
                 <option value="">Select an exam</option>
                 {examOptions.map((option) => <option key={option.id} value={option.id}>{option.name} · {option.yearName}{option.status !== "published" ? ` · ${option.status}` : ""}</option>)}
               </select>
             </label>
-            <label className="text-sm font-medium">Class
-              <select name="classId" defaultValue={examClass?.id ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+            <label className="min-w-0 text-sm font-medium">Class
+              <select name="classId" defaultValue={examClass?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
                 <option value="">Select a class</option>
                 {classes.map((item) => <option key={item.id} value={item.id}>{item.className}</option>)}
               </select>
             </label>
             {reportType === "subject-wise-marksheet" && (
-              <label className="text-sm font-medium">Subject
-                <select name="subjectId" defaultValue={selectedSubject?.id ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+              <label className="min-w-0 text-sm font-medium">Subject
+                <select name="subjectId" defaultValue={selectedSubject?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
                   <option value="">Select a subject</option>
                   {assessments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
             )}
             {needsStudent && (
-              <label className="text-sm font-medium">Student
-                <select name="enrollmentId" defaultValue={activeResult?.enrollmentId ?? ""} className="mt-1 w-full rounded-lg border p-2.5">
+              <label className="min-w-0 text-sm font-medium">Student
+                <select name="enrollmentId" defaultValue={activeResult?.enrollmentId ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
                   <option value="">Select a student</option>
                   {results.map((row) => <option key={row.enrollmentId} value={row.enrollmentId}>{row.name}{row.admissionNumber ? ` · ${row.admissionNumber}` : ""}</option>)}
                 </select>
