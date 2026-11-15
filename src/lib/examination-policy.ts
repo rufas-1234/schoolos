@@ -8,6 +8,18 @@ export type GradeBand = {
 
 export type ExamComponent = { title: string; maxMarks: number };
 
+export function canPreviewDraftTestReport(input: {
+  requested: boolean;
+  examName: string;
+  examStatus: string;
+  canManage: boolean;
+}): boolean {
+  return input.requested &&
+    input.examName.startsWith("TEST DATA - ") &&
+    input.examStatus === "open" &&
+    input.canManage;
+}
+
 export function parseExamComponents(
   value: string,
   system: "single" | "multi",

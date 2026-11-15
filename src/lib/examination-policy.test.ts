@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canPreviewDraftTestReport,
   calculateComponentTotal,
   calculateWeightedAverage,
   gradeForPercentage,
@@ -53,6 +54,33 @@ describe("examination policy", () => {
       { marks: null, maxMarks: 50 },
     ])).toBeNull();
     expect(calculateComponentTotal([{ marks: 51, maxMarks: 50 }])).toBeNull();
+  });
+
+  it("allows draft report previews only for managed, open test examinations", () => {
+    expect(canPreviewDraftTestReport({
+      requested: true,
+      examName: "TEST DATA - Multi Exam 2026",
+      examStatus: "open",
+      canManage: true,
+    })).toBe(true);
+    expect(canPreviewDraftTestReport({
+      requested: true,
+      examName: "Term 1 examination",
+      examStatus: "open",
+      canManage: true,
+    })).toBe(false);
+    expect(canPreviewDraftTestReport({
+      requested: true,
+      examName: "TEST DATA - Multi Exam 2026",
+      examStatus: "open",
+      canManage: false,
+    })).toBe(false);
+    expect(canPreviewDraftTestReport({
+      requested: true,
+      examName: "TEST DATA - Multi Exam 2026",
+      examStatus: "published",
+      canManage: true,
+    })).toBe(false);
   });
 
   it("uses competition ranking for tied scores", () => {

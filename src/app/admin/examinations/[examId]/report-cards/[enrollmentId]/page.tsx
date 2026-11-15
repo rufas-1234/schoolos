@@ -26,17 +26,25 @@ import {
 } from "@/db/schema";
 import { PrintButton } from "@/components/print-button";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { calculateWeightedAverage, gradeForPercentage, rankScores, type GradeBand } from "@/lib/examination-policy";
+import {
+  calculateWeightedAverage,
+  canPreviewDraftTestReport,
+  gradeForPercentage,
+  rankScores,
+  type GradeBand,
+} from "@/lib/examination-policy";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportCardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ examId: string; enrollmentId: string }>;
+  searchParams: Promise<{ preview?: string }>;
 }) {
   const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
-  const { examId: rawExamId, enrollmentId: rawEnrollmentId } = await params;
+  const [{ examId: rawExamId, enrollmentId: rawEnrollmentId }, query] = await Promise.all([params, searchParams]);
   if (!/^\d+$/.test(rawExamId) || !/^\d+$/.test(rawEnrollmentId)) notFound();
   const examId = Number(rawExamId);
   const enrollmentId = Number(rawEnrollmentId);
@@ -96,13 +104,20 @@ export default async function ReportCardPage({
     .where(and(
       eq(examinations.id, examId),
       eq(examinations.schoolId, context.schoolId),
-      eq(examinations.status, "published"),
     ))
     .limit(1);
-  if (!record || record.branchId !== null && record.branchId !== record.studentBranchId) notFound();
 
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");
+  if (!record || record.branchId !== null && record.branchId !== record.studentBranchId) notFound();
+  const draftPreview = canPreviewDraftTestReport({
+    requested: query.preview === "test",
+    examName: record.examinationName,
+    examStatus: record.examinationStatus,
+    canManage,
+  });
+  if (record.examinationStatus !== "published" && !draftPreview) notFound();
+
   if (!canManage) {
     const assignment = await db.select({ id: classSubjects.id }).from(classSubjects)
       .innerJoin(teachers, and(
@@ -133,7 +148,7 @@ export default async function ReportCardPage({
       eq(examSubjects.id, examMarks.examSubjectId),
       eq(examSubjects.examClassId, record.examClassId),
       eq(examSubjects.schoolId, context.schoolId),
-      eq(examSubjects.status, "published"),
+      draftPreview ? eq(examSubjects.status, "draft") : eq(examSubjects.status, "published"),
     ))
     .innerJoin(classSubjects, and(eq(classSubjects.id, examSubjects.classSubjectId), eq(classSubjects.schoolId, context.schoolId)))
     .innerJoin(subjects, and(eq(subjects.id, classSubjects.subjectId), eq(subjects.schoolId, context.schoolId)))
@@ -199,7 +214,7 @@ export default async function ReportCardPage({
         eq(examSubjects.id, examMarks.examSubjectId),
         eq(examSubjects.examClassId, record.examClassId),
         eq(examSubjects.schoolId, context.schoolId),
-        eq(examSubjects.status, "published"),
+        draftPreview ? eq(examSubjects.status, "draft") : eq(examSubjects.status, "published"),
       ))
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
@@ -255,6 +270,7 @@ export default async function ReportCardPage({
         <PrintButton label="Print / save PDF" targetId="student-report-card" />
       </header>
       <article id="student-report-card" className="print-report-content space-y-5 rounded-2xl border border-slate-200 bg-white p-7 text-slate-900 print:rounded-none print:border-0 print:p-0">
+        {draftPreview && <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-amber-950 print:border-2">Draft test preview — not official; scores are synthetic</div>}
         <header className="print-report-heading flex items-center gap-4">
           {record.schoolLogoUrl && <Image src={record.schoolLogoUrl} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="h-16 w-16 rounded-lg object-contain" />}
           <div className="min-w-0 flex-1">

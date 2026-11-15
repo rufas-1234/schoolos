@@ -321,6 +321,9 @@ export default async function SubjectMarksPage({
               {subject.examStatus === "published" && (
                 <Link href={`/admin/examinations/${examId}/report-cards/${row.enrollmentId}`} className="mt-3 inline-block text-sm font-semibold text-violet-700">Open report card →</Link>
               )}
+              {subject.examStatus === "open" && subject.examName.startsWith("TEST DATA - ") && (canConfigure || canReview) && (
+                <Link href={`/admin/examinations/${examId}/report-cards/${row.enrollmentId}?preview=test`} className="mt-3 inline-block text-sm font-semibold text-amber-800">Preview draft test report →</Link>
+              )}
             </article>
           ))}
         </div>
