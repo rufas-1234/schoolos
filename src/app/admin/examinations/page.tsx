@@ -59,9 +59,16 @@ export default async function ExaminationsPage({
     ? requestedSection!
     : "setup";
   const canConfigure = context.grantedPermissions.includes("examinations.create");
+  const today = new Date().toISOString().slice(0, 10);
   const [years, terms, branches, classes, scales, examTypesList] = await Promise.all([
     canConfigure
-      ? db.select({ id: academicYears.id, name: academicYears.name }).from(academicYears)
+      ? db.select({
+        id: academicYears.id,
+        name: academicYears.name,
+        status: academicYears.status,
+        startDate: academicYears.startDate,
+        endDate: academicYears.endDate,
+      }).from(academicYears)
         .where(eq(academicYears.schoolId, context.schoolId)).orderBy(asc(academicYears.startDate))
       : Promise.resolve([]),
     canConfigure
@@ -69,6 +76,8 @@ export default async function ExaminationsPage({
         id: academicTerms.id,
         academicYearId: academicTerms.academicYearId,
         name: academicTerms.name,
+        startDate: academicTerms.startDate,
+        endDate: academicTerms.endDate,
       }).from(academicTerms).where(eq(academicTerms.schoolId, context.schoolId)).orderBy(asc(academicTerms.startDate))
       : Promise.resolve([]),
     db.select({ id: schoolBranches.id, name: schoolBranches.name }).from(schoolBranches)
@@ -427,7 +436,7 @@ export default async function ExaminationsPage({
       )}
 
       {section === "setup" && canConfigure && (
-        <CreateExaminationForm years={years} terms={terms} branches={branches} examTypes={examTypesList} scales={scales} classes={classes} />
+        <CreateExaminationForm years={years} terms={terms} branches={branches} examTypes={examTypesList} scales={scales} classes={classes} today={today} />
       )}
 
       {section === "setup" && (

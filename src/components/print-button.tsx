@@ -1,9 +1,9 @@
 "use client";
 
-export function printElementById(elementId: string, title: string) {
+export function printElementById(elementId: string, title: string, pageOrientation?: "portrait" | "landscape") {
   const target = document.getElementById(elementId);
   if (!target) {
-    window.alert("The selected payroll content could not be found. Refresh the page and try again.");
+    window.alert("The selected report content could not be found. Refresh the page and try again.");
     return;
   }
 
@@ -40,7 +40,7 @@ export function printElementById(elementId: string, title: string) {
         <title>${safeTitle}</title>
         ${copiedStyles}
         <style>
-          @page { margin: 14mm; }
+          @page { margin: 14mm; ${pageOrientation ? `size: ${pageOrientation};` : ""} }
           html, body { min-height: 100%; background: white; color: #172033; }
           body { margin: 0; padding: 0; font: 10pt Arial, sans-serif; }
           [class~="print:hidden"], dialog { display: none !important; }
@@ -77,14 +77,16 @@ export function printElementById(elementId: string, title: string) {
 export function PrintButton({
   label = "Print",
   targetId,
+  pageOrientation,
 }: {
   label?: string;
   targetId?: string;
+  pageOrientation?: "portrait" | "landscape";
 }) {
   return (
     <button
       type="button"
-      onClick={() => targetId ? printElementById(targetId, label) : window.print()}
+      onClick={() => targetId ? printElementById(targetId, label, pageOrientation) : window.print()}
       className="print:hidden rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800"
     >
       {label}

@@ -42,18 +42,29 @@ export function CreateExaminationForm({
   examTypes,
   scales,
   classes,
+  today,
 }: {
-  years: Array<{ id: number; name: string }>;
-  terms: Array<{ id: number; academicYearId: number; name: string }>;
+  years: Array<{ id: number; name: string; status: string; startDate: string; endDate: string }>;
+  terms: Array<{ id: number; academicYearId: number; name: string; startDate: string; endDate: string }>;
   branches: Array<{ id: number; name: string }>;
   examTypes: Array<{ id: number; name: string; branchId: number | null }>;
   scales: Array<{ id: number; name: string; isDefault: boolean }>;
   classes: Array<{ id: number; name: string; branchId: number; branchName: string }>;
+  today: string;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createExamination, {});
+  const defaultYear = years.find((year) => year.status === "active") ?? years[0];
+  const initialTerm =
+    terms.find((term) => term.academicYearId === defaultYear?.id && term.startDate <= today && term.endDate >= today) ??
+    terms.find((term) => term.academicYearId === defaultYear?.id);
+  const [academicYearId, setAcademicYearId] = useState(String(defaultYear?.id ?? ""));
+  const [academicTermId, setAcademicTermId] = useState(String(initialTerm?.id ?? ""));
+  const [examStartDate, setExamStartDate] = useState(initialTerm?.startDate ?? defaultYear?.startDate ?? "");
+  const [examEndDate, setExamEndDate] = useState(initialTerm?.endDate ?? defaultYear?.endDate ?? "");
   const [branchId, setBranchId] = useState("");
   const [examSystem, setExamSystem] = useState<"single" | "multi">("single");
   const [components, setComponents] = useState("Exam | 100");
+  const visibleTerms = terms.filter((term) => term.academicYearId === Number(academicYearId));
   const visibleClasses = branchId
     ? classes.filter((classLevel) => classLevel.branchId === Number(branchId))
     : classes;
@@ -62,7 +73,11 @@ export function CreateExaminationForm({
   );
   return (
     <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-      <h2 className="text-lg font-bold text-slate-900">Create examination</h2>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wide text-violet-700">Step 1 of 4</p>
+        <h2 className="mt-1 text-lg font-bold text-slate-900">Set up an examination</h2>
+        <p className="mt-1 text-sm text-slate-600">Choose what to call it, when it happens, and which classes take part. SchoolOS adds a standard grading scale and exam type automatically if you have not created them yet.</p>
+      </div>
       <label className="block text-sm font-medium">Examination name
         <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="Term 1 examinations" />
       </label>
@@ -73,12 +88,6 @@ export function CreateExaminationForm({
           }} className="mt-1 w-full rounded-lg border p-2.5">
             <option value="">All branches</option>
             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium">Exam type
-          <select required name="examTypeId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
-            <option value="" disabled>Select type</option>
-            {visibleTypes.map((type) => <option key={type.id} value={type.id}>{type.name}{type.branchId === null ? " (all branches)" : ""}</option>)}
           </select>
         </label>
         <label className="text-sm font-medium">Exam system
@@ -96,41 +105,94 @@ export function CreateExaminationForm({
           </select>
         </label>
         <label className="text-sm font-medium">Academic year
-          <select required name="academicYearId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
+          <select required name="academicYearId" value={academicYearId} onChange={(event) => {
+            const nextYearId = event.target.value;
+            const nextYear = years.find((year) => year.id === Number(nextYearId));
+            const nextTerm = terms.find((term) => term.academicYearId === Number(nextYearId) && term.startDate <= today && term.endDate >= today) ??
+              terms.find((term) => term.academicYearId === Number(nextYearId));
+            setAcademicYearId(nextYearId);
+            setAcademicTermId(String(nextTerm?.id ?? ""));
+            setExamStartDate(nextTerm?.startDate ?? nextYear?.startDate ?? "");
+            setExamEndDate(nextTerm?.endDate ?? nextYear?.endDate ?? "");
+          }} className="mt-1 w-full rounded-lg border p-2.5">
             <option value="" disabled>Select year</option>
-            {years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}
+            {years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.status === "active" ? " (active)" : ""}</option>)}
           </select>
         </label>
         <label className="text-sm font-medium">Term
-          <select name="academicTermId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
+          <select name="academicTermId" value={academicTermId} onChange={(event) => {
+            const nextTermId = event.target.value;
+            const nextTerm = visibleTerms.find((term) => term.id === Number(nextTermId));
+            const year = years.find((item) => item.id === Number(academicYearId));
+            setAcademicTermId(nextTermId);
+            setExamStartDate(nextTerm?.startDate ?? year?.startDate ?? "");
+            setExamEndDate(nextTerm?.endDate ?? year?.endDate ?? "");
+          }} className="mt-1 w-full rounded-lg border p-2.5">
             <option value="">No term</option>
-            {terms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium">Grading scale
-          <select required name="gradingScaleId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue={scales.find((scale) => scale.isDefault)?.id ?? ""}>
-            <option value="" disabled>Select scale</option>
-            {scales.map((scale) => <option key={scale.id} value={scale.id}>{scale.name}{scale.isDefault ? " (default)" : ""}</option>)}
+            {visibleTerms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
           </select>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-sm font-medium">Start date
-            <input required type="date" name="startDate" className="mt-1 w-full rounded-lg border p-2.5" />
+            <input required type="date" name="startDate" value={examStartDate} onChange={(event) => setExamStartDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
           </label>
           <label className="text-sm font-medium">End date
-            <input required type="date" name="endDate" className="mt-1 w-full rounded-lg border p-2.5" />
+            <input required type="date" name="endDate" value={examEndDate} onChange={(event) => setExamEndDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
           </label>
         </div>
       </div>
-      <label className="block text-sm font-medium">Mark distribution
-        <textarea required name="components" rows={examSystem === "single" ? 2 : 4} className="mt-1 w-full rounded-lg border p-2.5 font-mono text-sm" value={components} onChange={(event) => setComponents(event.target.value)} />
-      </label>
-      <p className="text-xs text-slate-500">
-        {examSystem === "single"
-          ? "Single Exam uses exactly one component."
-          : "Multi Exam combines two or more components into each subject's total."}
-        {" "}Enter one component per line as title | maximum marks. Marks are summed; subject weights control the overall average.
-      </p>
+      <details className="rounded-xl border border-slate-200 px-4 py-3">
+        <summary className="cursor-pointer text-sm font-semibold">Advanced: choose exam type or grading scale</summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium">Exam type
+            <select name="examTypeId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
+              <option value="">Automatic (recommended)</option>
+              {visibleTypes.map((type) => <option key={type.id} value={type.id}>{type.name}{type.branchId === null ? " (all branches)" : ""}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">Grading scale
+            <select name="gradingScaleId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
+              <option value="">Automatic (recommended)</option>
+              {scales.map((scale) => <option key={scale.id} value={scale.id}>{scale.name}{scale.isDefault ? " (default)" : ""}</option>)}
+            </select>
+          </label>
+        </div>
+      </details>
+      <fieldset className="space-y-3 rounded-xl border border-slate-200 p-4">
+        <legend className="px-1 text-sm font-semibold">Marks for each subject</legend>
+        <p className="text-xs text-slate-600">
+          {examSystem === "single"
+            ? "Enter the one exam paper and the maximum score students can earn."
+            : "Add each paper or assessment part. SchoolOS adds the marks and maximums together."}
+        </p>
+        <div className="space-y-2">
+          {components.split(/\r?\n/).map((component, index) => {
+            const [title = "", maxMarks = ""] = component.split("|");
+            const updateComponent = (nextTitle: string, nextMaxMarks: string) => {
+              const rows = components.split(/\r?\n/);
+              rows[index] = `${nextTitle}|${nextMaxMarks}`;
+              setComponents(rows.join("\n"));
+            };
+            return (
+              <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]">
+                <label className="text-xs font-medium">Paper / component name
+                  <input required maxLength={120} value={title.trim()} onChange={(event) => updateComponent(event.target.value, maxMarks)} className="mt-1 w-full rounded-lg border p-2.5" placeholder={examSystem === "single" ? "Written exam" : `Paper ${index + 1}`} />
+                </label>
+                <label className="text-xs font-medium">Maximum marks
+                  <input required type="number" min="0.01" max="999999" step="0.01" value={maxMarks.trim()} onChange={(event) => updateComponent(title, event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
+                </label>
+                {examSystem === "multi" && components.split(/\r?\n/).length > 2 && (
+                  <button type="button" onClick={() => setComponents(components.split(/\r?\n/).filter((_, rowIndex) => rowIndex !== index).join("\n"))} className="self-end rounded-lg border px-3 py-2.5 text-sm font-medium text-rose-700">Remove</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {examSystem === "multi" && (
+          <button type="button" onClick={() => setComponents(`${components}\nPaper ${components.split(/\r?\n/).length + 1} | 50`)} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-800">Add another paper</button>
+        )}
+      </fieldset>
+      <input type="hidden" name="components" value={components} />
       <fieldset>
         <legend className="mb-2 text-sm font-semibold">Classes (all assigned subjects will be included)</legend>
         <div className="grid max-h-40 grid-cols-2 gap-2 overflow-auto rounded-lg border p-3 sm:grid-cols-3">
@@ -143,8 +205,8 @@ export function CreateExaminationForm({
           {visibleClasses.length === 0 && <p className="col-span-full text-sm text-slate-500">Add active classes and subject assignments first.</p>}
         </div>
       </fieldset>
-      <p className="text-xs text-slate-500">Only students enrolled in the selected branch are added to branch examinations. Each subject uses the component maximum total and starts with assessment weight 1.</p>
-      <SubmitButton pending={pending}>Create examination</SubmitButton>
+      <p className="text-xs text-slate-500">Only currently enrolled students in each selected class are added. You can adjust subject dates later.</p>
+      <SubmitButton pending={pending}>Create exam and open workflow</SubmitButton>
       <Feedback state={state} />
     </form>
   );

@@ -1,8 +1,9 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -233,8 +234,8 @@ export async function createExamination(
     branchId: z.union([z.literal(""), idField]),
     academicYearId: idField,
     academicTermId: z.union([z.literal(""), idField]),
-    examTypeId: idField,
-    gradingScaleId: idField,
+    examTypeId: z.union([z.literal(""), idField]),
+    gradingScaleId: z.union([z.literal(""), idField]),
     examSystem: z.enum(["single", "multi"]),
     components: z.string().trim().min(1).max(4000),
     startDate: z.string().refine(isCalendarDate),
@@ -254,7 +255,7 @@ export async function createExamination(
     classLevelIds: classValues,
   });
   if (!parsed.success || !isValidDateRange(value(formData, "startDate"), value(formData, "endDate"))) {
-    return { error: "Enter an exam name, branch, system, mark distribution, valid dates, academic year, grading scale, and at least one class." };
+    return { error: "Add an exam name, academic year, dates, mark distribution, and at least one class." };
   }
   const componentDefinitions = parseExamComponents(parsed.data.components, parsed.data.examSystem);
   if (!componentDefinitions) {
@@ -280,14 +281,23 @@ export async function createExamination(
     endDate: academicYears.endDate,
   }).from(academicYears)
     .where(and(eq(academicYears.id, parsed.data.academicYearId), eq(academicYears.schoolId, context.schoolId))).limit(1);
-  const [scale] = await db.select({ id: examGradingScales.id }).from(examGradingScales)
-    .where(and(eq(examGradingScales.id, parsed.data.gradingScaleId), eq(examGradingScales.schoolId, context.schoolId))).limit(1);
-  if (!year || !scale) return { error: "Choose an academic year and grading scale belonging to your school." };
-  const [examType] = await db.select({ id: examTypes.id, branchId: examTypes.branchId }).from(examTypes).where(and(
-    eq(examTypes.id, parsed.data.examTypeId),
-    eq(examTypes.schoolId, context.schoolId),
-  )).limit(1);
-  if (!examType || examType.branchId !== null && examType.branchId !== branchId) {
+  if (!year) return { error: "Choose an academic year belonging to your school." };
+  const selectedScaleId = parsed.data.gradingScaleId || null;
+  const scale = selectedScaleId
+    ? await db.select({ id: examGradingScales.id }).from(examGradingScales)
+      .where(and(eq(examGradingScales.id, selectedScaleId), eq(examGradingScales.schoolId, context.schoolId))).limit(1)
+    : [];
+  if (selectedScaleId && !scale.length) {
+    return { error: "Choose a grading scale belonging to your school." };
+  }
+  const selectedExamTypeId = parsed.data.examTypeId || null;
+  const examType = selectedExamTypeId
+    ? await db.select({ id: examTypes.id, branchId: examTypes.branchId }).from(examTypes).where(and(
+      eq(examTypes.id, selectedExamTypeId),
+      eq(examTypes.schoolId, context.schoolId),
+    )).limit(1)
+    : [];
+  if (selectedExamTypeId && (!examType[0] || examType[0].branchId !== null && examType[0].branchId !== branchId)) {
     return { error: "Choose an examination type for the selected branch or one shared across all branches." };
   }
   if (parsed.data.startDate < year.startDate || parsed.data.endDate > year.endDate) {
@@ -338,14 +348,83 @@ export async function createExamination(
 
   const examPublicId = randomUUID();
   const createOutcome = await db.transaction(async (tx) => {
+    let scaleId = selectedScaleId;
+    if (!scaleId) {
+      const [existingScale] = await tx.select({
+        id: examGradingScales.id,
+        name: examGradingScales.name,
+      }).from(examGradingScales)
+        .where(and(eq(examGradingScales.schoolId, context.schoolId), eq(examGradingScales.isDefault, true)))
+        .orderBy(asc(examGradingScales.id))
+        .limit(1);
+      if (existingScale && !existingScale.name.startsWith("TEST DATA - ")) {
+        scaleId = existingScale.id;
+      } else {
+        const existingScales = await tx.select({
+          id: examGradingScales.id,
+          name: examGradingScales.name,
+        }).from(examGradingScales)
+          .where(eq(examGradingScales.schoolId, context.schoolId))
+          .orderBy(asc(examGradingScales.id));
+        const firstSchoolScale = existingScales.find((item) => !item.name.startsWith("TEST DATA - "));
+        if (firstSchoolScale) {
+          scaleId = firstSchoolScale.id;
+        } else {
+          const [createdScale] = await tx.insert(examGradingScales).values({
+            publicId: randomUUID(),
+            schoolId: context.schoolId,
+            name: "Standard 0-100",
+            allowRanking: false,
+            isDefault: true,
+            createdBy: context.user.id,
+          }).$returningId();
+          scaleId = createdScale.id;
+          await tx.insert(examGradeBands).values([
+            { gradingScaleId: scaleId, minPercent: "0.00", maxPercent: "40.00", grade: "F", description: "Needs improvement", performanceRemark: "Needs additional support", sortOrder: 0 },
+            { gradingScaleId: scaleId, minPercent: "40.00", maxPercent: "60.00", grade: "D", description: "Developing", performanceRemark: "Keep practicing", sortOrder: 1 },
+            { gradingScaleId: scaleId, minPercent: "60.00", maxPercent: "75.00", grade: "C", description: "Satisfactory", performanceRemark: "Good effort", sortOrder: 2 },
+            { gradingScaleId: scaleId, minPercent: "75.00", maxPercent: "90.00", grade: "B", description: "Very good", performanceRemark: "Very good work", sortOrder: 3 },
+            { gradingScaleId: scaleId, minPercent: "90.00", maxPercent: "100.00", grade: "A", description: "Excellent", performanceRemark: "Outstanding performance", sortOrder: 4 },
+          ]);
+        }
+      }
+    }
+
+    let examTypeId = selectedExamTypeId;
+    if (!examTypeId) {
+      const existingTypes = await tx.select({
+        id: examTypes.id,
+        name: examTypes.name,
+      }).from(examTypes)
+        .where(and(
+          eq(examTypes.schoolId, context.schoolId),
+          branchId ? or(eq(examTypes.branchId, branchId), isNull(examTypes.branchId)) : isNull(examTypes.branchId),
+        ))
+        .orderBy(asc(examTypes.branchId), asc(examTypes.id));
+      const existingType = existingTypes.find((item) => !item.name.startsWith("TEST DATA - "));
+      if (existingType) {
+        examTypeId = existingType.id;
+      } else {
+        const [createdType] = await tx.insert(examTypes).values({
+          publicId: randomUUID(),
+          schoolId: context.schoolId,
+          branchId,
+          name: "General",
+          averagePassing: false,
+          averageMark: "0.00",
+          createdBy: context.user.id,
+        }).$returningId();
+        examTypeId = createdType.id;
+      }
+    }
     const [exam] = await tx.insert(examinations).values({
       publicId: examPublicId,
       schoolId: context.schoolId,
       branchId,
       academicYearId: year.id,
       academicTermId: parsed.data.academicTermId || null,
-      examTypeId: examType.id,
-      gradingScaleId: scale.id,
+      examTypeId,
+      gradingScaleId: scaleId,
       examSystem: parsed.data.examSystem,
       name: parsed.data.name,
       startDate: parsed.data.startDate,
@@ -446,6 +525,7 @@ export async function createExamination(
       resourcePublicId: examPublicId,
       changedFields: ["name", "branchId", "examSystem", "components", "examTypeId", "academicYearId", "academicTermId", "classes", "subjects", "dates"],
     });
+    return exam.id;
   }).catch((error: unknown) => {
     if (isDuplicateEntryError(error)) return "duplicate" as const;
     throw error;
@@ -454,7 +534,7 @@ export async function createExamination(
     return { error: "An examination with that name already exists in this academic year." };
   }
   revalidatePath("/admin/examinations");
-  return { success: true };
+  redirect(`/admin/examinations/${createOutcome}`);
 }
 
 export async function updateExamSubjectSettings(

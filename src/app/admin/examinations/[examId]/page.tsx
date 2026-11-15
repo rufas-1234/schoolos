@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   academicYears,
@@ -118,6 +118,28 @@ export default async function ExaminationDetailPage({
     .where(and(eq(examSubjects.schoolId, context.schoolId), eq(examClasses.examinationId, exam.id)))
     .orderBy(asc(classLevels.name), asc(subjects.name));
   const visibleSubjects = assignedIds ? allSubjects.filter((subject) => assignedIds?.includes(subject.id)) : allSubjects;
+  const progressMarks = allSubjects.length
+    ? await db.select({
+      examSubjectId: examMarks.examSubjectId,
+      marks: examMarks.marks,
+    }).from(examMarks).where(and(
+      eq(examMarks.schoolId, context.schoolId),
+      inArray(examMarks.examSubjectId, allSubjects.map((subject) => subject.id)),
+    ))
+    : [];
+  const markProgressBySubject = new Map<number, { entered: number; total: number }>();
+  for (const mark of progressMarks) {
+    const progress = markProgressBySubject.get(mark.examSubjectId) ?? { entered: 0, total: 0 };
+    progress.total += 1;
+    if (mark.marks !== null) progress.entered += 1;
+    markProgressBySubject.set(mark.examSubjectId, progress);
+  }
+  const completeSubjects = allSubjects.filter((subject) => {
+    const progress = markProgressBySubject.get(subject.id);
+    return !!progress && progress.total > 0 && progress.entered === progress.total;
+  }).length;
+  const canPreviewReports = exam.name.startsWith("TEST DATA - ") && (canConfigure || canReview);
+  const reportsReady = exam.status === "published" || canPreviewReports;
   const classRows = await db.select({
     id: examClasses.id,
     classLevelId: classLevels.id,
@@ -167,8 +189,31 @@ export default async function ExaminationDetailPage({
         {canReview && exam.status === "open" && <PublishExaminationForm examinationId={exam.id} />}
       </header>
 
+      <section aria-label="Exam workflow" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { number: "1", title: "Check setup", detail: `${classRows.length} classes · ${allSubjects.length} subjects`, href: "/admin/examinations?section=setup", done: true },
+          { number: "2", title: "Enter marks", detail: `${completeSubjects} of ${allSubjects.length} subject rosters complete`, href: "/admin/examinations?section=marks&examId=" + exam.id, done: completeSubjects === allSubjects.length && allSubjects.length > 0 },
+          { number: "3", title: "Review & publish", detail: `${allSubjects.filter((subject) => subject.status === "approved").length} of ${allSubjects.length} assessments approved`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
+          { number: "4", title: "Generate reports", detail: exam.status === "published" ? "Class marksheets and student report cards are ready" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? `/admin/examinations/${exam.id}/reports/${classRows[0].id}${exam.status === "published" ? "" : "?preview=test"}` : null, done: exam.status === "published" },
+        ].map((step) => (
+          step.href ? (
+            <Link key={step.number} href={step.href} className={`rounded-xl border p-4 ${step.done ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-700">Step {step.number}</p>
+              <h2 className="mt-1 font-semibold text-slate-950">{step.title}</h2>
+              <p className="mt-1 text-xs text-slate-600">{step.detail}</p>
+            </Link>
+          ) : (
+            <div key={step.number} aria-disabled="true" className="cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 p-4 opacity-80">
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-700">Step {step.number}</p>
+              <h2 className="mt-1 font-semibold text-slate-950">{step.title}</h2>
+              <p className="mt-1 text-xs text-slate-600">{step.detail}</p>
+            </div>
+          )
+        ))}
+      </section>
+
       {canReview && exam.status === "open" && (
-        <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <section id="publication-checklist" className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <h2 className="font-bold text-slate-900">Publication checklist</h2>
           <p className="mt-1 text-sm text-slate-600">{allSubjects.filter((subject) => subject.status === "approved").length} of {allSubjects.length} assessments approved. {publishReady ? "All subject approvals are in; publication also rechecks every roster for complete marks." : "All assessments must be submitted and approved."}</p>
         </section>
@@ -190,7 +235,7 @@ export default async function ExaminationDetailPage({
       )}
 
       <section className="space-y-5">
-        <h2 className="text-xl font-bold text-slate-950">Classes and assessments</h2>
+        <h2 id="assessments" className="text-xl font-bold text-slate-950">Classes and assessments</h2>
         {classRows.map((classRow) => {
           const subjectRows = visibleSubjects.filter((subject) => subject.examClassId === classRow.id);
           if (!subjectRows.length) return null;
@@ -198,7 +243,14 @@ export default async function ExaminationDetailPage({
             <article key={classRow.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
                 <h3 className="text-lg font-bold">{classRow.className}</h3>
-                <span className="text-sm text-slate-500">{subjectRows.length} subjects</span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-slate-500">{subjectRows.length} subjects</span>
+                  {(exam.status === "published" || canPreviewReports) && (
+                    <Link href={`/admin/examinations/${exam.id}/reports/${classRow.id}${exam.status === "published" ? "" : "?preview=test"}`} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">
+                      {exam.status === "published" ? "Generate class report" : "Preview test report"}
+                    </Link>
+                  )}
+                </div>
               </div>
               {canReview && exam.status === "open" && <div className="p-4"><PrincipalRemarkForm examClassId={classRow.id} remark={classRow.principalRemark} /></div>}
               <div className="divide-y">
@@ -208,6 +260,7 @@ export default async function ExaminationDetailPage({
                       <div>
                         <h4 className="font-semibold text-slate-900">{subject.subjectName} <span className="text-xs font-normal text-slate-500">({subject.subjectCode})</span></h4>
                         <p className="mt-1 text-xs text-slate-500">Teacher: {subject.teacherFirstName ? `${subject.teacherFirstName} ${subject.teacherLastName}` : "Not assigned"} · {subject.examDate} · Maximum {subject.maxMarks} · Weight {subject.weight}</p>
+                        <p className="mt-1 text-xs text-slate-500">{markProgressBySubject.get(subject.id)?.entered ?? 0} of {markProgressBySubject.get(subject.id)?.total ?? 0} student marks entered</p>
                         {subject.reviewNote && <p className="mt-1 text-xs text-amber-800">Review note: {subject.reviewNote}</p>}
                       </div>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${subject.status === "published" || subject.status === "approved" ? "bg-emerald-100 text-emerald-800" : subject.status === "submitted" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-700"}`}>{subject.status}</span>
