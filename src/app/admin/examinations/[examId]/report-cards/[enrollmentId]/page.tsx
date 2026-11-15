@@ -332,7 +332,7 @@ export default async function ReportCardPage({
     : null;
 
   return (
-    <main className="mx-auto max-w-4xl space-y-5 p-6 print:max-w-none print:p-0">
+    <main className="exam-report-document mx-auto max-w-4xl space-y-5 p-6 print:max-w-none print:p-0">
       <header className="flex flex-wrap items-end justify-between gap-4 print:hidden">
         <div>
           <Link href={`/admin/examinations/${examId}`} className="text-sm font-semibold text-violet-700">← Back to {record.examinationName}</Link>

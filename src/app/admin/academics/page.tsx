@@ -1244,6 +1244,7 @@ export default async function AcademicStructurePage({
             {sectionId === "attendance" && (
               <AttendanceWorkspace
                 sections={activeSectionOptions}
+                schoolName={context.schoolName}
                 selectedSectionId={activeAttendanceSection ? String(activeAttendanceSection.id) : ""}
                 attendanceDate={attendanceDate}
                 roster={attendanceRoster.map((student) => ({

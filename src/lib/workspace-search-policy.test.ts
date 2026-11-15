@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankWorkspaceSearchResults } from "./workspace-search-policy";
+import { getFuzzySearchNgrams, rankWorkspaceSearchResults } from "./workspace-search-policy";
 
 const results = [
   { id: "attendance", title: "Student Attendance Report", description: "Daily attendance by class and date", href: "/attendance", category: "Pages" },
@@ -8,6 +8,12 @@ const results = [
 ];
 
 describe("workspace search policy", () => {
+  it("generates bounded fuzzy-match n-grams only for useful query tokens", () => {
+    expect(getFuzzySearchNgrams(["xy", "attendance"])).toEqual(["at", "te", "nd", "an", "ce"]);
+    expect(getFuzzySearchNgrams([Array.from({ length: 120 }, (_, index) => String.fromCharCode(97 + index % 26)).join("")])).toHaveLength(8);
+    expect(getFuzzySearchNgrams(["xy"])).toEqual([]);
+  });
+
   it("finds closest page matches when the query contains typos", () => {
     expect(rankWorkspaceSearchResults("studnt attendnce", results).map((result) => result.id))
       .toContain("attendance");

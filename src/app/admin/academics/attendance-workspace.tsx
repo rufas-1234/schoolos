@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { CheckCheck, Save } from "lucide-react";
+import { PrintButton } from "@/components/print-button";
 import { attendanceStatuses, type AttendanceStatus } from "@/lib/attendance-policy";
 import { SearchableSelect } from "@/components/searchable-select";
 import { saveAttendance } from "./attendance-actions";
@@ -26,12 +27,14 @@ const statusLabels: Record<AttendanceStatus, string> = {
 
 export function AttendanceWorkspace({
   sections,
+  schoolName,
   selectedSectionId,
   attendanceDate,
   roster,
   canManageAttendance,
 }: {
   sections: AttendanceOption[];
+  schoolName: string;
   selectedSectionId: string;
   attendanceDate: string;
   roster: AttendanceRecord[];
@@ -130,6 +133,7 @@ export function AttendanceWorkspace({
                 </span>
               ))}
             </div>
+            <PrintButton label="Print attendance report" targetId="student-attendance-report-output" />
           </div>
           {canManageAttendance ? (
             <form action={formAction}>
@@ -244,6 +248,43 @@ export function AttendanceWorkspace({
               </table>
             </div>
           )}
+          <section
+            id="student-attendance-report-output"
+            className="hidden student-report-document p-6 print:block print-report-content"
+          >
+            <header className="mb-5 border-b-2 border-black pb-4 text-center">
+              <h1 className="text-2xl font-bold">{schoolName}</h1>
+              <h2 className="mt-1 text-xl font-bold">Student Attendance Report</h2>
+              <p className="mt-2 text-sm">
+                {sections.find((section) => String(section.id) === selectedSectionId)?.label ?? "Class section"} · {attendanceDate}
+              </p>
+            </header>
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Student</th>
+                  <th>Student ID</th>
+                  <th>Status</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map((student, index) => (
+                  <tr key={student.studentId}>
+                    <td>{index + 1}</td>
+                    <td>{student.firstName} {student.lastName}</td>
+                    <td>{student.publicId}</td>
+                    <td>{student.status ? statusLabels[student.status] : "Not marked"}</td>
+                    <td>{student.note ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <footer className="mt-6 border-t border-black pt-2 text-xs">
+              {roster.length} enrolled {roster.length === 1 ? "student" : "students"} · Generated {new Date().toLocaleDateString()}
+            </footer>
+          </section>
         </section>
       )}
     </div>

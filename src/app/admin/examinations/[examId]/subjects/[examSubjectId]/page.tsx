@@ -232,7 +232,7 @@ export default async function SubjectMarksPage({
       .limit(1)
     : [];
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6">
+    <main className="exam-report-document mx-auto max-w-6xl space-y-6 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link href={`/admin/examinations/${examId}`} className="text-sm font-semibold text-violet-700">← {subject.examName}</Link>

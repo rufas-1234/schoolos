@@ -428,6 +428,80 @@ h6 {
     padding-left: 0 !important;
   }
 
+  .exam-report-document,
+  .student-report-document {
+    color: #111 !important;
+    background: white !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+  }
+
+  .exam-report-document *,
+  .student-report-document * {
+    color: #111 !important;
+    background-color: transparent !important;
+    border-color: #333 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .exam-report-document h1,
+  .exam-report-document h2,
+  .exam-report-document h3,
+  .student-report-document h1,
+  .student-report-document h2,
+  .student-report-document h3 {
+    font-family: Georgia, "Times New Roman", serif !important;
+    letter-spacing: normal !important;
+  }
+
+  .exam-report-document .print-report-content,
+  .student-report-document {
+    background: white !important;
+    font-size: 9pt;
+  }
+
+  .exam-report-document .exam-report-heading,
+  .exam-report-document .print-report-heading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-bottom: 1px solid #111 !important;
+    text-align: center;
+  }
+
+  .exam-report-document img {
+    filter: grayscale(1);
+  }
+
+  .exam-report-document .exam-report-heading h2 {
+    color: #111 !important;
+  }
+
+  .exam-report-document .print-report-content table,
+  .student-report-document table {
+    border-collapse: collapse;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+
+  .exam-report-document .print-report-content th,
+  .exam-report-document .print-report-content td,
+  .student-report-document th,
+  .student-report-document td {
+    border: 1px solid #333 !important;
+    padding: 2mm;
+    color: #111 !important;
+  }
+
+  .exam-report-document .print-report-content thead th,
+  .student-report-document thead th {
+    background: #e8e8e8 !important;
+    color: #111 !important;
+  }
+
+  .exam-report-document .a4-report-card {
+    border: 1px solid #111 !important;
+  }
+
   .print-report-page > :not(.print-report-content) {
     display: none !important;
   }

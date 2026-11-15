@@ -761,7 +761,7 @@ export default async function ExaminationReportPage({
   const previousExams = previousExamRows.slice(0, 6);
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-6">
+    <main className="exam-report-document mx-auto max-w-7xl space-y-6 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4 print:hidden">
         <div>
           <Link href="/admin/examinations" className="text-sm font-semibold text-violet-700">← Examinations</Link>

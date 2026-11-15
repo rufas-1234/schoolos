@@ -17,7 +17,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { rankWorkspaceSearchResults } from "@/lib/workspace-search-policy";
+import { getFuzzySearchNgrams, rankWorkspaceSearchResults } from "@/lib/workspace-search-policy";
 
 const querySchema = z.string().trim().min(2).max(120);
 const workspacePermissions = [
@@ -44,6 +44,19 @@ export type WorkspaceSearchResult = {
 
 function patternFor(query: string): string {
   return `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
+function fuzzyTextMatch(queryTokens: string[], ...columns: Array<Parameters<typeof like>[0]>) {
+  const tokenPredicates = queryTokens
+    .slice(0, 8)
+    .map((token) => {
+      const grams = getFuzzySearchNgrams([token]);
+      const predicates = columns.flatMap((column) => grams.length
+        ? grams.map((gram) => like(sql`lower(${column})`, patternFor(gram)))
+        : [like(sql`lower(${column})`, patternFor(token))]);
+      return predicates.length ? or(...predicates) : sql`false`;
+    });
+  return tokenPredicates.length ? and(...tokenPredicates) : sql`false`;
 }
 
 export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearchResult[]> {
@@ -96,9 +109,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (canViewStudents) {
     addPage("student-list", "Student list", "Search and manage student profiles", "/admin/students", ["students", "student records", "directory", "lists"]);
-    addPage("student-attendance", "Student attendance", "Daily attendance by class and date", "/admin/academics?section=attendance", ["attendance register", "absent", "present"]);
-    addPage("student-attendance-report", "Student Attendance Report", "Review daily attendance by class section and date", "/admin/academics?section=attendance", ["attendance report", "student attendance"]);
-    addPage("student-routine-report", "Class Routine", "View and print a class section timetable", "/admin/academics?section=routines", ["class routine", "timetable"]);
+    addPage("student-reports", "Student Reports", "Open supported student reports, attendance reports, and class routines", "/admin/students/reports", ["student report", "attendance report", "class routine", "timetable"]);
     addPage("student-directory-report", "Student Report", "View or print the student directory", "/admin/students?action=export", ["student report", "student list", "directory"]);
     addPage("student-groups", "Student groups", "Student group lists", "/admin/students/groups", ["group"]);
     addPage("student-disabled", "Disabled students", "Students marked disabled", "/admin/students/disabled");
@@ -133,12 +144,6 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const queryTokens = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const tokenMatch = (column: Parameters<typeof like>[0]) =>
     and(...queryTokens.map((token) => like(sql`lower(${column})`, patternFor(token))));
-  const soundexMatch = (column: Parameters<typeof like>[0]) => {
-    const soundexTerms = queryTokens
-      .filter((token) => token.length >= 3)
-      .map((token) => sql`SOUNDEX(${column}) = SOUNDEX(${token})`);
-    return soundexTerms.length ? or(...soundexTerms) : sql`false`;
-  };
   const [studentRows, staffRows, academicRows, examRows] = await Promise.all([
     canViewStudents
       ? db.select({
@@ -153,8 +158,11 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(students.firstName),
             tokenMatch(students.lastName),
             tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
-            soundexMatch(students.firstName),
-            soundexMatch(students.lastName),
+            fuzzyTextMatch(queryTokens,
+              students.firstName,
+              students.lastName,
+              sql`concat(${students.firstName}, ' ', ${students.lastName})`,
+            ),
             like(sql`lower(${students.admissionNumber})`, pattern),
             like(sql`lower(${students.publicId})`, pattern),
           ),
@@ -177,8 +185,11 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(staffMembers.firstName),
             tokenMatch(staffMembers.lastName),
             tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
-            soundexMatch(staffMembers.firstName),
-            soundexMatch(staffMembers.lastName),
+            fuzzyTextMatch(queryTokens,
+              staffMembers.firstName,
+              staffMembers.lastName,
+              sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`,
+            ),
             like(sql`lower(${staffMembers.employeeCode})`, pattern),
             tokenMatch(staffMembers.jobTitle),
             tokenMatch(staffMembers.department),
@@ -193,7 +204,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           .from(classLevels)
           .where(and(
             eq(classLevels.schoolId, context.schoolId),
-            or(tokenMatch(classLevels.name), soundexMatch(classLevels.name), like(sql`lower(${classLevels.code})`, pattern)),
+            or(tokenMatch(classLevels.name), fuzzyTextMatch(queryTokens, classLevels.name), like(sql`lower(${classLevels.code})`, pattern)),
           ))
           .orderBy(asc(classLevels.name))
           .limit(20),
@@ -213,7 +224,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           ))
           .where(and(
             eq(classSections.schoolId, context.schoolId),
-            or(tokenMatch(classSections.name), tokenMatch(classLevels.name), soundexMatch(classSections.name), soundexMatch(classLevels.name)),
+            or(tokenMatch(classSections.name), tokenMatch(classLevels.name), fuzzyTextMatch(queryTokens, classSections.name, classLevels.name)),
           ))
           .orderBy(asc(classLevels.name), asc(classSections.name))
           .limit(20),
@@ -224,7 +235,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         }).from(subjects)
           .where(and(
             eq(subjects.schoolId, context.schoolId),
-            or(tokenMatch(subjects.name), soundexMatch(subjects.name), like(sql`lower(${subjects.code})`, pattern)),
+            or(tokenMatch(subjects.name), fuzzyTextMatch(queryTokens, subjects.name), like(sql`lower(${subjects.code})`, pattern)),
           ))
           .orderBy(asc(subjects.name))
           .limit(20),
@@ -248,7 +259,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         ))
         .where(and(
           eq(examinations.schoolId, context.schoolId),
-          or(tokenMatch(examinations.name), tokenMatch(classLevels.name), soundexMatch(examinations.name), soundexMatch(classLevels.name)),
+          or(tokenMatch(examinations.name), tokenMatch(classLevels.name), fuzzyTextMatch(queryTokens, examinations.name, classLevels.name)),
         ))
         .orderBy(asc(examinations.startDate), asc(examinations.name))
         .limit(30)
@@ -289,7 +300,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           ))
           .where(and(
             eq(examinations.schoolId, context.schoolId),
-            or(tokenMatch(examinations.name), tokenMatch(classLevels.name), soundexMatch(examinations.name), soundexMatch(classLevels.name)),
+            or(tokenMatch(examinations.name), tokenMatch(classLevels.name), fuzzyTextMatch(queryTokens, examinations.name, classLevels.name)),
           ))
           .groupBy(examinations.id, examinations.name, examinations.status, examinations.startDate, classLevels.name)
           .orderBy(asc(examinations.startDate), asc(examinations.name))

@@ -35,6 +35,19 @@ function termScore(queryTerm: string, candidate: string): number {
   return 1 - editDistance(queryTerm, candidate) / Math.max(queryTerm.length, candidate.length);
 }
 
+export function getFuzzySearchNgrams(queryTerms: string[]): string[] {
+  const grams = new Set<string>();
+  for (const token of queryTerms.slice(0, 8)) {
+    if (token.length < 3) continue;
+    const pairCount = token.length - 1;
+    const step = Math.max(1, Math.ceil(pairCount / 8));
+    for (let index = 0; index < pairCount && grams.size < 64; index += step) {
+      grams.add(token.slice(index, index + 2));
+    }
+  }
+  return [...grams];
+}
+
 function resultScore(query: string, result: RankedWorkspaceSearchResult): number {
   const normalizedQuery = normalize(query).trim();
   const content = normalize(`${result.title} ${result.description} ${(result.searchTerms ?? []).join(" ")}`);
