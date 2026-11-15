@@ -185,14 +185,14 @@ export default async function StaffPayrollPage({
         )}
       </div>
 
-      <section className="print-report-content space-y-5">
+      <section id="payroll-report-to-print" className="print-report-content space-y-5">
         <header className="flex flex-wrap items-end justify-between gap-4 print-report-heading">
           <div>
             <p className="print-report-kicker">Human resources · Payroll</p>
             <h2>Payroll report</h2>
             <p>{branch ? `${branch.name} · ` : ""}{payPeriod} · {selectedStatus === "all" ? "All payment statuses" : selectedStatus}{staffSearch ? ` · Search: ${staffSearch}` : ""}</p>
           </div>
-          <PrintButton label="Print payroll report" />
+          <PrintButton label="Print payroll report" targetId="payroll-report-to-print" />
         </header>
         <section className="grid gap-3 sm:grid-cols-4">
           <SummaryCard label="Staff on report" value={String(records.length)} />

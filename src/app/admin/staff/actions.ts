@@ -355,7 +355,7 @@ async function applyStaffLoginAccess(
         ));
     }
     return {
-      linkedUserId: null,
+      linkedUserId: submittedLinkedUserId,
       action: previousLinkedUserId ? "staff.login_access.disabled" : null,
       passwordChanged: false,
     };

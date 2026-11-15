@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { RequiredMark } from "@/components/required-mark";
 import { SearchableSelect } from "@/components/searchable-select";
+import { printElementById } from "@/components/print-button";
 import {
   assignStaffLeaveBalance,
   createStaffLeaveRequest,
@@ -363,17 +364,7 @@ export function PayrollRecordPrintButton({
     <>
       <button
         type="button"
-        onClick={() => {
-          const target = document.getElementById(targetId);
-          if (!target) return;
-          target.classList.add("payroll-record-print-target");
-          document.body.classList.add("payroll-record-printing");
-          window.addEventListener("afterprint", () => {
-            target.classList.remove("payroll-record-print-target");
-            document.body.classList.remove("payroll-record-printing");
-          }, { once: true });
-          window.print();
-        }}
+        onClick={() => printElementById(targetId, "Payroll statement")}
         className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
       >
         Print

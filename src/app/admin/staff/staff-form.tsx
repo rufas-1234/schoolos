@@ -114,6 +114,7 @@ export function StaffForm({
     }
     if (!state.error || !submittedValues.current || !formRef.current) return;
     for (const [name, values] of submittedValues.current) {
+      if (name === "accountPassword" || name === "accountPasswordConfirmation") continue;
       const field = formRef.current.elements.namedItem(name);
       if (field instanceof RadioNodeList) {
         field.value = values[0] ?? "";
