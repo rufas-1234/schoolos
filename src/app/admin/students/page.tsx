@@ -49,12 +49,13 @@ const genderLabels: Record<string, string> = {
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ action?: string | string[]; search?: string | string[] }>;
+  searchParams: Promise<{ action?: string | string[]; search?: string | string[]; profile?: string | string[] }>;
 }) {
-  const { action, search } = await searchParams;
+  const { action, search, profile } = await searchParams;
   const openAddStudent = action === "add";
   const exportMode = action === "export";
   const initialSearch = typeof search === "string" ? search.slice(0, 120) : "";
+  const profilePublicId = typeof profile === "string" && profile.length <= 36 ? profile : "";
   const context = await requireSchoolPermission("students.view");
   const [savedStudentSettings] = await db.select({ fields: studentSettings.fields })
     .from(studentSettings).where(eq(studentSettings.schoolId, context.schoolId)).limit(1);
@@ -254,8 +255,13 @@ export default async function StudentsPage({
   const canOpenReportCards = context.grantedPermissions.some((permission) =>
     ["examinations.create", "results.enter", "results.publish"].includes(permission),
   );
+  const profileRecord = profilePublicId
+    ? records.find((record) => record.publicId === profilePublicId)
+    : undefined;
   const tableInitialSearch =
-    /^\d+$/.test(initialSearch)
+    profileRecord
+      ? `${profileRecord.firstName} ${profileRecord.lastName}`
+      : /^\d+$/.test(initialSearch)
       ? records.find((record) => String(record.id) === initialSearch)?.publicId ?? initialSearch
       : initialSearch;
   const [branches, years, classes, sections, categoryOptions] = await Promise.all([
@@ -517,6 +523,7 @@ export default async function StudentsPage({
                   title={`${record.firstName} ${record.lastName}`}
                   mode="view"
                   wide
+                  initialOpen={record.publicId === profilePublicId}
                 >
                   <StudentProfileDetails
                     studentName={`${record.firstName} ${record.lastName}`}

@@ -90,18 +90,24 @@ export function AdminRecordDialog({
   mode = "edit",
   wide = false,
   showLabel = false,
+  initialOpen = false,
   children,
 }: {
   title: string;
   mode?: "view" | "edit";
   wide?: boolean;
   showLabel?: boolean;
+  initialOpen?: boolean;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const Icon = mode === "view" ? Eye : Pencil;
   const actionLabel = mode === "view" ? "View" : "Edit";
+
+  useEffect(() => {
+    if (initialOpen) dialogRef.current?.showModal();
+  }, [initialOpen]);
 
   return (
     <>

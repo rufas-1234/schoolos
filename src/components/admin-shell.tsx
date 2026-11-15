@@ -24,7 +24,7 @@ import { authClient } from "@/lib/auth-client";
 import { academicSections } from "@/lib/academic-sections";
 import { studentSections } from "@/lib/student-sections";
 import { cn } from "@/lib/utils";
-import { StudentQuickSearch } from "@/components/student-quick-search";
+import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 
 type NavigationChild = {
   id: string;
@@ -467,7 +467,7 @@ export function AdminShell({
             <span className="text-sm font-semibold text-slate-800 sm:hidden">SchoolOS</span>
           </div>
 
-          {permissions.includes("students.view") && <StudentQuickSearch />}
+          <WorkspaceQuickSearch />
 
           <div className="flex items-center gap-2">
             <div className="mx-1 hidden h-8 w-px bg-slate-100 sm:block" />
