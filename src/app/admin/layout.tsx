@@ -30,6 +30,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <AdminShell
       schoolName={context.schoolName}
+      schoolLogoUrl={context.schoolLogoUrl}
       schoolEmail={context.schoolEmail}
       schoolPhone={context.schoolPhone}
       schoolAddress={context.schoolAddress}

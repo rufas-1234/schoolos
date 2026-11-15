@@ -12,7 +12,6 @@ const profileSchema = z.object({
   email: z.union([z.literal(""), z.string().trim().email().max(320)]),
   phone: z.string().trim().max(40),
   address: z.string().trim().max(1000),
-  logoUrl: z.union([z.literal(""), z.string().trim().url().max(2048).refine((value) => value.startsWith("https://"))]),
   currency: z.string().trim().regex(/^[A-Z]{3}$/),
   timezone: z
     .string()
@@ -41,7 +40,6 @@ export async function updateSchoolProfile(
     email: formData.get("email"),
     phone: formData.get("phone"),
     address: formData.get("address"),
-    logoUrl: formData.get("logoUrl"),
     currency: formData.get("currency"),
     timezone: formData.get("timezone"),
   });
@@ -55,7 +53,6 @@ export async function updateSchoolProfile(
     email: result.data.email || null,
     phone: result.data.phone || null,
     address: result.data.address || null,
-    logoUrl: result.data.logoUrl || null,
     currency: result.data.currency,
     timezone: result.data.timezone,
   };

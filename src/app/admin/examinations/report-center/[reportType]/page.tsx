@@ -28,6 +28,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { schoolLogoSource } from "@/lib/school-logo";
 import {
   calculateWeightedAverage,
   gradeForPercentage,
@@ -116,9 +117,10 @@ function ReportHeading({
   title: string;
   subtitle: string;
 }) {
+  const logoSrc = schoolLogoSource(schoolLogoUrl);
   return (
     <header className="exam-report-heading flex items-center gap-4">
-      {schoolLogoUrl && <Image src={schoolLogoUrl} unoptimized width={64} height={64} alt={`${schoolName} logo`} className="h-16 w-16 object-contain" />}
+      {logoSrc && <Image src={logoSrc} unoptimized width={64} height={64} alt={`${schoolName} logo`} className="h-16 w-16 object-contain" />}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold uppercase tracking-wide text-slate-700">{schoolName}</p>
         <h2 className="mt-1 text-xl font-bold text-slate-950">{title}</h2>

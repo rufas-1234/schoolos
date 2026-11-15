@@ -123,6 +123,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("exam-attendance", "Exam attendance", "Attendance for examination sittings", "/admin/examinations?section=attendance", ["exam attendance"]);
     addPage("marks-register", "Marks register", "Enter or review marks by subject roster", "/admin/examinations?section=marks", ["results", "scores"]);
     addPage("exam-reports", "Exams Reports", "Merit lists, marksheets, tabulation and progress cards", "/admin/examinations/report-center/exam-routine", ["report", "reports", "report cards"]);
+    if (permissions.has("examinations.create") || permissions.has("results.publish")) {
+      addPage("exam-analytics", "Exam Analytics", "Compare published examination results by class, stream, subject and student", "/admin/exam-analytics", ["exam analytics", "class performance", "subject performance", "student performance", "mean grade"]);
+    }
     addPage("send-marks-sms", "Send Marks By SMS", "Send published examination results", "/admin/examinations?section=sms", ["sms", "text message"]);
   }
   if (canManageStaff) {

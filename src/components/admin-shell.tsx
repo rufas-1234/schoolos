@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
@@ -25,6 +26,7 @@ import { academicSections } from "@/lib/academic-sections";
 import { studentSections } from "@/lib/student-sections";
 import { cn } from "@/lib/utils";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
+import { schoolLogoSource } from "@/lib/school-logo";
 
 type NavigationChild = {
   id: string;
@@ -83,6 +85,7 @@ const navigation: NavigationItem[] = [
       { id: "marks-grade", label: "Marks Grade", href: "/admin/examinations?section=grades", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "grades" } },
       { id: "send-marks-sms", label: "Send Marks By SMS", href: "/admin/examinations?section=sms", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "sms" } },
       { id: "exam-reports", label: "Exams Reports", href: "/admin/examinations/report-center/exam-routine" },
+      { id: "exam-analytics", label: "Exam Analytics", href: "/admin/exam-analytics", matchPath: "/admin/exam-analytics", permission: "examinations.create", permissionAlternatives: ["results.publish"] },
     ],
   },
   {
@@ -139,6 +142,7 @@ const navigation: NavigationItem[] = [
 export function AdminShell({
   children,
   schoolName,
+  schoolLogoUrl,
   schoolEmail,
   schoolPhone,
   schoolAddress,
@@ -148,6 +152,7 @@ export function AdminShell({
 }: {
   children: ReactNode;
   schoolName: string;
+  schoolLogoUrl: string | null;
   schoolEmail: string | null;
   schoolPhone: string | null;
   schoolAddress: string | null;
@@ -174,7 +179,7 @@ export function AdminShell({
     pathname.startsWith("/admin/fees"),
   );
   const [examinationsOpen, setExaminationsOpen] = useState(() =>
-    pathname.startsWith("/admin/examinations"),
+    pathname.startsWith("/admin/examinations") || pathname === "/admin/exam-analytics",
   );
   const router = useRouter();
   const visibleNavigation = navigation.filter((item) =>
@@ -207,6 +212,7 @@ export function AdminShell({
       .map((word) => word[0])
       .join("")
       .toLocaleUpperCase() || "S";
+  const schoolLogo = schoolLogoSource(schoolLogoUrl);
   const activeSection = academicSections.find(
     (section) => section.id === searchParams.get("section"),
   );
@@ -234,6 +240,8 @@ export function AdminShell({
           ? activeHrSection?.label ?? "User roles"
         : pathname.startsWith("/admin/fees")
           ? activeFinanceSection?.label ?? "Finances"
+        : pathname === "/admin/exam-analytics"
+          ? "Exam Analytics"
       : visibleNavigation.find(
         (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
       )?.label ?? "Workspace";
@@ -263,7 +271,9 @@ export function AdminShell({
     <aside className="print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-100 bg-white px-5 py-6">
       <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
-          <GraduationCap size={24} />
+          {schoolLogo
+            ? <Image src={schoolLogo} unoptimized width={44} height={44} alt={`${schoolName} logo`} className="h-full w-full rounded-2xl bg-white object-contain" />
+            : <GraduationCap size={24} />}
         </span>
         <span className="min-w-0">
           <span className="block truncate text-sm font-bold text-slate-900">{schoolName}</span>
@@ -284,6 +294,7 @@ export function AdminShell({
           const active =
             pathname === href ||
             (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
+            (href === "/admin/examinations" && pathname === "/admin/exam-analytics") ||
             (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees")) ||
             (href === "/admin/hr" && pathname === "/admin/settings/roles");
           if (children) {
@@ -427,7 +438,9 @@ export function AdminShell({
     <div className="min-h-screen bg-[#f7f7fa]">
       <header className="admin-print-header" aria-label={`${schoolName} letterhead`}>
         <div className="admin-print-crest" aria-hidden="true">
-          <span>{schoolMonogram}</span>
+          {schoolLogo
+            ? <Image src={schoolLogo} unoptimized width={40} height={40} alt="" className="h-full w-full rounded-full bg-white object-contain" />
+            : <span>{schoolMonogram}</span>}
         </div>
         <div className="admin-print-identity">
           <p className="admin-print-eyebrow">Official school record</p>

@@ -27,6 +27,7 @@ import {
 } from "@/db/schema";
 import { PrintButton } from "@/components/print-button";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { schoolLogoSource } from "@/lib/school-logo";
 import {
   calculateWeightedAverage,
   canPreviewDraftTestReport,
@@ -314,6 +315,7 @@ export default async function ReportCardPage({
   const photoUrl = photoAllowed && photo?.objectKey && photo.fileName
     ? `/api/admin/students/${record.studentPublicId}/photo`
     : null;
+  const schoolLogo = schoolLogoSource(record.schoolLogoUrl);
 
   return (
     <main className="exam-report-document mx-auto max-w-4xl space-y-5 p-6 print:max-w-none print:p-0">
@@ -327,7 +329,7 @@ export default async function ReportCardPage({
       <article id="student-report-card" className="a4-report-card a4-report-card-last print-report-content space-y-5 rounded-2xl border border-slate-200 bg-white p-7 text-slate-900 print:rounded-none print:border-0 print:p-0">
         {draftPreview && <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-amber-950 print:border-2">Draft test preview — not official; scores are synthetic</div>}
         <header className="print-report-heading flex items-center gap-4">
-          {record.schoolLogoUrl && <Image src={record.schoolLogoUrl} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="h-16 w-16 rounded-lg object-contain" />}
+          {schoolLogo && <Image src={schoolLogo} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="h-16 w-16 rounded-lg object-contain" />}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold uppercase tracking-wide text-violet-700">{record.schoolName}</p>
             <h2 className="mt-1 text-2xl font-bold">Academic report</h2>

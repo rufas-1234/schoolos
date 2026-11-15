@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { schools } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { SchoolSettingsForm } from "./school-settings-form";
+import { SchoolLogoUpload } from "./school-logo-upload";
 
 export default async function SchoolSettingsPage() {
   const context = await requireSchoolPermission("school.settings.manage");
@@ -19,6 +20,9 @@ export default async function SchoolSettingsPage() {
           Keep your school&apos;s core information and regional settings up to date.
         </p>
       </div>
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
+        <SchoolLogoUpload logoUrl={school.logoUrl} />
+      </section>
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
         <SchoolSettingsForm school={school} />
       </section>

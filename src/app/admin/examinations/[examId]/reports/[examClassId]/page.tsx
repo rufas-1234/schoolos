@@ -24,6 +24,7 @@ import {
   classSubjects,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { schoolLogoSource } from "@/lib/school-logo";
 import {
   calculateWeightedAverage,
   canPreviewDraftTestReport,
@@ -241,6 +242,7 @@ export default async function ClassMarksheetReportPage({
       : []))
     : new Map<number, number>();
   const passMark = exam.averagePassing ? Number(exam.averageMark ?? 0) : 0;
+  const schoolLogo = schoolLogoSource(exam.schoolLogoUrl);
 
   return (
     <main className="exam-report-document print-report-page mx-auto max-w-7xl space-y-5 p-6 print:max-w-none print:p-0">
@@ -255,7 +257,7 @@ export default async function ClassMarksheetReportPage({
 
       <section id="class-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
         <header className="print-report-heading flex items-center gap-4">
-          {exam.schoolLogoUrl && <Image src={exam.schoolLogoUrl} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="h-14 w-14 object-contain" />}
+          {schoolLogo && <Image src={schoolLogo} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="h-14 w-14 object-contain" />}
           <div className="flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide">{exam.schoolName}</p>
             <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className} marksheet</h2>
@@ -292,7 +294,7 @@ export default async function ClassMarksheetReportPage({
       <section id="class-marksheet-report" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
         {draftPreview && <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-center text-sm font-bold uppercase text-amber-950 print:border-2">Draft test preview — not official; scores are synthetic</div>}
         <header className="print-report-heading flex items-center gap-4">
-          {exam.schoolLogoUrl && <Image src={exam.schoolLogoUrl} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="h-14 w-14 object-contain" />}
+          {schoolLogo && <Image src={schoolLogo} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="h-14 w-14 object-contain" />}
           <div className="flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">{exam.schoolName}</p>
             <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className}</h2>
