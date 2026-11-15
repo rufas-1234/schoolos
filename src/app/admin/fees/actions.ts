@@ -529,6 +529,10 @@ export async function createFeeStructure(
         eq(classSections.id, studentEnrollments.classSectionId),
         eq(classSections.schoolId, context.schoolId),
       ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSections.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+      ))
       .innerJoin(students, and(
         eq(students.id, studentEnrollments.studentId),
         eq(students.schoolId, context.schoolId),
@@ -537,9 +541,10 @@ export async function createFeeStructure(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.academicYearId, year.id),
         eq(studentEnrollments.status, "enrolled"),
+        eq(classSections.academicYearId, year.id),
         eq(classSections.classLevelId, classLevel.id),
         eq(students.id, result.data.studentId),
-        eq(students.branchId, branch.id),
+        eq(classLevels.branchId, branch.id),
         inArray(students.status, ["admitted", "active"]),
       ))
       .limit(1);
@@ -648,6 +653,10 @@ export async function generateStudentFeeInvoices(
         eq(classSections.id, studentEnrollments.classSectionId),
         eq(classSections.schoolId, context.schoolId),
       ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSections.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+      ))
       .innerJoin(students, and(eq(students.id, studentEnrollments.studentId), eq(students.schoolId, context.schoolId)))
       .leftJoin(studentFeeDiscounts, and(
         eq(studentFeeDiscounts.studentId, students.id),
@@ -664,7 +673,7 @@ export async function generateStudentFeeInvoices(
         eq(studentEnrollments.status, "enrolled"),
         eq(classSections.academicYearId, structure.academicYearId),
         eq(classSections.classLevelId, structure.classLevelId),
-        eq(students.branchId, structure.branchId),
+        eq(classLevels.branchId, structure.branchId),
         inArray(students.status, ["admitted", "active"]),
         ...(structure.studentId !== null ? [eq(students.id, structure.studentId)] : []),
         ...(studentId?.success ? [eq(students.id, studentId.data)] : []),
