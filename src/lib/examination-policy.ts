@@ -68,6 +68,31 @@ export function calculateComponentTotal(
   };
 }
 
+export function completeSubmittedMarkIds(
+  componentKeys: Iterable<string>,
+  rosterMarkIds: number[],
+  componentIds: number[],
+): number[] | null {
+  const rosterIds = new Set(rosterMarkIds);
+  const validComponentIds = new Set(componentIds);
+  const submittedIds = new Set<number>();
+  const submittedKeys = new Set(componentKeys);
+
+  for (const key of submittedKeys) {
+    const match = /^(\d+):(\d+)$/.exec(key);
+    if (!match) return null;
+    const markId = Number(match[1]);
+    const componentId = Number(match[2]);
+    if (!rosterIds.has(markId) || !validComponentIds.has(componentId)) return null;
+    submittedIds.add(markId);
+  }
+
+  for (const markId of submittedIds) {
+    if (componentIds.some((componentId) => !submittedKeys.has(`${markId}:${componentId}`))) return null;
+  }
+  return [...submittedIds];
+}
+
 export function validateGradeBands(bands: GradeBand[]): string | null {
   if (bands.length === 0) return "Add at least one grade band.";
   const sorted = [...bands].sort((a, b) => a.minPercent - b.minPercent);

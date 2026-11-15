@@ -37,6 +37,7 @@ import { isCalendarDate, isValidDateRange } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import {
   calculateComponentTotal,
+  completeSubmittedMarkIds,
   parseExamComponents,
   validateGradeBands,
   type GradeBand,
@@ -1015,6 +1016,7 @@ export async function saveExamMarks(
   }> = [];
   const markById = new Map(currentMarks.map((mark) => [String(mark.id), mark]));
   const seenComponentKeys = new Set<string>();
+  const submittedComponentMarks = new Map<string, number | null>();
   for (const [fieldName, raw] of formData.entries()) {
     const match = /^component_(\d+)_(\d+)$/.exec(fieldName);
     if (!match || typeof raw !== "string") continue;
@@ -1033,22 +1035,30 @@ export async function saveExamMarks(
     if (marks !== null && (marks < 0 || marks > Number(existingComponent.maxMarks))) {
       return { error: `Marks for ${existingComponent.title} must be between 0 and ${existingComponent.maxMarks}.` };
     }
+    submittedComponentMarks.set(componentKey, marks);
   }
-  if (seenComponentKeys.size !== currentMarks.length * componentDefinitions.length) {
-    return { error: "Submit every component for every student in this assessment roster." };
+  const submittedMarkIds = completeSubmittedMarkIds(
+    seenComponentKeys,
+    currentMarks.map((mark) => mark.id),
+    componentDefinitions.map((component) => component.id),
+  );
+  if (!submittedMarkIds) {
+    return { error: "Submit every mark component for each student you are saving." };
   }
-  for (const mark of currentMarks) {
+  if (submittedMarkIds.length === 0) {
+    return { error: "Choose at least one student to save." };
+  }
+  const submittedMarkIdSet = new Set(submittedMarkIds);
+  for (const mark of currentMarks.filter((currentMark) => submittedMarkIdSet.has(currentMark.id))) {
     const components = componentDefinitions.map((component) => {
       const current = componentRowByKey.get(`${mark.id}:${component.id}`);
-      const raw = formData.get(`component_${mark.id}_${component.id}`);
-      if (!current || typeof raw !== "string") return null;
-      const parsedMark = raw.trim() === "" ? null : numericField.safeParse(raw.trim());
-      if (parsedMark !== null && !parsedMark.success) return null;
+      const componentKey = `${mark.id}:${component.id}`;
+      if (!current || !submittedComponentMarks.has(componentKey)) return null;
       return {
         id: current.id,
         componentId: component.id,
         maxMarks: Number(component.maxMarks),
-        marks: parsedMark === null ? null : parsedMark.data,
+        marks: submittedComponentMarks.get(componentKey) ?? null,
       };
     });
     if (components.some((component) => component === null)) {
@@ -1070,7 +1080,7 @@ export async function saveExamMarks(
       components: componentUpdates,
     });
   }
-  if (updates.length !== currentMarks.length) return { error: "Submit the complete student roster for this assessment." };
+  if (updates.length !== submittedMarkIds.length) return { error: "A student or component value is invalid. Reload this assessment and try again." };
 
   const saveOutcome = await db.transaction(async (tx) => {
     const [lockedSubject] = await tx.select({
@@ -1112,12 +1122,12 @@ export async function saveExamMarks(
       inArray(examComponentMarks.examMarkId, lockedMarks.map((mark) => mark.id)),
     )).for("update");
     if (
-      lockedMarks.length !== updates.length ||
+      lockedMarks.length !== currentMarks.length ||
       updates.some((update) => !lockedMarks.some((mark) => mark.id === update.markId && mark.enrollmentId === update.enrollmentId))
     ) {
       return "roster-changed" as const;
     }
-    if (lockedComponents.length !== updates.length * componentDefinitions.length ||
+    if (lockedComponents.length !== currentMarks.length * componentDefinitions.length ||
       updates.some((update) => update.components.some((component) =>
         !lockedComponents.some((row) => row.id === component.id && row.examMarkId === update.markId && row.examComponentId === component.componentId),
       ))) {

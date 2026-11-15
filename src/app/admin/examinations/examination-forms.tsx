@@ -370,43 +370,71 @@ export function SaveMarksForm({
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamMarks, {});
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(students.flatMap((student) => [
+      ...student.components.map((component) => [
+        `component_${student.markId}_${component.id}`,
+        component.marks ?? "",
+      ]),
+      [`remark_${student.enrollmentId}`, student.teacherRemark ?? ""],
+    ])),
+  );
   const normalizedSearch = search.trim().toLocaleLowerCase();
-  const visibleCount = students.filter((student) =>
+  const filteredStudents = students.filter((student) =>
     `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
-  ).length;
+  );
+  const pageSize = 20;
+  const pageCount = Math.ceil(filteredStudents.length / pageSize);
+  const currentPage = Math.min(page, Math.max(pageCount - 1, 0));
+  const visibleStudents = filteredStudents.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const firstVisible = filteredStudents.length === 0 ? 0 : currentPage * pageSize + 1;
+  const lastVisible = Math.min((currentPage + 1) * pageSize, filteredStudents.length);
   if (!editable) return null;
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
-      <p className="text-sm text-slate-600">Enter each component separately. The complete total is calculated as the sum of components, out of {maxMarks} marks.</p>
+      <p className="text-sm text-slate-600">Enter marks for each component. The total is calculated from the marks entered, out of {maxMarks}; grades are based on the total. Remarks are optional.</p>
       <label className="block max-w-lg text-sm font-medium text-slate-700">
         Search students
         <input
           type="search"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(0);
+          }}
           placeholder="Name or admission number"
           className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
         />
       </label>
-      <p className="text-xs text-slate-500" aria-live="polite">Showing {visibleCount} of {students.length} students. All marks remain included when saved.</p>
+      <p className="text-xs text-slate-500" aria-live="polite">
+        Showing {firstVisible}–{lastVisible} of {filteredStudents.length} matching students (page {pageCount === 0 ? 0 : currentPage + 1} of {pageCount}). Saving updates only the students shown on this page.
+      </p>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th>{students[0]?.components.map((component) => <th key={component.id} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Teacher remark</th></tr></thead>
-          <tbody>{students.map((student) => {
-            const matches = `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch);
-            return (
-              <tr key={student.enrollmentId} className={`border-t${matches ? "" : " hidden"}`}>
+          <tbody>{visibleStudents.length > 0 ? visibleStudents.map((student) => (
+              <tr key={student.enrollmentId} className="border-t">
                 <td className="p-3 font-medium">{student.name}</td>
                 <td className="p-3">{student.admissionNumber ?? "—"}</td>
-                {student.components.map((component) => <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={`component_${student.markId}_${component.id}`} min="0" max={component.maxMarks} step="0.01" defaultValue={component.marks ?? ""} className="w-28 rounded-lg border p-2" /></td>)}
-                <td className="p-3"><input aria-label={`Teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} defaultValue={student.teacherRemark ?? ""} className="w-full min-w-48 rounded-lg border p-2" /></td>
+                {student.components.map((component) => {
+                  const name = `component_${student.markId}_${component.id}`;
+                  return <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={name} min="0" max={component.maxMarks} step="0.01" value={values[name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} className="w-28 rounded-lg border p-2" /></td>;
+                })}
+                <td className="p-3"><input aria-label={`Optional teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} value={values[`remark_${student.enrollmentId}`] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [`remark_${student.enrollmentId}`]: event.target.value }))} className="w-full min-w-48 rounded-lg border p-2" /></td>
               </tr>
-            );
-          })}</tbody>
+            )) : <tr><td colSpan={(students[0]?.components.length ?? 0) + 3} className="p-4 text-center text-slate-500">No students match this search.</td></tr>}</tbody>
         </table>
       </div>
-      <SubmitButton pending={pending}>Save draft marks</SubmitButton>
+      {pageCount > 1 && (
+        <nav aria-label="Marks roster pages" className="flex items-center justify-between gap-3">
+          <button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50">Previous</button>
+          <span className="text-sm text-slate-600">Page {currentPage + 1} of {pageCount}</span>
+          <button type="button" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50">Next</button>
+        </nav>
+      )}
+      <SubmitButton pending={pending}>Save marks for shown students</SubmitButton>
       <Feedback state={state} />
     </form>
   );
@@ -420,10 +448,17 @@ export function SearchableStudentItems({
   emptyMessage: string;
 }) {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const normalizedSearch = search.trim().toLocaleLowerCase();
   const visibleItems = items.filter((item) =>
     `${item.name} ${item.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
   );
+  const pageSize = 20;
+  const pageCount = Math.ceil(visibleItems.length / pageSize);
+  const currentPage = Math.min(page, Math.max(pageCount - 1, 0));
+  const pageItems = visibleItems.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const firstVisible = visibleItems.length === 0 ? 0 : currentPage * pageSize + 1;
+  const lastVisible = Math.min((currentPage + 1) * pageSize, visibleItems.length);
   return (
     <div className="space-y-4">
       <label className="block max-w-lg text-sm font-medium text-slate-700">
@@ -431,21 +466,30 @@ export function SearchableStudentItems({
         <input
           type="search"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(0);
+          }}
           placeholder="Name or admission number"
           className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
         />
       </label>
-      <p className="text-xs text-slate-500" aria-live="polite">Showing {visibleItems.length} of {items.length} students.</p>
-      {visibleItems.length > 0 ? (
+      <p className="text-xs text-slate-500" aria-live="polite">
+        Showing {firstVisible}–{lastVisible} of {visibleItems.length} matching students (page {pageCount === 0 ? 0 : currentPage + 1} of {pageCount}).
+      </p>
+      {pageItems.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {items.map((item) => {
-            const matches = `${item.name} ${item.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch);
-            return <div key={item.id} className={matches ? "" : "hidden"}>{item.content}</div>;
-          })}
+          {pageItems.map((item) => <div key={item.id}>{item.content}</div>)}
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">{emptyMessage}</p>
+      )}
+      {pageCount > 1 && (
+        <nav aria-label="Student remarks pages" className="flex items-center justify-between gap-3">
+          <button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50">Previous</button>
+          <span className="text-sm text-slate-600">Page {currentPage + 1} of {pageCount}</span>
+          <button type="button" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50">Next</button>
+        </nav>
       )}
     </div>
   );

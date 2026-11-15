@@ -3,6 +3,7 @@ import {
   canPreviewDraftTestReport,
   calculateComponentTotal,
   calculateWeightedAverage,
+  completeSubmittedMarkIds,
   gradeForPercentage,
   parseExamComponents,
   rankScores,
@@ -54,6 +55,24 @@ describe("examination policy", () => {
       { marks: null, maxMarks: 50 },
     ])).toBeNull();
     expect(calculateComponentTotal([{ marks: 51, maxMarks: 50 }])).toBeNull();
+  });
+
+  it("accepts complete component marks for only the submitted students", () => {
+    expect(completeSubmittedMarkIds(
+      ["12:3", "12:4", "14:3", "14:4"],
+      [12, 13, 14],
+      [3, 4],
+    )).toEqual([12, 14]);
+    expect(completeSubmittedMarkIds(
+      ["12:3", "14:3", "14:4"],
+      [12, 13, 14],
+      [3, 4],
+    )).toBeNull();
+    expect(completeSubmittedMarkIds(
+      ["99:3"],
+      [12, 13, 14],
+      [3, 4],
+    )).toBeNull();
   });
 
   it("allows draft report previews only for managed, open test examinations", () => {
