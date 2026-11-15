@@ -35,6 +35,7 @@ import { isCalendarDate } from "@/lib/academic-policy";
 import { AcademicQuickSearch } from "./academic-quick-search";
 import {
   AcademicTermForm,
+  DeleteAcademicTermForm,
   AcademicYearForm,
   ClassSubjectForm,
   ClassLevelForm,
@@ -730,6 +731,9 @@ export default async function AcademicStructurePage({
                       : "Not set",
                   },
                   editForm: <AcademicTermForm years={allYearOptions} record={term} />,
+                  deleteForm: (
+                    <DeleteAcademicTermForm termId={term.id} termName={term.name} />
+                  ),
                 }))}
               />
             )}

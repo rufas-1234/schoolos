@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { RequiredMark } from "@/components/required-mark";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   saveStudentCategory,
   type StudentCategoryActionState,
@@ -28,20 +29,15 @@ export function StudentCategoryForm({
       <p className="text-xs text-slate-500">
         <RequiredMark /> Required fields
       </p>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Branch <RequiredMark />
-        <select
-          name="branchId"
-          required
-          defaultValue={record ? String(record.branchId) : ""}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
-        >
-          <option value="" disabled>Select a branch</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.label}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+        required
+        defaultValue={record ? String(record.branchId) : ""}
+        placeholder="Search branches..."
+        disabled={!branches.length}
+      />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Category <RequiredMark />
         <input

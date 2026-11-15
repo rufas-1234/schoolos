@@ -4,6 +4,7 @@ import { ArrowUpRight, BriefcaseBusiness, Users } from "lucide-react";
 import { db } from "@/db";
 import { schoolBranches, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { SearchableSelect } from "@/components/searchable-select";
 
 const employmentTypeLabels: Record<string, string> = {
   full_time: "Full-time",
@@ -98,13 +99,16 @@ export default async function HumanResourcesPage({
       </section>
 
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Branch
-          <select name="branchId" defaultValue={selectedBranch?.id.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="">All branches</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-        </label>
+        <SearchableSelect
+          label="Branch"
+          name="branchId"
+          options={[
+            { value: "", label: "All branches" },
+            ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+          ]}
+          defaultValue={selectedBranch?.id.toString() ?? ""}
+          placeholder="Search branches..."
+        />
         <button className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View branch</button>
       </form>
 

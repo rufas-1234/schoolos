@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { CheckCheck, Save } from "lucide-react";
 import { attendanceStatuses, type AttendanceStatus } from "@/lib/attendance-policy";
+import { SearchableSelect } from "@/components/searchable-select";
 import { saveAttendance } from "./attendance-actions";
 import type { AcademicActionState } from "./actions";
 
@@ -68,20 +69,15 @@ export function AttendanceWorkspace({
         className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end"
       >
         <input type="hidden" name="section" value="attendance" />
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Class section <span className="text-rose-600" aria-hidden="true">*</span>
-          <select
-            name="attendanceSectionId"
-            required
-            defaultValue={selectedSectionId}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
-          >
-            <option value="" disabled>Choose a class section</option>
-            {sections.map((section) => (
-              <option key={section.id} value={section.id}>{section.label}</option>
-            ))}
-          </select>
-        </label>
+        <SearchableSelect
+          label="Class section"
+          name="attendanceSectionId"
+          options={sections.map((section) => ({ value: String(section.id), label: section.label }))}
+          required
+          defaultValue={selectedSectionId}
+          placeholder="Search class sections..."
+          disabled={!sections.length}
+        />
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Attendance date <span className="text-rose-600" aria-hidden="true">*</span>
           <input

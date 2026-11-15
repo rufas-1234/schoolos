@@ -15,6 +15,7 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { SearchableSelect } from "@/components/searchable-select";
 import { removeStudentClass } from "../class-actions";
 import { StudentClassForm } from "../student-class-form";
 
@@ -30,7 +31,6 @@ type SearchParams = {
 function singleValue(value: SearchParam): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
-
 function positiveId(value: SearchParam): number | null {
   if (typeof value !== "string") return null;
   if (!value || !/^\d+$/.test(value)) return null;
@@ -215,45 +215,56 @@ export default async function MultiClassStudentsPage({
           Select a branch and academic year first. Then choose a class and section to load students.
         </p>
         <form method="get" className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Branch <span className="text-rose-600" aria-hidden="true">*</span>
-            <select name="branchId" required defaultValue={branchValue ?? ""} className={inputClass}>
-              <option value="" disabled>Select branch</option>
-              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Academic year <span className="text-rose-600" aria-hidden="true">*</span>
-            <select name="academicYearId" required defaultValue={yearValue ?? ""} className={inputClass}>
-              <option value="" disabled>Select academic year</option>
-              {years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Class {classSectionCriteriaRequired && <span className="text-rose-600" aria-hidden="true">*</span>}
-            <select name="classLevelId" required={classSectionCriteriaRequired} defaultValue={classValue ?? ""} className={inputClass}>
-              <option value="" disabled>Select class</option>
-              {classes.map((classLevel) => <option key={classLevel.id} value={classLevel.id}>{classLevel.name}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Section {classSectionCriteriaRequired && <span className="text-rose-600" aria-hidden="true">*</span>}
-            <select name="sectionId" required={classSectionCriteriaRequired} defaultValue={sectionValue ?? ""} className={inputClass}>
-              <option value="" disabled>Select section</option>
-              {sectionOptions.map((section) => <option key={section.id} value={section.id}>{section.label}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Student
-            <select name="studentPublicId" defaultValue={studentPublicId ?? ""} className={inputClass}>
-              <option value="" disabled>Select student</option>
-              {eligibleStudents.map((student) => (
-                <option key={student.publicId} value={student.publicId}>
-                  {student.firstName} {student.lastName}{student.admissionNumber ? ` · ${student.admissionNumber}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SearchableSelect
+            label="Branch"
+            name="branchId"
+            options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
+            required
+            defaultValue={branchValue ?? ""}
+            placeholder="Search branches..."
+            disabled={!branches.length}
+          />
+          <SearchableSelect
+            label="Academic year"
+            name="academicYearId"
+            options={years.map((year) => ({ value: String(year.id), label: year.name }))}
+            required
+            defaultValue={yearValue ?? ""}
+            placeholder="Search academic years..."
+            disabled={!years.length}
+          />
+          <SearchableSelect
+            label="Class"
+            name="classLevelId"
+            options={classes.map((classLevel) => ({ value: String(classLevel.id), label: classLevel.name }))}
+            required={classSectionCriteriaRequired}
+            defaultValue={classValue ?? ""}
+            placeholder="Search classes..."
+            disabled={!classes.length}
+          />
+          <SearchableSelect
+            label="Section"
+            name="sectionId"
+            options={sectionOptions.map((section) => ({ value: String(section.id), label: section.label }))}
+            required={classSectionCriteriaRequired}
+            defaultValue={sectionValue ?? ""}
+            placeholder="Search sections..."
+            disabled={!sectionOptions.length}
+          />
+          <SearchableSelect
+            label="Student"
+            name="studentPublicId"
+            options={[
+              { value: "", label: "All students" },
+              ...eligibleStudents.map((student) => ({
+                value: student.publicId,
+                label: `${student.firstName} ${student.lastName}${student.admissionNumber ? ` · ${student.admissionNumber}` : ""}`,
+              })),
+            ]}
+            defaultValue={studentPublicId ?? ""}
+            placeholder="Search students..."
+            disabled={!eligibleStudents.length}
+          />
           <div className="flex items-end">
             <button type="submit" className="w-full rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 sm:w-auto">
               Search
@@ -340,6 +351,3 @@ export default async function MultiClassStudentsPage({
     </div>
   );
 }
-
-const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white";

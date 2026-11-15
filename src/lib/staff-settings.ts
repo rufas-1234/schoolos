@@ -57,11 +57,24 @@ export const defaultRequiredStaffFields = staffSettingFields
   .filter((field) => field.locked)
   .map((field) => field.name);
 
+export const defaultVisibleStaffFields = staffSettingFields.map((field) => field.name);
+
 export function normalizeRequiredStaffFields(fields: string[] | null | undefined): string[] {
   return [...new Set([
     ...defaultRequiredStaffFields,
     ...(fields ?? []).filter((name) => staffSettingFields.some((field) => field.name === name)),
   ])];
+}
+
+export function normalizeVisibleStaffFields(fields: string[] | null | undefined): string[] {
+  const visible = new Set([
+    ...defaultRequiredStaffFields,
+    ...(fields ?? defaultVisibleStaffFields)
+      .filter((name) => staffSettingFields.some((field) => field.name === name)),
+  ]);
+  return staffSettingFields
+    .filter((field) => visible.has(field.name))
+    .map((field) => field.name);
 }
 
 export function getStaffRequiredFieldError(

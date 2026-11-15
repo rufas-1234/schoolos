@@ -127,6 +127,12 @@ export default async function StudentPromotionPage() {
       value: eventType,
       label: eventType.replaceAll("_", " "),
     })),
+  }, {
+    key: "eventYear",
+    label: "year",
+    options: [...new Set(events.map((event) => event.eventDate.slice(0, 4)))]
+      .sort((first, second) => second.localeCompare(first))
+      .map((year) => ({ value: year, label: year })),
   }];
 
   return (
@@ -173,6 +179,7 @@ export default async function StudentPromotionPage() {
           values: {
             student: `${event.student} ${event.lastName}`,
             eventType: event.eventType.replaceAll("_", " "),
+            eventYear: event.eventDate.slice(0, 4),
             eventDate: event.eventDate,
             destination: event.externalInstitution ?? "",
             reason: event.reason,

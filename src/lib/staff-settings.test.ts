@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultRequiredStaffFields,
+  defaultVisibleStaffFields,
   getStaffRequiredFieldError,
   normalizeRequiredStaffFields,
+  normalizeVisibleStaffFields,
 } from "./staff-settings";
 
 describe("staff settings", () => {
@@ -31,5 +33,16 @@ describe("staff settings", () => {
     };
     expect(getStaffRequiredFieldError(values, defaultRequiredStaffFields)).toBeNull();
     expect(getStaffRequiredFieldError(values, [...defaultRequiredStaffFields, "email"])).toBe("Email is required.");
+  });
+
+  it("always keeps required core fields visible and ignores unknown visibility settings", () => {
+    const expected = [
+      ...defaultRequiredStaffFields,
+      "email",
+    ].sort((first, second) =>
+      defaultVisibleStaffFields.indexOf(first) - defaultVisibleStaffFields.indexOf(second),
+    );
+    expect(normalizeVisibleStaffFields(["email", "unknown"])).toEqual(expected);
+    expect(normalizeVisibleStaffFields(null)).toEqual(defaultVisibleStaffFields);
   });
 });

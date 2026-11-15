@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   ChevronLeft,
   ChevronRight,
@@ -340,24 +341,22 @@ export function AdminDataTable({
             />
           </label>
           {filters.map((filter) => (
-            <label key={filter.key}>
-              <span className="sr-only">Filter by {filter.label.toLocaleLowerCase()}</span>
-              <select
-                aria-label={`Filter by ${filter.label.toLocaleLowerCase()}`}
-                value={filterValues[filter.key] ?? ""}
-                onChange={(event) => {
-                  setFilterValues((current) => ({ ...current, [filter.key]: event.target.value }));
+              <SearchableSelect
+                key={filter.key}
+                label={`Filter by ${filter.label.toLocaleLowerCase()}`}
+                name={`filter-${filter.key}`}
+                options={[
+                  { value: "", label: `All ${filter.label.toLocaleLowerCase()}` },
+                  ...filter.options,
+                ]}
+                defaultValue={filterValues[filter.key] ?? ""}
+                placeholder={`Search ${filter.label.toLocaleLowerCase()}...`}
+                onValueChange={(value) => {
+                  setFilterValues((current) => ({ ...current, [filter.key]: value }));
                   setShowAllRecords(false);
                   setPage(1);
                 }}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-violet-400 sm:w-auto"
-              >
-                <option value="">All {filter.label.toLocaleLowerCase()}</option>
-                {filter.options.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
+              />
           ))}
           {showAllRecordsLabel && (
             <button

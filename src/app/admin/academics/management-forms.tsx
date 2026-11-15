@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
   AdminActionDialog,
   AdminDeleteButton,
@@ -9,6 +10,7 @@ import {
   type AdminTableFilter,
 } from "@/components/admin-data-table";
 import { RequiredMark } from "@/components/required-mark";
+import { SearchableSelect } from "@/components/searchable-select";
 import { deleteClassLevel, type AcademicActionState } from "./actions";
 import {
   ActionForm,
@@ -196,81 +198,60 @@ export function ClassRoutineForm({
       submitLabel={record ? "Save changes" : "Add to routine"}
       recordId={record?.id}
     >
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Branch <RequiredMark />
-        <select
-          required
-          value={branchId}
-          onChange={(event) => {
-            setBranchId(event.target.value);
-            setSectionId("");
-            setAssignmentId("");
-            setRoomId("");
-          }}
-          disabled={branches.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Class section <RequiredMark />
-        <select
-          name="sectionId"
-          required
-          value={sectionId}
-          onChange={(event) => {
-            setSectionId(event.target.value);
-            setAssignmentId("");
-            setRoomId("");
-          }}
-          disabled={!branchId || availableSections.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>
-            {!branchId ? "Choose a branch first" : "No class sections available for this branch"}
-          </option>
-          {availableSections.map((section) => (
-            <option key={section.id} value={section.id}>{section.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Subject for this class <RequiredMark />
-        <select
-          name="classSubjectId"
-          required
-          value={availableAssignments.some((assignment) => String(assignment.id) === assignmentId) ? assignmentId : ""}
-          onChange={(event) => setAssignmentId(event.target.value)}
-          disabled={availableAssignments.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>
-            {!selectedSection ? "Choose a class section first" : "No subjects assigned to this class"}
-          </option>
-          {availableAssignments.map((assignment) => (
-            <option key={assignment.id} value={assignment.id}>{assignment.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Classroom (optional)
-        <select
-          name="classRoomId"
-          value={availableRooms.some((room) => String(room.id) === roomId) ? roomId : ""}
-          onChange={(event) => setRoomId(event.target.value)}
-          disabled={!selectedSection || availableRooms.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="">No room assigned</option>
-          {availableRooms.map((room) => (
-            <option key={room.id} value={room.id}>{room.label}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+        defaultValue={branchId}
+        required
+        disabled={branches.length === 0}
+        placeholder={branches.length === 0 ? "Create a branch first" : "Search branches..."}
+        onValueChange={(value) => {
+          setBranchId(value);
+          setSectionId("");
+          setAssignmentId("");
+          setRoomId("");
+        }}
+      />
+      <SearchableSelect
+        key={branchId}
+        label="Class section"
+        name="sectionId"
+        options={availableSections.map((section) => ({ value: String(section.id), label: section.label }))}
+        defaultValue={sectionId}
+        required
+        disabled={!branchId || availableSections.length === 0}
+        placeholder={!branchId ? "Choose a branch first" : "Search sections..."}
+        onValueChange={(value) => {
+          setSectionId(value);
+          setAssignmentId("");
+          setRoomId("");
+        }}
+      />
+      <SearchableSelect
+        key={`subject-${sectionId}`}
+        label="Subject for this class"
+        name="classSubjectId"
+        options={availableAssignments.map((assignment) => ({ value: String(assignment.id), label: assignment.label }))}
+        defaultValue={availableAssignments.some((assignment) => String(assignment.id) === assignmentId) ? assignmentId : ""}
+        required
+        disabled={availableAssignments.length === 0}
+        placeholder={!selectedSection ? "Choose a class section first" : "Search subjects..."}
+        onValueChange={setAssignmentId}
+      />
+      <SearchableSelect
+        key={`room-${sectionId}`}
+        label="Classroom (optional)"
+        name="classRoomId"
+        options={[
+          { value: "", label: "No room assigned" },
+          ...availableRooms.map((room) => ({ value: String(room.id), label: room.label })),
+        ]}
+        defaultValue={availableRooms.some((room) => String(room.id) === roomId) ? roomId : ""}
+        disabled={!selectedSection || availableRooms.length === 0}
+        placeholder="Search classrooms..."
+        onValueChange={setRoomId}
+      />
       <p className="text-xs text-slate-500">
         Choose a branch and section first; only subjects assigned to that class and classrooms at that branch are available.
       </p>
@@ -544,6 +525,14 @@ export function ClassRoutineList({
                 : "Select a branch, class, and section to open its weekly timetable."}
             </p>
           </div>
+          {criteriaSelected && selectedSection && (
+            <Link
+              href={`/admin/academics/routines/print?sectionId=${selectedSection.id}`}
+              className="print:hidden inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Print class routine
+            </Link>
+          )}
         </div>
         {!criteriaSelected ? (
           <p className="px-5 py-10 text-center text-sm text-slate-500">
@@ -662,21 +651,17 @@ function RoutineFilter({
   const allLabel = label === "Branch" ? "branches" : `${label.toLowerCase()}s`;
 
   return (
-    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-      {label}
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
-      >
-        <option value="">All {allLabel}</option>
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <SearchableSelect
+      label={label}
+      name={`${label.toLocaleLowerCase()}Filter`}
+      options={[
+        { value: "", label: `All ${allLabel}` },
+        ...options.map((option) => ({ value: String(option.id), label: option.label })),
+      ]}
+      defaultValue={value}
+      placeholder={`Search ${allLabel}...`}
+      onValueChange={onChange}
+    />
   );
 }
 
@@ -747,62 +732,48 @@ export function SectionAssignmentForm({
       action={updateSectionAssignment}
       submitLabel="Save class assignment"
     >
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Branch <RequiredMark />
-        <select
-          required
-          value={branchId}
-          onChange={(event) => {
-            setBranchId(event.target.value);
-            setSectionId("");
-            setTeacherId("");
-          }}
-          disabled={branches.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Class section / stream <RequiredMark />
-        <select
-          name="sectionId"
-          required
-          value={sectionId}
-          onChange={(event) => {
-            setSectionId(event.target.value);
-            setTeacherId("");
-          }}
-          disabled={!branchId || availableSections.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>
-            {!branchId ? "Choose a branch first" : "No class sections available for this branch"}
-          </option>
-          {availableSections.map((section) => (
-            <option key={section.id} value={section.id}>{section.label}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+        defaultValue={branchId}
+        required
+        disabled={branches.length === 0}
+        placeholder={branches.length === 0 ? "Create a branch first" : "Search branches..."}
+        onValueChange={(value) => {
+          setBranchId(value);
+          setSectionId("");
+          setTeacherId("");
+        }}
+      />
+      <SearchableSelect
+        key={branchId}
+        label="Class section / stream"
+        name="sectionId"
+        options={availableSections.map((section) => ({ value: String(section.id), label: section.label }))}
+        defaultValue={sectionId}
+        required
+        disabled={!branchId || availableSections.length === 0}
+        placeholder={!branchId ? "Choose a branch first" : "Search class sections..."}
+        onValueChange={(value) => {
+          setSectionId(value);
+          setTeacherId("");
+        }}
+      />
       <Field label="Student capacity (leave blank for unlimited)" name="capacity" type="number" required={false} defaultValue={record?.capacity} />
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Class teacher (optional)
-        <select
-          name="teacherId"
-          value={availableTeachers.some((teacher) => String(teacher.id) === teacherId) ? teacherId : ""}
-          onChange={(event) => setTeacherId(event.target.value)}
-          disabled={!sectionId || availableTeachers.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="">Unassigned</option>
-          {availableTeachers.map((teacher) => (
-            <option key={teacher.id} value={teacher.id}>{teacher.label}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        key={`teacher-${branchId}`}
+        label="Class teacher (optional)"
+        name="teacherId"
+        options={[
+          { value: "", label: "Unassigned" },
+          ...availableTeachers.map((teacher) => ({ value: String(teacher.id), label: teacher.label })),
+        ]}
+        defaultValue={availableTeachers.some((teacher) => String(teacher.id) === teacherId) ? teacherId : ""}
+        disabled={!sectionId || availableTeachers.length === 0}
+        placeholder="Search teachers..."
+        onValueChange={setTeacherId}
+      />
     </ActionForm>
   );
 }
@@ -832,61 +803,47 @@ export function SubjectTeacherForm({
       action={updateSubjectTeacher}
       submitLabel="Save subject teacher"
     >
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Branch <RequiredMark />
-        <select
-          required
-          value={branchId}
-          onChange={(event) => {
-            setBranchId(event.target.value);
-            setAssignmentId("");
-            setTeacherId("");
-          }}
-          disabled={branches.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Class subject <RequiredMark />
-        <select
-          name="assignmentId"
-          required
-          value={assignmentId}
-          onChange={(event) => {
-            setAssignmentId(event.target.value);
-            setTeacherId("");
-          }}
-          disabled={!branchId || availableAssignments.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>
-            {!branchId ? "Choose a branch first" : "No class subjects available for this branch"}
-          </option>
-          {availableAssignments.map((assignment) => (
-            <option key={assignment.id} value={assignment.id}>{assignment.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Teacher
-        <select
-          name="teacherId"
-          value={availableTeachers.some((teacher) => String(teacher.id) === teacherId) ? teacherId : ""}
-          onChange={(event) => setTeacherId(event.target.value)}
-          disabled={!assignmentId || availableTeachers.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="">Unassigned</option>
-          {availableTeachers.map((teacher) => (
-            <option key={teacher.id} value={teacher.id}>{teacher.label}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+        defaultValue={branchId}
+        required
+        disabled={branches.length === 0}
+        placeholder={branches.length === 0 ? "Create a branch first" : "Search branches..."}
+        onValueChange={(value) => {
+          setBranchId(value);
+          setAssignmentId("");
+          setTeacherId("");
+        }}
+      />
+      <SearchableSelect
+        key={branchId}
+        label="Class subject"
+        name="assignmentId"
+        options={availableAssignments.map((assignment) => ({ value: String(assignment.id), label: assignment.label }))}
+        defaultValue={assignmentId}
+        required
+        disabled={!branchId || availableAssignments.length === 0}
+        placeholder={!branchId ? "Choose a branch first" : "Search class subjects..."}
+        onValueChange={(value) => {
+          setAssignmentId(value);
+          setTeacherId("");
+        }}
+      />
+      <SearchableSelect
+        key={`teacher-${branchId}-${assignmentId}`}
+        label="Teacher"
+        name="teacherId"
+        options={[
+          { value: "", label: "Unassigned" },
+          ...availableTeachers.map((teacher) => ({ value: String(teacher.id), label: teacher.label })),
+        ]}
+        defaultValue={availableTeachers.some((teacher) => String(teacher.id) === teacherId) ? teacherId : ""}
+        disabled={!assignmentId || availableTeachers.length === 0}
+        placeholder="Search teachers..."
+        onValueChange={setTeacherId}
+      />
     </ActionForm>
   );
 }
@@ -908,42 +865,30 @@ export function StudentPlacementForm({
   return (
     <ActionForm title="Place a student in a class" action={placeStudent} submitLabel="Place student">
       <SelectField label="Admitted / active student" name="studentId" options={students} />
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Branch <RequiredMark />
-        <select
-          required
-          value={branchId}
-          onChange={(event) => {
-            setBranchId(event.target.value);
-            setSectionId("");
-          }}
-          disabled={branches.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>{branches.length === 0 ? "Create a branch first" : "Choose a branch"}</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Active-year class section <RequiredMark />
-        <select
-          name="sectionId"
-          required
-          value={sectionId}
-          onChange={(event) => setSectionId(event.target.value)}
-          disabled={!branchId || availableSections.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="" disabled>
-            {!branchId ? "Choose a branch first" : "No class sections available for this branch"}
-          </option>
-          {availableSections.map((section) => (
-            <option key={section.id} value={section.id}>{section.label}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+        defaultValue={branchId}
+        required
+        disabled={branches.length === 0}
+        placeholder={branches.length === 0 ? "Create a branch first" : "Search branches..."}
+        onValueChange={(value) => {
+          setBranchId(value);
+          setSectionId("");
+        }}
+      />
+      <SearchableSelect
+        key={branchId}
+        label="Active-year class section"
+        name="sectionId"
+        options={availableSections.map((section) => ({ value: String(section.id), label: section.label }))}
+        defaultValue={sectionId}
+        required
+        disabled={!branchId || availableSections.length === 0}
+        placeholder={!branchId ? "Choose a branch first" : "Search class sections..."}
+        onValueChange={setSectionId}
+      />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Placement type <RequiredMark />
         <select
@@ -1013,65 +958,60 @@ export function EnrollmentOperationForm({
           <option value="graduate">Graduate</option>
         </select>
       </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Destination academic year (not needed for transfer-out / graduation) {needsDestination && <RequiredMark />}
-        <select
-          name="targetYearId"
-          required={needsDestination}
-          value={yearId}
-          onChange={(event) => {
-            setYearId(event.target.value);
-            setSectionId("");
-          }}
-          disabled={!needsDestination || years.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="">{needsDestination ? "Choose a destination year" : "No destination year"}</option>
-          {years.map((year) => (
-            <option key={year.id} value={year.id}>{year.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Destination branch {needsDestination && <RequiredMark />}
-        <select
-          required={needsDestination}
-          value={branchId}
-          onChange={(event) => {
-            setBranchId(event.target.value);
-            setSectionId("");
-          }}
-          disabled={!needsDestination || branches.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="">{needsDestination ? "Choose a branch" : "No destination branch"}</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Destination class section (not needed for transfer-out / graduation) {needsDestination && <RequiredMark />}
-        <select
-          name="targetSectionId"
-          required={needsDestination}
-          value={sectionId}
-          onChange={(event) => setSectionId(event.target.value)}
-          disabled={!needsDestination || !yearId || !branchId || availableSections.length === 0}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="">
-            {!needsDestination
+      <SearchableSelect
+        label="Destination academic year (not needed for transfer-out / graduation)"
+        name="targetYearId"
+        options={[
+          { value: "", label: needsDestination ? "Choose a destination year" : "No destination year" },
+          ...years.map((year) => ({ value: String(year.id), label: year.label })),
+        ]}
+        required={needsDestination}
+        defaultValue={yearId}
+        disabled={!needsDestination || !years.length}
+        placeholder="Search academic years..."
+        onValueChange={(value) => {
+          setYearId(value);
+          setSectionId("");
+        }}
+      />
+      <SearchableSelect
+        key={`destination-branch-${needsDestination}`}
+        label="Destination branch"
+        name="branchId"
+        options={[
+          { value: "", label: needsDestination ? "Choose a branch" : "No destination branch" },
+          ...branches.map((branch) => ({ value: String(branch.id), label: branch.label })),
+        ]}
+        required={needsDestination}
+        defaultValue={branchId}
+        disabled={!needsDestination || !branches.length}
+        placeholder="Search branches..."
+        onValueChange={(value) => {
+          setBranchId(value);
+          setSectionId("");
+        }}
+      />
+      <SearchableSelect
+        key={`destination-section-${yearId}-${branchId}-${needsDestination}`}
+        label="Destination class section (not needed for transfer-out / graduation)"
+        name="targetSectionId"
+        options={[
+          {
+            value: "",
+            label: !needsDestination
               ? "No destination section"
               : !yearId || !branchId
                 ? "Choose a year and branch first"
-                : "No class sections for this year and branch"}
-          </option>
-          {availableSections.map((section) => (
-            <option key={section.id} value={section.id}>{section.label}</option>
-          ))}
-        </select>
-      </label>
+                : "No class sections for this year and branch",
+          },
+          ...availableSections.map((section) => ({ value: String(section.id), label: section.label })),
+        ]}
+        required={needsDestination}
+        defaultValue={sectionId}
+        disabled={!needsDestination || !yearId || !branchId || !availableSections.length}
+        placeholder="Search class sections..."
+        onValueChange={setSectionId}
+      />
       <Field
         label="Destination school"
         name="externalInstitution"

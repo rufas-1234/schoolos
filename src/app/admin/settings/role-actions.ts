@@ -10,6 +10,7 @@ import {
   rolePermissions,
   roles,
   schoolMemberships,
+  schools,
   user,
   userRoles,
 } from "@/db/schema";
@@ -333,6 +334,93 @@ export async function assignSchoolRoles(
   if (outcome === "invalid-role") return { error: "Select roles that belong to this school." };
   if (outcome === "cannot-remove-own-access") {
     return { error: "Keep at least one role that grants you permission to manage roles." };
+  }
+  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function setSchoolAccountAccess(
+  _previousState: RoleActionState,
+  formData: FormData,
+): Promise<RoleActionState> {
+  const context = await requireSchoolPermission("roles.manage");
+  const parsed = z.object({
+    membershipId: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()),
+    status: z.enum(["active", "inactive"]),
+  }).safeParse({
+    membershipId: value(formData, "membershipId"),
+    status: value(formData, "status"),
+  });
+  if (!parsed.success) return { error: "Choose a valid school account access status." };
+
+  const outcome = await db.transaction(async (tx) => {
+    const [school] = await tx.select({ id: schools.id })
+      .from(schools)
+      .where(eq(schools.id, context.schoolId))
+      .for("update")
+      .limit(1);
+    if (!school) return "not-found";
+    const [membership] = await tx.select({
+      id: schoolMemberships.id,
+      userId: schoolMemberships.userId,
+      status: schoolMemberships.status,
+    }).from(schoolMemberships)
+      .innerJoin(user, eq(schoolMemberships.userId, user.id))
+      .where(and(
+        eq(schoolMemberships.id, parsed.data.membershipId),
+        eq(schoolMemberships.schoolId, context.schoolId),
+        eq(user.isActive, true),
+      ))
+      .for("update")
+      .limit(1);
+    if (!membership) return "not-found";
+    if (membership.userId === context.user.id && parsed.data.status === "inactive") {
+      return "cannot-disable-self";
+    }
+    if (membership.status === "active" && parsed.data.status === "inactive") {
+      const [anotherRoleManager] = await tx.select({ membershipId: schoolMemberships.id })
+        .from(schoolMemberships)
+        .innerJoin(user, eq(schoolMemberships.userId, user.id))
+        .innerJoin(userRoles, eq(userRoles.membershipId, schoolMemberships.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
+        .innerJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+        .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+        .where(and(
+          eq(schoolMemberships.schoolId, context.schoolId),
+          eq(schoolMemberships.status, "active"),
+          eq(user.isActive, true),
+          ne(schoolMemberships.id, membership.id),
+          eq(roles.schoolId, context.schoolId),
+          eq(permissions.key, "roles.manage"),
+        ))
+        .limit(1);
+      if (!anotherRoleManager) return "last-role-manager";
+    }
+
+    await tx.update(schoolMemberships)
+      .set({ status: parsed.data.status })
+      .where(and(
+        eq(schoolMemberships.id, membership.id),
+        eq(schoolMemberships.schoolId, context.schoolId),
+      ));
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "roles.login_access.updated",
+      resourceType: "school_membership",
+      resourcePublicId: String(membership.id),
+      changedFields: ["status"],
+    });
+    return "updated";
+  });
+
+  if (outcome === "not-found") return { error: "The active account was not found in this school." };
+  if (outcome === "cannot-disable-self") {
+    return { error: "You cannot disable your own access to this school." };
+  }
+  if (outcome === "last-role-manager") {
+    return { error: "Keep at least one other active account with role-management permission." };
   }
   revalidatePath("/admin/settings/roles");
   revalidatePath("/admin");

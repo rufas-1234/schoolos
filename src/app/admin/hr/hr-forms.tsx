@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { RequiredMark } from "@/components/required-mark";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   assignStaffLeaveBalance,
   createStaffLeaveRequest,
@@ -132,14 +133,15 @@ export function LeaveTypeForm({
   const [state, action, pending] = useActionState(createStaffLeaveType, {});
   return (
     <HrForm title="Add leave type" action={action} pending={pending} submitLabel="Add leave type" state={state}>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Branch
-        <select name="branchId" required defaultValue={branchId.toString()} className={inputClass}>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.name}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
+        required
+        defaultValue={branchId.toString()}
+        placeholder="Search branches..."
+        disabled={!branches.length}
+      />
       <Field label="Leave type name" name="name" placeholder="Annual leave" />
     </HrForm>
   );
@@ -360,13 +362,14 @@ function Field({
 
 function SelectField({ label, name, options }: { label: string; name: string; options: Option[] }) {
   return (
-    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-      {label} <RequiredMark />
-      <select name={name} required defaultValue="" className={inputClass}>
-        <option value="" disabled>Select…</option>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
+    <SearchableSelect
+      label={label}
+      name={name}
+      options={options}
+      required
+      placeholder={options.length ? `Search ${label.toLocaleLowerCase()}...` : "Create one first"}
+      disabled={!options.length}
+    />
   );
 }
 

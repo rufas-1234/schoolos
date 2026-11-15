@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, like, or } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, schools, staffMembers, staffPayrollRecords } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -8,6 +8,7 @@ import {
 } from "@/lib/hr-policy";
 import { PrintButton } from "@/components/print-button";
 import { MarkPayrollPaidForm, PayrollForm } from "../hr-forms";
+import { SearchableSelect } from "@/components/searchable-select";
 
 function isPayPeriod(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
@@ -16,7 +17,7 @@ function isPayPeriod(value: string): boolean {
 export default async function StaffPayrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string | string[]; branchId?: string | string[]; status?: string | string[] }>;
+  searchParams: Promise<{ period?: string | string[]; branchId?: string | string[]; status?: string | string[]; search?: string | string[] }>;
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const params = await searchParams;
@@ -44,6 +45,7 @@ export default async function StaffPayrollPage({
     ? params.period
     : currentPeriod;
   const selectedStatus = parseStaffPayrollFilter(typeof params.status === "string" ? params.status : "");
+  const staffSearch = typeof params.search === "string" ? params.search.trim().slice(0, 120) : "";
   const [staff, records] = await Promise.all([
     db.select({
       id: staffMembers.id,
@@ -80,6 +82,11 @@ export default async function StaffPayrollPage({
         eq(staffPayrollRecords.payPeriod, payPeriod),
         eq(staffMembers.branchId, branchId ?? 0),
         ...(selectedStatus === "all" ? [] : [eq(staffPayrollRecords.status, selectedStatus)]),
+        ...(staffSearch ? [or(
+          like(staffMembers.firstName, `%${staffSearch}%`),
+          like(staffMembers.lastName, `%${staffSearch}%`),
+          like(staffMembers.employeeCode, `%${staffSearch}%`),
+        )!] : []),
       ))
       .orderBy(desc(staffPayrollRecords.createdAt), asc(staffMembers.lastName)),
   ]);
@@ -119,13 +126,15 @@ export default async function StaffPayrollPage({
       </header>
 
       <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Branch
-          <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="" disabled>Select a branch</option>
-            {branches.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.code})</option>)}
-          </select>
-        </label>
+        <SearchableSelect
+          label="Branch"
+          name="branchId"
+          options={branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` }))}
+          required
+          defaultValue={branchId?.toString() ?? ""}
+          placeholder="Search branches..."
+          disabled={!branches.length}
+        />
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Pay period
           <input type="month" name="period" defaultValue={payPeriod} required className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" />
@@ -137,6 +146,10 @@ export default async function StaffPayrollPage({
             <option value="recorded">Recorded, not paid</option>
             <option value="paid">Paid</option>
           </select>
+        </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Search staff
+          <input type="search" name="search" maxLength={120} defaultValue={staffSearch} placeholder="Name or staff number" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
         <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View report</button>
       </form>
@@ -160,7 +173,7 @@ export default async function StaffPayrollPage({
           <div>
             <p className="print-report-kicker">Human resources · Payroll</p>
             <h2>Payroll report</h2>
-            <p>{branch ? `${branch.name} · ` : ""}{payPeriod} · {selectedStatus === "all" ? "All payment statuses" : selectedStatus}</p>
+            <p>{branch ? `${branch.name} · ` : ""}{payPeriod} · {selectedStatus === "all" ? "All payment statuses" : selectedStatus}{staffSearch ? ` · Search: ${staffSearch}` : ""}</p>
           </div>
           <PrintButton label="Print payroll report" />
         </header>

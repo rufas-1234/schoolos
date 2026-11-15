@@ -1,17 +1,18 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, like, or } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, schools, staffAttendance, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { parseStaffRoleFilter } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
+import { SearchableSelect } from "@/components/searchable-select";
 import { AttendanceForm, BulkAttendanceForm, StaffAttendanceSelectAll } from "../hr-forms";
 import { PrintReportButton } from "../reports/print-report-button";
 
 export default async function StaffAttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string | string[]; branchId?: string | string[]; role?: string | string[] }>;
+  searchParams: Promise<{ date?: string | string[]; branchId?: string | string[]; role?: string | string[]; search?: string | string[] }>;
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const params = await searchParams;
@@ -38,12 +39,21 @@ export default async function StaffAttendancePage({
     : branches[0]?.id;
   const requestedRole = typeof params.role === "string" ? params.role : "";
   const selectedRole = parseStaffRoleFilter(requestedRole);
+  const staffSearch = typeof params.search === "string" ? params.search.trim().slice(0, 120) : "";
   const attendanceDate = requestedDate ?? today;
   const staffConditions = [
     eq(staffMembers.schoolId, context.schoolId),
     eq(staffMembers.status, "active"),
   ];
   if (branchId) staffConditions.push(eq(staffMembers.branchId, branchId));
+  if (staffSearch) {
+    const pattern = `%${staffSearch}%`;
+    staffConditions.push(or(
+      like(staffMembers.firstName, pattern),
+      like(staffMembers.lastName, pattern),
+      like(staffMembers.employeeCode, pattern),
+    )!);
+  }
   if (selectedRole === "unassigned") staffConditions.push(isNull(staffMembers.personnelRole));
   else if (selectedRole !== "all") staffConditions.push(eq(staffMembers.personnelRole, selectedRole));
   const attendanceConditions = [
@@ -51,6 +61,14 @@ export default async function StaffAttendancePage({
     eq(staffAttendance.attendanceDate, attendanceDate),
   ];
   if (branchId) attendanceConditions.push(eq(staffMembers.branchId, branchId));
+  if (staffSearch) {
+    const pattern = `%${staffSearch}%`;
+    attendanceConditions.push(or(
+      like(staffMembers.firstName, pattern),
+      like(staffMembers.lastName, pattern),
+      like(staffMembers.employeeCode, pattern),
+    )!);
+  }
   if (selectedRole === "unassigned") attendanceConditions.push(isNull(staffMembers.personnelRole));
   else if (selectedRole !== "all") attendanceConditions.push(eq(staffMembers.personnelRole, selectedRole));
   const [staff, marks] = await Promise.all([
@@ -96,13 +114,15 @@ export default async function StaffAttendancePage({
       </header>
 
       <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Branch
-          <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="" disabled>Select a branch</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-        </label>
+        <SearchableSelect
+          label="Branch"
+          name="branchId"
+          options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
+          required
+          defaultValue={branchId?.toString() ?? ""}
+          placeholder="Search branches..."
+          disabled={!branches.length}
+        />
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Attendance date
           <input type="date" name="date" defaultValue={attendanceDate} required className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
@@ -116,6 +136,10 @@ export default async function StaffAttendancePage({
             ))}
             <option value="unassigned">Unassigned role</option>
           </select>
+        </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Search staff
+          <input type="search" name="search" maxLength={120} defaultValue={staffSearch} placeholder="Name or staff number" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
         <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View date</button>
       </form>

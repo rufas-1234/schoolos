@@ -3,6 +3,7 @@
 import { Building2 } from "lucide-react";
 import { useActionState } from "react";
 import { AdminRecordDialog } from "@/components/admin-data-table";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   createStaffCatalogEntry,
   deleteStaffCatalogEntry,
@@ -31,15 +32,14 @@ export function CreateCatalogEntryForm({
         <h2 className="font-semibold text-slate-900">Add {label}</h2>
         <p className="mt-1 text-sm text-slate-500">Choose the branch this {label} belongs to.</p>
       </div>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Branch
-        <select name="branchId" required defaultValue="" className={fieldClass}>
-          <option value="" disabled>Select a branch</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>{branch.name}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
+        required
+        placeholder="Search branches..."
+        disabled={!branches.length}
+      />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Name
         <input name="name" required minLength={2} maxLength={120} className={fieldClass} />

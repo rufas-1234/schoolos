@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { auditLogs, staffSettings } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import {
+  normalizeVisibleStaffFields,
   normalizeRequiredStaffFields,
   staffSettingFields,
 } from "@/lib/staff-settings";
@@ -18,8 +19,17 @@ export async function saveStaffSettings(
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const submittedFields = formData.getAll("requiredFields")
     .filter((value): value is string => typeof value === "string");
-  if (submittedFields.some((name) => !staffSettingFields.some((field) => field.name === name))) {
+  const submittedVisibleFields = formData.getAll("visibleFields")
+    .filter((value): value is string => typeof value === "string");
+  if (
+    [...submittedFields, ...submittedVisibleFields]
+      .some((name) => !staffSettingFields.some((field) => field.name === name))
+  ) {
     return { error: "One or more selected staff fields are invalid." };
+  }
+  const visibleFields = normalizeVisibleStaffFields(submittedVisibleFields);
+  if (submittedFields.some((name) => !visibleFields.includes(name))) {
+    return { error: "A hidden staff field cannot be required. Show the field or clear its required setting." };
   }
   const requiredFields = normalizeRequiredStaffFields(submittedFields);
 
@@ -27,14 +37,15 @@ export async function saveStaffSettings(
     await tx.insert(staffSettings).values({
       schoolId: context.schoolId,
       requiredFields,
-    }).onDuplicateKeyUpdate({ set: { requiredFields } });
+      visibleFields,
+    }).onDuplicateKeyUpdate({ set: { requiredFields, visibleFields } });
     await tx.insert(auditLogs).values({
       schoolId: context.schoolId,
       actorUserId: context.user.id,
       action: "staff.settings.updated",
       resourceType: "staff_settings",
       resourcePublicId: context.schoolPublicId,
-      changedFields: ["requiredFields"],
+      changedFields: ["requiredFields", "visibleFields"],
     });
   });
 

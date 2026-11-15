@@ -419,6 +419,60 @@ export async function createAcademicTerm(
   return { success: true };
 }
 
+export async function deleteAcademicTerm(
+  _previousState: AcademicActionState,
+  formData: FormData,
+): Promise<AcademicActionState> {
+  const context = await requireSchoolPermission("school.settings.manage");
+  const recordId = readRecordId(formData);
+  if (recordId === null || recordId === undefined) {
+    return { error: "Choose a valid academic term to delete." };
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    const [term] = await tx
+      .select({ id: academicTerms.id, publicId: academicTerms.publicId })
+      .from(academicTerms)
+      .where(and(eq(academicTerms.id, recordId), eq(academicTerms.schoolId, context.schoolId)))
+      .for("update")
+      .limit(1);
+    if (!term) return "not-found";
+
+    const [[holidayCount], [feeStructureCount]] = await Promise.all([
+      tx.select({ total: count() })
+        .from(academicHolidays)
+        .where(and(
+          eq(academicHolidays.schoolId, context.schoolId),
+          eq(academicHolidays.academicTermId, term.id),
+        )),
+      tx.select({ total: count() })
+        .from(feeStructures)
+        .where(and(
+          eq(feeStructures.schoolId, context.schoolId),
+          eq(feeStructures.academicTermId, term.id),
+        )),
+    ]);
+    if (Number(holidayCount.total) > 0 || Number(feeStructureCount.total) > 0) {
+      return "in-use";
+    }
+
+    await tx.delete(academicTerms)
+      .where(and(eq(academicTerms.id, term.id), eq(academicTerms.schoolId, context.schoolId)));
+    await writeAudit(tx, context, "academic.term.deleted", "academic_term", term.publicId, [
+      "deleted",
+    ]);
+    return "deleted";
+  });
+
+  if (outcome === "not-found") return { error: "Academic term was not found in this school." };
+  if (outcome === "in-use") {
+    return { error: "This term is linked to holidays or fee structures. Remove those links before deleting it." };
+  }
+
+  revalidatePath("/admin/academics");
+  return { success: true };
+}
+
 export async function createClassLevel(
   _previousState: AcademicActionState,
   formData: FormData,

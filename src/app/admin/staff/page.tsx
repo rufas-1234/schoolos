@@ -18,7 +18,9 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import {
+  defaultVisibleStaffFields,
   defaultRequiredStaffFields,
+  normalizeVisibleStaffFields,
   normalizeRequiredStaffFields,
 } from "@/lib/staff-settings";
 import { transitionStaffStatus } from "./actions";
@@ -118,10 +120,14 @@ export default async function StaffDirectoryPage() {
     }).from(staffDesignations)
       .where(eq(staffDesignations.schoolId, context.schoolId))
       .orderBy(asc(staffDesignations.name)),
-    db.select({ requiredFields: staffSettings.requiredFields })
+    db.select({
+      requiredFields: staffSettings.requiredFields,
+      visibleFields: staffSettings.visibleFields,
+    })
       .from(staffSettings).where(eq(staffSettings.schoolId, context.schoolId)).limit(1),
   ]);
   const requiredFields = normalizeRequiredStaffFields(settings[0]?.requiredFields ?? defaultRequiredStaffFields);
+  const visibleFields = normalizeVisibleStaffFields(settings[0]?.visibleFields ?? defaultVisibleStaffFields);
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
@@ -135,6 +141,11 @@ export default async function StaffDirectoryPage() {
       options: uniqueOptions(records.map((record) => employmentTypeLabels[record.employmentType] ?? record.employmentType)),
     },
     { key: "status", label: "status", options: uniqueOptions(records.map((record) => record.status)) },
+    {
+      key: "personnelRole",
+      label: "staff role",
+      options: uniqueOptions(records.map((record) => record.personnelRole ?? "Unassigned")),
+    },
   ];
 
   return (
@@ -182,6 +193,7 @@ export default async function StaffDirectoryPage() {
                 departments={departments}
                 designations={designations}
                 requiredFields={requiredFields}
+                visibleFields={visibleFields}
               />
             </AdminActionDialog>
           }
@@ -199,6 +211,7 @@ export default async function StaffDirectoryPage() {
               employmentType: employmentTypeLabels[record.employmentType] ?? record.employmentType,
               startDate: record.startDate ?? "",
               status: record.status,
+              personnelRole: record.personnelRole ?? "Unassigned",
             },
             actions: (
               <div className="flex min-w-36 flex-wrap items-center gap-2">
@@ -210,6 +223,7 @@ export default async function StaffDirectoryPage() {
                     departments={departments}
                     designations={designations}
                     requiredFields={requiredFields}
+                    visibleFields={visibleFields}
                   />
                 </AdminRecordDialog>
                 <form action={transitionStaffStatus}>

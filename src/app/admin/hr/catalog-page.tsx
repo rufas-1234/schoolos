@@ -3,7 +3,8 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, staffDepartments, staffDesignations, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { CatalogEntryForm, CreateCatalogEntryForm } from "./catalog-forms";
+import { CatalogDirectory } from "./catalog-directory";
+import { CreateCatalogEntryForm } from "./catalog-forms";
 import type { HrCatalogKind } from "./catalog-actions";
 
 export async function StaffCatalogPage({ kind }: { kind: HrCatalogKind }) {
@@ -46,6 +47,14 @@ export async function StaffCatalogPage({ kind }: { kind: HrCatalogKind }) {
       .orderBy(asc(schoolBranches.name)),
   ]);
   const label = kind === "department" ? "Departments" : "Designations";
+  const directoryEntries = entries.map((entry) => ({
+    ...entry,
+    staffCount: staff.filter((member) => {
+      const memberName = kind === "department" ? member.department : member.jobTitle;
+      return memberName === entry.name &&
+        (entry.branchId === null || member.branchId === entry.branchId);
+    }).length,
+  }));
 
   return (
     <div className="space-y-7">
@@ -64,33 +73,7 @@ export async function StaffCatalogPage({ kind }: { kind: HrCatalogKind }) {
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(18rem,0.75fr)_minmax(0,1.5fr)]">
         <CreateCatalogEntryForm kind={kind} branches={branches} />
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-5 py-4">
-            <h2 className="font-semibold text-slate-900">{label} directory</h2>
-            <p className="mt-1 text-sm text-slate-500">{entries.length} entries</p>
-          </div>
-          {entries.length === 0 ? (
-            <p className="p-7 text-center text-sm text-slate-500">No {kind} entries yet.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {entries.map((entry) => (
-                <CatalogEntryForm
-                  key={entry.id}
-                  id={entry.id}
-                  kind={kind}
-                  name={entry.name}
-                  branchName={entry.branchName}
-                  branchCode={entry.branchCode}
-                  staffCount={staff.filter((member) => {
-                    const memberName = kind === "department" ? member.department : member.jobTitle;
-                    return memberName === entry.name &&
-                      (entry.branchId === null || member.branchId === entry.branchId);
-                  }).length}
-                />
-              ))}
-            </ul>
-          )}
-        </section>
+        <CatalogDirectory kind={kind} entries={directoryEntries} />
       </div>
     </div>
   );

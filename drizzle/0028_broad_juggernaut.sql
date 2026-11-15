@@ -1,0 +1,1 @@
+ALTER TABLE `staff_settings` ADD `visibleFields` json;

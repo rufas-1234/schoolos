@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, or, sum } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, or, sum } from "drizzle-orm";
 import { db } from "@/db";
 import {
   schoolBranches,
@@ -9,11 +9,19 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { LeaveBalanceForm, LeaveRequestForm, LeaveReviewForm, LeaveTypeForm } from "../hr-forms";
+import { SearchableSelect } from "@/components/searchable-select";
 
 export default async function StaffLeavePage({
   searchParams,
 }: {
-  searchParams: Promise<{ branchId?: string | string[] }>;
+  searchParams: Promise<{
+    branchId?: string | string[];
+    search?: string | string[];
+    staffId?: string | string[];
+    leaveTypeId?: string | string[];
+    year?: string | string[];
+    requestStatus?: string | string[];
+  }>;
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const [branches, params] = await Promise.all([
@@ -30,6 +38,15 @@ export default async function StaffLeavePage({
   const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
   const branchId = branch?.id;
   const branchName = branch?.name ?? "No active branch";
+  const search = typeof params.search === "string" ? params.search.trim().slice(0, 120) : "";
+  const staffId = parsePositiveId(params.staffId);
+  const leaveTypeId = parsePositiveId(params.leaveTypeId);
+  const yearCandidate = typeof params.year === "string" ? params.year : "";
+  const leaveYear = /^\d{4}$/.test(yearCandidate) ? Number(yearCandidate) : undefined;
+  const statusCandidate = typeof params.requestStatus === "string" ? params.requestStatus : "";
+  const requestStatus = ["pending", "approved", "rejected"].includes(statusCandidate)
+    ? statusCandidate
+    : "all";
   const [staff, types, balances, usage, requests] = await Promise.all([
     db.select({
       id: staffMembers.id,
@@ -76,6 +93,14 @@ export default async function StaffLeavePage({
         eq(staffLeaveBalances.schoolId, context.schoolId),
         ...(branchId ? [eq(staffMembers.branchId, branchId)] : []),
         ...(branchId ? [or(eq(staffLeaveTypes.branchId, branchId), isNull(staffLeaveTypes.branchId))] : []),
+        ...(staffId ? [eq(staffLeaveBalances.staffId, staffId)] : []),
+        ...(leaveTypeId ? [eq(staffLeaveBalances.leaveTypeId, leaveTypeId)] : []),
+        ...(leaveYear ? [eq(staffLeaveBalances.leaveYear, leaveYear)] : []),
+        ...(search ? [or(
+          like(staffMembers.firstName, `%${search}%`),
+          like(staffMembers.lastName, `%${search}%`),
+          like(staffLeaveTypes.name, `%${search}%`),
+        )!] : []),
       ))
       .orderBy(asc(staffMembers.lastName), asc(staffLeaveTypes.name)),
     db.select({
@@ -118,6 +143,15 @@ export default async function StaffLeavePage({
         eq(staffLeaveRequests.schoolId, context.schoolId),
         ...(branchId ? [eq(staffMembers.branchId, branchId)] : []),
         ...(branchId ? [or(eq(staffLeaveTypes.branchId, branchId), isNull(staffLeaveTypes.branchId))] : []),
+        ...(staffId ? [eq(staffLeaveRequests.staffId, staffId)] : []),
+        ...(leaveTypeId ? [eq(staffLeaveRequests.leaveTypeId, leaveTypeId)] : []),
+        ...(leaveYear ? [eq(staffLeaveRequests.leaveYear, leaveYear)] : []),
+        ...(requestStatus === "all" ? [] : [eq(staffLeaveRequests.status, requestStatus)]),
+        ...(search ? [or(
+          like(staffMembers.firstName, `%${search}%`),
+          like(staffMembers.lastName, `%${search}%`),
+          like(staffLeaveTypes.name, `%${search}%`),
+        )!] : []),
       ))
       .orderBy(desc(staffLeaveRequests.createdAt))
       .limit(100),
@@ -150,14 +184,58 @@ export default async function StaffLeavePage({
       </header>
 
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <SearchableSelect
+          label="Branch"
+          name="branchId"
+          options={branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` }))}
+          required
+          defaultValue={branchId?.toString() ?? ""}
+          placeholder="Search branches..."
+          disabled={!branches.length}
+        />
+        <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View branch</button>
+      </form>
+
+      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        {branchId && <input type="hidden" name="branchId" value={branchId} />}
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Branch
-          <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="" disabled>Select a branch</option>
-            {branches.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.code})</option>)}
+          Search staff or leave type
+          <input type="search" name="search" maxLength={120} defaultValue={search} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
+        </label>
+        <SearchableSelect
+          label="Staff member"
+          name="staffId"
+          options={[
+            { value: "", label: "All staff" },
+            ...staff.map((member) => ({ value: String(member.id), label: `${member.firstName} ${member.lastName}` })),
+          ]}
+          defaultValue={staffId?.toString() ?? ""}
+          placeholder="Search staff..."
+        />
+        <SearchableSelect
+          label="Leave type"
+          name="leaveTypeId"
+          options={[
+            { value: "", label: "All leave types" },
+            ...types.map((type) => ({ value: String(type.id), label: type.name })),
+          ]}
+          defaultValue={leaveTypeId?.toString() ?? ""}
+          placeholder="Search leave types..."
+        />
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Year
+          <input type="number" name="year" min="2000" max="9999" defaultValue={leaveYear ?? ""} className="block w-28 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
+        </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Request status
+          <select name="requestStatus" defaultValue={requestStatus} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
           </select>
         </label>
-        <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View branch</button>
+        <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
       </form>
 
       {!branch && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Create an active branch before managing leave.</p>}
@@ -242,4 +320,10 @@ export default async function StaffLeavePage({
       </section>
     </div>
   );
+}
+
+function parsePositiveId(value: string | string[] | undefined): number | undefined {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }

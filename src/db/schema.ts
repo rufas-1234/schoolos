@@ -612,6 +612,7 @@ export const staffSettings = mysqlTable(
       .notNull()
       .references(() => schools.id),
     requiredFields: json("requiredFields").$type<string[]>().notNull(),
+    visibleFields: json("visibleFields").$type<string[]>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

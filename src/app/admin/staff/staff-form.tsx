@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 import { createStaffMember, updateStaffMember, type StaffActionState } from "./actions";
 import type { StaffCustomField, StaffDocuments, StaffStoredFile } from "@/db/schema";
 import { employmentTypes, staffContractTypes, staffGenders, staffMaritalStatuses, staffRoles } from "@/lib/staff-policy";
@@ -64,6 +65,7 @@ type StaffFormProps = {
   departments: { id: number; name: string; branchId: number | null }[];
   designations: { id: number; name: string; branchId: number | null }[];
   requiredFields: string[];
+  visibleFields: string[];
 };
 
 const tabs = [
@@ -77,8 +79,17 @@ const tabs = [
 type Tab = (typeof tabs)[number];
 
 const requiredStaffFieldsContext = createContext<ReadonlySet<string>>(new Set());
+const visibleStaffFieldsContext = createContext<ReadonlySet<string>>(new Set());
 
-export function StaffForm({ record, accounts, branches, departments, designations, requiredFields }: StaffFormProps) {
+export function StaffForm({
+  record,
+  accounts,
+  branches,
+  departments,
+  designations,
+  requiredFields,
+  visibleFields,
+}: StaffFormProps) {
   const action = record ? updateStaffMember : createStaffMember;
   const [state, formAction, pending] = useActionState<StaffActionState, FormData>(action, {});
   const [activeTab, setActiveTab] = useState<Tab>(tabs[0]);
@@ -109,6 +120,7 @@ export function StaffForm({ record, accounts, branches, departments, designation
   }, [state]);
 
   return (
+    <visibleStaffFieldsContext.Provider value={new Set(visibleFields)}>
     <requiredStaffFieldsContext.Provider value={new Set(requiredFields)}>
     <form
       ref={formRef}
@@ -152,22 +164,28 @@ export function StaffForm({ record, accounts, branches, departments, designation
                 {staffRoles.map((role) => <option key={role} value={role}>{titleCase(role)}</option>)}
               </select>
             </Field>
-            <Field label="Department">
-              <select name="department" defaultValue={record?.department ?? ""} required className={inputClass}>
-                <option value="">Select department</option>
-                {departmentOptions.map((option) => (
-                  <option key={option.id} value={option.name}>{option.name}{option.branchId === null ? " (All branches)" : ""}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Designation">
-              <select name="jobTitle" defaultValue={record?.jobTitle ?? ""} required className={inputClass}>
-                <option value="">Select designation</option>
-                {designationOptions.map((option) => (
-                  <option key={option.id} value={option.name}>{option.name}{option.branchId === null ? " (All branches)" : ""}</option>
-                ))}
-              </select>
-            </Field>
+            <StaffSearchableSelectField
+              key={`department-${selectedBranchId}`}
+              label="Department"
+              name="department"
+              options={departmentOptions.map((option) => ({
+                value: option.name,
+                label: `${option.name}${option.branchId === null ? " (All branches)" : ""}`,
+              }))}
+              defaultValue={record?.department ?? ""}
+              placeholder="Search departments..."
+            />
+            <StaffSearchableSelectField
+              key={`designation-${selectedBranchId}`}
+              label="Designation"
+              name="jobTitle"
+              options={designationOptions.map((option) => ({
+                value: option.name,
+                label: `${option.name}${option.branchId === null ? " (All branches)" : ""}`,
+              }))}
+              defaultValue={record?.jobTitle ?? ""}
+              placeholder="Search designations..."
+            />
             <Field label="First name"><input name="firstName" required minLength={2} maxLength={120} defaultValue={record?.firstName ?? ""} className={inputClass} /></Field>
             <Field label="Last name"><input name="lastName" required minLength={2} maxLength={120} defaultValue={record?.lastName ?? ""} className={inputClass} /></Field>
             <Field label="Father's name"><input name="fatherName" maxLength={160} defaultValue={record?.fatherName ?? ""} className={inputClass} /></Field>
@@ -191,18 +209,14 @@ export function StaffForm({ record, accounts, branches, departments, designation
             <Field label="Emergency mobile"><input name="emergencyContactPhone" type="tel" maxLength={40} defaultValue={record?.emergencyContactPhone ?? ""} className={inputClass} /></Field>
             <Field label="Emergency contact name"><input name="emergencyContactName" maxLength={160} defaultValue={record?.emergencyContactName ?? ""} className={inputClass} /></Field>
             <Field label="Driving license"><input name="drivingLicense" maxLength={80} defaultValue={record?.drivingLicense ?? ""} className={inputClass} /></Field>
-            <Field label="Branch" required>
-              <select
-                name="branchId"
-                required
-                value={selectedBranchId}
-                onChange={(event) => setSelectedBranchId(event.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select branch</option>
-                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-              </select>
-            </Field>
+            <StaffSearchableSelectField
+              label="Branch"
+              name="branchId"
+              options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
+              defaultValue={selectedBranchId}
+              placeholder="Search branches..."
+              onValueChange={setSelectedBranchId}
+            />
             <Field label="Profile photo" fieldName="profilePhotoFileName">
               <StaffFileField
                 purpose="profilePhoto"
@@ -221,12 +235,17 @@ export function StaffForm({ record, accounts, branches, departments, designation
             <Field label="Permanent address" full><textarea name="permanentAddress" rows={2} maxLength={1000} defaultValue={record?.permanentAddress ?? ""} className={inputClass} /></Field>
             <Field label="Qualifications" full><textarea name="qualification" rows={2} maxLength={2000} defaultValue={record?.qualification ?? ""} className={inputClass} /></Field>
             <Field label="Experience" full><textarea name="experience" rows={2} maxLength={2000} defaultValue={record?.experience ?? ""} className={inputClass} /></Field>
-            <Field label="Linked school account" full>
-              <select name="linkedUserId" defaultValue={record?.linkedUserId ?? ""} className={inputClass}>
-                <option value="">No linked account</option>
-                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} ({account.email})</option>)}
-              </select>
-            </Field>
+            <StaffSearchableSelectField
+              label="Linked school account"
+              name="linkedUserId"
+              options={[
+                { value: "", label: "No linked account" },
+                ...accounts.map((account) => ({ value: account.id, label: `${account.name} (${account.email})` })),
+              ]}
+              defaultValue={record?.linkedUserId ?? ""}
+              placeholder="Search school accounts..."
+              full
+            />
             <Field label="Employment type">
               <select name="employmentType" defaultValue={record?.employmentType ?? "full_time"} className={inputClass}>
                 {employmentTypes.map((value) => <option key={value} value={value}>{titleCase(value.replaceAll("_", " "))}</option>)}
@@ -299,6 +318,7 @@ export function StaffForm({ record, accounts, branches, departments, designation
       </div>
     </form>
     </requiredStaffFieldsContext.Provider>
+    </visibleStaffFieldsContext.Provider>
   );
 }
 
@@ -400,16 +420,53 @@ function Field({
   children: React.ReactNode;
 }) {
   const requiredFields = useContext(requiredStaffFieldsContext);
+  const visibleFields = useContext(visibleStaffFieldsContext);
   const childName = isValidElement<{ name?: string }>(children) ? children.props.name : undefined;
-  const requiredField = required || requiredFields.has(fieldName ?? childName ?? "");
+  const name = fieldName ?? childName ?? "";
+  const requiredField = required || requiredFields.has(name);
   const control = isValidElement<{ name?: string; required?: boolean }>(children) && (fieldName || childName)
     ? cloneElement(children, { required: requiredField })
     : children;
   return (
-    <label className={`space-y-1.5 text-sm font-medium text-slate-700 ${full ? "sm:col-span-2" : ""}`}>
+    <label hidden={!visibleFields.has(name)} className={`space-y-1.5 text-sm font-medium text-slate-700 ${full ? "sm:col-span-2" : ""}`}>
       <span>{label}{requiredField ? " *" : ""}</span>
       {control}
     </label>
+  );
+}
+
+function StaffSearchableSelectField({
+  label,
+  name,
+  options,
+  defaultValue,
+  placeholder,
+  onValueChange,
+  full = false,
+}: {
+  label: string;
+  name: string;
+  options: SearchableSelectOption[];
+  defaultValue?: string;
+  placeholder: string;
+  onValueChange?: (value: string) => void;
+  full?: boolean;
+}) {
+  const requiredFields = useContext(requiredStaffFieldsContext);
+  const visibleFields = useContext(visibleStaffFieldsContext);
+  return (
+    <div className={full ? "sm:col-span-2" : undefined}>
+      <SearchableSelect
+        label={label}
+        name={name}
+        options={options}
+        required={requiredFields.has(name)}
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        hidden={!visibleFields.has(name)}
+        onValueChange={onValueChange}
+      />
+    </div>
   );
 }
 

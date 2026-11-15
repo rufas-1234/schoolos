@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
+import { and, asc, count, desc, eq, like, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { AdminActionDialog, AdminRecordDialog } from "@/components/admin-data-table";
 import Link from "next/link";
@@ -35,7 +35,10 @@ type SearchParams = {
   branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
+  page?: string | string[];
 };
+
+const INVOICE_PAGE_SIZE = 10;
 
 function money(minorUnits: number): string {
   return (minorUnits / 100).toFixed(2);
@@ -71,9 +74,122 @@ export default async function FeeCollectionPage({
   const requestedSection = typeof params.sectionId === "string" && /^\d+$/.test(params.sectionId)
     ? Number(params.sectionId)
     : null;
-  const [school, branches, classes, sections, invoices] = await Promise.all([
-    db.select({ currency: schools.currency, timezone: schools.timezone })
-      .from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
+  const requestedPage = typeof params.page === "string" && /^\d+$/.test(params.page)
+    ? Math.max(1, Number(params.page))
+    : 1;
+  const [school] = await db.select({ currency: schools.currency, timezone: schools.timezone })
+    .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
+  const today = todayInTimezone(school?.timezone ?? "UTC");
+  const paymentTotals = db.select({
+    invoiceId: feePayments.invoiceId,
+    paid: sql<string>`COALESCE(SUM(${feePayments.amount} - ${feePayments.reversedAmount}), 0)`,
+  })
+    .from(feePayments)
+    .where(eq(feePayments.schoolId, context.schoolId))
+    .groupBy(feePayments.invoiceId)
+    .as("invoice_payment_totals");
+  const fineDue = sql`CASE
+    WHEN ${studentFeeInvoices.fineType} = 'none' OR ${studentFeeInvoices.dueDate} >= ${today} THEN 0
+    WHEN ${studentFeeInvoices.fineType} = 'fixed' THEN ${studentFeeInvoices.fineValue}
+    WHEN ${studentFeeInvoices.fineType} = 'percentage'
+      THEN ROUND((${studentFeeInvoices.amount} - ${studentFeeInvoices.discountAmount}) * ${studentFeeInvoices.fineValue} / 100, 2)
+    ELSE 0
+  END`;
+  const totalDueSql = sql`(${studentFeeInvoices.amount} - ${studentFeeInvoices.discountAmount} + ${fineDue})`;
+  const paidSql = sql`COALESCE(${paymentTotals.paid}, 0)`;
+  const invoiceStatusSql = sql<string>`CASE
+    WHEN ${paidSql} < 0 OR ${totalDueSql} < 0 OR ${paidSql} > ${totalDueSql} THEN 'unpaid'
+    WHEN ${paidSql} = ${totalDueSql} THEN 'paid'
+    WHEN ${paidSql} = 0 THEN 'unpaid'
+    ELSE 'partial'
+  END`;
+  const invoiceFilters = [
+    eq(studentFeeInvoices.schoolId, context.schoolId),
+    ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
+    ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
+    ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
+    ...(search ? [or(
+      like(students.firstName, `%${search}%`),
+      like(students.lastName, `%${search}%`),
+      like(sql`lower(concat(${students.firstName}, ' ', ${students.lastName}))`, `%${search.toLocaleLowerCase()}%`),
+      like(students.admissionNumber, `%${search}%`),
+      like(studentEnrollments.rollNumber, `%${search}%`),
+      like(students.phone, `%${search}%`),
+      like(students.publicId, `%${search}%`),
+    )!] : []),
+  ];
+  const matchingInvoices = db.select({
+    id: studentFeeInvoices.id,
+    publicId: studentFeeInvoices.publicId,
+    invoiceNumber: studentFeeInvoices.invoiceNumber,
+    amount: studentFeeInvoices.amount,
+    discountAmount: studentFeeInvoices.discountAmount,
+    fineType: studentFeeInvoices.fineType,
+    fineValue: studentFeeInvoices.fineValue,
+    dueDate: studentFeeInvoices.dueDate,
+    createdAt: studentFeeInvoices.createdAt,
+    studentId: students.id,
+    studentName: students.firstName,
+    studentLastName: students.lastName,
+    admissionNumber: students.admissionNumber,
+    rollNumber: studentEnrollments.rollNumber,
+    className: classLevels.name,
+    sectionName: classSections.name,
+    branchId: schoolBranches.id,
+    branchName: schoolBranches.name,
+    yearName: academicYears.name,
+    termName: academicTerms.name,
+    groupName: feeGroups.name,
+    typeName: feeTypes.name,
+    paidAmount: paidSql,
+    status: invoiceStatusSql,
+  })
+    .from(studentFeeInvoices)
+    .innerJoin(students, and(
+      eq(students.id, studentFeeInvoices.studentId),
+      eq(students.schoolId, context.schoolId),
+    ))
+    .innerJoin(studentEnrollments, and(
+      eq(studentEnrollments.id, studentFeeInvoices.enrollmentId),
+      eq(studentEnrollments.schoolId, context.schoolId),
+    ))
+    .innerJoin(classSections, and(
+      eq(classSections.id, studentEnrollments.classSectionId),
+      eq(classSections.schoolId, context.schoolId),
+    ))
+    .innerJoin(classLevels, and(
+      eq(classLevels.id, classSections.classLevelId),
+      eq(classLevels.schoolId, context.schoolId),
+    ))
+    .innerJoin(schoolBranches, and(
+      eq(schoolBranches.id, classLevels.branchId),
+      eq(schoolBranches.schoolId, context.schoolId),
+    ))
+    .innerJoin(feeStructures, and(
+      eq(feeStructures.id, studentFeeInvoices.feeStructureId),
+      eq(feeStructures.schoolId, context.schoolId),
+    ))
+    .innerJoin(academicYears, and(
+      eq(academicYears.id, feeStructures.academicYearId),
+      eq(academicYears.schoolId, context.schoolId),
+    ))
+    .leftJoin(academicTerms, eq(academicTerms.id, feeStructures.academicTermId))
+    .innerJoin(feeGroups, and(
+      eq(feeGroups.id, feeStructures.feeGroupId),
+      eq(feeGroups.schoolId, context.schoolId),
+    ))
+    .innerJoin(feeTypes, and(
+      eq(feeTypes.id, feeStructures.feeTypeId),
+      eq(feeTypes.schoolId, context.schoolId),
+    ))
+    .leftJoin(paymentTotals, eq(paymentTotals.invoiceId, studentFeeInvoices.id))
+    .where(and(...invoiceFilters))
+    .as("matching_invoices");
+  const statusFilterCondition = statusFilter
+    ? eq(matchingInvoices.status, statusFilter)
+    : undefined;
+  const [countResult, branches, classes, sections] = await Promise.all([
+    db.select({ total: count() }).from(matchingInvoices).where(statusFilterCondition),
     db.select({ id: schoolBranches.id, name: schoolBranches.name })
       .from(schoolBranches).where(eq(schoolBranches.schoolId, context.schoolId))
       .orderBy(asc(schoolBranches.name)),
@@ -107,108 +223,22 @@ export default async function FeeCollectionPage({
       ))
       .where(eq(classSections.schoolId, context.schoolId))
       .orderBy(asc(schoolBranches.name), asc(classLevels.name), asc(classSections.name)),
-    db.select({
-      id: studentFeeInvoices.id,
-      publicId: studentFeeInvoices.publicId,
-      invoiceNumber: studentFeeInvoices.invoiceNumber,
-      amount: studentFeeInvoices.amount,
-      discountAmount: studentFeeInvoices.discountAmount,
-      fineType: studentFeeInvoices.fineType,
-      fineValue: studentFeeInvoices.fineValue,
-      dueDate: studentFeeInvoices.dueDate,
-      createdAt: studentFeeInvoices.createdAt,
-      studentId: students.id,
-      studentName: students.firstName,
-      studentLastName: students.lastName,
-      admissionNumber: students.admissionNumber,
-      rollNumber: studentEnrollments.rollNumber,
-      className: classLevels.name,
-      sectionName: classSections.name,
-      branchId: schoolBranches.id,
-      branchName: schoolBranches.name,
-      yearName: academicYears.name,
-      termName: academicTerms.name,
-      groupName: feeGroups.name,
-      typeName: feeTypes.name,
-    })
-      .from(studentFeeInvoices)
-      .innerJoin(students, and(
-        eq(students.id, studentFeeInvoices.studentId),
-        eq(students.schoolId, context.schoolId),
-      ))
-      .innerJoin(studentEnrollments, and(
-        eq(studentEnrollments.id, studentFeeInvoices.enrollmentId),
-        eq(studentEnrollments.schoolId, context.schoolId),
-      ))
-      .innerJoin(classSections, and(
-        eq(classSections.id, studentEnrollments.classSectionId),
-        eq(classSections.schoolId, context.schoolId),
-      ))
-      .innerJoin(classLevels, and(
-        eq(classLevels.id, classSections.classLevelId),
-        eq(classLevels.schoolId, context.schoolId),
-      ))
-      .innerJoin(schoolBranches, and(
-        eq(schoolBranches.id, classLevels.branchId),
-        eq(schoolBranches.schoolId, context.schoolId),
-      ))
-      .innerJoin(feeStructures, and(
-        eq(feeStructures.id, studentFeeInvoices.feeStructureId),
-        eq(feeStructures.schoolId, context.schoolId),
-      ))
-      .innerJoin(academicYears, and(
-        eq(academicYears.id, feeStructures.academicYearId),
-        eq(academicYears.schoolId, context.schoolId),
-      ))
-      .leftJoin(academicTerms, eq(academicTerms.id, feeStructures.academicTermId))
-      .innerJoin(feeGroups, and(
-        eq(feeGroups.id, feeStructures.feeGroupId),
-        eq(feeGroups.schoolId, context.schoolId),
-      ))
-      .innerJoin(feeTypes, and(
-        eq(feeTypes.id, feeStructures.feeTypeId),
-        eq(feeTypes.schoolId, context.schoolId),
-      ))
-      .where(and(
-        eq(studentFeeInvoices.schoolId, context.schoolId),
-        ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
-        ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
-        ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
-        ...(search ? [or(
-          like(students.firstName, `%${search}%`),
-          like(students.lastName, `%${search}%`),
-          like(sql`lower(concat(${students.firstName}, ' ', ${students.lastName}))`, `%${search.toLocaleLowerCase()}%`),
-          like(students.admissionNumber, `%${search}%`),
-          like(studentEnrollments.rollNumber, `%${search}%`),
-          like(students.phone, `%${search}%`),
-          like(students.publicId, `%${search}%`),
-        )!] : []),
-      ))
-      .orderBy(desc(studentFeeInvoices.createdAt))
-      .limit(250),
   ]);
-  const invoiceIds = invoices.map((invoice) => invoice.id);
-  const payments = invoiceIds.length
-    ? await db.select({
-        invoiceId: feePayments.invoiceId,
-        amount: sum(sql`${feePayments.amount} - ${feePayments.reversedAmount}`),
-      })
-      .from(feePayments)
-      .where(and(eq(feePayments.schoolId, context.schoolId), inArray(feePayments.invoiceId, invoiceIds)))
-      .groupBy(feePayments.invoiceId)
-    : [];
-  const paidByInvoice = new Map(payments.map((payment) => [
-    payment.invoiceId,
-    parseMoneyToMinorUnits(payment.amount ?? "0") ?? 0,
-  ]));
-  const today = todayInTimezone(school?.timezone ?? "UTC");
+  const matchingCount = Number(countResult[0]?.total ?? 0);
+  const pageCount = Math.max(1, Math.ceil(matchingCount / INVOICE_PAGE_SIZE));
+  const page = Math.min(requestedPage, pageCount);
+  const invoices = await db.select().from(matchingInvoices)
+    .where(statusFilterCondition)
+    .orderBy(desc(matchingInvoices.createdAt), desc(matchingInvoices.id))
+    .limit(INVOICE_PAGE_SIZE)
+    .offset((page - 1) * INVOICE_PAGE_SIZE);
   const invoiceRows = invoices.map((invoice) => {
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
     const fine = today > invoice.dueDate
       ? calculateFineMinorUnits(amount - discount, invoice.fineType, invoice.fineValue) ?? 0
       : 0;
-    const paid = paidByInvoice.get(invoice.id) ?? 0;
+    const paid = parseMoneyToMinorUnits(invoice.paidAmount) ?? 0;
     const totalDue = amount - discount + fine;
     return {
       ...invoice,
@@ -218,7 +248,7 @@ export default async function FeeCollectionPage({
       status: feeInvoiceStatus(totalDue, paid) ?? "unpaid",
     };
   });
-  const rows = invoiceRows.filter((invoice) => !statusFilter || invoice.status === statusFilter);
+  const rows = invoiceRows;
   const currency = school?.currency ?? "";
   const branchOptions: SearchableSelectOption[] = [
     { value: "", label: "All branches" },
@@ -242,6 +272,18 @@ export default async function FeeCollectionPage({
       id: invoice.id,
       label: `${invoice.invoiceNumber} · ${invoice.studentName} ${invoice.studentLastName} · ${currency} ${money(invoice.balance)} due`,
     }));
+  const firstResult = matchingCount === 0 ? 0 : (page - 1) * INVOICE_PAGE_SIZE + 1;
+  const lastResult = Math.min(page * INVOICE_PAGE_SIZE, matchingCount);
+  const pageHref = (targetPage: number) => {
+    const query = new URLSearchParams();
+    if (search) query.set("search", search);
+    if (statusFilter) query.set("status", statusFilter);
+    if (requestedBranch !== null) query.set("branchId", String(requestedBranch));
+    if (requestedClass !== null) query.set("classLevelId", String(requestedClass));
+    if (requestedSection !== null) query.set("sectionId", String(requestedSection));
+    query.set("page", String(targetPage));
+    return `/admin/fees/collection?${query.toString()}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -282,11 +324,41 @@ export default async function FeeCollectionPage({
         </Link>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard label="Invoices shown" value={String(rows.length)} />
-        <SummaryCard label="Outstanding shown" value={`${currency} ${money(totalOutstanding)}`} />
-        <SummaryCard label="Showing up to" value="250 recent invoices" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SummaryCard label="Invoices matching filters" value={String(matchingCount)} />
+        <SummaryCard label="Outstanding on this page" value={`${currency} ${money(totalOutstanding)}`} />
       </div>
+
+      <nav aria-label="Invoice pages" className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">
+          Showing {firstResult}–{lastResult} of {matchingCount} invoices
+        </p>
+        <div className="flex items-center gap-2">
+          <Link
+            href={pageHref(Math.max(1, page - 1))}
+            aria-disabled={page <= 1}
+            className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+              page <= 1
+                ? "pointer-events-none border-slate-100 text-slate-400"
+                : "border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Previous
+          </Link>
+          <span className="text-sm text-slate-500">Page {page} of {pageCount}</span>
+          <Link
+            href={pageHref(Math.min(pageCount, page + 1))}
+            aria-disabled={page >= pageCount}
+            className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+              page >= pageCount
+                ? "pointer-events-none border-slate-100 text-slate-400"
+                : "border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Next
+          </Link>
+        </div>
+      </nav>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         {rows.length ? rows.map((invoice) => (

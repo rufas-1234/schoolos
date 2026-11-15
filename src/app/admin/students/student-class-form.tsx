@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { RequiredMark } from "@/components/required-mark";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   addStudentClass,
   updateStudentClass,
@@ -62,20 +62,15 @@ export function StudentClassForm({
           <input type="hidden" name="sourceSectionId" value={sourceSectionId ?? ""} />
         </>
       )}
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Class and section <RequiredMark />
-        <select
-          name="targetSectionId"
-          required
-          defaultValue={record ? String(record.classSectionId) : ""}
-          className={inputClass}
-        >
-          <option value="" disabled>Select a class section</option>
-          {sections.map((section) => (
-            <option key={section.id} value={section.id}>{section.label}</option>
-          ))}
-        </select>
-      </label>
+      <SearchableSelect
+        label="Class and section"
+        name="targetSectionId"
+        options={sections.map((section) => ({ value: String(section.id), label: section.label }))}
+        required
+        defaultValue={record ? String(record.classSectionId) : ""}
+        placeholder="Search class sections..."
+        disabled={!sections.length}
+      />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Roll number
         <input

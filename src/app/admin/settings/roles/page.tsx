@@ -16,6 +16,7 @@ import {
   CreateRoleForm,
   DeleteRoleForm,
   EditRoleForm,
+  SchoolAccountAccessForm,
 } from "../role-forms";
 
 export default async function UserRolesPage() {
@@ -39,11 +40,11 @@ export default async function UserRolesPage() {
       userId: user.id,
       name: user.name,
       email: user.email,
+      membershipStatus: schoolMemberships.status,
     }).from(schoolMemberships)
       .innerJoin(user, eq(schoolMemberships.userId, user.id))
       .where(and(
         eq(schoolMemberships.schoolId, context.schoolId),
-        eq(schoolMemberships.status, "active"),
         eq(user.isActive, true),
       ))
       .orderBy(asc(user.name)),
@@ -192,8 +193,8 @@ export default async function UserRolesPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">Account role assignments</h2>
-          <p className="mt-1 text-sm text-slate-500">Assign roles to existing active accounts; this does not create user accounts.</p>
+          <h2 className="font-semibold text-slate-900">School login access and role assignments</h2>
+          <p className="mt-1 text-sm text-slate-500">Manage school access and roles for existing accounts. Disabling access blocks this account from entering this school but does not delete the user.</p>
         </div>
         {accounts.length === 0 ? (
           <p className="p-7 text-center text-sm text-slate-500">No active school accounts are available.</p>
@@ -204,12 +205,26 @@ export default async function UserRolesPage() {
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-slate-800">{account.name}</p>
                   <p className="truncate text-sm text-slate-500">{account.email}</p>
+                  <p className={`mt-1 text-xs font-semibold ${account.membershipStatus === "active" ? "text-emerald-700" : "text-rose-700"}`}>
+                    {account.membershipStatus === "active" ? "School access enabled" : "School access disabled"}
+                  </p>
+                  <div className="mt-3">
+                    <SchoolAccountAccessForm
+                      membershipId={account.membershipId}
+                      enabled={account.membershipStatus === "active"}
+                      userName={account.name}
+                    />
+                  </div>
                 </div>
-                <AccountRolesForm
-                  userId={account.userId}
-                  currentRoleIds={roleIdsByMembership.get(account.membershipId) ?? []}
-                  roles={schoolRoles.map(({ id, name }) => ({ id, name }))}
-                />
+                {account.membershipStatus === "active" ? (
+                  <AccountRolesForm
+                    userId={account.userId}
+                    currentRoleIds={roleIdsByMembership.get(account.membershipId) ?? []}
+                    roles={schoolRoles.map(({ id, name }) => ({ id, name }))}
+                  />
+                ) : (
+                  <p className="self-center text-sm text-slate-500">Enable school access before assigning roles.</p>
+                )}
               </li>
             ))}
           </ul>

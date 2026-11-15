@@ -10,6 +10,7 @@ import {
   classLevels,
   classSections,
   schoolBranches,
+  studentCategories,
   studentEnrollments,
   students,
 } from "@/db/schema";
@@ -61,9 +62,19 @@ export default async function UnassignedStudentsPage() {
             branchId: schoolBranches.id,
             branchName: schoolBranches.name,
             branchCode: schoolBranches.code,
+            gender: students.gender,
+            categoryId: studentCategories.id,
+            categoryName: studentCategories.name,
             phone: students.phone,
           })
           .from(students)
+          .leftJoin(
+            studentCategories,
+            and(
+              eq(students.categoryId, studentCategories.id),
+              eq(studentCategories.schoolId, context.schoolId),
+            ),
+          )
           .leftJoin(
             schoolBranches,
             and(
@@ -117,6 +128,20 @@ export default async function UnassignedStudentsPage() {
         ? [{ value: "none", label: "No branch assigned" }]
         : []),
     ],
+  }, {
+    key: "genderFilter",
+    label: "gender",
+    options: uniqueOptions(unassignedStudents.map((student) => ({
+        value: student.gender ?? "__unspecified__",
+        label: student.gender ? genderLabels[student.gender] ?? student.gender : "Not specified",
+    }))),
+  }, {
+    key: "categoryFilter",
+    label: "category",
+    options: uniqueOptions(unassignedStudents.map((student) => ({
+        value: student.categoryId === null ? "__uncategorized__" : String(student.categoryId),
+        label: student.categoryName ?? "Uncategorized",
+    }))),
   }];
 
   return (
@@ -148,8 +173,18 @@ export default async function UnassignedStudentsPage() {
             admissionNumber: student.admissionNumber ?? "",
             branch: student.branchName ?? "Not assigned",
             branchFilter: student.branchId === null ? "none" : String(student.branchId),
+            genderFilter: student.gender ?? "__unspecified__",
+            categoryFilter: student.categoryId === null ? "__uncategorized__" : String(student.categoryId),
             phone: student.phone ?? "",
           },
+          searchableText: [
+            student.firstName,
+            student.lastName,
+            student.admissionNumber ?? "",
+            student.branchName ?? "",
+            student.categoryName ?? "",
+            student.phone ?? "",
+          ].join(" "),
         }))}
         filters={branchFilters}
         requireSearchCriteria
@@ -173,4 +208,17 @@ export default async function UnassignedStudentsPage() {
       )}
     </div>
   );
+}
+
+const genderLabels: Record<string, string> = {
+  female: "Female",
+  male: "Male",
+  other: "Other",
+  non_binary: "Non-binary",
+  prefer_not_to_say: "Prefer not to say",
+};
+
+function uniqueOptions(options: { value: string; label: string }[]) {
+  return [...new Map(options.map((option) => [option.value, option])).values()]
+    .sort((first, second) => first.label.localeCompare(second.label));
 }

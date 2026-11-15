@@ -22,6 +22,9 @@ export function SearchableSelect({
   emptyLabel = "No matching options.",
   required = false,
   autoSubmit = false,
+  disabled = false,
+  onValueChange,
+  hidden = false,
 }: {
   label: string;
   name: string;
@@ -31,10 +34,14 @@ export function SearchableSelect({
   emptyLabel?: string;
   required?: boolean;
   autoSubmit?: boolean;
+  disabled?: boolean;
+  onValueChange?: (value: string) => void;
+  hidden?: boolean;
 }) {
   const listId = useId();
-  const selectedOption = options.find((option) => option.value === defaultValue);
-  const [selectedValue, setSelectedValue] = useState(defaultValue);
+  const initialValue = options.some((option) => option.value === defaultValue) ? defaultValue : "";
+  const [selectedValue, setSelectedValue] = useState(initialValue);
+  const selectedOption = options.find((option) => option.value === selectedValue);
   const [query, setQuery] = useState(selectedOption?.label ?? "");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -49,6 +56,7 @@ export function SearchableSelect({
     setQuery(option.label);
     setOpen(false);
     setActiveIndex(-1);
+    onValueChange?.(option.value);
     if (autoSubmit) {
       window.setTimeout(() => inputRef.current?.form?.requestSubmit(), 0);
     }
@@ -73,11 +81,11 @@ export function SearchableSelect({
   }
 
   return (
-    <div className="relative block space-y-1.5 text-sm font-medium text-slate-700">
+    <div hidden={hidden} className="relative block space-y-1.5 text-sm font-medium text-slate-700">
       <label htmlFor={`${listId}-input`}>
         {label} {required && <RequiredMark />}
       </label>
-      <input type="hidden" name={name} value={selectedValue} />
+      <input type="hidden" name={name} value={selectedValue} disabled={disabled} />
       <input
         ref={inputRef}
         id={`${listId}-input`}
@@ -86,6 +94,7 @@ export function SearchableSelect({
         autoComplete="off"
         value={query}
         required={required}
+        disabled={disabled}
         pattern={required ? (selectedValue ? escapePattern(options.find((option) => option.value === selectedValue)?.label ?? "") : "(?!)") : undefined}
         aria-autocomplete="list"
         aria-expanded={open}
@@ -93,6 +102,7 @@ export function SearchableSelect({
         aria-activedescendant={activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined}
         placeholder={placeholder}
         onFocus={(event) => {
+          if (disabled) return;
           setOpen(true);
           if (selectedValue) event.currentTarget.select();
         }}
@@ -103,11 +113,13 @@ export function SearchableSelect({
           setSelectedValue("");
           setActiveIndex(-1);
           setOpen(true);
+          onValueChange?.("");
         }}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-10 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-10 text-slate-900 outline-none focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
       />
       <button
         type="button"
+        disabled={disabled}
         aria-label={`${label} dropdown`}
         aria-expanded={open}
         onPointerDown={(event) => event.preventDefault()}
@@ -115,7 +127,7 @@ export function SearchableSelect({
           setOpen((value) => !value);
           inputRef.current?.focus();
         }}
-        className="absolute right-2 top-8 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+        className="absolute right-2 top-8 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ChevronDown size={16} aria-hidden="true" />
       </button>

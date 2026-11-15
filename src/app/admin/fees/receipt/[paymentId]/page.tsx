@@ -115,15 +115,24 @@ export default async function FeeReceiptPage({
   const netAmount = (originalAmount - reversedAmount) / 100;
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 print:border-0 print:p-0">
+    <main className="fee-receipt-page mx-auto max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 print:border-0 print:p-0">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <p className="text-sm font-semibold text-violet-700">Payment receipt</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Official payment receipt</p>
           <h1 className="mt-1 text-2xl font-bold">{receipt.schoolName}</h1>
-          <p className="mt-1 text-sm text-slate-500">Receipt {receipt.receiptNumber}</p>
+          <p className="mt-1 text-sm font-medium text-slate-600">Receipt no. {receipt.receiptNumber}</p>
         </div>
         <ReceiptActions />
       </header>
+      <section className="fee-receipt-total rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+        <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Amount received</p>
+        <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+          {receipt.currency} {receipt.amount}
+        </p>
+        <p className="mt-2 text-sm text-slate-600">
+          Payment recorded on {receipt.paidAt.toISOString().replace("T", " ").slice(0, 16)}
+        </p>
+      </section>
       <section className="grid gap-4 sm:grid-cols-2">
         <ReceiptField label="Student" value={`${receipt.studentName} ${receipt.studentLastName}`} />
         <ReceiptField label="Admission / roll number" value={`${receipt.admissionNumber || "—"} / ${receipt.rollNumber || "—"}`} />
@@ -136,7 +145,7 @@ export default async function FeeReceiptPage({
       </section>
       <section className="space-y-3 rounded-xl bg-slate-50 p-5">
         <div className="flex justify-between gap-4 text-sm">
-          <span>Original payment amount</span><strong>{receipt.currency} {receipt.amount}</strong>
+          <span>Payment amount</span><strong>{receipt.currency} {receipt.amount}</strong>
         </div>
         <div className="flex justify-between gap-4 text-sm">
           <span>Reversed / refunded</span><strong>{receipt.currency} {(reversedAmount / 100).toFixed(2)}</strong>
@@ -167,7 +176,9 @@ export default async function FeeReceiptPage({
           </ul>
         </section>
       )}
-      <p className="border-t border-slate-200 pt-4 text-xs text-slate-500">Due date: {receipt.dueDate}</p>
+      <p className="border-t border-slate-200 pt-4 text-xs text-slate-500">
+        Invoice due date: {receipt.dueDate}
+      </p>
       {netAmount > 0 && (
         <div className="print:hidden">
           <FeePaymentReversalForm

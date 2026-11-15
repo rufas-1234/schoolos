@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useActionState, useEffect, useId, useMemo, useRef, useState } from "react";
 import { RequiredMark } from "@/components/required-mark";
+import { SearchableSelect } from "@/components/searchable-select";
 import type { StudentAdditionalDetails, StudentFieldSettings } from "@/db/schema";
 import { createStudent, updateStudent } from "./actions";
 
@@ -208,47 +209,38 @@ export function StudentForm({
           </p>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Branch <RequiredMark />
-            <select
-              name="branchId"
+          <SearchableSelect
+            label="Branch"
+            name="branchId"
+            options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+            required
+            defaultValue={branchId}
+            placeholder="Search branches..."
+            disabled={!branches.length}
+            onValueChange={(value) => {
+              setBranchId(value);
+              setYearId("");
+              setClassLevelId("");
+              setSectionId("");
+            }}
+          />
+
+          {!record ? (
+            <SearchableSelect
+              key={branchId}
+              label="Academic year"
+              name="academicYearId"
+              options={years.map((year) => ({ value: String(year.id), label: year.label }))}
               required
-              value={branchId}
-              onChange={(event) => {
-                setBranchId(event.target.value);
-                setYearId("");
+              defaultValue={yearId}
+              placeholder="Search academic years..."
+              disabled={!years.length}
+              onValueChange={(value) => {
+                setYearId(value);
                 setClassLevelId("");
                 setSectionId("");
               }}
-              className={inputClass}
-            >
-              <option value="" disabled>Select a branch</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>{branch.label}</option>
-              ))}
-            </select>
-          </label>
-
-          {!record ? (
-            <label className="space-y-1.5 text-sm font-medium text-slate-700">
-              Academic year <RequiredMark />
-              <select
-                name="academicYearId"
-                required
-                value={yearId}
-                onChange={(event) => {
-                  setYearId(event.target.value);
-                  setClassLevelId("");
-                  setSectionId("");
-                }}
-                className={inputClass}
-              >
-                <option value="" disabled>Select an active academic year</option>
-                {years.map((year) => (
-                  <option key={year.id} value={year.id}>{year.label}</option>
-                ))}
-              </select>
-            </label>
+            />
           ) : (
             <>
               <ReadOnlyField label="Admission number" value={record.admissionNumber} />
@@ -262,41 +254,31 @@ export function StudentForm({
 
           {!record && (
             <>
-              <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                Class <RequiredMark />
-                <select
-                  name="classLevelId"
-                  required
-                  value={classLevelId}
-                  onChange={(event) => {
-                    setClassLevelId(event.target.value);
-                    setSectionId("");
-                  }}
-                  disabled={!branchId}
-                  className={inputClass}
-                >
-                  <option value="" disabled>Select a class</option>
-                  {branchClasses.map((classOption) => (
-                    <option key={classOption.id} value={classOption.id}>{classOption.label}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                Class section <RequiredMark />
-                <select
-                  name="classSectionId"
-                  required
-                  value={sectionId}
-                  onChange={(event) => setSectionId(event.target.value)}
-                  disabled={!yearId || !classLevelId}
-                  className={inputClass}
-                >
-                  <option value="" disabled>Select a section</option>
-                  {yearSections.map((section) => (
-                    <option key={section.id} value={section.id}>{section.label}</option>
-                  ))}
-                </select>
-              </label>
+              <SearchableSelect
+                key={branchId}
+                label="Class"
+                name="classLevelId"
+                options={branchClasses.map((classOption) => ({ value: String(classOption.id), label: classOption.label }))}
+                required
+                defaultValue={classLevelId}
+                placeholder="Search classes..."
+                disabled={!branchId || !branchClasses.length}
+                onValueChange={(value) => {
+                  setClassLevelId(value);
+                  setSectionId("");
+                }}
+              />
+              <SearchableSelect
+                key={`${yearId}-${classLevelId}`}
+                label="Class section"
+                name="classSectionId"
+                options={yearSections.map((section) => ({ value: String(section.id), label: section.label }))}
+                required
+                defaultValue={sectionId}
+                placeholder="Search class sections..."
+                disabled={!yearId || !classLevelId || !yearSections.length}
+                onValueChange={setSectionId}
+              />
               <p className="text-sm text-slate-500 sm:col-span-2">Admission and roll numbers will be generated automatically when this student is registered.</p>
             </>
           )}
@@ -311,21 +293,21 @@ export function StudentForm({
               className={inputClass}
             />
           </label>
-          <label hidden={!fieldConfig("categoryId").enabled} className="space-y-1.5 text-sm font-medium text-slate-700">
-            Student category {fieldConfig("categoryId").required && <RequiredMark />}
-            <select
+          <div hidden={!fieldConfig("categoryId").enabled}>
+            <SearchableSelect
+              key={branchId}
               name="categoryId"
+              label="Student category"
+              options={[
+                { value: "", label: "No category" },
+                ...branchCategories.map((category) => ({ value: String(category.id), label: category.label })),
+              ]}
               required={fieldConfig("categoryId").required}
               defaultValue={record?.categoryId ? String(record.categoryId) : ""}
               disabled={!branchId}
-              className={inputClass}
-            >
-              <option value="">No category</option>
-              {branchCategories.map((category) => (
-                <option key={category.id} value={category.id}>{category.label}</option>
-              ))}
-            </select>
-          </label>
+              placeholder="Search categories..."
+            />
+          </div>
         </div>
       </fieldset>
 

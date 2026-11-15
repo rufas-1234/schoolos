@@ -1,18 +1,19 @@
 import Link from "next/link";
-import { and, asc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, like, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, schools, staffAttendance, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isValidStaffReportRange, parseStaffRoleFilter, staffAttendanceStatuses } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
 import { PrintReportButton } from "./print-report-button";
+import { SearchableSelect } from "@/components/searchable-select";
 
 type AttendanceTotals = Record<(typeof staffAttendanceStatuses)[number], number>;
 
 export default async function StaffReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ start?: string | string[]; end?: string | string[]; branchId?: string | string[]; role?: string | string[] }>;
+  searchParams: Promise<{ start?: string | string[]; end?: string | string[]; branchId?: string | string[]; role?: string | string[]; search?: string | string[] }>;
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const [schoolResult, branches, params] = await Promise.all([
@@ -36,6 +37,7 @@ export default async function StaffReportsPage({
   const branchId = branch?.id;
   const requestedRole = typeof params.role === "string" ? params.role : "";
   const selectedRole = parseStaffRoleFilter(requestedRole);
+  const staffSearch = typeof params.search === "string" ? params.search.trim().slice(0, 120) : "";
   const startCandidate = typeof params.start === "string" ? params.start : "";
   const endCandidate = typeof params.end === "string" ? params.end : "";
   const requestedRangeValid = isValidStaffReportRange(startCandidate, endCandidate);
@@ -58,6 +60,19 @@ export default async function StaffReportsPage({
   } else if (selectedRole !== "all") {
     staffConditions.push(eq(staffMembers.personnelRole, selectedRole));
     markConditions.push(eq(staffMembers.personnelRole, selectedRole));
+  }
+  if (staffSearch) {
+    const pattern = `%${staffSearch}%`;
+    staffConditions.push(or(
+      like(staffMembers.firstName, pattern),
+      like(staffMembers.lastName, pattern),
+      like(staffMembers.employeeCode, pattern),
+    )!);
+    markConditions.push(or(
+      like(staffMembers.firstName, pattern),
+      like(staffMembers.lastName, pattern),
+      like(staffMembers.employeeCode, pattern),
+    )!);
   }
   const [staff, marks] = await Promise.all([
     db.select({
@@ -118,13 +133,15 @@ export default async function StaffReportsPage({
       </header>
 
       <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Branch
-          <select name="branchId" required defaultValue={branchId?.toString() ?? ""} className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <option value="" disabled>Select a branch</option>
-            {branches.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.code})</option>)}
-          </select>
-        </label>
+        <SearchableSelect
+          label="Branch"
+          name="branchId"
+          options={branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` }))}
+          required
+          defaultValue={branchId?.toString() ?? ""}
+          placeholder="Search branches..."
+          disabled={!branches.length}
+        />
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           From
           <input type="date" name="start" defaultValue={startDate} required className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
@@ -143,6 +160,10 @@ export default async function StaffReportsPage({
             <option value="unassigned">Unassigned role</option>
           </select>
         </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Search staff
+          <input type="search" name="search" maxLength={120} defaultValue={staffSearch} placeholder="Name or staff number" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
+        </label>
         <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View report</button>
         {!requestedRangeValid && (startCandidate || endCandidate) && (
           <p role="status" className="basis-full text-sm text-amber-700">Choose a valid date range of up to 367 days.</p>
@@ -156,6 +177,7 @@ export default async function StaffReportsPage({
           <p>
             {branch ? `${branch.name} · ` : ""}{startDate} through {endDate}
             {selectedRole !== "all" ? ` · ${selectedRole === "unassigned" ? "Unassigned role" : selectedRole}` : " · All staff roles"}
+            {staffSearch ? ` · Search: ${staffSearch}` : ""}
             {` · ${staff.length} staff members`}
           </p>
         </header>

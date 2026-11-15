@@ -5,6 +5,7 @@ import {
   assignSchoolRoles,
   createSchoolRole,
   deleteSchoolRole,
+  setSchoolAccountAccess,
   updateSchoolRole,
   type RoleActionState,
 } from "./role-actions";
@@ -154,6 +155,41 @@ export function AccountRolesForm({
       <button disabled={pending} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
         {pending ? "Saving..." : "Save role assignments"}
       </button>
+    </form>
+  );
+}
+
+export function SchoolAccountAccessForm({
+  membershipId,
+  enabled,
+  userName,
+}: {
+  membershipId: number;
+  enabled: boolean;
+  userName: string;
+}) {
+  const [state, action, pending] = useActionState(setSchoolAccountAccess, {});
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="membershipId" value={membershipId} />
+      <input type="hidden" name="status" value={enabled ? "inactive" : "active"} />
+      <button
+        type="submit"
+        disabled={pending}
+        onClick={(event) => {
+          if (enabled && !window.confirm(`Disable ${userName}'s access to this school?`)) {
+            event.preventDefault();
+          }
+        }}
+        className={`rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${
+          enabled
+            ? "border-rose-200 text-rose-700 hover:bg-rose-50"
+            : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+        }`}
+      >
+        {pending ? "Saving..." : enabled ? "Disable school access" : "Enable school access"}
+      </button>
+      <ActionFeedback state={state} />
     </form>
   );
 }

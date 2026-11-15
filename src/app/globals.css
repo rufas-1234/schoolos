@@ -91,6 +91,14 @@ h6 {
   line-height: 0.95;
 }
 
+.fee-receipt-page {
+  color: #172033;
+}
+
+.fee-receipt-total {
+  break-inside: avoid;
+}
+
 .fee-invoice-number-block {
   display: grid;
   gap: 5px;
@@ -432,6 +440,30 @@ h6 {
     margin: 0 !important;
     padding: 0 !important;
     color: #172033;
+  }
+
+  .fee-receipt-page {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #172033;
+  }
+
+  body:has(.fee-receipt-page) * {
+    visibility: hidden !important;
+  }
+
+  body:has(.fee-receipt-page) .fee-receipt-page,
+  body:has(.fee-receipt-page) .fee-receipt-page * {
+    visibility: visible !important;
+  }
+
+  .fee-receipt-total {
+    border-color: #a7f3d0 !important;
+    background: #ecfdf5 !important;
   }
 
   body:has(.fee-invoice-page) * {
