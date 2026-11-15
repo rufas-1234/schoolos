@@ -9,6 +9,7 @@ import {
   classSubjects,
   examClasses,
   examAttendance,
+  examComponents,
   examGradeBands,
   examGradingScales,
   examMarks,
@@ -25,6 +26,7 @@ import {
   CreateExamTypeForm,
   CreateExaminationForm,
   CreateGradingScaleForm,
+  DeleteExaminationForm,
 } from "./examination-forms";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +38,8 @@ export default async function ExaminationsPage({
     section?: string;
     branchId?: string;
     examId?: string;
+    editExam?: string;
+    saved?: string;
     classLevelId?: string;
     sectionId?: string;
     subjectId?: string;
@@ -46,18 +50,30 @@ export default async function ExaminationsPage({
     section: requestedSection,
     branchId: rawBranchId,
     examId: rawExamId,
+    editExam: rawEditExamId,
+    saved: savedStatus,
     classLevelId: rawClassLevelId,
     sectionId: rawSectionId,
     subjectId: rawSubjectId,
   } = await searchParams;
   const branchFilter = rawBranchId && /^\d+$/.test(rawBranchId) ? Number(rawBranchId) : null;
   const examFilter = rawExamId && /^\d+$/.test(rawExamId) ? Number(rawExamId) : null;
+  const editExamId = rawEditExamId && /^\d+$/.test(rawEditExamId) ? Number(rawEditExamId) : null;
   const classFilter = rawClassLevelId && /^\d+$/.test(rawClassLevelId) ? Number(rawClassLevelId) : null;
   const sectionFilter = rawSectionId && /^\d+$/.test(rawSectionId) ? Number(rawSectionId) : null;
   const subjectFilter = rawSubjectId && /^\d+$/.test(rawSubjectId) ? Number(rawSubjectId) : null;
   const section = ["types", "setup", "schedule", "attendance", "marks", "grades", "sms"].includes(requestedSection ?? "")
     ? requestedSection!
     : "setup";
+  const sectionTitles: Record<string, string> = {
+    types: "Exam Type",
+    setup: "Exam Setup",
+    schedule: "Exam Schedule",
+    attendance: "Exam Attendance",
+    marks: "Marks Register",
+    grades: "Marks Grade",
+    sms: "Send Marks By SMS",
+  } as const;
   const canConfigure = context.grantedPermissions.includes("examinations.create");
   const today = new Date().toISOString().slice(0, 10);
   const [years, terms, branches, classes, scales, examTypesList] = await Promise.all([
@@ -212,6 +228,61 @@ export default async function ExaminationsPage({
     (!branchFilter || exam.branchId === null || exam.branchId === branchFilter) &&
     (!examFilter || exam.id === examFilter),
   );
+  const [editExam] = canConfigure && section === "setup" && editExamId
+    ? await db.select({
+      id: examinations.id,
+      name: examinations.name,
+      branchId: examinations.branchId,
+      examSystem: examinations.examSystem,
+      startDate: examinations.startDate,
+      endDate: examinations.endDate,
+      academicYearId: examinations.academicYearId,
+      academicTermId: examinations.academicTermId,
+    }).from(examinations).where(and(
+      eq(examinations.id, editExamId),
+      eq(examinations.schoolId, context.schoolId),
+    )).limit(1)
+    : [];
+  const editClassRows = editExam
+    ? await db.select({
+      classLevelId: examClasses.classLevelId,
+      className: classLevels.name,
+    }).from(examClasses).innerJoin(classLevels, and(
+      eq(classLevels.id, examClasses.classLevelId),
+      eq(classLevels.schoolId, context.schoolId),
+    )).where(and(
+      eq(examClasses.schoolId, context.schoolId),
+      eq(examClasses.examinationId, editExam.id),
+    ))
+    : [];
+  const editSubjectRows = editExam
+    ? await db.select({ id: examSubjects.id }).from(examSubjects).innerJoin(examClasses, and(
+      eq(examClasses.id, examSubjects.examClassId),
+      eq(examClasses.schoolId, context.schoolId),
+    )).where(and(
+      eq(examClasses.examinationId, editExam.id),
+      eq(examSubjects.schoolId, context.schoolId),
+    ))
+    : [];
+  const editComponents = editSubjectRows.length
+    ? await db.select({
+      title: examComponents.title,
+      maxMarks: examComponents.maxMarks,
+    }).from(examComponents).where(and(
+      eq(examComponents.schoolId, context.schoolId),
+      eq(examComponents.examSubjectId, editSubjectRows[0].id),
+    )).orderBy(asc(examComponents.sortOrder))
+    : [];
+  const editRecord = editExam && editComponents.length
+    ? {
+      ...editExam,
+      classNames: editClassRows.map((row) => row.className),
+      components: editComponents.map((component) => ({
+        title: component.title,
+        maxMarks: Number(component.maxMarks),
+      })),
+    }
+    : undefined;
   const gradeBands = scales.length
     ? await db.select({
       scaleId: examGradeBands.gradingScaleId,
@@ -260,6 +331,7 @@ export default async function ExaminationsPage({
     ? await db.select({
       id: examSubjects.id,
       examId: examinations.id,
+      examClassId: examClasses.id,
       examName: examinations.name,
       branchId: examinations.branchId,
       classBranchId: classLevels.branchId,
@@ -323,6 +395,23 @@ export default async function ExaminationsPage({
   );
   const visibleAssessments = filteredAssessments;
   const assessmentIds = visibleAssessments.map((assessment) => assessment.id);
+  const assessmentComponents = assessmentIds.length
+    ? await db.select({
+      examSubjectId: examComponents.examSubjectId,
+      title: examComponents.title,
+      maxMarks: examComponents.maxMarks,
+      sortOrder: examComponents.sortOrder,
+    }).from(examComponents).where(and(
+      eq(examComponents.schoolId, context.schoolId),
+      inArray(examComponents.examSubjectId, assessmentIds),
+    )).orderBy(asc(examComponents.examSubjectId), asc(examComponents.sortOrder))
+    : [];
+  const componentRowsBySubject = new Map<number, typeof assessmentComponents>();
+  for (const component of assessmentComponents) {
+    const rows = componentRowsBySubject.get(component.examSubjectId) ?? [];
+    rows.push(component);
+    componentRowsBySubject.set(component.examSubjectId, rows);
+  }
   const markRows = assessmentIds.length
     ? await db.select({
       examSubjectId: examMarks.examSubjectId,
@@ -395,30 +484,17 @@ export default async function ExaminationsPage({
   return (
     <main className="mx-auto max-w-7xl space-y-8 p-6">
       <header>
-        <p className="text-sm font-semibold text-violet-700">{context.schoolName}</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-950">Examinations &amp; results</h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">Set up assessments, enter and review marks, then publish complete results and printable report cards. Published marks are locked; corrections are reviewed and retained in the audit history.</p>
+        <p className="text-sm font-semibold text-violet-700">{context.schoolName} · Examinations</p>
+        <h1 className="mt-1 text-3xl font-bold text-slate-950">{sectionTitles[section]}</h1>
+        <p className="mt-2 max-w-3xl text-sm text-slate-600">
+          {section === "setup"
+            ? "Add an exam, set its mark distributions, and manage it from the exam list below."
+            : "This section is separate from the other examination features. Choose another item from the Examinations menu on the left."}
+        </p>
       </header>
 
-      <nav aria-label="Examination sections" className="flex flex-wrap gap-2 border-b pb-3">
-        {[
-          ["types", "Exam Type"],
-          ["setup", "Exam Setup"],
-          ["schedule", "Exam Schedule"],
-          ["attendance", "Exam Attendance"],
-          ["marks", "Marks Register"],
-          ["grades", "Marks Grade"],
-          ["sms", "Send Marks By SMS"],
-        ].map(([id, label]) => (
-          <Link key={id} href={`/admin/examinations?section=${id}`} aria-current={section === id ? "page" : undefined}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${section === id ? "bg-violet-700 text-white" : "bg-white text-slate-600 hover:bg-violet-50 hover:text-violet-800"}`}>
-            {label}
-          </Link>
-        ))}
-      </nav>
-
       {section === "types" && (
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <section className="space-y-5">
           {canConfigure && <CreateExamTypeForm branches={branches} />}
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 className="text-lg font-bold text-slate-900">Exam types</h2>
@@ -435,40 +511,84 @@ export default async function ExaminationsPage({
         </section>
       )}
 
-      {section === "setup" && canConfigure && (
-        <CreateExaminationForm years={years} terms={terms} branches={branches} examTypes={examTypesList} scales={scales} classes={classes} today={today} />
+      {section === "setup" && canConfigure && editRecord && (
+        <section className="space-y-4">
+          <Link href="/admin/examinations?section=setup" className="text-sm font-semibold text-violet-700">← Back to Exam List</Link>
+          <CreateExaminationForm key={editRecord.id} years={years} terms={terms} branches={branches} classes={classes} today={today} record={editRecord} />
+        </section>
       )}
 
-      {section === "setup" && (
-      <section>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-950">Examination records</h2>
-            <p className="text-sm text-slate-500">{isManager ? "All school examinations" : "Examinations containing your assigned subjects"}</p>
+      {section === "setup" && !editRecord && (
+      <section className="space-y-8">
+        {savedStatus === "1" && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Exam changes saved.</p>}
+        {canConfigure && <CreateExaminationForm years={years} terms={terms} branches={branches} classes={classes} today={today} />}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-slate-950">Exam List</h2>
+            <p className="text-sm text-slate-500">{isManager ? "Examinations for your school" : "Examinations containing your assigned subjects"}</p>
           </div>
-        </div>
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-              <tr><th className="p-4">Examination</th><th className="p-4">Branch</th><th className="p-4">System</th><th className="p-4">Type</th><th className="p-4">Academic year</th><th className="p-4">Dates</th><th className="p-4">Grading scale</th><th className="p-4">Status</th><th className="p-4">Actions</th></tr>
+              <tr><th className="p-4">SL</th><th className="p-4">Branch</th><th className="p-4">Exam title</th><th className="p-4">Class / section</th><th className="p-4">Subject</th><th className="p-4">Total mark</th><th className="p-4">Mark distribution</th><th className="p-4">Action</th></tr>
             </thead>
             <tbody>
-              {exams.map((exam) => (
-                <tr key={exam.id} className="border-t border-slate-100">
-                  <td className="p-4 font-semibold text-slate-900">{exam.name}</td>
-                  <td className="p-4">{exam.branchName ?? "All branches"}</td>
-                  <td className="p-4">{exam.examSystem === "multi" ? "Multi Exam" : "Single Exam"}</td>
-                  <td className="p-4">{exam.examTypeName ?? "Not set"}</td>
-                  <td className="p-4">{exam.yearName}</td>
-                  <td className="p-4">{exam.startDate} – {exam.endDate}</td>
-                  <td className="p-4">{exam.scaleName}</td>
-                  <td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${exam.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{exam.status}</span></td>
-                  <td className="p-4"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/examinations/${exam.id}`}>Open examination</Link></td>
-                </tr>
-              ))}
-              {exams.length === 0 && <tr><td colSpan={9} className="p-10 text-center text-slate-500">No examinations are available yet.</td></tr>}
+              {exams.map((exam, index) => {
+                const examAssessments = visibleAssessments.filter((assessment) => assessment.examId === exam.id);
+                const canEdit = exam.status === "open" &&
+                  examAssessments.length > 0 &&
+                  examAssessments.every((assessment) => assessment.status === "draft");
+                const classNames = [...new Set(examAssessments.map((assessment) => assessment.className))];
+                const sectionNames = [...new Set(examAssessments.flatMap((assessment) => sectionRows
+                  .filter((classSection) => classSection.classLevelId === assessment.classLevelId && classSection.academicYearId === assessment.academicYearId)
+                  .map((classSection) => `${assessment.className} ${classSection.name}`)))];
+                const canDelete = exam.status === "open" &&
+                  examAssessments.length > 0 &&
+                  examAssessments.every((assessment) => assessment.status === "draft") &&
+                  !markRows.some((mark) => examAssessments.some((assessment) => assessment.id === mark.examSubjectId) && mark.marks !== null) &&
+                  !attendanceRows.some((attendance) => examAssessments.some((assessment) => assessment.id === attendance.examSubjectId));
+                return (
+                  <tr key={exam.id} className="border-t border-slate-100 align-top">
+                    <td className="p-4">{index + 1}</td>
+                    <td className="p-4">{exam.branchName ?? "All branches"}</td>
+                    <td className="p-4">
+                      <p className="font-semibold text-slate-900">{exam.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">{exam.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · {exam.yearName} · {exam.startDate} – {exam.endDate} · {exam.status}</p>
+                    </td>
+                    <td className="p-4">{sectionNames.length ? sectionNames.join(", ") : classNames.join(", ") || "—"}</td>
+                    <td className="p-4">
+                      {examAssessments.length
+                        ? <ul className="space-y-1">{examAssessments.map((assessment) => <li key={assessment.id}>{assessment.subjectName}</li>)}</ul>
+                        : "—"}
+                    </td>
+                    <td className="p-4">
+                      {examAssessments.length
+                        ? <ul className="space-y-1">{examAssessments.map((assessment) => <li key={assessment.id}>{assessment.maxMarks}</li>)}</ul>
+                        : "—"}
+                    </td>
+                    <td className="p-4">
+                      {examAssessments.length
+                        ? <ul className="space-y-1">{examAssessments.map((assessment) => (
+                          <li key={assessment.id}>{(componentRowsBySubject.get(assessment.id) ?? []).map((component) => `${component.title}: ${component.maxMarks}`).join(", ") || "—"}</li>
+                        ))}</ul>
+                        : "—"}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" href={`/admin/examinations/${exam.id}`}>View</Link>
+                        {canConfigure && <>
+                          {canEdit && <Link className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-50" href={`/admin/examinations?section=setup&editExam=${exam.id}`}>Edit</Link>}
+                          <DeleteExaminationForm examinationId={exam.id} examinationName={exam.name} disabled={!canDelete} />
+                        </>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {exams.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-slate-500">No examinations are available yet.</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
       )}

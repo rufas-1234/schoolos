@@ -1,10 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { AdminDeleteButton } from "@/components/admin-data-table";
 import {
   createExamType,
   createExamination,
   createGradingScale,
+  deleteExamination,
   publishExamination,
   requestMarkCorrection,
   reviewExamSubject,
@@ -14,6 +16,7 @@ import {
   saveExamAttendance,
   savePrincipalRemark,
   submitExamSubject,
+  updateExamination,
   updateExamSubjectSettings,
   type ExaminationActionState,
 } from "./actions";
@@ -39,54 +42,70 @@ export function CreateExaminationForm({
   years,
   terms,
   branches,
-  examTypes,
-  scales,
   classes,
   today,
+  record,
 }: {
   years: Array<{ id: number; name: string; status: string; startDate: string; endDate: string }>;
   terms: Array<{ id: number; academicYearId: number; name: string; startDate: string; endDate: string }>;
   branches: Array<{ id: number; name: string }>;
-  examTypes: Array<{ id: number; name: string; branchId: number | null }>;
-  scales: Array<{ id: number; name: string; isDefault: boolean }>;
   classes: Array<{ id: number; name: string; branchId: number; branchName: string }>;
   today: string;
+  record?: {
+    id: number;
+    name: string;
+    branchId: number | null;
+    examSystem: string;
+    startDate: string;
+    endDate: string;
+    academicYearId: number;
+    academicTermId: number | null;
+    classNames: string[];
+    components: Array<{ title: string; maxMarks: number }>;
+  };
 }) {
-  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createExamination, {});
+  const formAction = record ? updateExamination : createExamination;
+  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(formAction, {});
   const defaultYear = years.find((year) => year.status === "active") ?? years[0];
   const initialTerm =
     terms.find((term) => term.academicYearId === defaultYear?.id && term.startDate <= today && term.endDate >= today) ??
     terms.find((term) => term.academicYearId === defaultYear?.id);
-  const [academicYearId, setAcademicYearId] = useState(String(defaultYear?.id ?? ""));
-  const [academicTermId, setAcademicTermId] = useState(String(initialTerm?.id ?? ""));
-  const [examStartDate, setExamStartDate] = useState(initialTerm?.startDate ?? defaultYear?.startDate ?? "");
-  const [examEndDate, setExamEndDate] = useState(initialTerm?.endDate ?? defaultYear?.endDate ?? "");
-  const [branchId, setBranchId] = useState("");
-  const [examSystem, setExamSystem] = useState<"single" | "multi">("single");
-  const [components, setComponents] = useState("Exam | 100");
+  const [academicYearId, setAcademicYearId] = useState(String(record?.academicYearId ?? defaultYear?.id ?? ""));
+  const [academicTermId, setAcademicTermId] = useState(String(record?.academicTermId ?? initialTerm?.id ?? ""));
+  const [examStartDate, setExamStartDate] = useState(record?.startDate ?? initialTerm?.startDate ?? defaultYear?.startDate ?? "");
+  const [examEndDate, setExamEndDate] = useState(record?.endDate ?? initialTerm?.endDate ?? defaultYear?.endDate ?? "");
+  const [branchId, setBranchId] = useState(String(record?.branchId ?? ""));
+  const [examSystem, setExamSystem] = useState<"single" | "multi">(record?.examSystem === "multi" ? "multi" : "single");
+  const [components, setComponents] = useState<Array<{ title: string; maxMarks: string }>>(
+    record?.components.map((component) => ({ title: component.title, maxMarks: String(component.maxMarks) })) ??
+    [{ title: "Exam", maxMarks: "100" }],
+  );
   const visibleTerms = terms.filter((term) => term.academicYearId === Number(academicYearId));
   const visibleClasses = branchId
     ? classes.filter((classLevel) => classLevel.branchId === Number(branchId))
     : classes;
-  const visibleTypes = examTypes.filter((type) =>
-    !branchId ? type.branchId === null : type.branchId === null || type.branchId === Number(branchId),
-  );
+  const totalMarks = components.reduce((total, component) => total + (Number(component.maxMarks) || 0), 0);
+  const updateComponent = (index: number, patch: Partial<{ title: string; maxMarks: string }>) => {
+    setComponents((current) => current.map((component, rowIndex) =>
+      rowIndex === index ? { ...component, ...patch } : component,
+    ));
+  };
+  const componentPayload = components.map((component) => `${component.title}|${component.maxMarks}`).join("\n");
   return (
     <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-violet-700">Step 1 of 4</p>
-        <h2 className="mt-1 text-lg font-bold text-slate-900">Set up an examination</h2>
-        <p className="mt-1 text-sm text-slate-600">Choose what to call it, when it happens, and which classes take part. SchoolOS adds a standard grading scale and exam type automatically if you have not created them yet.</p>
+        <h2 className="text-xl font-bold text-slate-900">{record ? "Edit Exam" : "Add Exam"}</h2>
+        <p className="mt-1 text-sm text-slate-600">Choose the branch and exam system, then define the mark distributions for each subject.</p>
       </div>
-      <label className="block text-sm font-medium">Examination name
-        <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="Term 1 examinations" />
+      {record && <input type="hidden" name="examinationId" value={record.id} />}
+      <label className="block text-sm font-medium">Exam title *
+        <input required name="name" maxLength={120} defaultValue={record?.name ?? ""} className="mt-1 w-full rounded-lg border p-2.5" placeholder="First Term" />
       </label>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-medium">Branch
-          <select name="branchId" value={branchId} onChange={(event) => {
-            setBranchId(event.target.value);
-          }} className="mt-1 w-full rounded-lg border p-2.5">
-            <option value="">All branches</option>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <label className="text-sm font-medium">Select branch *
+          <select required={!record} name="branchId" value={branchId} onChange={(event) => setBranchId(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5">
+            {!record && <option value="" disabled>Select branch</option>}
+            {record && <option value="">All branches</option>}
             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
         </label>
@@ -94,17 +113,27 @@ export function CreateExaminationForm({
           <select name="examSystem" value={examSystem} onChange={(event) => {
             const nextSystem = event.target.value === "multi" ? "multi" : "single";
             setExamSystem(nextSystem);
-            if (nextSystem === "multi" && components.split(/\r?\n/).filter(Boolean).length < 2) {
-              setComponents("Paper 1 | 50\nPaper 2 | 50");
-            } else if (nextSystem === "single" && components.split(/\r?\n/).filter(Boolean).length > 1) {
-              setComponents("Exam | 100");
+            if (nextSystem === "multi" && components.length < 2) {
+              setComponents([{ title: "Paper 1", maxMarks: "50" }, { title: "Paper 2", maxMarks: "50" }]);
+            } else if (nextSystem === "single" && components.length > 1) {
+              setComponents([{ title: "Exam", maxMarks: "100" }]);
             }
           }} className="mt-1 w-full rounded-lg border p-2.5">
             <option value="single">Single Exam</option>
             <option value="multi">Multi Exam</option>
           </select>
         </label>
-        <label className="text-sm font-medium">Academic year
+        {record ? (
+          <div className="rounded-lg bg-slate-50 p-3 text-sm">
+            <p className="font-medium">Academic year and term</p>
+            <p className="mt-1 text-slate-600">
+              {years.find((year) => year.id === record.academicYearId)?.name ?? "Academic year"}
+              {terms.find((term) => term.id === record.academicTermId)?.name ? ` · ${terms.find((term) => term.id === record.academicTermId)?.name}` : ""}
+              {` · Classes: ${record.classNames.join(", ") || "none"}.`}
+            </p>
+          </div>
+        ) : <>
+        <label className="text-sm font-medium">Academic year *
           <select required name="academicYearId" value={academicYearId} onChange={(event) => {
             const nextYearId = event.target.value;
             const nextYear = years.find((year) => year.id === Number(nextYearId));
@@ -132,82 +161,84 @@ export function CreateExaminationForm({
             {visibleTerms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
           </select>
         </label>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-sm font-medium">Start date
-            <input required type="date" name="startDate" value={examStartDate} onChange={(event) => setExamStartDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
-          </label>
-          <label className="text-sm font-medium">End date
-            <input required type="date" name="endDate" value={examEndDate} onChange={(event) => setExamEndDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
-          </label>
-        </div>
+        </>}
+        <label className="text-sm font-medium">Start date *
+          <input required type="date" name="startDate" value={examStartDate} onChange={(event) => setExamStartDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
+        </label>
+        <label className="text-sm font-medium">End date *
+          <input required type="date" name="endDate" value={examEndDate} onChange={(event) => setExamEndDate(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
+        </label>
+        <label className="text-sm font-medium">Exam Mark *
+          <input readOnly value={totalMarks.toFixed(2)} className="mt-1 w-full rounded-lg border bg-slate-50 p-2.5" />
+        </label>
       </div>
-      <details className="rounded-xl border border-slate-200 px-4 py-3">
-        <summary className="cursor-pointer text-sm font-semibold">Advanced: choose exam type or grading scale</summary>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-medium">Exam type
-            <select name="examTypeId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
-              <option value="">Automatic (recommended)</option>
-              {visibleTypes.map((type) => <option key={type.id} value={type.id}>{type.name}{type.branchId === null ? " (all branches)" : ""}</option>)}
-            </select>
-          </label>
-          <label className="text-sm font-medium">Grading scale
-            <select name="gradingScaleId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
-              <option value="">Automatic (recommended)</option>
-              {scales.map((scale) => <option key={scale.id} value={scale.id}>{scale.name}{scale.isDefault ? " (default)" : ""}</option>)}
-            </select>
-          </label>
-        </div>
-      </details>
-      <fieldset className="space-y-3 rounded-xl border border-slate-200 p-4">
-        <legend className="px-1 text-sm font-semibold">Marks for each subject</legend>
-        <p className="text-xs text-slate-600">
-          {examSystem === "single"
-            ? "Enter the one exam paper and the maximum score students can earn."
-            : "Add each paper or assessment part. SchoolOS adds the marks and maximums together."}
-        </p>
-        <div className="space-y-2">
-          {components.split(/\r?\n/).map((component, index) => {
-            const [title = "", maxMarks = ""] = component.split("|");
-            const updateComponent = (nextTitle: string, nextMaxMarks: string) => {
-              const rows = components.split(/\r?\n/);
-              rows[index] = `${nextTitle}|${nextMaxMarks}`;
-              setComponents(rows.join("\n"));
-            };
-            return (
-              <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]">
-                <label className="text-xs font-medium">Paper / component name
-                  <input required maxLength={120} value={title.trim()} onChange={(event) => updateComponent(event.target.value, maxMarks)} className="mt-1 w-full rounded-lg border p-2.5" placeholder={examSystem === "single" ? "Written exam" : `Paper ${index + 1}`} />
-                </label>
-                <label className="text-xs font-medium">Maximum marks
-                  <input required type="number" min="0.01" max="999999" step="0.01" value={maxMarks.trim()} onChange={(event) => updateComponent(title, event.target.value)} className="mt-1 w-full rounded-lg border p-2.5" />
-                </label>
-                {examSystem === "multi" && components.split(/\r?\n/).length > 2 && (
-                  <button type="button" onClick={() => setComponents(components.split(/\r?\n/).filter((_, rowIndex) => rowIndex !== index).join("\n"))} className="self-end rounded-lg border px-3 py-2.5 text-sm font-medium text-rose-700">Remove</button>
-                )}
-              </div>
-            );
-          })}
+      <fieldset className="rounded-xl border border-slate-200 p-4">
+        <legend className="px-1 text-sm font-semibold">Add Mark Distributions</legend>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr><th className="p-3">Exam title</th><th className="p-3">Exam mark</th><th className="p-3">Action</th></tr>
+            </thead>
+            <tbody>{components.map((component, index) => (
+              <tr key={index} className="border-t">
+                <td className="p-2">
+                  <label className="sr-only" htmlFor={`exam-component-title-${index}`}>Distribution title</label>
+                  <input id={`exam-component-title-${index}`} required maxLength={120} value={component.title} onChange={(event) => updateComponent(index, { title: event.target.value })} className="w-full rounded-lg border p-2.5" placeholder="First Term Exam" />
+                </td>
+                <td className="p-2">
+                  <label className="sr-only" htmlFor={`exam-component-marks-${index}`}>Distribution maximum marks</label>
+                  <input id={`exam-component-marks-${index}`} required type="number" min="0.01" max="999999" step="0.01" value={component.maxMarks} onChange={(event) => updateComponent(index, { maxMarks: event.target.value })} className="w-full rounded-lg border p-2.5" />
+                </td>
+                <td className="p-2">
+                  <button type="button" disabled={examSystem === "single" || components.length <= 2} onClick={() => setComponents((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
+                </td>
+              </tr>
+            ))}</tbody>
+            <tfoot><tr className="border-t font-semibold"><td className="p-3 text-right">Total</td><td className="p-3">{totalMarks.toFixed(2)}</td><td /></tr></tfoot>
+          </table>
         </div>
         {examSystem === "multi" && (
-          <button type="button" onClick={() => setComponents(`${components}\nPaper ${components.split(/\r?\n/).length + 1} | 50`)} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-800">Add another paper</button>
+          <button type="button" onClick={() => setComponents((current) => [...current, { title: `Paper ${current.length + 1}`, maxMarks: "50" }])} className="mt-3 rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-800">Add Mark Distribution</button>
         )}
       </fieldset>
-      <input type="hidden" name="components" value={components} />
-      <fieldset>
+      <input type="hidden" name="components" value={componentPayload} />
+      {!record && <fieldset>
         <legend className="mb-2 text-sm font-semibold">Classes (all assigned subjects will be included)</legend>
         <div className="grid max-h-40 grid-cols-2 gap-2 overflow-auto rounded-lg border p-3 sm:grid-cols-3">
           {visibleClasses.map((classLevel) => (
             <label key={classLevel.id} className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="classLevelIds" value={classLevel.id} />
-              {classLevel.name}{!branchId && ` · ${classLevel.branchName}`}
+              {classLevel.name}
             </label>
           ))}
           {visibleClasses.length === 0 && <p className="col-span-full text-sm text-slate-500">Add active classes and subject assignments first.</p>}
         </div>
-      </fieldset>
-      <p className="text-xs text-slate-500">Only currently enrolled students in each selected class are added. You can adjust subject dates later.</p>
-      <SubmitButton pending={pending}>Create exam and open workflow</SubmitButton>
+      </fieldset>}
+      {record && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Classes and subjects remain unchanged. Mark distributions can be changed only before marks are entered; a branch change must preserve the student roster.</p>}
+      {!record && <p className="text-xs text-slate-500">Choose the classes that will take this exam. Currently enrolled students and assigned subjects are added automatically.</p>}
+      <SubmitButton pending={pending}>{record ? "Save changes" : "Save Exam"}</SubmitButton>
       <Feedback state={state} />
+    </form>
+  );
+}
+
+export function DeleteExaminationForm({
+  examinationId,
+  examinationName,
+  disabled,
+}: {
+  examinationId: number;
+  examinationName: string;
+  disabled: boolean;
+}) {
+  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(deleteExamination, {});
+  return (
+    <form action={action} className="flex flex-col items-start gap-1">
+      <input type="hidden" name="examinationId" value={examinationId} />
+      <AdminDeleteButton label={`Delete ${examinationName}`} disabled={disabled || pending} />
+      {disabled && <span className="max-w-40 text-xs text-slate-500">Deletion is available only before marks, attendance, or submission.</span>}
+      {state.error && <p role="alert" className="max-w-56 text-xs text-rose-700">{state.error}</p>}
+      {state.success && <p role="status" className="text-xs text-emerald-700">Examination deleted.</p>}
     </form>
   );
 }

@@ -231,7 +231,7 @@ export async function createExamination(
   const classValues = formData.getAll("classLevelIds");
   const parsed = z.object({
     name: text(120),
-    branchId: z.union([z.literal(""), idField]),
+    branchId: idField,
     academicYearId: idField,
     academicTermId: z.union([z.literal(""), idField]),
     examTypeId: z.union([z.literal(""), idField]),
@@ -255,7 +255,7 @@ export async function createExamination(
     classLevelIds: classValues,
   });
   if (!parsed.success || !isValidDateRange(value(formData, "startDate"), value(formData, "endDate"))) {
-    return { error: "Add an exam name, academic year, dates, mark distribution, and at least one class." };
+    return { error: "Select a branch and academic year, enter valid exam dates and mark distributions, and choose at least one class." };
   }
   const componentDefinitions = parseExamComponents(parsed.data.components, parsed.data.examSystem);
   if (!componentDefinitions) {
@@ -265,7 +265,7 @@ export async function createExamination(
   }
   const totalMaxMarks = componentDefinitions.reduce((total, component) => total + component.maxMarks, 0);
   if (totalMaxMarks > 999999) return { error: "The total maximum marks across components cannot exceed 999,999." };
-  const branchId = parsed.data.branchId || null;
+  const branchId = parsed.data.branchId;
   if (branchId) {
     const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
       eq(schoolBranches.id, branchId),
@@ -535,6 +535,362 @@ export async function createExamination(
   }
   revalidatePath("/admin/examinations");
   redirect(`/admin/examinations/${createOutcome}`);
+}
+
+export async function updateExamination(
+  _previousState: ExaminationActionState,
+  formData: FormData,
+): Promise<ExaminationActionState> {
+  const context = await requireSchoolPermission("examinations.create");
+  const parsed = z.object({
+    examinationId: idField,
+    name: text(120),
+    branchId: z.union([z.literal(""), idField]),
+    examSystem: z.enum(["single", "multi"]),
+    components: z.string().trim().min(1).max(4000),
+    startDate: z.string().refine(isCalendarDate),
+    endDate: z.string().refine(isCalendarDate),
+  }).safeParse({
+    examinationId: value(formData, "examinationId"),
+    name: value(formData, "name"),
+    branchId: value(formData, "branchId"),
+    examSystem: value(formData, "examSystem"),
+    components: value(formData, "components"),
+    startDate: value(formData, "startDate"),
+    endDate: value(formData, "endDate"),
+  });
+  if (!parsed.success || !isValidDateRange(value(formData, "startDate"), value(formData, "endDate"))) {
+    return { error: "Enter an exam title and valid examination dates." };
+  }
+  const componentDefinitions = parseExamComponents(parsed.data.components, parsed.data.examSystem);
+  if (!componentDefinitions) {
+    return { error: parsed.data.examSystem === "single"
+      ? "Single Exam requires exactly one valid unique mark distribution."
+      : "Multi Exam requires at least two valid unique mark distributions." };
+  }
+  const totalMaxMarks = componentDefinitions.reduce((total, component) => total + component.maxMarks, 0);
+  if (totalMaxMarks > 999999) return { error: "The total maximum marks cannot exceed 999,999." };
+  const branchId = parsed.data.branchId || null;
+  const componentPayload = JSON.stringify(componentDefinitions);
+  const outcome = await db.transaction(async (tx) => {
+    const [exam] = await tx.select({
+      id: examinations.id,
+      publicId: examinations.publicId,
+      status: examinations.status,
+      academicYearId: examinations.academicYearId,
+      academicTermId: examinations.academicTermId,
+      name: examinations.name,
+      branchId: examinations.branchId,
+      examSystem: examinations.examSystem,
+      startDate: examinations.startDate,
+      endDate: examinations.endDate,
+    }).from(examinations).where(and(
+      eq(examinations.id, parsed.data.examinationId),
+      eq(examinations.schoolId, context.schoolId),
+    )).for("update").limit(1);
+    if (!exam) return "missing" as const;
+    if (exam.status !== "open") return "locked" as const;
+    const [year] = await tx.select({
+      startDate: academicYears.startDate,
+      endDate: academicYears.endDate,
+    }).from(academicYears).where(and(
+      eq(academicYears.id, exam.academicYearId),
+      eq(academicYears.schoolId, context.schoolId),
+    )).limit(1);
+    if (!year || parsed.data.startDate < year.startDate || parsed.data.endDate > year.endDate) {
+      return "invalid-dates" as const;
+    }
+    if (exam.academicTermId) {
+      const [term] = await tx.select({
+        startDate: academicTerms.startDate,
+        endDate: academicTerms.endDate,
+      }).from(academicTerms).where(and(
+        eq(academicTerms.id, exam.academicTermId),
+        eq(academicTerms.schoolId, context.schoolId),
+      )).limit(1);
+      if (!term || parsed.data.startDate < term.startDate || parsed.data.endDate > term.endDate) {
+        return "invalid-dates" as const;
+      }
+    }
+    const duplicate = await tx.select({ id: examinations.id }).from(examinations).where(and(
+      eq(examinations.schoolId, context.schoolId),
+      eq(examinations.academicYearId, exam.academicYearId),
+      eq(examinations.name, parsed.data.name),
+    )).limit(1);
+    if (duplicate.length && duplicate[0].id !== exam.id) return "duplicate" as const;
+
+    const classRows = await tx.select({
+      classLevelId: examClasses.classLevelId,
+      branchId: classLevels.branchId,
+    }).from(examClasses).innerJoin(classLevels, and(
+      eq(classLevels.id, examClasses.classLevelId),
+      eq(classLevels.schoolId, context.schoolId),
+    )).where(and(
+      eq(examClasses.examinationId, exam.id),
+      eq(examClasses.schoolId, context.schoolId),
+    ));
+    if (!classRows.length || branchId && classRows.some((classRow) => classRow.branchId !== branchId)) {
+      return "branch-classes" as const;
+    }
+    if (branchId) {
+      const [branch] = await tx.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
+        eq(schoolBranches.id, branchId),
+        eq(schoolBranches.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
+      )).limit(1);
+      if (!branch) return "branch-classes" as const;
+    }
+    const subjectRows = await tx.select({
+      id: examSubjects.id,
+      classLevelId: examClasses.classLevelId,
+      status: examSubjects.status,
+    }).from(examSubjects).innerJoin(examClasses, and(
+      eq(examClasses.id, examSubjects.examClassId),
+      eq(examClasses.schoolId, context.schoolId),
+    )).where(and(
+      eq(examClasses.examinationId, exam.id),
+      eq(examSubjects.schoolId, context.schoolId),
+    ));
+    if (!subjectRows.length || subjectRows.some((subject) => subject.status !== "draft")) {
+      return "locked" as const;
+    }
+    if (exam.branchId !== branchId) {
+      for (const subject of subjectRows) {
+        const [expectedRoster, existingRoster] = await Promise.all([
+          tx.select({ id: studentEnrollments.id }).from(studentEnrollments)
+            .innerJoin(classSections, and(
+              eq(classSections.id, studentEnrollments.classSectionId),
+              eq(classSections.schoolId, context.schoolId),
+              eq(classSections.classLevelId, subject.classLevelId),
+              eq(classSections.academicYearId, exam.academicYearId),
+            ))
+            .innerJoin(students, and(
+              eq(students.id, studentEnrollments.studentId),
+              eq(students.schoolId, context.schoolId),
+            ))
+            .where(and(
+              eq(studentEnrollments.schoolId, context.schoolId),
+              eq(studentEnrollments.academicYearId, exam.academicYearId),
+              eq(studentEnrollments.status, "enrolled"),
+              branchId ? eq(students.branchId, branchId) : undefined,
+            )),
+          tx.select({ id: examMarks.enrollmentId }).from(examMarks).where(and(
+            eq(examMarks.schoolId, context.schoolId),
+            eq(examMarks.examSubjectId, subject.id),
+          )),
+        ]);
+        if (expectedRoster.length !== existingRoster.length ||
+          expectedRoster.some((enrollment) => !existingRoster.some((existing) => existing.id === enrollment.id))) {
+          return "branch-roster" as const;
+        }
+      }
+    }
+    const subjectIds = subjectRows.map((subject) => subject.id);
+    const currentComponents = await tx.select({
+      examSubjectId: examComponents.examSubjectId,
+      title: examComponents.title,
+      maxMarks: examComponents.maxMarks,
+      sortOrder: examComponents.sortOrder,
+    }).from(examComponents).where(and(
+      eq(examComponents.schoolId, context.schoolId),
+      inArray(examComponents.examSubjectId, subjectIds),
+    )).orderBy(asc(examComponents.examSubjectId), asc(examComponents.sortOrder));
+    const currentBySubject = new Map<number, typeof currentComponents>();
+    for (const component of currentComponents) {
+      const rows = currentBySubject.get(component.examSubjectId) ?? [];
+      rows.push(component);
+      currentBySubject.set(component.examSubjectId, rows);
+    }
+    const distributionsChanged = subjectRows.some((subject) =>
+      JSON.stringify((currentBySubject.get(subject.id) ?? []).map((component) => ({
+        title: component.title,
+        maxMarks: Number(component.maxMarks),
+      }))) !== componentPayload,
+    );
+    if (distributionsChanged) {
+      const currentMarks = await tx.select({
+        id: examMarks.id,
+        examSubjectId: examMarks.examSubjectId,
+        marks: examMarks.marks,
+      }).from(examMarks).where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        inArray(examMarks.examSubjectId, subjectIds),
+      ));
+      if (currentMarks.some((mark) => mark.marks !== null)) return "has-marks" as const;
+      const markIds = currentMarks.map((mark) => mark.id);
+      if (markIds.length) {
+        const [componentMarks, markHistory, corrections] = await Promise.all([
+          tx.select({ marks: examComponentMarks.marks }).from(examComponentMarks).where(and(
+            eq(examComponentMarks.schoolId, context.schoolId),
+            inArray(examComponentMarks.examMarkId, markIds),
+          )),
+          tx.select({ id: examMarkAudits.id }).from(examMarkAudits).where(and(
+            eq(examMarkAudits.schoolId, context.schoolId),
+            inArray(examMarkAudits.examMarkId, markIds),
+          )),
+          tx.select({ id: examMarkCorrections.id }).from(examMarkCorrections).where(and(
+            eq(examMarkCorrections.schoolId, context.schoolId),
+            inArray(examMarkCorrections.examMarkId, markIds),
+          )),
+        ]);
+        if (componentMarks.some((mark) => mark.marks !== null) || markHistory.length || corrections.length) {
+          return "has-marks" as const;
+        }
+      }
+      for (const subjectId of subjectIds) {
+        await tx.delete(examComponents).where(and(
+          eq(examComponents.schoolId, context.schoolId),
+          eq(examComponents.examSubjectId, subjectId),
+        ));
+        const createdComponents = await tx.insert(examComponents).values(componentDefinitions.map((component, sortOrder) => ({
+          publicId: randomUUID(),
+          schoolId: context.schoolId,
+          examSubjectId: subjectId,
+          title: component.title,
+          maxMarks: component.maxMarks.toFixed(2),
+          sortOrder,
+        }))).$returningId();
+        await tx.update(examSubjects).set({ maxMarks: totalMaxMarks.toFixed(2) }).where(and(
+          eq(examSubjects.id, subjectId),
+          eq(examSubjects.schoolId, context.schoolId),
+        ));
+        const subjectMarks = currentMarks.filter((mark) => mark.examSubjectId === subjectId);
+        if (subjectMarks.length) {
+          await tx.insert(examComponentMarks).values(subjectMarks.flatMap((mark) =>
+              createdComponents.map((component) => ({
+                publicId: randomUUID(),
+                schoolId: context.schoolId,
+                examMarkId: mark.id,
+                examComponentId: component.id,
+                marks: null,
+                updatedBy: context.user.id,
+              })),
+            ));
+        }
+      }
+    }
+    const changedFields = [
+      ...(exam.name === parsed.data.name ? [] : ["name"]),
+      ...(exam.branchId === branchId ? [] : ["branchId"]),
+      ...(exam.examSystem === parsed.data.examSystem ? [] : ["examSystem"]),
+      ...(exam.startDate === parsed.data.startDate ? [] : ["startDate"]),
+      ...(exam.endDate === parsed.data.endDate ? [] : ["endDate"]),
+      ...(distributionsChanged ? ["markDistributions"] : []),
+    ];
+    await tx.update(examinations).set({
+      name: parsed.data.name,
+      branchId,
+      examSystem: parsed.data.examSystem,
+      startDate: parsed.data.startDate,
+      endDate: parsed.data.endDate,
+    }).where(and(eq(examinations.id, exam.id), eq(examinations.schoolId, context.schoolId)));
+    if (changedFields.length) {
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: "examination.updated",
+        resourceType: "examination",
+        resourcePublicId: exam.publicId,
+        changedFields,
+      });
+    }
+    return exam.id;
+  }).catch((error: unknown) => {
+    if (isDuplicateEntryError(error)) return "duplicate" as const;
+    throw error;
+  });
+  if (outcome === "missing") return { error: "This examination no longer exists." };
+  if (outcome === "locked") return { error: "Only open examinations with draft assessments can be edited." };
+  if (outcome === "invalid-dates") return { error: "Examination dates must remain within the academic year and term." };
+  if (outcome === "duplicate") return { error: "An examination with that name already exists in this academic year." };
+  if (outcome === "branch-classes") return { error: "The selected branch must match the classes already assigned to this examination." };
+  if (outcome === "branch-roster") return { error: "The branch cannot be changed because it would change the student roster for this examination." };
+  if (outcome === "has-marks") return { error: "Mark distributions cannot be changed after marks or mark history has been recorded." };
+  revalidatePath("/admin/examinations");
+  revalidatePath(`/admin/examinations/${outcome}`);
+  return { success: true };
+}
+
+export async function deleteExamination(
+  _previousState: ExaminationActionState,
+  formData: FormData,
+): Promise<ExaminationActionState> {
+  const context = await requireSchoolPermission("examinations.create");
+  const parsedId = idField.safeParse(value(formData, "examinationId"));
+  if (!parsedId.success) return { error: "Choose a valid examination to delete." };
+  const outcome = await db.transaction(async (tx) => {
+    const [exam] = await tx.select({
+      id: examinations.id,
+      publicId: examinations.publicId,
+      status: examinations.status,
+    }).from(examinations).where(and(
+      eq(examinations.id, parsedId.data),
+      eq(examinations.schoolId, context.schoolId),
+    )).for("update").limit(1);
+    if (!exam) return "missing" as const;
+    if (exam.status !== "open") return "locked" as const;
+    const subjectRows = await tx.select({
+      id: examSubjects.id,
+      status: examSubjects.status,
+    }).from(examSubjects).innerJoin(examClasses, and(
+      eq(examClasses.id, examSubjects.examClassId),
+      eq(examClasses.schoolId, context.schoolId),
+    )).where(and(
+      eq(examClasses.examinationId, exam.id),
+      eq(examSubjects.schoolId, context.schoolId),
+    ));
+    if (!subjectRows.length || subjectRows.some((subject) => subject.status !== "draft")) return "locked" as const;
+    const subjectIds = subjectRows.map((subject) => subject.id);
+    const [marks, attendance] = await Promise.all([
+      tx.select({ id: examMarks.id, marks: examMarks.marks }).from(examMarks).where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        inArray(examMarks.examSubjectId, subjectIds),
+      )),
+      tx.select({ id: examAttendance.id }).from(examAttendance).where(and(
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.examSubjectId, subjectIds),
+      )),
+    ]);
+    if (marks.some((mark) => mark.marks !== null) || attendance.length) return "has-data" as const;
+    const markIds = marks.map((mark) => mark.id);
+    if (markIds.length) {
+      const [componentMarks, markHistory, corrections] = await Promise.all([
+        tx.select({ marks: examComponentMarks.marks }).from(examComponentMarks).where(and(
+          eq(examComponentMarks.schoolId, context.schoolId),
+          inArray(examComponentMarks.examMarkId, markIds),
+        )),
+        tx.select({ id: examMarkAudits.id }).from(examMarkAudits).where(and(
+          eq(examMarkAudits.schoolId, context.schoolId),
+          inArray(examMarkAudits.examMarkId, markIds),
+        )),
+        tx.select({ id: examMarkCorrections.id }).from(examMarkCorrections).where(and(
+          eq(examMarkCorrections.schoolId, context.schoolId),
+          inArray(examMarkCorrections.examMarkId, markIds),
+        )),
+      ]);
+      if (componentMarks.some((mark) => mark.marks !== null) || markHistory.length || corrections.length) {
+        return "has-data" as const;
+      }
+    }
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "examination.deleted",
+      resourceType: "examination",
+      resourcePublicId: exam.publicId,
+      changedFields: ["deleted"],
+    });
+    await tx.delete(examinations).where(and(
+      eq(examinations.id, exam.id),
+      eq(examinations.schoolId, context.schoolId),
+    ));
+    return exam.id;
+  });
+  if (outcome === "missing") return { error: "This examination no longer exists." };
+  if (outcome === "locked") return { error: "Only open examinations with draft assessments and no submitted results can be deleted." };
+  if (outcome === "has-data") return { error: "This examination has marks, attendance, or audit history. It cannot be deleted." };
+  revalidatePath("/admin/examinations");
+  return { success: true };
 }
 
 export async function updateExamSubjectSettings(
