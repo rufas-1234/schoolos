@@ -16,6 +16,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     "roles.manage",
     "fees.manage",
     "payments.record",
+    "examinations.create",
+    "results.enter",
+    "results.publish",
   ]);
   return (
     <AdminShell

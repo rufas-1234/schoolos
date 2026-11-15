@@ -94,6 +94,7 @@ export const schools = mysqlTable("schools", {
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 40 }),
   address: varchar("address", { length: 1000 }),
+  logoUrl: varchar("logoUrl", { length: 2048 }),
   currency: varchar("currency", { length: 3 }).notNull().default("USD"),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   createdAt: createdAt(),
@@ -1084,6 +1085,234 @@ export const studentAttendance = mysqlTable(
       table.classSectionId,
       table.attendanceDate,
     ),
+  ],
+);
+
+export const examGradingScales = mysqlTable(
+  "exam_grading_scales",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    allowRanking: boolean("allowRanking").notNull().default(false),
+    isDefault: boolean("isDefault").notNull().default(false),
+    createdBy: varchar("createdBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_grading_scales_school_name_uq").on(table.schoolId, table.name),
+    index("exam_grading_scales_school_default_idx").on(table.schoolId, table.isDefault),
+  ],
+);
+
+export const examGradeBands = mysqlTable(
+  "exam_grade_bands",
+  {
+    id: id(),
+    gradingScaleId: bigint("gradingScaleId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examGradingScales.id, { onDelete: "cascade" }),
+    minPercent: decimal("minPercent", { precision: 5, scale: 2 }).notNull(),
+    maxPercent: decimal("maxPercent", { precision: 5, scale: 2 }).notNull(),
+    grade: varchar("grade", { length: 8 }).notNull(),
+    description: varchar("description", { length: 255 }).notNull(),
+    performanceRemark: varchar("performanceRemark", { length: 255 }).notNull(),
+    sortOrder: int("sortOrder", { unsigned: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_grade_bands_scale_grade_uq").on(table.gradingScaleId, table.grade),
+    index("exam_grade_bands_scale_range_idx").on(table.gradingScaleId, table.minPercent, table.maxPercent),
+  ],
+);
+
+export const examinations = mysqlTable(
+  "examinations",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    academicYearId: bigint("academicYearId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => academicYears.id),
+    academicTermId: bigint("academicTermId", { mode: "number", unsigned: true })
+      .references(() => academicTerms.id),
+    gradingScaleId: bigint("gradingScaleId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examGradingScales.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    startDate: date("startDate", { mode: "string" }).notNull(),
+    endDate: date("endDate", { mode: "string" }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("open"),
+    createdBy: varchar("createdBy", { length: 36 }).notNull().references(() => user.id),
+    publishedBy: varchar("publishedBy", { length: 36 }).references(() => user.id),
+    publishedAt: timestamp("publishedAt"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("examinations_school_name_year_uq").on(table.schoolId, table.academicYearId, table.name),
+    index("examinations_school_year_status_idx").on(table.schoolId, table.academicYearId, table.status),
+  ],
+);
+
+export const examClasses = mysqlTable(
+  "exam_classes",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examinationId: bigint("examinationId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examinations.id, { onDelete: "cascade" }),
+    classLevelId: bigint("classLevelId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => classLevels.id),
+    classTeacherId: bigint("classTeacherId", { mode: "number", unsigned: true })
+      .references(() => teachers.id),
+    principalRemark: varchar("principalRemark", { length: 1000 }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_classes_school_exam_class_uq").on(table.schoolId, table.examinationId, table.classLevelId),
+    index("exam_classes_school_class_idx").on(table.schoolId, table.classLevelId),
+  ],
+);
+
+export const examSubjects = mysqlTable(
+  "exam_subjects",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examClassId: bigint("examClassId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examClasses.id, { onDelete: "cascade" }),
+    classSubjectId: bigint("classSubjectId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => classSubjects.id),
+    examDate: date("examDate", { mode: "string" }).notNull(),
+    maxMarks: decimal("maxMarks", { precision: 8, scale: 2 }).notNull().default("100"),
+    weight: decimal("weight", { precision: 6, scale: 2 }).notNull().default("1"),
+    status: varchar("status", { length: 20 }).notNull().default("draft"),
+    submittedBy: varchar("submittedBy", { length: 36 }).references(() => user.id),
+    submittedAt: timestamp("submittedAt"),
+    reviewedBy: varchar("reviewedBy", { length: 36 }).references(() => user.id),
+    reviewedAt: timestamp("reviewedAt"),
+    reviewNote: varchar("reviewNote", { length: 1000 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_subjects_school_class_subject_uq").on(table.schoolId, table.examClassId, table.classSubjectId),
+    index("exam_subjects_school_status_idx").on(table.schoolId, table.status),
+  ],
+);
+
+export const examMarks = mysqlTable(
+  "exam_marks",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examSubjectId: bigint("examSubjectId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examSubjects.id, { onDelete: "cascade" }),
+    enrollmentId: bigint("enrollmentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => studentEnrollments.id),
+    marks: decimal("marks", { precision: 8, scale: 2 }),
+    teacherRemark: varchar("teacherRemark", { length: 1000 }),
+    updatedBy: varchar("updatedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_marks_school_subject_enrollment_uq").on(table.schoolId, table.examSubjectId, table.enrollmentId),
+    index("exam_marks_school_enrollment_idx").on(table.schoolId, table.enrollmentId),
+  ],
+);
+
+export const examStudentRemarks = mysqlTable(
+  "exam_student_remarks",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examClassId: bigint("examClassId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examClasses.id, { onDelete: "cascade" }),
+    enrollmentId: bigint("enrollmentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => studentEnrollments.id),
+    classTeacherRemark: varchar("classTeacherRemark", { length: 1000 }),
+    updatedBy: varchar("updatedBy", { length: 36 }).notNull().references(() => user.id),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_student_remarks_class_enrollment_uq").on(table.schoolId, table.examClassId, table.enrollmentId),
+  ],
+);
+
+export const examMarkCorrections = mysqlTable(
+  "exam_mark_corrections",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examMarkId: bigint("examMarkId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examMarks.id),
+    previousMarks: decimal("previousMarks", { precision: 8, scale: 2 }).notNull(),
+    requestedMarks: decimal("requestedMarks", { precision: 8, scale: 2 }).notNull(),
+    reason: varchar("reason", { length: 1000 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    requestedBy: varchar("requestedBy", { length: 36 }).notNull().references(() => user.id),
+    reviewedBy: varchar("reviewedBy", { length: 36 }).references(() => user.id),
+    reviewNote: varchar("reviewNote", { length: 1000 }),
+    requestedAt: timestamp("requestedAt").notNull().defaultNow(),
+    reviewedAt: timestamp("reviewedAt"),
+  },
+  (table) => [
+    index("exam_mark_corrections_school_status_idx").on(table.schoolId, table.status),
+    index("exam_mark_corrections_mark_idx").on(table.examMarkId, table.requestedAt),
+  ],
+);
+
+export const examMarkAudits = mysqlTable(
+  "exam_mark_audits",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examMarkId: bigint("examMarkId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examMarks.id),
+    previousMarks: decimal("previousMarks", { precision: 8, scale: 2 }),
+    updatedMarks: decimal("updatedMarks", { precision: 8, scale: 2 }),
+    action: varchar("action", { length: 30 }).notNull(),
+    reason: varchar("reason", { length: 1000 }),
+    actorUserId: varchar("actorUserId", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("exam_mark_audits_school_mark_created_idx").on(table.schoolId, table.examMarkId, table.createdAt),
   ],
 );
 

@@ -199,6 +199,9 @@ async function seed() {
       "fees.manage",
       "payments.record",
       "reports.export",
+      "examinations.create",
+      "results.enter",
+      "results.publish",
     ];
     const rolePermissionIds = new Set(
       (
@@ -244,6 +247,34 @@ async function seed() {
       await tx.insert(rolePermissions).values({
         roleId: hrRole.id,
         permissionId: staffPermission.id,
+      });
+    }
+
+    const [teacherRole] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.schoolId, school.id), eq(roles.name, "Teacher")))
+      .limit(1);
+    const [resultsEnterPermission] = await tx
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(eq(permissions.key, "results.enter"))
+      .limit(1);
+    if (!teacherRole || !resultsEnterPermission) {
+      throw new Error("The Teacher role or results-entry permission could not be created.");
+    }
+    const [teacherRolePermission] = await tx
+      .select({ roleId: rolePermissions.roleId })
+      .from(rolePermissions)
+      .where(and(
+        eq(rolePermissions.roleId, teacherRole.id),
+        eq(rolePermissions.permissionId, resultsEnterPermission.id),
+      ))
+      .limit(1);
+    if (!teacherRolePermission) {
+      await tx.insert(rolePermissions).values({
+        roleId: teacherRole.id,
+        permissionId: resultsEnterPermission.id,
       });
     }
 

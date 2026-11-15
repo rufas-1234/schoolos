@@ -67,6 +67,13 @@ const navigation: NavigationItem[] = [
     children: studentSections,
   },
   {
+    href: "/admin/examinations",
+    label: "Examinations",
+    icon: BookOpen,
+    permission: "examinations.create",
+    permissionAlternatives: ["results.enter", "results.publish"],
+  },
+  {
     href: "/admin/hr",
     label: "Human resources",
     icon: BriefcaseBusiness,
@@ -168,6 +175,8 @@ export function AdminShell({
         ? "/admin/settings/roles"
       : permissions.includes("fees.manage") || permissions.includes("payments.record")
         ? "/admin/fees/collection"
+      : permissions.includes("examinations.create") || permissions.includes("results.enter") || permissions.includes("results.publish")
+        ? "/admin/examinations"
         : "/admin/settings/roles";
   const schoolMonogram =
     schoolName

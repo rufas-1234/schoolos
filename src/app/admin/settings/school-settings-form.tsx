@@ -11,6 +11,7 @@ type SchoolProfile = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  logoUrl: string | null;
   currency: string;
   timezone: string;
 };
@@ -43,6 +44,7 @@ export function SchoolSettingsForm({ school }: { school: SchoolProfile }) {
         <Field label="Telephone" name="phone" defaultValue={school.phone ?? ""} />
         <Field label="Currency (ISO 4217)" name="currency" required defaultValue={school.currency} />
         <Field label="Timezone" name="timezone" required defaultValue={school.timezone} />
+        <Field label="School logo URL (HTTPS)" name="logoUrl" defaultValue={school.logoUrl ?? ""} />
         <label className="block sm:col-span-2">
           <span className="mb-2 block text-sm font-medium text-slate-700">Address</span>
           <textarea
@@ -84,10 +86,10 @@ function Field({
       <input
         className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
         defaultValue={defaultValue}
-        maxLength={name === "phone" ? 40 : undefined}
+        maxLength={name === "phone" ? 40 : name === "logoUrl" ? 2048 : undefined}
         name={name}
         required={required}
-        type={type}
+        type={name === "logoUrl" ? "url" : type}
       />
     </label>
   );
