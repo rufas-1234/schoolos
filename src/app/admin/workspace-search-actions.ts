@@ -17,6 +17,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { rankWorkspaceSearchResults } from "@/lib/workspace-search-policy";
 
 const querySchema = z.string().trim().min(2).max(120);
 const workspacePermissions = [
@@ -38,13 +39,8 @@ export type WorkspaceSearchResult = {
   description: string;
   href: string;
   category: "Pages" | "Students" | "Staff" | "Academics" | "Examinations";
+  searchTerms?: string[];
 };
-
-function matchesQuery(query: string, ...values: string[]): boolean {
-  const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const content = values.join(" ").toLocaleLowerCase();
-  return terms.every((term) => content.includes(term));
-}
 
 function patternFor(query: string): string {
   return `%${query.replace(/[\\%_]/g, "\\$&")}%`;
@@ -73,9 +69,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     href: string,
     aliases: string[] = [],
   ) => {
-    if (matchesQuery(query, title, description, ...aliases)) {
-      results.push({ id, title, description, href, category: "Pages" });
-    }
+    results.push({ id, title, description, href, category: "Pages", searchTerms: aliases });
   };
 
   if (permissions.has("dashboard.view")) {
@@ -103,6 +97,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   if (canViewStudents) {
     addPage("student-list", "Student list", "Search and manage student profiles", "/admin/students", ["students", "student records", "directory", "lists"]);
     addPage("student-attendance", "Student attendance", "Daily attendance by class and date", "/admin/academics?section=attendance", ["attendance register", "absent", "present"]);
+    addPage("student-attendance-report", "Student Attendance Report", "Review daily attendance by class section and date", "/admin/academics?section=attendance", ["attendance report", "student attendance"]);
+    addPage("student-routine-report", "Class Routine", "View and print a class section timetable", "/admin/academics?section=routines", ["class routine", "timetable"]);
+    addPage("student-directory-report", "Student Report", "View or print the student directory", "/admin/students?action=export", ["student report", "student list", "directory"]);
     addPage("student-groups", "Student groups", "Student group lists", "/admin/students/groups", ["group"]);
     addPage("student-disabled", "Disabled students", "Students marked disabled", "/admin/students/disabled");
   }
@@ -136,6 +133,12 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const queryTokens = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const tokenMatch = (column: Parameters<typeof like>[0]) =>
     and(...queryTokens.map((token) => like(sql`lower(${column})`, patternFor(token))));
+  const soundexMatch = (column: Parameters<typeof like>[0]) => {
+    const soundexTerms = queryTokens
+      .filter((token) => token.length >= 3)
+      .map((token) => sql`SOUNDEX(${column}) = SOUNDEX(${token})`);
+    return soundexTerms.length ? or(...soundexTerms) : sql`false`;
+  };
   const [studentRows, staffRows, academicRows, examRows] = await Promise.all([
     canViewStudents
       ? db.select({
@@ -150,12 +153,14 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(students.firstName),
             tokenMatch(students.lastName),
             tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
+            soundexMatch(students.firstName),
+            soundexMatch(students.lastName),
             like(sql`lower(${students.admissionNumber})`, pattern),
             like(sql`lower(${students.publicId})`, pattern),
           ),
         ))
         .orderBy(asc(students.lastName), asc(students.firstName))
-        .limit(6)
+        .limit(40)
       : Promise.resolve([]),
     canManageStaff
       ? db.select({
@@ -172,13 +177,15 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(staffMembers.firstName),
             tokenMatch(staffMembers.lastName),
             tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
+            soundexMatch(staffMembers.firstName),
+            soundexMatch(staffMembers.lastName),
             like(sql`lower(${staffMembers.employeeCode})`, pattern),
             tokenMatch(staffMembers.jobTitle),
             tokenMatch(staffMembers.department),
           ),
         ))
         .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName))
-        .limit(5)
+        .limit(30)
       : Promise.resolve([]),
     canManageAcademics
       ? Promise.all([
@@ -186,10 +193,10 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           .from(classLevels)
           .where(and(
             eq(classLevels.schoolId, context.schoolId),
-            or(tokenMatch(classLevels.name), like(sql`lower(${classLevels.code})`, pattern)),
+            or(tokenMatch(classLevels.name), soundexMatch(classLevels.name), like(sql`lower(${classLevels.code})`, pattern)),
           ))
           .orderBy(asc(classLevels.name))
-          .limit(4),
+          .limit(20),
         db.select({
           id: classSections.id,
           name: classSections.name,
@@ -206,10 +213,10 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           ))
           .where(and(
             eq(classSections.schoolId, context.schoolId),
-            or(tokenMatch(classSections.name), tokenMatch(classLevels.name)),
+            or(tokenMatch(classSections.name), tokenMatch(classLevels.name), soundexMatch(classSections.name), soundexMatch(classLevels.name)),
           ))
           .orderBy(asc(classLevels.name), asc(classSections.name))
-          .limit(4),
+          .limit(20),
         db.select({
           id: subjects.id,
           name: subjects.name,
@@ -217,10 +224,10 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         }).from(subjects)
           .where(and(
             eq(subjects.schoolId, context.schoolId),
-            or(tokenMatch(subjects.name), like(sql`lower(${subjects.code})`, pattern)),
+            or(tokenMatch(subjects.name), soundexMatch(subjects.name), like(sql`lower(${subjects.code})`, pattern)),
           ))
           .orderBy(asc(subjects.name))
-          .limit(4),
+          .limit(20),
       ])
       : Promise.resolve([[], [], []] as const),
     canManageExaminations
@@ -241,10 +248,10 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         ))
         .where(and(
           eq(examinations.schoolId, context.schoolId),
-          or(tokenMatch(examinations.name), tokenMatch(classLevels.name)),
+          or(tokenMatch(examinations.name), tokenMatch(classLevels.name), soundexMatch(examinations.name), soundexMatch(classLevels.name)),
         ))
         .orderBy(asc(examinations.startDate), asc(examinations.name))
-        .limit(8)
+        .limit(30)
       : permissions.has("results.enter")
         ? db.select({
           id: examinations.id,
@@ -282,11 +289,11 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           ))
           .where(and(
             eq(examinations.schoolId, context.schoolId),
-            or(tokenMatch(examinations.name), tokenMatch(classLevels.name)),
+            or(tokenMatch(examinations.name), tokenMatch(classLevels.name), soundexMatch(examinations.name), soundexMatch(classLevels.name)),
           ))
           .groupBy(examinations.id, examinations.name, examinations.status, examinations.startDate, classLevels.name)
           .orderBy(asc(examinations.startDate), asc(examinations.name))
-          .limit(8)
+          .limit(30)
         : Promise.resolve([]),
   ]);
 
@@ -345,5 +352,5 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     });
   }
 
-  return results.slice(0, 20);
+  return rankWorkspaceSearchResults(query, results, 20);
 }

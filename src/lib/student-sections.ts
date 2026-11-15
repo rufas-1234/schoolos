@@ -70,4 +70,20 @@ export const studentSections = [
     permission: "students.update",
     permissionAlternatives: ["school.settings.manage"],
   },
+  {
+    id: "student-attendance-report",
+    label: "Student Attendance Report",
+    href: "/admin/academics?section=attendance",
+  },
+  {
+    id: "class-routine-report",
+    label: "Class Routine",
+    href: "/admin/academics?section=routines",
+    permission: "school.settings.manage",
+  },
+  {
+    id: "student-report",
+    label: "Student Report",
+    href: "/admin/students?action=export",
+  },
 ] as const;
