@@ -240,7 +240,7 @@ export default async function SubjectMarksPage({
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{subject.subjectName} marks</h1>
           <p className="mt-2 text-sm text-slate-600">{subject.className} · {subject.subjectCode} · {subject.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · Exam date {subject.examDate} · Maximum {subject.maxMarks} · Weight {subject.weight} · {subject.status}</p>
         </div>
-        <PrintButton label="Print marks-only sheet" targetId="exam-marks-only-sheet" pageOrientation="landscape" />
+        <PrintButton label="Print marks-only sheet" targetId="exam-marks-only-sheet" pageOrientation="landscape" pageSize="A4" />
       </header>
 
       <section id="exam-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">

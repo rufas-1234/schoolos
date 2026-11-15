@@ -194,7 +194,7 @@ export default async function ExaminationDetailPage({
           { number: "1", title: "Check setup", detail: `${classRows.length} classes · ${allSubjects.length} subjects`, href: "/admin/examinations?section=setup", done: true },
           { number: "2", title: "Enter marks", detail: `${completeSubjects} of ${allSubjects.length} subject rosters complete`, href: "/admin/examinations?section=marks&examId=" + exam.id, done: completeSubjects === allSubjects.length && allSubjects.length > 0 },
           { number: "3", title: "Review & publish", detail: `${allSubjects.filter((subject) => subject.status === "approved").length} of ${allSubjects.length} assessments approved`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
-          { number: "4", title: "Generate reports", detail: exam.status === "published" ? "Class marksheets and student report cards are ready" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? `/admin/examinations/${exam.id}/reports/${classRows[0].id}${exam.status === "published" ? "" : "?preview=test"}` : null, done: exam.status === "published" },
+          { number: "4", title: "Generate reports", detail: exam.status === "published" ? "A4 marksheets and individual or bulk progress cards are ready" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? `/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRows[0].id}` : null, done: exam.status === "published" },
         ].map((step) => (
           step.href ? (
             <Link key={step.number} href={step.href} className={`rounded-xl border p-4 ${step.done ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
@@ -246,9 +246,12 @@ export default async function ExaminationDetailPage({
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm text-slate-500">{subjectRows.length} subjects</span>
                   {(exam.status === "published" || canPreviewReports) && (
-                    <Link href={`/admin/examinations/${exam.id}/reports/${classRow.id}${exam.status === "published" ? "" : "?preview=test"}`} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">
-                      {exam.status === "published" ? "Generate class report" : "Preview test report"}
-                    </Link>
+                    <>
+                      <Link href={`/admin/examinations/${exam.id}/reports/${classRow.id}${exam.status === "published" ? "" : "?preview=test"}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                        {exam.status === "published" ? "Generate class report" : "Preview test report"}
+                      </Link>
+                      {exam.status === "published" && <Link href={`/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRow.id}`} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">Bulk progress cards</Link>}
+                    </>
                   )}
                 </div>
               </div>

@@ -248,7 +248,7 @@ export default async function ClassMarksheetReportPage({
           <h1 className="mt-3 text-2xl font-bold text-slate-950">Class marksheet report</h1>
           <p className="mt-1 text-sm text-slate-600">{exam.name} · {exam.className} · {exam.termName ?? exam.yearName}</p>
         </div>
-        <PrintButton label="Print marks-only sheet" targetId="class-marks-only-sheet" pageOrientation="landscape" />
+        <PrintButton label="Print marks-only sheet" targetId="class-marks-only-sheet" pageOrientation="landscape" pageSize="A4" />
       </header>
 
       <section id="class-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">

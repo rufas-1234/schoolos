@@ -98,6 +98,9 @@ export default async function ReportCardPage({
     classTeacherId: classSections.classTeacherId,
     schoolLogoUrl: schools.logoUrl,
     schoolName: schools.name,
+    schoolAddress: schools.address,
+    schoolPhone: schools.phone,
+    schoolEmail: schools.email,
     schoolCurrency: schools.currency,
     schoolTimezone: schools.timezone,
   }).from(examinations)
@@ -335,9 +338,9 @@ export default async function ReportCardPage({
           <Link href={`/admin/examinations/${examId}`} className="text-sm font-semibold text-violet-700">← Back to {record.examinationName}</Link>
           <h1 className="mt-3 text-2xl font-bold text-slate-950">Student report card</h1>
         </div>
-        <PrintButton label="Print / save PDF" targetId="student-report-card" />
+        <PrintButton label="Print / save A4 PDF" targetId="student-report-card" pageSize="A4" />
       </header>
-      <article id="student-report-card" className="print-report-content space-y-5 rounded-2xl border border-slate-200 bg-white p-7 text-slate-900 print:rounded-none print:border-0 print:p-0">
+      <article id="student-report-card" className="a4-report-card a4-report-card-last print-report-content space-y-5 rounded-2xl border border-slate-200 bg-white p-7 text-slate-900 print:rounded-none print:border-0 print:p-0">
         {draftPreview && <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-amber-950 print:border-2">Draft test preview — not official; scores are synthetic</div>}
         <header className="print-report-heading flex items-center gap-4">
           {record.schoolLogoUrl && <Image src={record.schoolLogoUrl} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="h-16 w-16 rounded-lg object-contain" />}
@@ -401,7 +404,17 @@ export default async function ReportCardPage({
             <div className="rounded-xl border p-4"><h3 className="font-bold">Principal&apos;s remarks</h3><p className="mt-2 text-sm">{record.principalRemark ?? "—"}</p></div>
           </div>
         </section>
-        <footer className="flex justify-between border-t pt-4 text-xs text-slate-500"><span>{record.schoolName}</span><span>{record.examinationName} · {record.yearName}</span></footer>
+        <section className="grid grid-cols-3 gap-3 pt-4 text-center text-xs">
+          {["Parent / Guardian", "Class Teacher", "Principal"].map((label) => (
+            <div key={label} className="pt-8">
+              <div className="border-t border-slate-500 pt-1">{label} signature</div>
+            </div>
+          ))}
+        </section>
+        <footer className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-slate-500">
+          <span>{[record.schoolAddress, record.schoolPhone, record.schoolEmail].filter(Boolean).join(" · ") || record.schoolName}</span>
+          <span>{record.examinationName} · {record.yearName}</span>
+        </footer>
       </article>
     </main>
   );
