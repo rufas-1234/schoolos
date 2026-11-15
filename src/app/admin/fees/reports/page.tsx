@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, lte, sql, sum } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, lte, or, sql, sum } from "drizzle-orm";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { db } from "@/db";
@@ -268,8 +268,16 @@ export default async function FeeReportsPage({
       ))
       .where(and(
         eq(studentFeeInvoices.schoolId, context.schoolId),
-        gte(studentFeeInvoices.dueDate, from),
-        lte(studentFeeInvoices.dueDate, to),
+        or(
+          and(
+            gte(studentFeeInvoices.dueDate, from),
+            lte(studentFeeInvoices.dueDate, to),
+          ),
+          and(
+            gte(studentFeeInvoices.createdAt, dateRange.start),
+            lt(studentFeeInvoices.createdAt, dateRange.endExclusive),
+          ),
+        ),
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
         ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
         ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
@@ -516,7 +524,7 @@ export default async function FeeReportsPage({
           <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee reports</h1>
           <p className="mt-2 text-sm text-slate-600">Review payments, reversals, refunds, fines and outstanding balances by date, branch and class.</p>
         </div>
-        <PrintButton label="Print report" />
+        <PrintButton label="Print report" targetId="fee-report-content" />
       </header>
 
       <FeeReportFilters
@@ -534,71 +542,72 @@ export default async function FeeReportsPage({
         selectedStatus={requestedStatus}
       />
 
-      <section className="grid gap-4 sm:grid-cols-3 print:grid-cols-3">
-        <SummaryCard label="Collected in period" value={`${currency} ${money(totalCollected)}`} />
-        <SummaryCard label="Fines collected" value={`${currency} ${money(totalFines)}`} />
-        <SummaryCard label="Outstanding due in period" value={`${currency} ${money(totalOutstanding)}`} />
-      </section>
-
-      <ReportTable
-        title="Payment report"
-        description={`Payments recorded ${from} through ${to} in ${school?.timezone ?? "UTC"} local time; up to 500 most recent entries.`}
-        empty="No payments were recorded during this date range."
-        headings={["Student", "Class / section", "Fee type", "Date", "Method", "Payment", "Reversed", "Fine", "Receipt"]}
-        hasRows={payments.length > 0}
-      >
-        {payments.map((payment) => (
-          <tr key={payment.publicId} className="border-t border-slate-100">
-            <td className="px-4 py-3">{payment.studentName} {payment.studentLastName}<span className="block text-xs text-slate-500">{payment.admissionNumber || "—"} · {payment.rollNumber || "—"}</span></td>
-            <td className="px-4 py-3">{payment.branchName} / {payment.className} / {payment.sectionName}</td>
-            <td className="px-4 py-3">{payment.feeTypeName}</td>
-            <td className="px-4 py-3">{formatFeeReportDate(payment.paidAt, school?.timezone ?? "UTC")}</td>
-            <td className="px-4 py-3 capitalize">{payment.paymentMethod.replace("_", " ")}</td>
-            <td className="px-4 py-3">{currency} {payment.amount}</td>
-            <td className="px-4 py-3">{currency} {payment.reversedAmount}</td>
-            <td className="px-4 py-3">{currency} {payment.fineAmount}</td>
-            <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${payment.publicId}`}>{payment.receiptNumber}</Link></td>
-          </tr>
-        ))}
-      </ReportTable>
-
-      <ReportTable
-        title="Reversals and refunds"
-        description={`Reversals recorded ${from} through ${to}; up to 500 most recent entries.`}
-        empty="No payment reversals or refunds were recorded during this date range."
-        headings={["Student", "Class / section", "Date", "Type", "Amount", "Reason", "Receipt"]}
-        hasRows={reversals.length > 0}
-      >
-        {reversals.map((reversal) => (
-          <tr key={reversal.publicId} className="border-t border-slate-100">
-            <td className="px-4 py-3">{reversal.studentName} {reversal.studentLastName}</td>
-            <td className="px-4 py-3">{reversal.branchName} / {reversal.className} / {reversal.sectionName}</td>
-            <td className="px-4 py-3">{formatFeeReportDate(reversal.createdAt, school?.timezone ?? "UTC")}</td>
-            <td className="px-4 py-3 capitalize">{reversal.reversalType}</td>
-            <td className="px-4 py-3">{currency} {reversal.amount}</td>
-            <td className="px-4 py-3">{reversal.reason}{reversal.reference ? ` · Ref ${reversal.reference}` : ""}</td>
-            <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${reversal.paymentPublicId}`}>{reversal.receiptNumber}</Link></td>
-          </tr>
-        ))}
-      </ReportTable>
-
-      <section className="print-report-content">
+      <section id="fee-report-content" className="print-report-content space-y-6">
         <header className="print-report-heading">
           <p className="print-report-kicker">Finances · Fee report</p>
-          <h2>Invoice payment status</h2>
+          <h2>Fee report</h2>
           <p>
-            Due {from} through {to}
-            {requestedStatus ? ` · ${requestedStatus === "paid" ? "Fully paid" : requestedStatus === "partial" ? "Partially paid" : "Unpaid"}` : " · All payment statuses"}
+            {from} through {to}
             {requestedBranch ? ` · ${branches.find((branch) => branch.id === requestedBranch)?.name ?? "Selected branch"}` : ""}
             {requestedClass ? ` · ${classes.find((item) => item.id === requestedClass)?.name ?? "Selected class"}` : ""}
             {requestedSection ? ` · ${sections.find((section) => section.id === requestedSection)?.name ?? "Selected section"}` : ""}
             {requestedFeeTypeId ? ` · ${feeTypesList.find((feeType) => feeType.id === requestedFeeTypeId)?.name ?? "Selected fee type"}` : ""}
-            {` · ${filteredInvoices.length} invoice${filteredInvoices.length === 1 ? "" : "s"}`}
+            {requestedStatus ? ` · ${requestedStatus === "paid" ? "Fully paid" : requestedStatus === "partial" ? "Partially paid" : "Unpaid"} invoices` : ""}
           </p>
+          <p className="text-xs">Invoice reports include invoices issued or due during this period. Payment and reversal reports use their transaction dates.</p>
         </header>
+
+        <section className="grid gap-4 sm:grid-cols-3 print:grid-cols-3">
+          <SummaryCard label="Collected in period" value={`${currency} ${money(totalCollected)}`} />
+          <SummaryCard label="Fines collected" value={`${currency} ${money(totalFines)}`} />
+          <SummaryCard label="Outstanding balance on period invoices" value={`${currency} ${money(totalOutstanding)}`} />
+        </section>
+
+        <ReportTable
+          title="Payment report"
+          description={`Payments recorded ${from} through ${to} in ${school?.timezone ?? "UTC"} local time; up to 500 most recent entries.`}
+          empty="No payments were recorded during this date range."
+          headings={["Student", "Class / section", "Fee type", "Date", "Method", "Payment", "Reversed", "Fine", "Receipt"]}
+          hasRows={payments.length > 0}
+        >
+          {payments.map((payment) => (
+            <tr key={payment.publicId} className="border-t border-slate-100">
+              <td className="px-4 py-3">{payment.studentName} {payment.studentLastName}<span className="block text-xs text-slate-500">{payment.admissionNumber || "—"} · {payment.rollNumber || "—"}</span></td>
+              <td className="px-4 py-3">{payment.branchName} / {payment.className} / {payment.sectionName}</td>
+              <td className="px-4 py-3">{payment.feeTypeName}</td>
+              <td className="px-4 py-3">{formatFeeReportDate(payment.paidAt, school?.timezone ?? "UTC")}</td>
+              <td className="px-4 py-3 capitalize">{payment.paymentMethod.replace("_", " ")}</td>
+              <td className="px-4 py-3">{currency} {payment.amount}</td>
+              <td className="px-4 py-3">{currency} {payment.reversedAmount}</td>
+              <td className="px-4 py-3">{currency} {payment.fineAmount}</td>
+              <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${payment.publicId}`}>{payment.receiptNumber}</Link></td>
+            </tr>
+          ))}
+        </ReportTable>
+
+        <ReportTable
+          title="Reversals and refunds"
+          description={`Reversals recorded ${from} through ${to}; up to 500 most recent entries.`}
+          empty="No payment reversals or refunds were recorded during this date range."
+          headings={["Student", "Class / section", "Date", "Type", "Amount", "Reason", "Receipt"]}
+          hasRows={reversals.length > 0}
+        >
+          {reversals.map((reversal) => (
+            <tr key={reversal.publicId} className="border-t border-slate-100">
+              <td className="px-4 py-3">{reversal.studentName} {reversal.studentLastName}</td>
+              <td className="px-4 py-3">{reversal.branchName} / {reversal.className} / {reversal.sectionName}</td>
+              <td className="px-4 py-3">{formatFeeReportDate(reversal.createdAt, school?.timezone ?? "UTC")}</td>
+              <td className="px-4 py-3 capitalize">{reversal.reversalType}</td>
+              <td className="px-4 py-3">{currency} {reversal.amount}</td>
+              <td className="px-4 py-3">{reversal.reason}{reversal.reference ? ` · Ref ${reversal.reference}` : ""}</td>
+              <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${reversal.paymentPublicId}`}>{reversal.receiptNumber}</Link></td>
+            </tr>
+          ))}
+        </ReportTable>
+
         <ReportTable
           title="Invoice totals by fee type"
-          description="Totals for invoices due in the selected date range. Configured fee types with no matching invoices remain visible with zero totals."
+          description="Totals for invoices issued or due in the selected date range. Configured fee types with no matching invoices remain visible with zero totals."
           empty="No invoices match the selected filters."
           headings={["Fee type", "Invoices", "Amount due", "Amount paid", "Balance"]}
           hasRows={feeTypeSummary.length > 0}
@@ -615,8 +624,8 @@ export default async function FeeReportsPage({
         </ReportTable>
         <ReportTable
           title="Invoice payment status report"
-          description={`Invoices due ${from} through ${to}${requestedStatus ? ` with ${requestedStatus === "paid" ? "full payment" : requestedStatus === "partial" ? "partial payment" : "no payment"}` : " across all payment statuses"}; balance includes applicable late fines.`}
-          empty={`No ${requestedStatus ? `${requestedStatus} ` : ""}invoices are due in this date range.`}
+          description={`Invoices issued or due ${from} through ${to}${requestedStatus ? ` with ${requestedStatus === "paid" ? "full payment" : requestedStatus === "partial" ? "partial payment" : "no payment"}` : " across all payment statuses"}; balance includes applicable late fines.`}
+          empty={`No ${requestedStatus ? `${requestedStatus} ` : ""}invoices were issued or are due in this date range.`}
           headings={["Student", "Class / section", "Fee type", "Due date", "Paid", "Balance", "Status"]}
           hasRows={filteredInvoices.length > 0}
         >
