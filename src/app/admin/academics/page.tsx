@@ -93,7 +93,10 @@ export default async function AcademicStructurePage({
   const academicSearch = typeof requestedSearch === "string" ? requestedSearch.slice(0, 160) : "";
   const notice = requestedNotice === "class-deleted" ? "Class and its unused academic setup were permanently deleted." : null;
   const selectedSection = academicSections.find((section) => section.id === sectionId);
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
+  const canDeleteAcademic =
+    context.grantedPermissions.includes("academics.delete") ||
+    context.grantedPermissions.includes("school.settings.manage");
   const canManageEnrollments = context.grantedPermissions.includes("students.update");
   const canViewEnrollmentHistory =
     canManageEnrollments || context.grantedPermissions.includes("students.view");
@@ -731,9 +734,9 @@ export default async function AcademicStructurePage({
                       : "Not set",
                   },
                   editForm: <AcademicTermForm years={allYearOptions} record={term} />,
-                  deleteForm: (
+                  deleteForm: canDeleteAcademic ? (
                     <DeleteAcademicTermForm termId={term.id} termName={term.name} />
-                  ),
+                  ) : undefined,
                 }))}
               />
             )}
@@ -787,9 +790,9 @@ export default async function AcademicStructurePage({
                       record={classLevel}
                     />
                   ),
-                  deleteForm: (
+                  deleteForm: canDeleteAcademic ? (
                     <ClassLevelDeleteForm classLevelId={classLevel.id} />
-                  ),
+                  ) : undefined,
                 }))}
                 filters={branchFilters}
                 initialQuery={academicSearch}
@@ -864,12 +867,12 @@ export default async function AcademicStructurePage({
                       />
                     </div>
                   ),
-                  deleteForm: (
+                  deleteForm: canDeleteAcademic ? (
                     <form action={deleteClassSection}>
                       <input type="hidden" name="recordId" value={section.id} />
                       <AdminDeleteButton label="Delete class section" />
                     </form>
-                  ),
+                  ) : undefined,
                 }))}
                 filters={[
                   ...branchFilters,
@@ -920,12 +923,12 @@ export default async function AcademicStructurePage({
                       branchId: String(subject.branchId),
                     },
                     editForm: <SubjectForm branches={allBranchOptions} record={subject} />,
-                    deleteForm: (
+                    deleteForm: canDeleteAcademic ? (
                       <form action={deleteSubject}>
                         <input type="hidden" name="recordId" value={subject.id} />
                         <AdminDeleteButton label="Delete subject" />
                       </form>
-                    ),
+                    ) : undefined,
                   }))}
                   filters={branchFilters}
                 />
@@ -982,12 +985,12 @@ export default async function AcademicStructurePage({
                         />
                       </div>
                     ),
-                    deleteForm: (
+                    deleteForm: canDeleteAcademic ? (
                       <form action={deleteClassSubject}>
                         <input type="hidden" name="recordId" value={assignment.id} />
                         <AdminDeleteButton label="Remove class subject assignment" />
                       </form>
-                    ),
+                    ) : undefined,
                   }))}
                   filters={classSubjectFilters}
                 />
@@ -1043,12 +1046,12 @@ export default async function AcademicStructurePage({
                         />
                       </div>
                     ),
-                    deleteForm: (
+                    deleteForm: canDeleteAcademic ? (
                       <form action={deleteClassSubject}>
                         <input type="hidden" name="recordId" value={assignment.id} />
                         <AdminDeleteButton label="Remove optional subject assignment" />
                       </form>
-                    ),
+                    ) : undefined,
                   }))}
                 filters={classSubjectFilters}
               />
@@ -1090,6 +1093,7 @@ export default async function AcademicStructurePage({
               <ClassRoomList
                 branches={allBranchOptions}
                 filters={branchFilters}
+                canDelete={canDeleteAcademic}
                 toolbarActions={
                   <AdminActionDialog label="Add classroom" title="Add classroom">
                     <ClassRoomForm branches={branchOptions} />
@@ -1113,6 +1117,7 @@ export default async function AcademicStructurePage({
                 sections={sectionFilterOptions}
                 assignments={routineAssignmentOptions}
                 rooms={roomOptions}
+                canDelete={canDeleteAcademic}
                 routines={routines.map((routine) => ({
                   id: routine.id,
                   publicId: routine.publicId,

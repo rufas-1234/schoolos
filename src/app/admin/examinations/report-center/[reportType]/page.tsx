@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, inArray, isNotNull, lt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { PrintButton } from "@/components/print-button";
 import { db } from "@/db";
 import {
@@ -10,7 +10,6 @@ import {
   classLevels,
   classSections,
   classSubjects,
-  examAttendance,
   examClasses,
   examGradeBands,
   examGradingScales,
@@ -22,7 +21,6 @@ import {
   feePayments,
   schools,
   staffMembers,
-  studentAttendance,
   studentEnrollments,
   studentFeeInvoices,
   students,
@@ -135,7 +133,6 @@ function ProgressCard({
   exam,
   bands,
   position,
-  attendance,
   classRemark,
   principalRemark,
   showPercentages,
@@ -161,12 +158,10 @@ function ProgressCard({
     marks: Map<number, number | null>;
     overall: { totalMarks: number; maxMarks: number; percentage: number } | null;
     complete: boolean;
-    examAttendance: { present: number; absent: number; late: number; excused: number };
   };
   exam: { name: string; yearName: string; termName: string | null; allowRanking: boolean; assessments: ProgressAssessment[] };
   bands: GradeBand[];
   position: number | null;
-  attendance: { present: number; absent: number; late: number; excused: number; total: number };
   classRemark: string | null;
   principalRemark: string | null;
   showPercentages: boolean;
@@ -233,12 +228,6 @@ function ProgressCard({
             <p>Includes overdue fines and payments net of reversals.</p>
           </div>
         )}
-        <div className="rounded-lg border border-slate-200 p-3">
-          <h3 className="font-bold">Attendance</h3>
-          <p className="mt-1">Present {attendance.present} · Absent {attendance.absent}</p>
-          <p>Late {attendance.late} · Excused {attendance.excused} · Recorded {attendance.total}</p>
-          <p className="mt-1">Exam sittings present: {row.examAttendance.present}</p>
-        </div>
       </section>
       <section className="rounded-lg border border-slate-200 p-3 text-xs">
         <h3 className="font-bold">Comments</h3>
@@ -361,11 +350,7 @@ export default async function ExaminationReportPage({
     endDate: examinations.endDate,
     academicYearId: examinations.academicYearId,
     yearName: academicYears.name,
-    yearStart: academicYears.startDate,
-    yearEnd: academicYears.endDate,
     termName: academicTerms.name,
-    termStart: academicTerms.startDate,
-    termEnd: academicTerms.endDate,
     branchId: examinations.branchId,
     examTypeName: examTypes.name,
     averagePassing: examTypes.averagePassing,
@@ -505,7 +490,7 @@ export default async function ExaminationReportPage({
     : [];
   const sectionSummary = [...new Set(resultRows.map((row) => row.sectionName))].join(", ");
   const canViewPhotos = context.grantedPermissions.includes("students.view");
-  const [markRows, gradeRows, attendanceRows, remarksRows, dailyAttendanceRows] = resultRows.length && assessments.length
+  const [markRows, gradeRows, remarksRows] = resultRows.length && assessments.length
     ? await Promise.all([
       db.select({
         enrollmentId: examMarks.enrollmentId,
@@ -526,14 +511,6 @@ export default async function ExaminationReportPage({
       }).from(examGradeBands).where(eq(examGradeBands.gradingScaleId, examDetails!.scaleId))
         .orderBy(asc(examGradeBands.sortOrder)),
       db.select({
-        enrollmentId: examAttendance.enrollmentId,
-        status: examAttendance.status,
-      }).from(examAttendance).where(and(
-        eq(examAttendance.schoolId, context.schoolId),
-        inArray(examAttendance.enrollmentId, resultRows.map((row) => row.enrollmentId)),
-        inArray(examAttendance.examSubjectId, assessments.map((row) => row.id)),
-      )),
-      db.select({
         enrollmentId: examStudentRemarks.enrollmentId,
         remark: examStudentRemarks.classTeacherRemark,
       }).from(examStudentRemarks).where(and(
@@ -541,17 +518,8 @@ export default async function ExaminationReportPage({
         eq(examStudentRemarks.examClassId, examClass!.id),
         inArray(examStudentRemarks.enrollmentId, resultRows.map((row) => row.enrollmentId)),
       )),
-      db.select({
-        enrollmentId: studentAttendance.enrollmentId,
-        status: studentAttendance.status,
-      }).from(studentAttendance).where(and(
-        eq(studentAttendance.schoolId, context.schoolId),
-        inArray(studentAttendance.enrollmentId, resultRows.map((row) => row.enrollmentId)),
-        gte(studentAttendance.attendanceDate, examDetails!.termStart ?? examDetails!.yearStart),
-        lte(studentAttendance.attendanceDate, examDetails!.termEnd ?? examDetails!.yearEnd),
-      )),
     ])
-    : [[], [], [], [], []];
+    : [[], [], []];
   const bands = gradeBands(gradeRows);
   const marksByEnrollment = new Map<number, Map<number, number | null>>();
   const teacherRemarksByMark = new Map<string, string | null>();
@@ -562,22 +530,6 @@ export default async function ExaminationReportPage({
     teacherRemarksByMark.set(`${mark.enrollmentId}:${mark.examSubjectId}`, mark.teacherRemark);
   }
   const classRemarkByEnrollment = new Map(remarksRows.map((row) => [row.enrollmentId, row.remark]));
-  const attendanceByEnrollment = new Map<number, { present: number; absent: number; late: number; excused: number; total: number }>();
-  for (const entry of dailyAttendanceRows) {
-    const counts = attendanceByEnrollment.get(entry.enrollmentId) ?? { present: 0, absent: 0, late: 0, excused: 0, total: 0 };
-    if (entry.status === "present") counts.present += 1;
-    else if (entry.status === "absent") counts.absent += 1;
-    else if (entry.status === "late") counts.late += 1;
-    else if (entry.status === "excused") counts.excused += 1;
-    counts.total += 1;
-    attendanceByEnrollment.set(entry.enrollmentId, counts);
-  }
-  const examAttendanceByEnrollment = new Map<number, { present: number; absent: number; late: number; excused: number }>();
-  for (const entry of attendanceRows) {
-    const counts = examAttendanceByEnrollment.get(entry.enrollmentId) ?? { present: 0, absent: 0, late: 0, excused: 0 };
-    if (entry.status in counts) counts[entry.status as keyof typeof counts] += 1;
-    examAttendanceByEnrollment.set(entry.enrollmentId, counts);
-  }
   const results = resultRows.map((row) => {
     const marks = marksByEnrollment.get(row.enrollmentId) ?? new Map<number, number | null>();
     const complete = assessments.every((assessment) => typeof marks.get(assessment.id) === "number");
@@ -605,8 +557,6 @@ export default async function ExaminationReportPage({
       complete,
       grade: overall ? gradeForPercentage(overall.percentage, bands) : null,
       classRemark: classRemarkByEnrollment.get(row.enrollmentId) ?? null,
-      attendance: attendanceByEnrollment.get(row.enrollmentId) ?? { present: 0, absent: 0, late: 0, excused: 0, total: 0 },
-      examAttendance: examAttendanceByEnrollment.get(row.enrollmentId) ?? { present: 0, absent: 0, late: 0, excused: 0 },
     };
   });
   const ranking = examDetails?.allowRanking
@@ -615,7 +565,8 @@ export default async function ExaminationReportPage({
   const activeResult = results.find((row) => row.enrollmentId === requestedEnrollmentId) ?? null;
   const reportIsReady = !!examDetails && examDetails.status === "published";
   const canPrintBulkCards = reportType === "progress-card" || reportType === "progress-card-100-percent";
-  const showFeeBalance = context.grantedPermissions.includes("payments.record") ||
+  const showFeeBalance = context.grantedPermissions.includes("fees.balance.view") ||
+    context.grantedPermissions.includes("payments.record") ||
     context.grantedPermissions.includes("fees.manage");
   const feeBalanceByStudent = new Map<number, number>();
   if (showFeeBalance && canPrintBulkCards && results.length && examDetails) {
@@ -927,7 +878,6 @@ export default async function ExaminationReportPage({
                       exam={{ name: examDetails.name, yearName: examDetails.yearName, termName: examDetails.termName, allowRanking: examDetails.allowRanking, assessments }}
                       bands={bands}
                       position={ranking.get(activeResult.enrollmentId) ?? null}
-                      attendance={activeResult.attendance}
                       classRemark={activeResult.classRemark}
                       principalRemark={examClass.principalRemark}
                       showPercentages={reportType === "progress-card-100-percent"}
@@ -949,7 +899,6 @@ export default async function ExaminationReportPage({
                         exam={{ name: examDetails.name, yearName: examDetails.yearName, termName: examDetails.termName, allowRanking: examDetails.allowRanking, assessments }}
                         bands={bands}
                         position={ranking.get(row.enrollmentId) ?? null}
-                        attendance={row.attendance}
                         classRemark={row.classRemark}
                         principalRemark={examClass.principalRemark}
                         showPercentages={reportType === "progress-card-100-percent"}

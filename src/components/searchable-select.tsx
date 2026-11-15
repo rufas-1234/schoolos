@@ -44,9 +44,10 @@ export function SearchableSelect({
   const selectedOption = options.find((option) => option.value === selectedValue);
   const [query, setQuery] = useState(selectedOption?.label ?? "");
   const [open, setOpen] = useState(false);
+  const [showAllOptions, setShowAllOptions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const filterQuery = open && selectedValue && query === selectedOption?.label ? "" : query;
+  const filterQuery = showAllOptions || (open && selectedValue && query === selectedOption?.label) ? "" : query;
   const filteredOptions = options
     .filter((option) => option.label.toLocaleLowerCase().includes(filterQuery.trim().toLocaleLowerCase()))
     .slice(0, 40);
@@ -55,6 +56,7 @@ export function SearchableSelect({
     setSelectedValue(option.value);
     setQuery(option.label);
     setOpen(false);
+    setShowAllOptions(false);
     setActiveIndex(-1);
     onValueChange?.(option.value);
     if (autoSubmit) {
@@ -104,6 +106,7 @@ export function SearchableSelect({
         onFocus={(event) => {
           if (disabled) return;
           setOpen(true);
+          setShowAllOptions(true);
           if (selectedValue) event.currentTarget.select();
         }}
         onBlur={() => setOpen(false)}
@@ -111,6 +114,7 @@ export function SearchableSelect({
         onChange={(event) => {
           setQuery(event.target.value);
           setSelectedValue("");
+          setShowAllOptions(false);
           setActiveIndex(-1);
           setOpen(true);
           onValueChange?.("");
@@ -125,6 +129,8 @@ export function SearchableSelect({
         onPointerDown={(event) => event.preventDefault()}
         onClick={() => {
           setOpen((value) => !value);
+          setShowAllOptions(true);
+          setActiveIndex(-1);
           inputRef.current?.focus();
         }}
         className="absolute right-2 top-8 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-50"

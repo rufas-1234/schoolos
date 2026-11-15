@@ -80,7 +80,7 @@ export async function setAcademicYearStatus(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const result = z
     .object({
       academicYearId: idField,
@@ -207,7 +207,7 @@ export async function createSchoolBranch(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid branch." };
   const result = branchSchema.safeParse({
@@ -278,7 +278,7 @@ export async function createSchoolBranch(
 }
 
 export async function setSchoolBranchStatus(formData: FormData): Promise<void> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const result = z
     .object({
       branchId: idField,
@@ -369,7 +369,7 @@ export async function createClassRoom(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid classroom." };
   const result = classRoomSchema.safeParse({
@@ -479,7 +479,7 @@ export async function createClassRoutine(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid class routine." };
   const result = classRoutineSchema.safeParse({
@@ -672,7 +672,7 @@ export async function createClassRoutine(
 }
 
 export async function deleteClassRoutine(formData: FormData): Promise<void> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.delete", "school.settings.manage"]);
   const result = z.object({ publicId: z.string().uuid() }).safeParse({
     publicId: readFormValue(formData, "publicId"),
   });
@@ -708,7 +708,7 @@ export async function deleteClassRoutine(formData: FormData): Promise<void> {
 }
 
 export async function deleteClassRoom(formData: FormData): Promise<void> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.delete", "school.settings.manage"]);
   const result = z.object({ publicId: z.string().uuid() }).safeParse({
     publicId: readFormValue(formData, "publicId"),
   });
@@ -764,7 +764,7 @@ export async function createAcademicHoliday(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid school holiday." };
   const result = holidaySchema.safeParse({
@@ -884,7 +884,7 @@ export async function updateSectionAssignment(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const result = sectionAssignmentSchema.safeParse({
     sectionId: readFormValue(formData, "sectionId"),
     capacity: readFormValue(formData, "capacity"),
@@ -966,7 +966,7 @@ export async function setClassLevelStatus(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const classLevelId = idField.safeParse(readFormValue(formData, "classLevelId"));
   const status = z.enum(["active", "archived"]).safeParse(readFormValue(formData, "status"));
   if (!classLevelId.success || !status.success) {
@@ -1028,7 +1028,7 @@ export async function updateSubjectTeacher(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const result = subjectTeacherSchema.safeParse({
     assignmentId: readFormValue(formData, "assignmentId"),
     teacherId: readFormValue(formData, "teacherId"),

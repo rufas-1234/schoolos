@@ -79,6 +79,7 @@ export default async function ExaminationsPage({
     sms: "Send Marks By SMS",
   } as const;
   const canConfigure = context.grantedPermissions.includes("examinations.create");
+  const canDeleteExaminations = context.grantedPermissions.includes("examinations.delete");
   const today = new Date().toISOString().slice(0, 10);
   const [years, terms, branches, classes, scales, examTypesList] = await Promise.all([
     canConfigure
@@ -586,7 +587,9 @@ export default async function ExaminationsPage({
                         <Link className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" href={`/admin/examinations/${exam.id}`}>View</Link>
                         {canConfigure && <>
                           {canEdit && <Link className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-50" href={`/admin/examinations?section=setup&editExam=${exam.id}`}>Edit</Link>}
-                          <DeleteExaminationForm examinationId={exam.id} examinationName={exam.name} disabled={!canDelete} />
+                          {canDeleteExaminations && (
+                            <DeleteExaminationForm examinationId={exam.id} examinationName={exam.name} disabled={!canDelete} />
+                          )}
                         </>}
                       </div>
                     </td>

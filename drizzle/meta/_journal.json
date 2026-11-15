@@ -232,6 +232,27 @@
       "when": 1794778200000,
       "tag": "0032_teacher_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1794784800000,
+      "tag": "0033_teacher_academic_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1794786000000,
+      "tag": "0034_restrict_teacher_destructive_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1794787200000,
+      "tag": "0035_report_card_fee_balance",
+      "breakpoints": true
     }
   ]
 }

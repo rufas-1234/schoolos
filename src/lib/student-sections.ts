@@ -34,7 +34,8 @@ export const studentSections = [
     href: "/admin/academics?section=attendance",
     matchPath: "/admin/academics",
     matchQuery: { key: "section", value: "attendance" },
-    permission: "school.settings.manage",
+    permission: "academics.manage",
+    permissionAlternatives: ["school.settings.manage", "students.update"],
   },
   {
     id: "group",

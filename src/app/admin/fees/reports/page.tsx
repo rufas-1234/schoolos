@@ -20,13 +20,14 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { isCalendarDate } from "@/lib/academic-policy";
 import {
   calculateFineMinorUnits,
   feeDisplayName,
+  formatFeeReportDate,
   feePaymentDateRangeInTimezone,
   feeInvoiceStatus,
   parseMoneyToMinorUnits,
+  resolveFeeReportDateRange,
 } from "@/lib/fees-policy";
 
 type SearchParams = {
@@ -103,13 +104,11 @@ export default async function FeeReportsPage({
       .orderBy(asc(feeTypes.name)),
   ]);
   const today = todayInTimezone(school?.timezone ?? "UTC");
-  const firstDay = `${today.slice(0, 7)}-01`;
-  const requestedFrom = typeof params.from === "string" && isCalendarDate(params.from) ? params.from : firstDay;
-  const requestedTo = typeof params.to === "string" && isCalendarDate(params.to) && params.to >= requestedFrom
-    ? params.to
-    : today;
-  const from = requestedFrom <= today ? requestedFrom : today;
-  const to = requestedTo <= today ? requestedTo : today;
+  const { from, to } = resolveFeeReportDateRange(
+    typeof params.from === "string" ? params.from : undefined,
+    typeof params.to === "string" ? params.to : undefined,
+    today,
+  );
   const requestedBranch = typeof params.branchId === "string" && /^\d+$/.test(params.branchId)
     ? Number(params.branchId)
     : null;
@@ -223,6 +222,7 @@ export default async function FeeReportsPage({
       .limit(500),
     db.select({
       id: studentFeeInvoices.id,
+      feeTypeId: feeTypes.id,
       amount: studentFeeInvoices.amount,
       discountAmount: studentFeeInvoices.discountAmount,
       fineType: studentFeeInvoices.fineType,
@@ -473,17 +473,31 @@ export default async function FeeReportsPage({
     !requestedStatus || invoice.status === requestedStatus
   );
   const outstandingInvoices = invoicesWithStatus.filter((invoice) => invoice.balance > 0);
-  const feeTypeRows = filteredInvoices.reduce((groups, invoice) => {
-    const row = groups.get(invoice.feeTypeName) ?? { count: 0, due: 0, paid: 0, balance: 0 };
+  const feeTypeRows = new Map(
+    feeTypesList
+      .filter((feeType) => requestedFeeTypeId === null || feeType.id === requestedFeeTypeId)
+      .map((feeType): [number, { name: string; count: number; due: number; paid: number; balance: number }] => [
+        feeType.id,
+        { name: feeType.name, count: 0, due: 0, paid: 0, balance: 0 },
+      ]),
+  );
+  filteredInvoices.reduce((groups, invoice) => {
+    const row = groups.get(invoice.feeTypeId) ?? {
+      name: invoice.feeTypeName,
+      count: 0,
+      due: 0,
+      paid: 0,
+      balance: 0,
+    };
     row.count += 1;
     row.due += invoice.amountDue;
     row.paid += invoice.paid;
     row.balance += invoice.balance;
-    groups.set(invoice.feeTypeName, row);
+    groups.set(invoice.feeTypeId, row);
     return groups;
-  }, new Map<string, { count: number; due: number; paid: number; balance: number }>());
-  const feeTypeSummary = [...feeTypeRows.entries()].sort(([first], [second]) =>
-    first.localeCompare(second)
+  }, feeTypeRows);
+  const feeTypeSummary = [...feeTypeRows.entries()].sort(([, first], [, second]) =>
+    first.name.localeCompare(second.name)
   );
   const totalCollected =
     (parseMoneyToMinorUnits(paymentTotals?.amount ?? "0") ?? 0) -
@@ -528,7 +542,7 @@ export default async function FeeReportsPage({
 
       <ReportTable
         title="Payment report"
-        description={`Payments recorded ${from} through ${to}; up to 500 most recent entries.`}
+        description={`Payments recorded ${from} through ${to} in ${school?.timezone ?? "UTC"} local time; up to 500 most recent entries.`}
         empty="No payments were recorded during this date range."
         headings={["Student", "Class / section", "Fee type", "Date", "Method", "Payment", "Reversed", "Fine", "Receipt"]}
         hasRows={payments.length > 0}
@@ -538,7 +552,7 @@ export default async function FeeReportsPage({
             <td className="px-4 py-3">{payment.studentName} {payment.studentLastName}<span className="block text-xs text-slate-500">{payment.admissionNumber || "—"} · {payment.rollNumber || "—"}</span></td>
             <td className="px-4 py-3">{payment.branchName} / {payment.className} / {payment.sectionName}</td>
             <td className="px-4 py-3">{payment.feeTypeName}</td>
-            <td className="px-4 py-3">{payment.paidAt.toISOString().slice(0, 10)}</td>
+            <td className="px-4 py-3">{formatFeeReportDate(payment.paidAt, school?.timezone ?? "UTC")}</td>
             <td className="px-4 py-3 capitalize">{payment.paymentMethod.replace("_", " ")}</td>
             <td className="px-4 py-3">{currency} {payment.amount}</td>
             <td className="px-4 py-3">{currency} {payment.reversedAmount}</td>
@@ -559,7 +573,7 @@ export default async function FeeReportsPage({
           <tr key={reversal.publicId} className="border-t border-slate-100">
             <td className="px-4 py-3">{reversal.studentName} {reversal.studentLastName}</td>
             <td className="px-4 py-3">{reversal.branchName} / {reversal.className} / {reversal.sectionName}</td>
-            <td className="px-4 py-3">{reversal.createdAt.toISOString().slice(0, 10)}</td>
+            <td className="px-4 py-3">{formatFeeReportDate(reversal.createdAt, school?.timezone ?? "UTC")}</td>
             <td className="px-4 py-3 capitalize">{reversal.reversalType}</td>
             <td className="px-4 py-3">{currency} {reversal.amount}</td>
             <td className="px-4 py-3">{reversal.reason}{reversal.reference ? ` · Ref ${reversal.reference}` : ""}</td>
@@ -584,14 +598,14 @@ export default async function FeeReportsPage({
         </header>
         <ReportTable
           title="Invoice totals by fee type"
-          description="Totals for invoices matching the current date, branch, class, section and payment-status filters."
+          description="Totals for invoices due in the selected date range. Configured fee types with no matching invoices remain visible with zero totals."
           empty="No invoices match the selected filters."
           headings={["Fee type", "Invoices", "Amount due", "Amount paid", "Balance"]}
           hasRows={feeTypeSummary.length > 0}
         >
-          {feeTypeSummary.map(([feeType, totals]) => (
-            <tr key={feeType} className="border-t border-slate-100">
-              <td className="px-4 py-3 font-medium">{feeType}</td>
+          {feeTypeSummary.map(([feeTypeId, totals]) => (
+            <tr key={feeTypeId} className="border-t border-slate-100">
+              <td className="px-4 py-3 font-medium">{totals.name}</td>
               <td className="px-4 py-3">{totals.count}</td>
               <td className="px-4 py-3">{currency} {money(totals.due)}</td>
               <td className="px-4 py-3">{currency} {money(totals.paid)}</td>

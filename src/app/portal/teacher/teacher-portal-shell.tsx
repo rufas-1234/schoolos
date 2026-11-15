@@ -48,12 +48,6 @@ export function TeacherPortalShell({
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm font-medium text-slate-700 sm:inline">{teacherName}</span>
-            <Link
-              href="/admin/examinations?section=marks"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              School workspace
-            </Link>
             <button
               type="button"
               onClick={signOut}
@@ -64,6 +58,24 @@ export function TeacherPortalShell({
             </button>
           </div>
         </div>
+        <nav aria-label="Teacher workspace" className="border-t border-slate-100">
+          <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 py-3">
+            {[
+              { href: "/admin/academics?section=years", label: "Manage academics" },
+              { href: "/admin/students", label: "Student info" },
+              { href: "/admin/examinations?section=setup", label: "Examinations" },
+              { href: "/admin/examinations?section=marks", label: "Enter marks" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
         {signOutError && (
           <p role="alert" className="mx-auto max-w-7xl px-5 pb-3 text-sm text-rose-700">
             {signOutError}

@@ -424,6 +424,12 @@ h6 {
     visibility: visible !important;
   }
 
+  body.print-target-active:has(.exam-report-document) .admin-print-header,
+  body.print-target-active:has(.exam-report-document) .admin-print-footer {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   .admin-shell-content {
     padding-left: 0 !important;
   }
@@ -500,6 +506,32 @@ h6 {
 
   .exam-report-document .a4-report-card {
     border: 1px solid #111 !important;
+    padding: 4mm !important;
+    font-size: 8pt !important;
+  }
+
+  .exam-report-document .a4-report-card > * {
+    margin-top: 2mm !important;
+  }
+
+  .exam-report-document .a4-report-card > :first-child {
+    margin-top: 0 !important;
+  }
+
+  .exam-report-document .a4-report-card .print-report-heading {
+    margin-bottom: 2mm;
+    padding-bottom: 2mm;
+  }
+
+  .exam-report-document .a4-report-card .print-report-heading h2 {
+    font-size: 14pt;
+  }
+
+  .exam-report-document .a4-report-card .print-report-content th,
+  .exam-report-document .a4-report-card .print-report-content td,
+  .exam-report-document .a4-report-card th,
+  .exam-report-document .a4-report-card td {
+    padding: 1mm 1.5mm !important;
   }
 
   .print-report-page > :not(.print-report-content) {

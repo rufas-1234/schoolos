@@ -356,6 +356,7 @@ export function ClassRoomList({
   branches,
   filters,
   toolbarActions,
+  canDelete,
 }: {
   rooms: {
     id: number;
@@ -369,6 +370,7 @@ export function ClassRoomList({
   branches: Option[];
   filters: AdminTableFilter[];
   toolbarActions?: ReactNode;
+  canDelete: boolean;
 }) {
   return (
     <AdminDataTable
@@ -396,10 +398,12 @@ export function ClassRoomList({
             <AdminRecordDialog title={`Edit room ${room.roomNumber}`}>
               <ClassRoomForm branches={branches} record={room} />
             </AdminRecordDialog>
-            <form action={deleteClassRoom}>
-              <input type="hidden" name="publicId" value={room.publicId} />
-              <AdminDeleteButton label="Delete classroom" />
-            </form>
+            {canDelete && (
+              <form action={deleteClassRoom}>
+                <input type="hidden" name="publicId" value={room.publicId} />
+                <AdminDeleteButton label="Delete classroom" />
+              </form>
+            )}
           </div>,
       }))}
     />
@@ -413,6 +417,7 @@ export function ClassRoutineList({
   assignments,
   rooms,
   routines,
+  canDelete,
 }: {
   branches: Option[];
   classes: { id: number; branchId: number; label: string }[];
@@ -438,6 +443,7 @@ export function ClassRoutineList({
     teacherName: string;
     roomNumber: string;
   }[];
+  canDelete: boolean;
 }) {
   const [branchId, setBranchId] = useState("");
   const [classLevelId, setClassLevelId] = useState("");
@@ -611,10 +617,12 @@ export function ClassRoutineList({
                                       record={routine}
                                     />
                                   </AdminRecordDialog>
-                                  <form action={deleteClassRoutine}>
-                                    <input type="hidden" name="publicId" value={routine.publicId} />
-                                    <AdminDeleteButton label={`Delete ${routine.subjectName} routine`} />
-                                  </form>
+                                  {canDelete && (
+                                    <form action={deleteClassRoutine}>
+                                      <input type="hidden" name="publicId" value={routine.publicId} />
+                                      <AdminDeleteButton label={`Delete ${routine.subjectName} routine`} />
+                                    </form>
+                                  )}
                                 </div>
                               </div>
                             ) : (

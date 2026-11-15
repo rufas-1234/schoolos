@@ -52,7 +52,8 @@ const navigation: NavigationItem[] = [
     href: "/admin/academics",
     label: "Academics",
     icon: CalendarDays,
-    permission: "school.settings.manage",
+    permission: "academics.manage",
+    permissionAlternatives: ["school.settings.manage"],
     children: academicSections.map((section) => ({
       id: section.id,
       label: section.label,
@@ -187,10 +188,10 @@ export function AdminShell({
         ? "/admin/settings/roles"
       : permissions.includes("school.settings.manage")
         ? "/admin/settings"
-      : permissions.includes("examinations.create") || permissions.includes("results.publish")
-        ? "/admin/examinations"
       : permissions.includes("results.enter")
         ? "/portal/teacher"
+      : permissions.includes("examinations.create") || permissions.includes("results.publish")
+        ? "/admin/examinations"
       : permissions.includes("staff.manage")
         ? "/admin/hr"
       : permissions.includes("fees.manage") || permissions.includes("payments.record")

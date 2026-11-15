@@ -37,7 +37,7 @@ export default async function ClassRoutinePrintPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const sectionId = parseSectionId((await searchParams).sectionId);
   if (!sectionId) notFound();
 

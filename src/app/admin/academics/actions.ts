@@ -144,7 +144,7 @@ export async function createAcademicYear(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid academic year." };
   const result = academicYearSchema.safeParse({
@@ -255,7 +255,7 @@ export async function createAcademicTerm(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid academic term." };
   const result = termSchema.safeParse({
@@ -423,7 +423,7 @@ export async function deleteAcademicTerm(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.delete", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === null || recordId === undefined) {
     return { error: "Choose a valid academic term to delete." };
@@ -477,7 +477,7 @@ export async function createClassLevel(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid class." };
   const result = classLevelSchema.safeParse({
@@ -687,7 +687,7 @@ export async function createClassSection(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid class section." };
   const result = classSectionSchema.safeParse({
@@ -836,7 +836,7 @@ export async function createClassSections(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const result = classSectionsSchema.safeParse({
     academicYearId: readFormValue(formData, "academicYearId"),
     classLevelId: readFormValue(formData, "classLevelId"),
@@ -920,7 +920,7 @@ export async function createSubject(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid subject." };
   const result = subjectSchema.safeParse({
@@ -1013,7 +1013,7 @@ export async function assignSubjectToClass(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === undefined) return { error: "Invalid class-subject assignment." };
   const result = classSubjectSchema.safeParse({
@@ -1123,7 +1123,7 @@ export async function deleteClassLevel(
   _previousState: AcademicActionState,
   formData: FormData,
 ): Promise<AcademicActionState> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.delete", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === null || recordId === undefined) return { error: "Invalid class deletion request." };
 
@@ -1230,7 +1230,7 @@ export async function deleteClassLevel(
 }
 
 export async function deleteSubject(formData: FormData): Promise<void> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.delete", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === null || recordId === undefined) throw new Error("Invalid subject deletion request.");
 
@@ -1264,7 +1264,7 @@ export async function deleteSubject(formData: FormData): Promise<void> {
 }
 
 export async function deleteClassSubject(formData: FormData): Promise<void> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.delete", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === null || recordId === undefined) {
     throw new Error("Invalid class-subject deletion request.");
@@ -1309,7 +1309,7 @@ export async function deleteClassSubject(formData: FormData): Promise<void> {
 }
 
 export async function deleteClassSection(formData: FormData): Promise<void> {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.delete", "school.settings.manage"]);
   const recordId = readRecordId(formData);
   if (recordId === null || recordId === undefined) {
     throw new Error("Invalid class-section deletion request.");

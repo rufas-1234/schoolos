@@ -240,6 +240,13 @@ export default async function TeacherPortalPage() {
               <SummaryCard icon={ClipboardCheck} label="Active exam assessments" value={assessments.length} />
             </section>
 
+            <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
+              <h2 className="font-semibold text-slate-950">Your school access</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                You can manage academic setup, student records, attendance, and examinations. Deleting academic or student records and publishing results remain restricted to authorized administrators.
+              </p>
+            </section>
+
             <section id="classes" className="space-y-4">
               <SectionHeading title="My classes" description="Assignments are shown by the actual class section." />
               {uniqueAssignments.length ? (

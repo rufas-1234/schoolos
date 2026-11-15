@@ -816,7 +816,7 @@ export async function deleteExamination(
   _previousState: ExaminationActionState,
   formData: FormData,
 ): Promise<ExaminationActionState> {
-  const context = await requireSchoolPermission("examinations.create");
+  const context = await requireSchoolPermission("examinations.delete");
   const parsedId = idField.safeParse(value(formData, "examinationId"));
   if (!parsedId.success) return { error: "Choose a valid examination to delete." };
   const outcome = await db.transaction(async (tx) => {

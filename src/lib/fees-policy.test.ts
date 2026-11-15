@@ -6,8 +6,10 @@ import {
   feeDisplayName,
   feePaymentDateRangeInTimezone,
   feeInvoiceStatus,
+  formatFeeReportDate,
   isPayDateOnOrAfterDueDate,
   parseMoneyToMinorUnits,
+  resolveFeeReportDateRange,
 } from "./fees-policy";
 
 describe("fees policies", () => {
@@ -93,5 +95,21 @@ describe("fees policies", () => {
     expect(range?.start.toISOString()).toBe("2026-03-08T08:00:00.000Z");
     expect(range?.endExclusive.toISOString()).toBe("2026-03-09T07:00:00.000Z");
     expect(feePaymentDateRangeInTimezone("2026-04-02", "2026-04-01", "UTC")).toBeNull();
+  });
+
+  it("preserves selected fee-report dates, including future due-date ranges", () => {
+    expect(resolveFeeReportDateRange("2026-12-01", "2026-12-31", "2026-11-16"))
+      .toEqual({ from: "2026-12-01", to: "2026-12-31" });
+    expect(resolveFeeReportDateRange("2026-11-20", "2026-11-10", "2026-11-16"))
+      .toEqual({ from: "2026-11-10", to: "2026-11-20" });
+    expect(resolveFeeReportDateRange("invalid", undefined, "2026-11-16"))
+      .toEqual({ from: "2026-11-01", to: "2026-11-16" });
+  });
+
+  it("formats payment dates in the school's timezone", () => {
+    expect(formatFeeReportDate(new Date("2026-03-08T07:30:00.000Z"), "America/Los_Angeles"))
+      .toBe("2026-03-07");
+    expect(formatFeeReportDate(new Date("2026-03-08T07:30:00.000Z"), "UTC"))
+      .toBe("2026-03-08");
   });
 });

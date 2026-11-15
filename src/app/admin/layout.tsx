@@ -13,14 +13,19 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const context = await requireSchoolPermission([
     "dashboard.view",
     "school.settings.manage",
+    "academics.manage",
+    "academics.delete",
     "staff.manage",
     "roles.manage",
     "fees.manage",
     "payments.record",
     "examinations.create",
+    "examinations.delete",
     "results.enter",
     "results.publish",
     "students.view",
+    "students.create",
+    "students.update",
   ]);
   return (
     <AdminShell

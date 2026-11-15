@@ -127,23 +127,11 @@ export async function updateSchoolRole(
     const outcome = await db.transaction(async (tx) => {
       const [existing] = await tx.select({
         id: roles.id,
-        isSystem: roles.isSystem,
       }).from(roles).where(and(
         eq(roles.id, parsed.data.id),
         eq(roles.schoolId, context.schoolId),
       )).for("update").limit(1);
       if (!existing) return "not-found";
-      if (existing.isSystem) {
-        const [assignment] = await tx.select({ membershipId: userRoles.membershipId })
-          .from(userRoles)
-          .innerJoin(schoolMemberships, eq(userRoles.membershipId, schoolMemberships.id))
-          .where(and(
-            eq(userRoles.roleId, existing.id),
-            eq(schoolMemberships.schoolId, context.schoolId),
-          ))
-          .limit(1);
-        if (assignment) return "system-role-assigned";
-      }
 
       const assignedToCurrentUser = await tx.select({ roleId: userRoles.roleId })
         .from(userRoles)
@@ -193,9 +181,6 @@ export async function updateSchoolRole(
       return "updated";
     });
     if (outcome === "not-found") return { error: "That role was not found in this school." };
-    if (outcome === "system-role-assigned") {
-      return { error: "Unassign this system role from all accounts before editing it." };
-    }
     if (outcome === "cannot-remove-own-access") {
       return { error: "Keep the role-management permission on this role or another role assigned to you." };
     }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   academicTerms,
@@ -19,7 +19,6 @@ import {
   feePayments,
   schools,
   staffMembers,
-  studentAttendance,
   studentEnrollments,
   studentFeeInvoices,
   students,
@@ -76,11 +75,7 @@ export default async function ReportCardPage({
     scaleName: examGradingScales.name,
     allowRanking: examGradingScales.allowRanking,
     yearName: academicYears.name,
-    yearStart: academicYears.startDate,
-    yearEnd: academicYears.endDate,
     termName: academicTerms.name,
-    termStart: academicTerms.startDate,
-    termEnd: academicTerms.endDate,
     examClassId: examClasses.id,
     classLevelId: classLevels.id,
     className: classLevels.name,
@@ -140,7 +135,8 @@ export default async function ReportCardPage({
   });
   if (record.examinationStatus !== "published" && !draftPreview) notFound();
 
-  const canViewFeeBalance = context.grantedPermissions.includes("payments.record") ||
+  const canViewFeeBalance = context.grantedPermissions.includes("fees.balance.view") ||
+    context.grantedPermissions.includes("payments.record") ||
     context.grantedPermissions.includes("fees.manage");
   let feeBalanceMinor = 0;
   if (canViewFeeBalance) {
@@ -306,18 +302,6 @@ export default async function ReportCardPage({
     classRank = rankScores(scored).get(record.enrollmentId) ?? null;
     classSize = scored.length;
   }
-  const attendanceStart = record.termStart ?? record.yearStart;
-  const attendanceEnd = record.termEnd ?? record.yearEnd;
-  const attendance = await db.select({
-    status: studentAttendance.status,
-  }).from(studentAttendance).where(and(
-    eq(studentAttendance.schoolId, context.schoolId),
-    eq(studentAttendance.enrollmentId, record.enrollmentId),
-    gte(studentAttendance.attendanceDate, attendanceStart),
-    lte(studentAttendance.attendanceDate, attendanceEnd),
-  ));
-  const attendanceCounts = new Map<string, number>();
-  for (const item of attendance) attendanceCounts.set(item.status, (attendanceCounts.get(item.status) ?? 0) + 1);
   const [classRemark] = await db.select({
     remark: examStudentRemarks.classTeacherRemark,
   }).from(examStudentRemarks).where(and(
@@ -391,18 +375,8 @@ export default async function ReportCardPage({
           </table>
         </section>
         <section className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border p-4">
-            <h3 className="font-bold">Attendance summary</h3>
-            <p className="mt-1 text-xs text-slate-500">{attendanceStart} through {attendanceEnd}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {["present", "late", "absent", "excused"].map((status) => <span key={status} className="rounded-lg bg-slate-50 px-3 py-2 text-sm capitalize">{status}: {attendanceCounts.get(status) ?? 0}</span>)}
-              <span className="rounded-lg bg-slate-50 px-3 py-2 text-sm">Recorded: {attendance.length}</span>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classRemark?.remark || (overallGrade?.performanceRemark ? `Suggested from grade ${overallGrade.grade}: ${overallGrade.performanceRemark}` : "—")}</p></div>
-            <div className="rounded-xl border p-4"><h3 className="font-bold">Principal&apos;s remarks</h3><p className="mt-2 text-sm">{record.principalRemark ?? "—"}</p></div>
-          </div>
+          <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classRemark?.remark || (overallGrade?.performanceRemark ? `Suggested from grade ${overallGrade.grade}: ${overallGrade.performanceRemark}` : "—")}</p></div>
+          <div className="rounded-xl border p-4"><h3 className="font-bold">Principal&apos;s remarks</h3><p className="mt-2 text-sm">{record.principalRemark ?? "—"}</p></div>
         </section>
         <section className="grid grid-cols-3 gap-3 pt-4 text-center text-xs">
           {["Parent / Guardian", "Class Teacher", "Principal"].map((label) => (

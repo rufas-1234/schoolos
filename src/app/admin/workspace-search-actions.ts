@@ -22,8 +22,11 @@ import { getFuzzySearchNgrams, rankWorkspaceSearchResults } from "@/lib/workspac
 const querySchema = z.string().trim().min(2).max(120);
 const workspacePermissions = [
   "students.view",
+  "students.create",
+  "students.update",
   "staff.manage",
   "school.settings.manage",
+  "academics.manage",
   "examinations.create",
   "results.enter",
   "results.publish",
@@ -66,7 +69,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
 
   const query = parsed.data;
   const permissions = new Set(context.grantedPermissions);
-  const canManageAcademics = permissions.has("school.settings.manage");
+  const canManageAcademics = permissions.has("academics.manage") || permissions.has("school.settings.manage");
   const canViewStudents = permissions.has("students.view");
   const canManageStaff = permissions.has("school.settings.manage") || permissions.has("staff.manage");
   const canManageExaminations = permissions.has("school.settings.manage") ||

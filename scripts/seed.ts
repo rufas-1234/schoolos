@@ -19,6 +19,8 @@ import {
 const permissionCatalog = [
   ["dashboard.view", "View the school dashboard"],
   ["school.settings.manage", "Manage school profile and settings"],
+  ["academics.manage", "Manage academic setup, attendance, and enrollment without deleting records"],
+  ["academics.delete", "Delete academic setup and records"],
   ["users.manage", "Manage school user accounts"],
   ["roles.manage", "Manage roles and permission assignments"],
   ["students.view", "View student records"],
@@ -28,10 +30,12 @@ const permissionCatalog = [
   ["students.promote", "Promote or transfer students"],
   ["attendance.mark", "Mark attendance"],
   ["attendance.approve", "Approve attendance corrections"],
-  ["examinations.create", "Create examinations"],
-  ["results.enter", "Enter examination results"],
+  ["examinations.create", "Configure examinations and assessments"],
+  ["examinations.delete", "Delete examinations"],
+  ["results.enter", "Enter marks for assigned assessments"],
   ["results.publish", "Approve and publish results"],
   ["fees.manage", "Manage fee structures"],
+  ["fees.balance.view", "View outstanding student fee balances"],
   ["payments.record", "Record school payments"],
   ["reports.export", "Export school reports"],
   ["staff.manage", "Manage staff records"],
@@ -189,6 +193,8 @@ async function seed() {
     const adminPermissions = [
       "dashboard.view",
       "school.settings.manage",
+      "academics.manage",
+      "academics.delete",
       "users.manage",
       "roles.manage",
       "students.view",
@@ -197,9 +203,11 @@ async function seed() {
       "students.delete",
       "staff.manage",
       "fees.manage",
+      "fees.balance.view",
       "payments.record",
       "reports.export",
       "examinations.create",
+      "examinations.delete",
       "results.enter",
       "results.publish",
     ];
@@ -255,33 +263,42 @@ async function seed() {
       .from(roles)
       .where(and(eq(roles.schoolId, school.id), eq(roles.name, "Teacher")))
       .limit(1);
-    const [resultsEnterPermission] = await tx
-      .select({ id: permissions.id })
-      .from(permissions)
-      .where(eq(permissions.key, "results.enter"))
-      .limit(1);
-    if (!teacherRole || !resultsEnterPermission) {
-      throw new Error("The Teacher role or results-entry permission could not be created.");
-    }
+    if (!teacherRole) throw new Error("The Teacher role could not be created.");
     await tx.update(roles).set({
-      description: "Access the Teacher Portal and enter marks for assigned subjects.",
+      description: "Manage academic setup, student records, and examinations; no delete or result-publishing access.",
     }).where(and(
       eq(roles.id, teacherRole.id),
       eq(roles.isSystem, true),
     ));
-    const [teacherRolePermission] = await tx
-      .select({ roleId: rolePermissions.roleId })
-      .from(rolePermissions)
-      .where(and(
-        eq(rolePermissions.roleId, teacherRole.id),
-        eq(rolePermissions.permissionId, resultsEnterPermission.id),
-      ))
-      .limit(1);
-    if (!teacherRolePermission) {
-      await tx.insert(rolePermissions).values({
-        roleId: teacherRole.id,
-        permissionId: resultsEnterPermission.id,
-      });
+    for (const permissionKey of [
+      "academics.manage",
+      "students.view",
+      "students.create",
+      "students.update",
+      "examinations.create",
+      "results.enter",
+      "fees.balance.view",
+    ]) {
+      const [permission] = await tx
+        .select({ id: permissions.id })
+        .from(permissions)
+        .where(eq(permissions.key, permissionKey))
+        .limit(1);
+      if (!permission) throw new Error(`Permission ${permissionKey} could not be created.`);
+      const [rolePermission] = await tx
+        .select({ roleId: rolePermissions.roleId })
+        .from(rolePermissions)
+        .where(and(
+          eq(rolePermissions.roleId, teacherRole.id),
+          eq(rolePermissions.permissionId, permission.id),
+        ))
+        .limit(1);
+      if (!rolePermission) {
+        await tx.insert(rolePermissions).values({
+          roleId: teacherRole.id,
+          permissionId: permission.id,
+        });
+      }
     }
 
     const [accountantRole] = await tx

@@ -115,6 +115,29 @@ export function isPayDateOnOrAfterDueDate(paidDate: string, dueDate: string): bo
   return isCalendarDate(paidDate) && isCalendarDate(dueDate) && paidDate >= dueDate;
 }
 
+export function resolveFeeReportDateRange(
+  requestedFrom: string | undefined,
+  requestedTo: string | undefined,
+  today: string,
+): { from: string; to: string } {
+  const defaultFrom = `${today.slice(0, 7)}-01`;
+  let from = requestedFrom && isCalendarDate(requestedFrom) ? requestedFrom : defaultFrom;
+  let to = requestedTo && isCalendarDate(requestedTo) ? requestedTo : today;
+  if (from > to) [from, to] = [to, from];
+  return { from, to };
+}
+
+export function formatFeeReportDate(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 function startOfDayInTimezone(date: string, timezone: string): Date {
   const [year, month, day] = date.split("-").map(Number);
   const desiredLocalTime = Date.UTC(year, month - 1, day);

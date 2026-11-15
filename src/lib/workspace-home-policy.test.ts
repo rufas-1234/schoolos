@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import { getWorkspaceHomePath } from "./workspace-home-policy";
 
 describe("workspace home policy", () => {
-  it("sends a teacher-only account to the teacher portal", () => {
-    expect(getWorkspaceHomePath(["results.enter"])).toBe("/portal/teacher");
+  it("sends teachers with academic and exam setup access to the teacher portal", () => {
+    expect(getWorkspaceHomePath([
+      "academics.manage",
+      "students.view",
+      "students.create",
+      "students.update",
+      "examinations.create",
+      "results.enter",
+    ])).toBe("/portal/teacher");
   });
 
   it("prefers administration for accounts with administrator access", () => {

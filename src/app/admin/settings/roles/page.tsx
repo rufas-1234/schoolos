@@ -10,7 +10,6 @@ import {
   userRoles,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { canEditRole } from "@/lib/role-policy";
 import {
   AccountRolesForm,
   CreateRoleForm,
@@ -108,7 +107,7 @@ export default async function UserRolesPage() {
           Create school-specific roles, grant the least required permissions, and assign those roles to active school accounts.
         </p>
         <p className="mt-3 max-w-3xl rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
-          The system Teacher role opens the Teacher Portal and allows marks entry only for subjects assigned to the linked teacher profile. Link a staff account to an active teacher record before assigning this role.
+          To enable a teacher, assign the Teacher role to their account below. It grants academic management, student record access, exam setup, and marks entry, but not deletion or result publishing. Link the account to an active teacher profile so the portal can show assigned classes and subjects.
         </p>
       </header>
 
@@ -117,7 +116,7 @@ export default async function UserRolesPage() {
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="font-semibold text-slate-900">Roles in {context.schoolName}</h2>
-            <p className="mt-1 text-sm text-slate-500">System roles come with least-privilege defaults and can be edited before assignment. Custom roles can be changed any time; unassign custom roles before deleting them.</p>
+            <p className="mt-1 text-sm text-slate-500">System and custom role permissions can be changed at any time. Roles must be unassigned before deletion.</p>
           </div>
           <ul className="divide-y divide-slate-100">
             {schoolRoles.map((role) => (
@@ -147,11 +146,7 @@ export default async function UserRolesPage() {
                       <div>
                         <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role type</dt>
                         <dd className="mt-1 text-sm text-slate-800">
-                          {role.isSystem
-                            ? canEditRole(role.isSystem, assignedCountByRole.get(role.id) ?? 0)
-                              ? "System role (editable until assigned)"
-                              : "System role (assigned; read-only)"
-                            : "Custom role"}
+                          {role.isSystem ? "System role (editable)" : "Custom role"}
                         </dd>
                       </div>
                       <div>
@@ -175,17 +170,15 @@ export default async function UserRolesPage() {
                       </div>
                     </dl>
                   </AdminRecordDialog>
-                  {canEditRole(role.isSystem, assignedCountByRole.get(role.id) ?? 0) && (
-                    <AdminRecordDialog title={`Edit ${role.name}`}>
-                      <EditRoleForm
-                        role={{
-                          ...role,
-                          permissionIds: permissionIdsByRole.get(role.id) ?? [],
-                        }}
-                        permissions={availablePermissions}
-                      />
-                    </AdminRecordDialog>
-                  )}
+                  <AdminRecordDialog title={`Edit ${role.name}`}>
+                    <EditRoleForm
+                      role={{
+                        ...role,
+                        permissionIds: permissionIdsByRole.get(role.id) ?? [],
+                      }}
+                      permissions={availablePermissions}
+                    />
+                  </AdminRecordDialog>
                   {!role.isSystem && <DeleteRoleForm roleId={role.id} roleName={role.name} />}
                 </div>
               </li>
@@ -197,7 +190,7 @@ export default async function UserRolesPage() {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-900">School login access and role assignments</h2>
-          <p className="mt-1 text-sm text-slate-500">Manage school access and roles for existing accounts. Disabling access blocks this account from entering this school but does not delete the user.</p>
+          <p className="mt-1 text-sm text-slate-500">Select the role names this account should have, then choose Save role assignments. For a teacher, select Teacher. Disabling access blocks this account from entering this school but does not delete the user.</p>
         </div>
         {accounts.length === 0 ? (
           <p className="p-7 text-center text-sm text-slate-500">No active school accounts are available.</p>

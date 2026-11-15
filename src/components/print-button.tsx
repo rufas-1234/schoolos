@@ -25,7 +25,11 @@ export function printCurrentPage({
 
   const printHeader = document.querySelector<HTMLElement>(".admin-print-header");
   const printFooter = document.querySelector<HTMLElement>(".admin-print-footer");
-  const retainedRoots = [target, printHeader, printFooter].filter((element): element is HTMLElement => element !== null);
+  const isExamReport = Boolean(target?.closest(".exam-report-document"));
+  const retainedRoots = [
+    target,
+    ...(isExamReport ? [] : [printHeader, printFooter]),
+  ].filter((element): element is HTMLElement => element !== null);
   const changedAttributes: Array<{
     element: HTMLElement;
     hidden: string | null;
@@ -35,7 +39,7 @@ export function printCurrentPage({
   const previousTitle = document.title;
   const pageStyle = document.createElement("style");
   pageStyle.dataset.adminPrintPage = "true";
-  pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: 27mm 14mm 20mm; }`;
+  pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: ${isExamReport ? "8mm" : "27mm 14mm 20mm"}; }`;
   document.head.append(pageStyle);
   document.body.classList.add("print-target-active");
 

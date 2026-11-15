@@ -1,6 +1,5 @@
 "use client";
 
-import type { ChangeEvent } from "react";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 
 export function FeeReportFilters({
@@ -30,17 +29,13 @@ export function FeeReportFilters({
   selectedFeeType: string;
   selectedStatus: string;
 }) {
-  function submitOnChange(event: ChangeEvent<HTMLInputElement>) {
-    event.currentTarget.form?.requestSubmit();
-  }
-
   return (
-    <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
+    <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
       <label className="text-sm font-medium text-slate-700">From
-        <input type="date" name="from" defaultValue={from} onChange={submitOnChange} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
+        <input type="date" name="from" defaultValue={from} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
       </label>
       <label className="text-sm font-medium text-slate-700">To
-        <input type="date" name="to" defaultValue={to} onChange={submitOnChange} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
+        <input type="date" name="to" defaultValue={to} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
       </label>
       <SearchableSelect
         label="Branch"
@@ -48,7 +43,6 @@ export function FeeReportFilters({
         options={branches}
         defaultValue={selectedBranch}
         placeholder="Search branches..."
-        autoSubmit
       />
       <SearchableSelect
         label="Class"
@@ -56,7 +50,6 @@ export function FeeReportFilters({
         options={classes}
         defaultValue={selectedClass}
         placeholder="Search classes..."
-        autoSubmit
       />
       <SearchableSelect
         label="Section"
@@ -64,7 +57,6 @@ export function FeeReportFilters({
         options={sections}
         defaultValue={selectedSection}
         placeholder="Search sections..."
-        autoSubmit
       />
       <SearchableSelect
         label="Fee type"
@@ -72,7 +64,6 @@ export function FeeReportFilters({
         options={feeTypes}
         defaultValue={selectedFeeType}
         placeholder="Search fee types..."
-        autoSubmit
       />
       <SearchableSelect
         label="Payment status"
@@ -80,8 +71,21 @@ export function FeeReportFilters({
         options={statuses}
         defaultValue={selectedStatus}
         placeholder="Search statuses..."
-        autoSubmit
       />
+      <div className="flex items-end gap-2">
+        <button
+          type="submit"
+          className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800"
+        >
+          Apply filters
+        </button>
+        <a
+          href="/admin/fees/reports"
+          className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Reset
+        </a>
+      </div>
     </form>
   );
 }

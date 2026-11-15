@@ -6,7 +6,7 @@ import { schoolBranches, subjects } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 
 export default async function SubjectListPrintPage() {
-  const context = await requireSchoolPermission("school.settings.manage");
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
   const records = await db
     .select({
       branchName: schoolBranches.name,
