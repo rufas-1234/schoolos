@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Printer } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { printCurrentPage } from "@/components/print-button";
 
 type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams";
 type ProfileField = {
@@ -57,12 +58,12 @@ export function StudentProfileDetails({
     if (!printing) return;
     const resetPrinting = () => setPrinting(false);
     window.addEventListener("afterprint", resetPrinting);
-    const timer = window.setTimeout(() => window.print(), 0);
+    const timer = window.setTimeout(() => printCurrentPage({ title: `${studentName} · Student profile` }), 0);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("afterprint", resetPrinting);
     };
-  }, [printing]);
+  }, [printing, studentName]);
 
   return (
     <div className={`student-profile-printable space-y-5${printing ? " student-profile-printing" : ""}`}>

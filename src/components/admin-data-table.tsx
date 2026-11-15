@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { SearchableSelect } from "@/components/searchable-select";
+import { printCurrentPage } from "@/components/print-button";
 import {
   ChevronLeft,
   ChevronRight,
@@ -231,7 +232,7 @@ export function AdminDataTable({
     if (!printAll) return;
     const resetPrint = () => setPrintAll(false);
     window.addEventListener("afterprint", resetPrint);
-    const timer = window.setTimeout(() => window.print(), 0);
+    const timer = window.setTimeout(() => printCurrentPage(), 0);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("afterprint", resetPrint);

@@ -770,7 +770,7 @@ export default async function ExaminationReportPage({
         </div>
         {reportType !== "online-exam" && examDetails && examClass && (reportType === "exam-routine" || reportIsReady) && (
           <PrintButton
-            label={canPrintBulkCards && !requestedEnrollmentId ? "Print all progress cards" : "Print / save as PDF"}
+            label={canPrintBulkCards && !requestedEnrollmentId ? "Print all progress cards / Save PDF" : "Print / Save PDF"}
             targetId="exam-report-output"
             pageOrientation={printOrientation}
             pageSize="A4"

@@ -279,8 +279,8 @@ h6 {
 
 @media print {
   @page {
-    size: auto;
-    margin: 25mm 14mm 20mm;
+    size: A4 portrait;
+    margin: 27mm 14mm 20mm;
   }
 
   html,
@@ -296,11 +296,16 @@ h6 {
   }
 
   .admin-print-header {
+    position: fixed;
+    top: -22mm;
+    right: 0;
+    left: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: 12px;
     min-height: 17mm;
-    margin-bottom: 8mm;
+    margin: 0;
     padding-bottom: 4mm;
     border-bottom: 2px solid #6d28d9;
     background: white;
@@ -372,14 +377,52 @@ h6 {
   }
 
   .admin-print-footer {
+    position: fixed;
+    right: 0;
+    bottom: -15mm;
+    left: 0;
+    z-index: 1;
     display: flex;
     justify-content: space-between;
-    margin-top: 10mm;
+    margin: 0;
     border-top: 1px solid #d8deea;
-    padding-top: 5px;
+    padding-top: 2mm;
     color: #596579;
     font-size: 7pt;
     break-inside: avoid;
+  }
+
+  body.print-target-active [data-print-hidden] {
+    display: none !important;
+  }
+
+  body.print-target-active [data-print-structure] {
+    display: contents !important;
+    overflow: visible !important;
+    visibility: visible !important;
+  }
+
+  body.print-target-active [data-print-target] {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    visibility: visible !important;
+  }
+
+  body.print-target-active [data-print-target] * {
+    visibility: visible !important;
+  }
+
+  body.print-target-active [data-print-target] [class~="print:hidden"] {
+    display: none !important;
+  }
+
+  body.print-target-active .admin-print-header,
+  body.print-target-active .admin-print-footer,
+  body.print-target-active .admin-print-header *,
+  body.print-target-active .admin-print-footer * {
+    visibility: visible !important;
   }
 
   .admin-shell-content {
@@ -401,6 +444,38 @@ h6 {
     border-bottom: 2px solid #6d28d9;
     padding-bottom: 4mm;
     break-inside: avoid;
+  }
+
+  .exam-report-heading {
+    margin-bottom: 3mm;
+    border-bottom: 4px solid #7f2524;
+    padding-bottom: 3mm;
+    break-inside: avoid;
+  }
+
+  .exam-report-heading h2 {
+    color: #7f2524;
+  }
+
+  .exam-report-heading p {
+    color: #30495f;
+  }
+
+  .a4-report-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .a4-report-card-last {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .a4-report-card > table thead th {
+    background: #7f2524 !important;
+    color: white !important;
   }
 
   .print-report-heading h2 {
@@ -529,6 +604,13 @@ h6 {
     visibility: visible !important;
   }
 
+  body.print-target-active:has(.fee-receipt-page) .admin-print-header,
+  body.print-target-active:has(.fee-receipt-page) .admin-print-footer,
+  body.print-target-active:has(.fee-receipt-page) .admin-print-header *,
+  body.print-target-active:has(.fee-receipt-page) .admin-print-footer * {
+    visibility: visible !important;
+  }
+
   .fee-receipt-total {
     border-color: #a7f3d0 !important;
     background: #ecfdf5 !important;
@@ -540,6 +622,13 @@ h6 {
 
   body:has(.fee-invoice-page) .fee-invoice-page,
   body:has(.fee-invoice-page) .fee-invoice-page * {
+    visibility: visible !important;
+  }
+
+  body.print-target-active:has(.fee-invoice-page) .admin-print-header,
+  body.print-target-active:has(.fee-invoice-page) .admin-print-footer,
+  body.print-target-active:has(.fee-invoice-page) .admin-print-header *,
+  body.print-target-active:has(.fee-invoice-page) .admin-print-footer * {
     visibility: visible !important;
   }
 
@@ -645,6 +734,13 @@ h6 {
 
   body:has(.student-profile-printing) .student-profile-printing,
   body:has(.student-profile-printing) .student-profile-printing * {
+    visibility: visible !important;
+  }
+
+  body.print-target-active:has(.student-profile-printing) .admin-print-header,
+  body.print-target-active:has(.student-profile-printing) .admin-print-footer,
+  body.print-target-active:has(.student-profile-printing) .admin-print-header *,
+  body.print-target-active:has(.student-profile-printing) .admin-print-footer * {
     visibility: visible !important;
   }
 
