@@ -51,7 +51,11 @@ function ActionForm({
       {children}
       {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
       {state.message && <p role="status" className="text-sm text-emerald-700">{state.message}</p>}
-      {state.receiptUrl && <Link href={state.receiptUrl} className="block text-sm font-semibold text-violet-700">Open receipt</Link>}
+      {state.receiptUrl && (
+        <Link href={state.receiptUrl} className="inline-flex rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+          Print receipt
+        </Link>
+      )}
       {state.success && !state.message && <p role="status" className="text-sm text-emerald-700">Saved successfully.</p>}
       <button
         type="submit"

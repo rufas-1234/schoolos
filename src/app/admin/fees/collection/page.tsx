@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { AdminActionDialog, AdminRecordDialog } from "@/components/admin-data-table";
 import Link from "next/link";
@@ -249,6 +249,25 @@ export default async function FeeCollectionPage({
     };
   });
   const rows = invoiceRows;
+  const receiptsByInvoice = new Map<number, { publicId: string; receiptNumber: string }[]>();
+  if (rows.length) {
+    const receipts = await db.select({
+      invoiceId: feePayments.invoiceId,
+      publicId: feePayments.publicId,
+      receiptNumber: feePayments.receiptNumber,
+    })
+      .from(feePayments)
+      .where(and(
+        eq(feePayments.schoolId, context.schoolId),
+        inArray(feePayments.invoiceId, rows.map((invoice) => invoice.id)),
+      ))
+      .orderBy(desc(feePayments.paidAt), desc(feePayments.id));
+    for (const receipt of receipts) {
+      const invoiceReceipts = receiptsByInvoice.get(receipt.invoiceId) ?? [];
+      invoiceReceipts.push({ publicId: receipt.publicId, receiptNumber: receipt.receiptNumber });
+      receiptsByInvoice.set(receipt.invoiceId, invoiceReceipts);
+    }
+  }
   const currency = school?.currency ?? "";
   const branchOptions: SearchableSelectOption[] = [
     { value: "", label: "All branches" },
@@ -361,7 +380,10 @@ export default async function FeeCollectionPage({
       </nav>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        {rows.length ? rows.map((invoice) => (
+        {rows.length ? rows.map((invoice) => {
+          const invoiceReceipts = receiptsByInvoice.get(invoice.id) ?? [];
+          const latestReceipt = invoiceReceipts[0];
+          return (
           <article key={invoice.id} className="border-b border-slate-100 p-5 last:border-0">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -372,7 +394,26 @@ export default async function FeeCollectionPage({
                 <p className="mt-1 text-sm text-slate-500">{feeDisplayName(invoice.typeName)}{invoice.termName ? ` · ${invoice.termName}` : ""} · due {invoice.dueDate}</p>
                 <p className="mt-2 text-xs text-slate-400">Invoice {invoice.invoiceNumber} · {invoice.createdAt.toISOString().slice(0, 10)}</p>
                 <div className="mt-2 flex gap-3 text-xs font-semibold text-violet-700">
-                  <Link href={`/admin/fees/invoices/print?invoiceId=${invoice.publicId}`}>Print invoice</Link>
+                  {latestReceipt ? (
+                    <>
+                      <Link href={`/admin/fees/receipt/${latestReceipt.publicId}`}>Print receipt</Link>
+                      {invoiceReceipts.length > 1 && (
+                        <details className="relative">
+                          <summary className="cursor-pointer">Other receipts</summary>
+                          <div className="absolute z-10 mt-1 grid max-h-48 min-w-max gap-2 overflow-auto rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+                            {invoiceReceipts.slice(1).map((receipt) => (
+                              <Link key={receipt.publicId} href={`/admin/fees/receipt/${receipt.publicId}`}>
+                                {receipt.receiptNumber}
+                              </Link>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                      <Link href={`/admin/fees/invoices/print?invoiceId=${invoice.publicId}`}>View invoice</Link>
+                    </>
+                  ) : (
+                    <Link href={`/admin/fees/invoices/print?invoiceId=${invoice.publicId}`}>Print invoice</Link>
+                  )}
                   <Link href={`/admin/fees/invoices/print?studentId=${invoice.studentId}`}>Print student invoices</Link>
                   <AdminRecordDialog title={`Edit invoice ${invoice.invoiceNumber}`}>
                     <EditFeeInvoiceForm invoice={{
@@ -408,7 +449,8 @@ export default async function FeeCollectionPage({
               </details>
             )}
           </article>
-        )) : (
+        );
+        }) : (
           <p className="p-6 text-sm text-slate-500">No fee invoices match these filters. Create a fee structure and generate invoices from fee setup.</p>
         )}
       </section>
