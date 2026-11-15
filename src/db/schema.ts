@@ -241,6 +241,13 @@ export type StudentAdditionalDetails = {
   customFieldValue: string;
 };
 
+export type StudentFieldSetting = {
+  enabled: boolean;
+  required: boolean;
+};
+
+export type StudentFieldSettings = Record<string, StudentFieldSetting>;
+
 export const students = mysqlTable(
   "students",
   {
@@ -956,6 +963,26 @@ export const studentEnrollments = mysqlTable(
       table.academicYearId,
       table.status,
     ),
+  ],
+);
+
+export const studentSettings = mysqlTable(
+  "student_settings",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    admissionFormat: varchar("admissionFormat", { length: 40 }).notNull().default("S{YY}{SEQ:4}"),
+    rollFormat: varchar("rollFormat", { length: 40 }).notNull().default("{SEQ:3}"),
+    nextAdmissionSequence: int("nextAdmissionSequence", { unsigned: true }).notNull().default(1),
+    nextRollSequence: int("nextRollSequence", { unsigned: true }).notNull().default(1),
+    fields: json("fields").$type<StudentFieldSettings>(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("student_settings_school_uq").on(table.schoolId),
   ],
 );
 

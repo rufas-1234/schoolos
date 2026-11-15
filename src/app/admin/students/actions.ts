@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -13,6 +13,7 @@ import {
   schoolBranches,
   studentCategories,
   studentEnrollments,
+  studentSettings,
   students,
   type StudentAdditionalDetails,
 } from "@/db/schema";
@@ -20,6 +21,12 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { canTransitionStudentStatus, studentStatuses } from "@/lib/student-policy";
+import {
+  defaultStudentFieldSettings,
+  formatStudentIdentifier,
+  normalizeStudentFieldSettings,
+  studentSettingFields,
+} from "@/lib/student-settings";
 
 const idField = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe());
 const optionalIdField = z.union([z.literal(""), idField]).transform((value) => value || null);
@@ -78,12 +85,12 @@ const studentAdditionalDetailsSchema = z.object({
 const personalDetailsSchema = z.object({
   firstName: z.string().trim().min(2).max(120),
   lastName: z.string().trim().min(2).max(120),
-  gender: genderField,
-  dateOfBirth: dateField.refine((value) => value <= new Date().toISOString().slice(0, 10), {
+  gender: z.union([z.literal(""), genderField]),
+  dateOfBirth: optionalDateField.refine((value) => !value || value <= new Date().toISOString().slice(0, 10), {
     message: "Date of birth cannot be in the future.",
   }),
   email: emailField,
-  phone: z.string().trim().min(1).max(40),
+  phone: phoneField,
   religion: z.string().trim().max(100),
   bloodGroup: bloodGroupField,
   currentAddress: z.string().trim().max(1000),
@@ -109,14 +116,11 @@ const admissionSchema = personalDetailsSchema.extend({
   academicYearId: idField,
   classLevelId: idField,
   classSectionId: idField,
-  admissionNumber: z.string().trim().min(1).max(40),
-  rollNumber: z.string().trim().max(40),
   admissionDate: optionalDateField,
 });
 
 const updateStudentSchema = personalDetailsSchema.extend({
   branchId: idField,
-  admissionNumber: z.string().trim().max(40),
   admissionDate: optionalDateField,
 });
 
@@ -196,10 +200,50 @@ function readPersonalDetails(formData: FormData) {
   };
 }
 
+function requiredStudentFieldError(
+  formData: FormData,
+  fieldSettings: ReturnType<typeof normalizeStudentFieldSettings>,
+) {
+  for (const field of studentSettingFields) {
+    if (!fieldSettings[field.name].enabled || !fieldSettings[field.name].required) continue;
+    if (field.locked && field.group === "Admission") continue;
+    const value = field.name === "profilePhoto"
+      ? readFormValue(formData, "profilePhotoFileName")
+      : field.name === "studentDocuments"
+        ? Array.from({ length: 4 }, (_, index) => readFormValue(formData, `documentFileName${index + 1}`)).find(Boolean) ?? ""
+        : readFormValue(formData, field.name);
+    if (!value.trim()) return `${field.label} is required.`;
+  }
+  return null;
+}
+
+type StudentTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function generateIdentifier(
+  tx: StudentTransaction,
+  schoolId: number,
+  format: string,
+  startSequence: number,
+  kind: "admission" | "roll",
+  date: string,
+) {
+  for (let sequence = startSequence; sequence < startSequence + 100_000; sequence++) {
+    const value = formatStudentIdentifier(format, sequence, date);
+    if (!value) throw new Error(`The configured ${kind} number format is invalid.`);
+    const [existing] = kind === "admission"
+      ? await tx.select({ id: students.id }).from(students)
+        .where(and(eq(students.schoolId, schoolId), eq(students.admissionNumber, value))).limit(1)
+      : await tx.select({ id: studentEnrollments.id }).from(studentEnrollments)
+        .where(and(eq(studentEnrollments.schoolId, schoolId), eq(studentEnrollments.rollNumber, value))).limit(1);
+    if (!existing) return { value, nextSequence: sequence + 1 };
+  }
+  throw new Error(`Unable to generate an unused ${kind} number.`);
+}
+
 function studentInsertValues(
   schoolId: number,
   branchId: number,
-  admissionNumber: string,
+  admissionNumber: string | null,
   admissionDate: string | null,
   personal: z.infer<typeof personalDetailsSchema>,
 ) {
@@ -212,7 +256,7 @@ function studentInsertValues(
     dateOfBirth: personal.dateOfBirth,
     firstName: personal.firstName,
     lastName: personal.lastName,
-    gender: personal.gender,
+    gender: personal.gender || null,
     email: personal.email || null,
     phone: personal.phone || null,
     religion: personal.religion || null,
@@ -250,18 +294,22 @@ export async function createStudent(
   formData: FormData,
 ): Promise<StudentActionState> {
   const context = await requireSchoolPermission("students.create");
+  const [savedSettings] = await db.select({ fields: studentSettings.fields })
+    .from(studentSettings).where(eq(studentSettings.schoolId, context.schoolId)).limit(1);
+  const fieldSettings = normalizeStudentFieldSettings(savedSettings?.fields);
+  const requiredError = requiredStudentFieldError(formData, fieldSettings);
+  if (requiredError) return { error: requiredError };
   const result = admissionSchema.safeParse({
     ...readPersonalDetails(formData),
     branchId: readFormValue(formData, "branchId"),
     academicYearId: readFormValue(formData, "academicYearId"),
     classLevelId: readFormValue(formData, "classLevelId"),
     classSectionId: readFormValue(formData, "classSectionId"),
-    admissionNumber: readFormValue(formData, "admissionNumber"),
-    rollNumber: readFormValue(formData, "rollNumber"),
     admissionDate: readFormValue(formData, "admissionDate"),
   });
   if (!result.success) {
-    return { error: "Review the required fields, dates, email addresses, and student details." };
+    const issue = result.error.issues[0];
+    return { error: issue ? `${String(issue.path.at(-1) ?? "Student details")}: ${issue.message}` : "Review the student details and try again." };
   }
 
   const admission = result.data;
@@ -275,6 +323,14 @@ export async function createStudent(
 
   try {
     const outcome = await db.transaction(async (tx) => {
+      await tx.insert(studentSettings).values({
+        schoolId: context.schoolId,
+        fields: defaultStudentFieldSettings,
+      }).onDuplicateKeyUpdate({ set: { schoolId: context.schoolId } });
+      const [identifierSettings] = await tx.select().from(studentSettings)
+        .where(eq(studentSettings.schoolId, context.schoolId)).for("update").limit(1);
+      if (!identifierSettings) throw new Error("Student identifier settings could not be initialized.");
+
       const [branch] = await tx
         .select({ id: schoolBranches.id })
         .from(schoolBranches)
@@ -343,17 +399,22 @@ export async function createStudent(
         if (!category) return "category-not-found";
       }
 
-      const [duplicate] = await tx
-        .select({ id: students.id })
-        .from(students)
-        .where(
-          and(
-            eq(students.schoolId, context.schoolId),
-            eq(students.admissionNumber, admission.admissionNumber),
-          ),
-        )
-        .limit(1);
-      if (duplicate) return "duplicate-admission-number";
+      const generatedAdmission = await generateIdentifier(
+        tx,
+        context.schoolId,
+        identifierSettings.admissionFormat,
+        identifierSettings.nextAdmissionSequence,
+        "admission",
+        admissionDate,
+      );
+      const generatedRoll = await generateIdentifier(
+        tx,
+        context.schoolId,
+        identifierSettings.rollFormat,
+        identifierSettings.nextRollSequence,
+        "roll",
+        admissionDate,
+      );
 
       const [createdStudent] = await tx
         .insert(students)
@@ -362,7 +423,7 @@ export async function createStudent(
           ...studentInsertValues(
             context.schoolId,
             admission.branchId,
-            admission.admissionNumber,
+            generatedAdmission.value,
             admissionDate,
             admission,
           ),
@@ -375,10 +436,14 @@ export async function createStudent(
         studentId: createdStudent.id,
         academicYearId: admission.academicYearId,
         classSectionId: admission.classSectionId,
-        rollNumber: admission.rollNumber || null,
+        rollNumber: generatedRoll.value,
         status: "pending",
         enrolledAt: admissionDate,
       });
+      await tx.update(studentSettings).set({
+        nextAdmissionSequence: generatedAdmission.nextSequence,
+        nextRollSequence: generatedRoll.nextSequence,
+      }).where(eq(studentSettings.id, identifierSettings.id));
       await tx.insert(auditLogs).values({
         schoolId: context.schoolId,
         actorUserId: context.user.id,
@@ -389,6 +454,7 @@ export async function createStudent(
           "branchId",
           "categoryId",
           "admissionNumber",
+          "rollNumber",
           "academicYearId",
           "classSectionId",
           "dateOfBirth",
@@ -414,12 +480,9 @@ export async function createStudent(
     if (outcome === "category-not-found") {
       return { error: "Choose a category belonging to the selected branch." };
     }
-    if (outcome === "duplicate-admission-number") {
-      return { error: "That admission number is already in use at this school." };
-    }
   } catch (error) {
     if (isDuplicateEntryError(error)) {
-      return { error: "That admission number is already in use at this school." };
+      return { error: "A generated student identifier collided with an existing record. No changes were saved; try again." };
     }
     throw error;
   }
@@ -435,15 +498,19 @@ export async function updateStudent(
 ): Promise<StudentActionState> {
   const context = await requireSchoolPermission("students.update");
   const publicId = z.string().uuid().safeParse(formData.get("publicId"));
-  const admissionNumber = readFormValue(formData, "admissionNumber");
+  const [savedSettings] = await db.select({ fields: studentSettings.fields })
+    .from(studentSettings).where(eq(studentSettings.schoolId, context.schoolId)).limit(1);
+  const fieldSettings = normalizeStudentFieldSettings(savedSettings?.fields);
+  const requiredError = requiredStudentFieldError(formData, fieldSettings);
+  if (requiredError) return { error: requiredError };
   const result = updateStudentSchema.safeParse({
     ...readPersonalDetails(formData),
     branchId: readFormValue(formData, "branchId"),
-    admissionNumber,
     admissionDate: readFormValue(formData, "admissionDate"),
   });
   if (!publicId.success || !result.success) {
-    return { error: "Review the required fields, dates, email addresses, and student details." };
+    const issue = result.success ? null : result.error.issues[0];
+    return { error: issue ? `${String(issue.path.at(-1) ?? "Student details")}: ${issue.message}` : "Student record could not be saved. Check the details and try again." };
   }
 
   const details = result.data;
@@ -456,6 +523,7 @@ export async function updateStudent(
         id: students.id,
         publicId: students.publicId,
         branchId: students.branchId,
+        admissionNumber: students.admissionNumber,
       })
       .from(students)
       .where(and(eq(students.publicId, publicId.data), eq(students.schoolId, context.schoolId)))
@@ -490,28 +558,13 @@ export async function updateStudent(
       if (!category) return "category-not-found";
     }
 
-    if (admissionNumber) {
-      const [duplicate] = await tx
-        .select({ id: students.id })
-        .from(students)
-        .where(
-          and(
-            eq(students.schoolId, context.schoolId),
-            eq(students.admissionNumber, admissionNumber),
-            ne(students.id, student.id),
-          ),
-        )
-        .limit(1);
-      if (duplicate) return "duplicate-admission-number";
-    }
-
     await tx
       .update(students)
       .set({
         ...studentInsertValues(
           context.schoolId,
           details.branchId,
-          admissionNumber,
+          student.admissionNumber,
           details.admissionDate,
           details,
         ),
@@ -541,7 +594,10 @@ export async function updateStudent(
     });
     return "updated";
   }).catch((error: unknown) => {
-    if (isDuplicateEntryError(error)) return "duplicate-admission-number" as const;
+    if (isDuplicateEntryError(error)) {
+      console.error("Student profile update failed due to a conflicting record.", error);
+      return "update-failed" as const;
+    }
     console.error("Student profile update failed; transaction rolled back.", error);
     return "update-failed" as const;
   });
@@ -557,10 +613,6 @@ export async function updateStudent(
   if (outcome === "category-not-found") {
     return { error: "Choose a category belonging to the student's branch." };
   }
-  if (outcome === "duplicate-admission-number") {
-    return { error: "That admission number is already in use at this school." };
-  }
-
   revalidateStudentPages();
   revalidatePath("/admin/dashboard");
   return { success: true };

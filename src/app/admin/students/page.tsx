@@ -15,10 +15,12 @@ import {
   schoolBranches,
   studentCategories,
   studentEnrollments,
+  studentSettings,
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { getStudentStatusTransitions } from "@/lib/student-policy";
+import { normalizeStudentFieldSettings } from "@/lib/student-settings";
 import { StudentForm } from "./student-form";
 import { StudentProfileDetails } from "./student-profile-details";
 import { StudentStatusForm } from "./student-status-form";
@@ -48,6 +50,9 @@ export default async function StudentsPage({
   const openAddStudent = action === "add";
   const initialSearch = typeof search === "string" ? search.slice(0, 120) : "";
   const context = await requireSchoolPermission("students.view");
+  const [savedStudentSettings] = await db.select({ fields: studentSettings.fields })
+    .from(studentSettings).where(eq(studentSettings.schoolId, context.schoolId)).limit(1);
+  const studentFieldSettings = normalizeStudentFieldSettings(savedStudentSettings?.fields);
   const rawRecords = await db
     .select({
       id: students.id,
@@ -378,6 +383,7 @@ export default async function StudentsPage({
                 classes={classOptions}
                 sections={sectionOptions}
                 categories={categorySelectOptions}
+                settings={studentFieldSettings}
               />
             </AdminActionDialog>
           ) : null}
@@ -509,6 +515,7 @@ export default async function StudentsPage({
                       classes={classOptions}
                       sections={sectionOptions}
                       categories={categorySelectOptions}
+                      settings={studentFieldSettings}
                       record={record}
                     />
                   </AdminRecordDialog>

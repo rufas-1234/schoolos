@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useEffect, useId, useMemo, useState } from "react";
+import { useActionState, useEffect, useId, useMemo, useRef, useState } from "react";
 import { RequiredMark } from "@/components/required-mark";
-import type { StudentAdditionalDetails } from "@/db/schema";
+import type { StudentAdditionalDetails, StudentFieldSettings } from "@/db/schema";
 import { createStudent, updateStudent } from "./actions";
 
 type BranchOption = { id: number; label: string };
@@ -72,6 +72,7 @@ export function StudentForm({
   classes,
   sections,
   categories,
+  settings,
   record,
 }: {
   branches: BranchOption[];
@@ -79,6 +80,7 @@ export function StudentForm({
   classes: ClassOption[];
   sections: SectionOption[];
   categories: CategoryOption[];
+  settings: StudentFieldSettings;
   record?: StudentEditRecord;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -93,7 +95,28 @@ export function StudentForm({
   const [sectionId, setSectionId] = useState("");
   const [activeTab, setActiveTab] = useState<StudentEditTab>("personal");
   const [pendingUploads, setPendingUploads] = useState<Record<number, boolean>>({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const submittedValues = useRef<Map<string, string[]> | null>(null);
   const hasPendingUploads = Object.values(pendingUploads).some(Boolean);
+  const fieldConfig = (name: keyof StudentFieldSettings) => settings[name];
+
+  useEffect(() => {
+    if (!state.error || !submittedValues.current || !formRef.current) return;
+    for (const [name, values] of submittedValues.current) {
+      const field = formRef.current.elements.namedItem(name);
+      if (field instanceof RadioNodeList) {
+        field.value = values[0] ?? "";
+      } else if (
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLSelectElement ||
+        field instanceof HTMLTextAreaElement
+      ) {
+        if (field instanceof HTMLInputElement && field.type === "file") continue;
+        field.value = values[0] ?? "";
+      }
+    }
+    submittedValues.current = null;
+  }, [state]);
 
   const branchClasses = useMemo(
     () => classes.filter((item) => String(item.branchId) === branchId),
@@ -114,17 +137,26 @@ export function StudentForm({
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       noValidate
       onSubmit={(event) => {
-        if (record) return;
         const formData = new FormData(event.currentTarget);
-        const studentName = [formData.get("firstName"), formData.get("lastName")]
-          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-          .join(" ");
-        const label = studentName || "this student";
-        if (!window.confirm(`Are you sure you want to register ${label} and place them in the selected class?`)) {
-          event.preventDefault();
+        const snapshot = new Map<string, string[]>();
+        for (const [name, value] of formData.entries()) {
+          if (typeof value !== "string") continue;
+          snapshot.set(name, [...(snapshot.get(name) ?? []), value]);
+        }
+        submittedValues.current = snapshot;
+        if (!record) {
+          const studentName = [formData.get("firstName"), formData.get("lastName")]
+            .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+            .join(" ");
+          const label = studentName || "this student";
+          if (!window.confirm(`Are you sure you want to register ${label} and place them in the selected class?`)) {
+            submittedValues.current = null;
+            event.preventDefault();
+          }
         }
       }}
       className="space-y-6"
@@ -219,7 +251,6 @@ export function StudentForm({
             </label>
           ) : (
             <>
-              <input type="hidden" name="admissionNumber" value={record.admissionNumber ?? ""} />
               <ReadOnlyField label="Admission number" value={record.admissionNumber} />
               <ReadOnlyField label="Roll" value={record.rollNumber} />
               <ReadOnlyField label="Class" value={record.className} />
@@ -266,36 +297,25 @@ export function StudentForm({
                   ))}
                 </select>
               </label>
-              <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                Admission number <RequiredMark />
-                <input
-                  name="admissionNumber"
-                  required
-                  maxLength={40}
-                  className={inputClass}
-                  placeholder="e.g. 2026-001"
-                />
-              </label>
-              <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                Roll number
-                <input name="rollNumber" maxLength={40} className={inputClass} />
-              </label>
+              <p className="text-sm text-slate-500 sm:col-span-2">Admission and roll numbers will be generated automatically when this student is registered.</p>
             </>
           )}
 
           <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Admission date
+            Admission date {fieldConfig("admissionDate").required && <RequiredMark />}
             <input
               name="admissionDate"
               type="date"
+              required={fieldConfig("admissionDate").required}
               defaultValue={record?.admissionDate ?? new Date().toISOString().slice(0, 10)}
               className={inputClass}
             />
           </label>
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Student category
+          <label hidden={!fieldConfig("categoryId").enabled} className="space-y-1.5 text-sm font-medium text-slate-700">
+            Student category {fieldConfig("categoryId").required && <RequiredMark />}
             <select
               name="categoryId"
+              required={fieldConfig("categoryId").required}
               defaultValue={record?.categoryId ? String(record.categoryId) : ""}
               disabled={!branchId}
               className={inputClass}
@@ -311,19 +331,24 @@ export function StudentForm({
 
       <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
         <legend className="px-2 text-sm font-semibold text-slate-900">Personal Info</legend>
-        <ProfilePhotoField
-          record={record}
-          photo={record?.additionalDetails?.profilePhoto}
-          onPendingChange={(isPending) =>
-            setPendingUploads((current) => ({ ...current, 0: isPending }))
-          }
-        />
+        <div hidden={!fieldConfig("profilePhoto").enabled} className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">
+            Profile photo {fieldConfig("profilePhoto").required && <RequiredMark />}
+          </span>
+          <ProfilePhotoField
+            record={record}
+            photo={record?.additionalDetails?.profilePhoto}
+            onPendingChange={(isPending) =>
+              setPendingUploads((current) => ({ ...current, 0: isPending }))
+            }
+          />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="First name" name="firstName" required defaultValue={record?.firstName} />
-          <Field label="Last name" name="lastName" required defaultValue={record?.lastName} />
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Gender <RequiredMark />
-            <select name="gender" required defaultValue={record?.gender ?? ""} className={inputClass}>
+          <Field label="First name" name="firstName" required={fieldConfig("firstName").required} visible={fieldConfig("firstName").enabled} defaultValue={record?.firstName} />
+          <Field label="Last name" name="lastName" required={fieldConfig("lastName").required} visible={fieldConfig("lastName").enabled} defaultValue={record?.lastName} />
+          <label hidden={!fieldConfig("gender").enabled} className="space-y-1.5 text-sm font-medium text-slate-700">
+          Gender {fieldConfig("gender").required && <RequiredMark />}
+          <select name="gender" required={fieldConfig("gender").required} defaultValue={record?.gender ?? ""} className={inputClass}>
               <option value="" disabled>Select gender</option>
               <option value="female">Female</option>
               <option value="male">Male</option>
@@ -336,40 +361,49 @@ export function StudentForm({
             label="Date of birth"
             name="dateOfBirth"
             type="date"
-            required
+          required={fieldConfig("dateOfBirth").required}
+          visible={fieldConfig("dateOfBirth").enabled}
             defaultValue={record?.dateOfBirth ?? ""}
           />
-          <Field label="Religion" name="religion" defaultValue={record?.religion ?? ""} />
+          <Field label="Religion" name="religion" required={fieldConfig("religion").required} visible={fieldConfig("religion").enabled} defaultValue={record?.religion ?? ""} />
           <Field
             label="Caste"
             name="caste"
+          required={fieldConfig("caste").required}
+          visible={fieldConfig("caste").enabled}
             defaultValue={record?.additionalDetails?.caste ?? ""}
           />
-          <label className="space-y-1.5 text-sm font-medium text-slate-700">
-            Blood group
-            <select name="bloodGroup" defaultValue={record?.bloodGroup ?? ""} className={inputClass}>
+          <label hidden={!fieldConfig("bloodGroup").enabled} className="space-y-1.5 text-sm font-medium text-slate-700">
+            Blood group {fieldConfig("bloodGroup").required && <RequiredMark />}
+            <select name="bloodGroup" required={fieldConfig("bloodGroup").required} defaultValue={record?.bloodGroup ?? ""} className={inputClass}>
               <option value="">Not specified</option>
               {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((group) => (
                 <option key={group} value={group}>{group}</option>
               ))}
             </select>
           </label>
-          <Field label="Student email" name="email" type="email" defaultValue={record?.email ?? ""} />
-          <Field label="Student phone" name="phone" required defaultValue={record?.phone ?? ""} />
+          <Field label="Student email" name="email" type="email" required={fieldConfig("email").required} visible={fieldConfig("email").enabled} defaultValue={record?.email ?? ""} />
+          <Field label="Student phone" name="phone" required={fieldConfig("phone").required} visible={fieldConfig("phone").enabled} defaultValue={record?.phone ?? ""} />
           <Field
             label="Current address"
             name="currentAddress"
+            required={fieldConfig("currentAddress").required}
+            visible={fieldConfig("currentAddress").enabled}
             defaultValue={record?.currentAddress ?? ""}
           />
           <Field
             label="Permanent address"
             name="permanentAddress"
+            required={fieldConfig("permanentAddress").required}
+            visible={fieldConfig("permanentAddress").enabled}
             defaultValue={record?.permanentAddress ?? ""}
           />
           <Field
             label="Height (inches)"
             name="heightInches"
             type="number"
+            required={fieldConfig("heightInches").required}
+            visible={fieldConfig("heightInches").enabled}
             min="0"
             max="120"
             step="0.1"
@@ -379,6 +413,8 @@ export function StudentForm({
             label="Weight (kg)"
             name="weightKg"
             type="number"
+            required={fieldConfig("weightKg").required}
+            visible={fieldConfig("weightKg").enabled}
             min="0"
             max="500"
             step="0.1"
@@ -397,29 +433,35 @@ export function StudentForm({
       <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
         <legend className="px-2 text-sm font-semibold text-slate-900">Parents &amp; Guardian Info</legend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Father's name" name="fatherName" defaultValue={record?.fatherName ?? ""} />
-          <Field label="Father's occupation" name="fatherOccupation" defaultValue={record?.fatherOccupation ?? ""} />
-          <Field label="Father's phone" name="fatherPhone" defaultValue={record?.fatherPhone ?? ""} />
-          <Field label="Mother's name" name="motherName" defaultValue={record?.motherName ?? ""} />
-          <Field label="Mother's occupation" name="motherOccupation" defaultValue={record?.motherOccupation ?? ""} />
-          <Field label="Mother's phone" name="motherPhone" defaultValue={record?.motherPhone ?? ""} />
-          <Field label="Guardian's name" name="guardianName" defaultValue={record?.guardianName ?? ""} />
-          <Field label="Relationship to student" name="guardianRelation" defaultValue={record?.guardianRelation ?? ""} />
+          <Field label="Father's name" name="fatherName" required={fieldConfig("fatherName").required} visible={fieldConfig("fatherName").enabled} defaultValue={record?.fatherName ?? ""} />
+          <Field label="Father's occupation" name="fatherOccupation" required={fieldConfig("fatherOccupation").required} visible={fieldConfig("fatherOccupation").enabled} defaultValue={record?.fatherOccupation ?? ""} />
+          <Field label="Father's phone" name="fatherPhone" required={fieldConfig("fatherPhone").required} visible={fieldConfig("fatherPhone").enabled} defaultValue={record?.fatherPhone ?? ""} />
+          <Field label="Mother's name" name="motherName" required={fieldConfig("motherName").required} visible={fieldConfig("motherName").enabled} defaultValue={record?.motherName ?? ""} />
+          <Field label="Mother's occupation" name="motherOccupation" required={fieldConfig("motherOccupation").required} visible={fieldConfig("motherOccupation").enabled} defaultValue={record?.motherOccupation ?? ""} />
+          <Field label="Mother's phone" name="motherPhone" required={fieldConfig("motherPhone").required} visible={fieldConfig("motherPhone").enabled} defaultValue={record?.motherPhone ?? ""} />
+          <Field label="Guardian's name" name="guardianName" required={fieldConfig("guardianName").required} visible={fieldConfig("guardianName").enabled} defaultValue={record?.guardianName ?? ""} />
+          <Field label="Relationship to student" name="guardianRelation" required={fieldConfig("guardianRelation").required} visible={fieldConfig("guardianRelation").enabled} defaultValue={record?.guardianRelation ?? ""} />
           <Field
             label="Guardian email"
             name="guardianEmail"
             type="email"
+            required={fieldConfig("guardianEmail").required}
+            visible={fieldConfig("guardianEmail").enabled}
             defaultValue={record?.guardianEmail ?? ""}
           />
-          <Field label="Guardian phone" name="guardianPhone" defaultValue={record?.guardianPhone ?? ""} />
+          <Field label="Guardian phone" name="guardianPhone" required={fieldConfig("guardianPhone").required} visible={fieldConfig("guardianPhone").enabled} defaultValue={record?.guardianPhone ?? ""} />
           <Field
             label="Guardian occupation"
             name="guardianOccupation"
+            required={fieldConfig("guardianOccupation").required}
+            visible={fieldConfig("guardianOccupation").enabled}
             defaultValue={record?.guardianOccupation ?? ""}
           />
           <Field
             label="Guardian address"
             name="guardianAddress"
+            required={fieldConfig("guardianAddress").required}
+            visible={fieldConfig("guardianAddress").enabled}
             defaultValue={record?.guardianAddress ?? ""}
           />
         </div>
@@ -436,20 +478,23 @@ export function StudentForm({
         <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold text-slate-900">Identity and financial information</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="National ID number" name="nationalIdNumber" defaultValue={record?.additionalDetails?.nationalIdNumber ?? ""} />
-            <Field label="Birth certificate number" name="birthCertificateNumber" defaultValue={record?.additionalDetails?.birthCertificateNumber ?? ""} />
-            <Field label="Bank name" name="bankName" defaultValue={record?.additionalDetails?.bankName ?? ""} />
-            <Field label="Bank account number" name="bankAccountNumber" defaultValue={record?.additionalDetails?.bankAccountNumber ?? ""} />
-            <Field label="IFSC / bank routing code" name="bankIfscCode" defaultValue={record?.additionalDetails?.bankIfscCode ?? ""} />
+            <Field label="National ID number" name="nationalIdNumber" required={fieldConfig("nationalIdNumber").required} visible={fieldConfig("nationalIdNumber").enabled} defaultValue={record?.additionalDetails?.nationalIdNumber ?? ""} />
+            <Field label="Birth certificate number" name="birthCertificateNumber" required={fieldConfig("birthCertificateNumber").required} visible={fieldConfig("birthCertificateNumber").enabled} defaultValue={record?.additionalDetails?.birthCertificateNumber ?? ""} />
+            <Field label="Bank name" name="bankName" required={fieldConfig("bankName").required} visible={fieldConfig("bankName").enabled} defaultValue={record?.additionalDetails?.bankName ?? ""} />
+            <Field label="Bank account number" name="bankAccountNumber" required={fieldConfig("bankAccountNumber").required} visible={fieldConfig("bankAccountNumber").enabled} defaultValue={record?.additionalDetails?.bankAccountNumber ?? ""} />
+            <Field label="IFSC / bank routing code" name="bankIfscCode" required={fieldConfig("bankIfscCode").required} visible={fieldConfig("bankIfscCode").enabled} defaultValue={record?.additionalDetails?.bankIfscCode ?? ""} />
           </div>
           <TextareaField
             label="Additional notes"
             name="additionalNotes"
+            required={fieldConfig("additionalNotes").required}
+            visible={fieldConfig("additionalNotes").enabled}
             defaultValue={record?.additionalDetails?.additionalNotes ?? ""}
           />
         </fieldset>
-        <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
+        <fieldset hidden={!fieldConfig("studentDocuments").enabled} className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold text-slate-900">Student documents</legend>
+          {fieldConfig("studentDocuments").required && <p className="text-sm text-slate-600"><RequiredMark /> At least one document is required.</p>}
           <p className="text-sm text-slate-500">PDF, JPEG, PNG, or WebP files up to 4 MB each.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             {Array.from({ length: 4 }, (_, index) => {
@@ -482,6 +527,8 @@ export function StudentForm({
           <TextareaField
             label="Previous school details"
             name="previousSchoolDetails"
+            required={fieldConfig("previousSchoolDetails").required}
+            visible={fieldConfig("previousSchoolDetails").enabled}
             defaultValue={record?.additionalDetails?.previousSchoolDetails ?? ""}
           />
         </fieldset>
@@ -497,15 +544,15 @@ export function StudentForm({
         <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold text-slate-900">Transport information</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Transport route" name="transportRoute" defaultValue={record?.additionalDetails?.transportRoute ?? ""} />
-            <Field label="Vehicle number" name="vehicleNumber" defaultValue={record?.additionalDetails?.vehicleNumber ?? ""} />
+            <Field label="Transport route" name="transportRoute" required={fieldConfig("transportRoute").required} visible={fieldConfig("transportRoute").enabled} defaultValue={record?.additionalDetails?.transportRoute ?? ""} />
+            <Field label="Vehicle number" name="vehicleNumber" required={fieldConfig("vehicleNumber").required} visible={fieldConfig("vehicleNumber").enabled} defaultValue={record?.additionalDetails?.vehicleNumber ?? ""} />
           </div>
         </fieldset>
         <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold text-slate-900">Dormitory information</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Dormitory" name="dormitoryName" defaultValue={record?.additionalDetails?.dormitoryName ?? ""} />
-            <Field label="Room number" name="dormitoryRoom" defaultValue={record?.additionalDetails?.dormitoryRoom ?? ""} />
+            <Field label="Dormitory" name="dormitoryName" required={fieldConfig("dormitoryName").required} visible={fieldConfig("dormitoryName").enabled} defaultValue={record?.additionalDetails?.dormitoryName ?? ""} />
+            <Field label="Room number" name="dormitoryRoom" required={fieldConfig("dormitoryRoom").required} visible={fieldConfig("dormitoryRoom").enabled} defaultValue={record?.additionalDetails?.dormitoryRoom ?? ""} />
           </div>
         </fieldset>
       </div>
@@ -519,8 +566,8 @@ export function StudentForm({
         <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-4 sm:p-5">
           <legend className="px-2 text-sm font-semibold text-slate-900">Custom student field</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Field name" name="customFieldName" defaultValue={record?.additionalDetails?.customFieldName ?? ""} />
-            <Field label="Field value" name="customFieldValue" defaultValue={record?.additionalDetails?.customFieldValue ?? ""} />
+            <Field label="Field name" name="customFieldName" required={fieldConfig("customFieldName").required} visible={fieldConfig("customFieldName").enabled} defaultValue={record?.additionalDetails?.customFieldName ?? ""} />
+            <Field label="Field value" name="customFieldValue" required={fieldConfig("customFieldValue").required} visible={fieldConfig("customFieldValue").enabled} defaultValue={record?.additionalDetails?.customFieldValue ?? ""} />
           </div>
         </fieldset>
       </div>
@@ -571,6 +618,7 @@ function Field({
   name,
   type = "text",
   required = false,
+  visible = true,
   defaultValue,
   min,
   max,
@@ -580,13 +628,14 @@ function Field({
   name: string;
   type?: string;
   required?: boolean;
+  visible?: boolean;
   defaultValue?: string;
   min?: string;
   max?: string;
   step?: string;
 }) {
   return (
-    <label className="space-y-1.5 text-sm font-medium text-slate-700">
+    <label hidden={!visible} className="space-y-1.5 text-sm font-medium text-slate-700">
       {label} {required && <RequiredMark />}
       <input
         name={name}
@@ -606,17 +655,22 @@ function Field({
 function TextareaField({
   label,
   name,
+  required = false,
+  visible = true,
   defaultValue,
 }: {
   label: string;
   name: string;
+  required?: boolean;
+  visible?: boolean;
   defaultValue?: string;
 }) {
   return (
-    <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-      {label}
+    <label hidden={!visible} className="block space-y-1.5 text-sm font-medium text-slate-700">
+      {label} {required && <RequiredMark />}
       <textarea
         name={name}
+        required={required}
         defaultValue={defaultValue}
         maxLength={2000}
         rows={4}

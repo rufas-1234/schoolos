@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { createStaffMember, updateStaffMember, type StaffActionState } from "./actions";
 import type { StaffCustomField, StaffDocuments, StaffStoredFile } from "@/db/schema";
 import { employmentTypes, staffContractTypes, staffGenders, staffMaritalStatuses, staffRoles } from "@/lib/staff-policy";
@@ -71,13 +71,45 @@ export function StaffForm({ record, accounts, branches, departments, designation
   const [state, formAction, pending] = useActionState<StaffActionState, FormData>(action, {});
   const [activeTab, setActiveTab] = useState<Tab>(tabs[0]);
   const [pendingUploads, setPendingUploads] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submittedValues = useRef<Map<string, string[]> | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState(record?.branchId?.toString() ?? "");
   const customField = (index: number) => record?.customFields?.[index];
   const departmentOptions = branchCatalogOptions(departments, selectedBranchId, record?.department);
   const designationOptions = branchCatalogOptions(designations, selectedBranchId, record?.jobTitle);
 
+  useEffect(() => {
+    if (!state.error || !submittedValues.current || !formRef.current) return;
+    for (const [name, values] of submittedValues.current) {
+      const field = formRef.current.elements.namedItem(name);
+      if (field instanceof RadioNodeList) {
+        field.value = values[0] ?? "";
+      } else if (
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLSelectElement ||
+        field instanceof HTMLTextAreaElement
+      ) {
+        if (field instanceof HTMLInputElement && field.type === "file") continue;
+        field.value = values[0] ?? "";
+      }
+    }
+    submittedValues.current = null;
+  }, [state]);
+
   return (
-    <form action={formAction} noValidate className="space-y-5">
+    <form
+      ref={formRef}
+      action={formAction}
+      noValidate
+      onSubmit={(event) => {
+        const values = new Map<string, string[]>();
+        for (const [name, value] of new FormData(event.currentTarget).entries()) {
+          if (typeof value === "string") values.set(name, [...(values.get(name) ?? []), value]);
+        }
+        submittedValues.current = values;
+      }}
+      className="space-y-5"
+    >
       {record && <input type="hidden" name="publicId" value={record.publicId} />}
       <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6" role="tablist" aria-label="Staff profile sections">
         {tabs.map((tab) => (

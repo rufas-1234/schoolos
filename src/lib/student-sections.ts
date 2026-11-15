@@ -64,5 +64,7 @@ export const studentSections = [
   {
     id: "settings",
     label: "Student Settings",
+    href: "/admin/students/settings",
+    permission: "students.update",
   },
 ] as const;

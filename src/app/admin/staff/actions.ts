@@ -358,7 +358,10 @@ export async function createStaffMember(
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const result = parseStaffForm(formData);
 
-  if (!result.success) return { error: "Please review the staff details and try again." };
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    return { error: issue ? `${String(issue.path.at(-1) ?? "Staff details")}: ${issue.message}` : "Please review the staff details and try again." };
+  }
 
   const staff = result.data;
   const extrasError = await validateStaffExtras(staff, context.schoolId, context.schoolPublicId);
@@ -512,7 +515,8 @@ export async function updateStaffMember(
   const publicId = z.string().uuid().safeParse(readFormValue(formData, "publicId"));
   const result = parseStaffForm(formData);
   if (!publicId.success || !result.success) {
-    return { error: "Please review the staff details and try again." };
+    const issue = result.success ? null : result.error.issues[0];
+    return { error: issue ? `${String(issue.path.at(-1) ?? "Staff details")}: ${issue.message}` : "Please review the staff details and try again." };
   }
 
   const staff = result.data;
