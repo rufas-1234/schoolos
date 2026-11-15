@@ -211,6 +211,13 @@
       "when": 1794717121617,
       "tag": "0029_remarkable_preak",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1794731780316,
+      "tag": "0030_faulty_longshot",
+      "breakpoints": true
     }
   ]
 }

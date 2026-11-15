@@ -10,6 +10,7 @@ import {
   examMarkCorrections,
   examMarks,
   examSubjects,
+  examTypes,
   examinations,
   staffMembers,
   studentEnrollments,
@@ -40,6 +41,7 @@ export default async function ExaminationDetailPage({
   const [exam] = await db.select({
     id: examinations.id,
     name: examinations.name,
+    examTypeName: examTypes.name,
     status: examinations.status,
     startDate: examinations.startDate,
     endDate: examinations.endDate,
@@ -50,6 +52,10 @@ export default async function ExaminationDetailPage({
     .innerJoin(academicYears, and(
       eq(academicYears.id, examinations.academicYearId),
       eq(academicYears.schoolId, context.schoolId),
+    ))
+    .leftJoin(examTypes, and(
+      eq(examTypes.id, examinations.examTypeId!),
+      eq(examTypes.schoolId, context.schoolId),
     ))
     .where(and(eq(examinations.id, examId), eq(examinations.schoolId, context.schoolId)))
     .limit(1);
@@ -152,7 +158,7 @@ export default async function ExaminationDetailPage({
           <Link href="/admin/examinations" className="text-sm font-semibold text-violet-700">← Examinations</Link>
           <p className="mt-4 text-sm font-semibold text-violet-700">{context.schoolName} · {exam.yearName}</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{exam.name}</h1>
-          <p className="mt-2 text-sm text-slate-600">{exam.startDate} – {exam.endDate} · {overallStatus}</p>
+          <p className="mt-2 text-sm text-slate-600">{exam.examTypeName ? `${exam.examTypeName} · ` : ""}{exam.startDate} – {exam.endDate} · {overallStatus}</p>
         </div>
         {canReview && exam.status === "open" && <PublishExaminationForm examinationId={exam.id} />}
       </header>

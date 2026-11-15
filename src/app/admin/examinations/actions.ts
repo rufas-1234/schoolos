@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -12,6 +12,7 @@ import {
   classLevels,
   classSections,
   classSubjects,
+  examAttendance,
   examClasses,
   examGradeBands,
   examGradingScales,
@@ -20,6 +21,7 @@ import {
   examMarks,
   examStudentRemarks,
   examSubjects,
+  examTypes,
   examinations,
   staffMembers,
   studentEnrollments,
@@ -38,23 +40,6 @@ const text = (max: number) => z.string().trim().min(1).max(max);
 function value(formData: FormData, key: string): string {
   const field = formData.get(key);
   return typeof field === "string" ? field : "";
-}
-
-async function writeAudit(
-  context: Awaited<ReturnType<typeof requireSchoolPermission>>,
-  action: string,
-  resourceType: string,
-  resourcePublicId: string,
-  changedFields: string[],
-) {
-  await db.insert(auditLogs).values({
-    schoolId: context.schoolId,
-    actorUserId: context.user.id,
-    action,
-    resourceType,
-    resourcePublicId,
-    changedFields,
-  });
 }
 
 async function assignedSubject(examSubjectId: number, schoolId: number, userId: string) {
@@ -161,6 +146,51 @@ export async function createGradingScale(
   return { success: true };
 }
 
+export async function createExamType(
+  _previousState: ExaminationActionState,
+  formData: FormData,
+): Promise<ExaminationActionState> {
+  const context = await requireSchoolPermission("examinations.create");
+  const parsed = z.object({
+    name: text(120),
+    averageMark: numericField.pipe(z.number().nonnegative().max(100)),
+  }).safeParse({
+    name: value(formData, "name"),
+    averageMark: value(formData, "averageMark"),
+  });
+  if (!parsed.success) return { error: "Enter an exam type name and a valid non-negative average mark." };
+  const publicId = randomUUID();
+  try {
+    await db.transaction(async (tx) => {
+      if (value(formData, "averagePassing") === "on") {
+        await tx.update(examTypes).set({ averagePassing: false })
+          .where(and(eq(examTypes.schoolId, context.schoolId), eq(examTypes.averagePassing, true)));
+      }
+      await tx.insert(examTypes).values({
+        publicId,
+        schoolId: context.schoolId,
+        name: parsed.data.name,
+        averagePassing: value(formData, "averagePassing") === "on",
+        averageMark: parsed.data.averageMark.toFixed(2),
+        createdBy: context.user.id,
+      });
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: "examination.type.created",
+        resourceType: "exam_type",
+        resourcePublicId: publicId,
+        changedFields: ["name", "averagePassing", "averageMark"],
+      });
+    });
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return { error: "An exam type with that name already exists." };
+    throw error;
+  }
+  revalidatePath("/admin/examinations?section=types");
+  return { success: true };
+}
+
 export async function createExamination(
   _previousState: ExaminationActionState,
   formData: FormData,
@@ -171,6 +201,7 @@ export async function createExamination(
     name: text(120),
     academicYearId: idField,
     academicTermId: z.union([z.literal(""), idField]),
+    examTypeId: idField,
     gradingScaleId: idField,
     startDate: z.string().refine(isCalendarDate),
     endDate: z.string().refine(isCalendarDate),
@@ -179,13 +210,14 @@ export async function createExamination(
     name: value(formData, "name"),
     academicYearId: value(formData, "academicYearId"),
     academicTermId: value(formData, "academicTermId"),
+    examTypeId: value(formData, "examTypeId"),
     gradingScaleId: value(formData, "gradingScaleId"),
     startDate: value(formData, "startDate"),
     endDate: value(formData, "endDate"),
     classLevelIds: classValues,
   });
   if (!parsed.success || !isValidDateRange(value(formData, "startDate"), value(formData, "endDate"))) {
-    return { error: "Enter a name, valid dates, academic year, grading scale, and at least one class." };
+    return { error: "Enter a name, exam type, valid dates, academic year, grading scale, and at least one class." };
   }
   const classIds = [...new Set(parsed.data.classLevelIds)];
   const [year] = await db.select({
@@ -197,6 +229,11 @@ export async function createExamination(
   const [scale] = await db.select({ id: examGradingScales.id }).from(examGradingScales)
     .where(and(eq(examGradingScales.id, parsed.data.gradingScaleId), eq(examGradingScales.schoolId, context.schoolId))).limit(1);
   if (!year || !scale) return { error: "Choose an academic year and grading scale belonging to your school." };
+  const [examType] = await db.select({ id: examTypes.id }).from(examTypes).where(and(
+    eq(examTypes.id, parsed.data.examTypeId),
+    eq(examTypes.schoolId, context.schoolId),
+  )).limit(1);
+  if (!examType) return { error: "Choose an examination type belonging to your school." };
   if (parsed.data.startDate < year.startDate || parsed.data.endDate > year.endDate) {
     return { error: "Examination dates must fall within the selected academic year." };
   }
@@ -247,6 +284,7 @@ export async function createExamination(
       schoolId: context.schoolId,
       academicYearId: year.id,
       academicTermId: parsed.data.academicTermId || null,
+      examTypeId: examType.id,
       gradingScaleId: scale.id,
       name: parsed.data.name,
       startDate: parsed.data.startDate,
@@ -302,7 +340,7 @@ export async function createExamination(
       action: "examination.created",
       resourceType: "examination",
       resourcePublicId: examPublicId,
-      changedFields: ["name", "academicYearId", "academicTermId", "classes", "subjects", "dates"],
+      changedFields: ["name", "examTypeId", "academicYearId", "academicTermId", "classes", "subjects", "dates"],
     });
   }).catch((error: unknown) => {
     if (isDuplicateEntryError(error)) return "duplicate" as const;
@@ -510,6 +548,101 @@ export async function saveExamMarks(
   return { success: true };
 }
 
+export async function saveExamAttendance(
+  _previousState: ExaminationActionState,
+  formData: FormData,
+): Promise<ExaminationActionState> {
+  const context = await requireSchoolPermission(["examinations.create", "results.enter"]);
+  const subjectId = idField.safeParse(value(formData, "examSubjectId"));
+  if (!subjectId.success) return { error: "Choose a valid exam subject." };
+  const [subject] = await db.select({
+    id: examSubjects.id,
+    publicId: examSubjects.publicId,
+    examClassId: examClasses.id,
+    examId: examinations.id,
+    examStatus: examinations.status,
+  }).from(examSubjects)
+    .innerJoin(examClasses, and(
+      eq(examClasses.id, examSubjects.examClassId),
+      eq(examClasses.schoolId, context.schoolId),
+    ))
+    .innerJoin(examinations, and(
+      eq(examinations.id, examClasses.examinationId),
+      eq(examinations.schoolId, context.schoolId),
+    ))
+    .where(and(eq(examSubjects.id, subjectId.data), eq(examSubjects.schoolId, context.schoolId)))
+    .limit(1);
+  if (!subject || subject.examStatus !== "open") {
+    return { error: "Exam attendance can only be changed before results are published." };
+  }
+  const canManage = context.grantedPermissions.includes("examinations.create") ||
+    context.grantedPermissions.includes("results.publish");
+  if (!canManage && !(await assignedSubject(subject.id, context.schoolId, context.user.id))) {
+    return { error: "You can only mark attendance for your assigned subjects." };
+  }
+  const roster = await db.select({ enrollmentId: examMarks.enrollmentId }).from(examMarks)
+    .where(and(eq(examMarks.schoolId, context.schoolId), eq(examMarks.examSubjectId, subject.id)));
+  if (!roster.length) return { error: "There are no enrolled students on this exam roster." };
+  const statuses = new Map<number, { status: "present" | "absent" | "late" | "excused"; note: string | null }>();
+  for (const enrollment of roster) {
+    const rawStatus = value(formData, `attendance_${enrollment.enrollmentId}`);
+    const result = z.enum(["present", "absent", "late", "excused"]).safeParse(rawStatus);
+    if (!result.success) return { error: "Choose an attendance status for every student in the roster." };
+    const rawNote = value(formData, `note_${enrollment.enrollmentId}`).trim();
+    if (rawNote.length > 500) return { error: "Attendance notes must be 500 characters or fewer." };
+    statuses.set(enrollment.enrollmentId, { status: result.data, note: rawNote || null });
+  }
+  const outcome = await db.transaction(async (tx) => {
+    const [locked] = await tx.select({
+      id: examSubjects.id,
+      examStatus: examinations.status,
+    }).from(examSubjects)
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+      ))
+      .where(and(eq(examSubjects.id, subject.id), eq(examSubjects.schoolId, context.schoolId)))
+      .for("update")
+      .limit(1);
+    if (!locked || locked.examStatus !== "open") return false;
+    for (const [enrollmentId, attendance] of statuses) {
+      await tx.insert(examAttendance).values({
+        publicId: randomUUID(),
+        schoolId: context.schoolId,
+        examSubjectId: subject.id,
+        enrollmentId,
+        status: attendance.status,
+        note: attendance.note,
+        updatedBy: context.user.id,
+      }).onDuplicateKeyUpdate({
+        set: {
+          status: attendance.status,
+          note: attendance.note,
+          updatedBy: context.user.id,
+          updatedAt: new Date(),
+        },
+      });
+    }
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "examination.attendance.saved",
+      resourceType: "exam_subject",
+      resourcePublicId: subject.publicId,
+      changedFields: ["attendance"],
+    });
+    return true;
+  });
+  if (!outcome) return { error: "Results were published while you were marking attendance. Reload the page." };
+  revalidatePath(`/admin/examinations/${subject.examId}/attendance/${subject.id}`);
+  revalidatePath(`/admin/examinations/${subject.examId}`);
+  return { success: true };
+}
+
 export async function submitExamSubject(
   _previousState: ExaminationActionState,
   formData: FormData,
@@ -517,40 +650,58 @@ export async function submitExamSubject(
   const context = await requireSchoolPermission(["examinations.create", "results.enter"]);
   const subjectId = idField.safeParse(value(formData, "examSubjectId"));
   if (!subjectId.success) return { error: "Choose a valid exam subject." };
-  const [record] = await db.select({
-    id: examSubjects.id,
-    status: examSubjects.status,
-    examinationId: examinations.id,
-    examinationStatus: examinations.status,
-    maxMarks: examSubjects.maxMarks,
-    publicId: examSubjects.publicId,
-  }).from(examSubjects).innerJoin(examClasses, eq(examClasses.id, examSubjects.examClassId))
-    .innerJoin(examinations, eq(examinations.id, examClasses.examinationId))
-    .where(and(eq(examSubjects.id, subjectId.data), eq(examSubjects.schoolId, context.schoolId)))
-    .limit(1);
-  if (!record || record.status !== "draft" || record.examinationStatus !== "open") {
-    return { error: "Only draft assessments in an open examination can be submitted." };
-  }
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");
-  if (!canManage && !(await assignedSubject(record.id, context.schoolId, context.user.id))) {
+  if (!canManage && !(await assignedSubject(subjectId.data, context.schoolId, context.user.id))) {
     return { error: "You can only submit marks for your assigned subjects." };
   }
-  const marks = await db.select({ marks: examMarks.marks }).from(examMarks).where(and(
-    eq(examMarks.schoolId, context.schoolId),
-    eq(examMarks.examSubjectId, record.id),
-  ));
-  if (!marks.length || marks.some((mark) => mark.marks === null || Number(mark.marks) > Number(record.maxMarks))) {
-    return { error: "Enter valid marks for every enrolled student before submitting." };
-  }
-  await db.update(examSubjects).set({
-    status: "submitted",
-    submittedBy: context.user.id,
-    submittedAt: new Date(),
-    reviewNote: null,
-  }).where(and(eq(examSubjects.id, record.id), eq(examSubjects.status, "draft")));
-  await writeAudit(context, "examination.subject.submitted", "exam_subject", record.publicId, ["status", "submittedBy"]);
-  revalidatePath(`/admin/examinations/${record.examinationId}`);
+  const outcome = await db.transaction(async (tx) => {
+    const [record] = await tx.select({
+      id: examSubjects.id,
+      status: examSubjects.status,
+      publicId: examSubjects.publicId,
+      examinationId: examinations.id,
+      examinationStatus: examinations.status,
+      maxMarks: examSubjects.maxMarks,
+    }).from(examSubjects)
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+      ))
+      .where(and(eq(examSubjects.id, subjectId.data), eq(examSubjects.schoolId, context.schoolId)))
+      .for("update")
+      .limit(1);
+    if (!record || record.status !== "draft" || record.examinationStatus !== "open") return "locked" as const;
+    const marks = await tx.select({ marks: examMarks.marks }).from(examMarks).where(and(
+      eq(examMarks.schoolId, context.schoolId),
+      eq(examMarks.examSubjectId, record.id),
+    )).for("update");
+    if (!marks.length || marks.some((mark) => mark.marks === null || Number(mark.marks) > Number(record.maxMarks))) {
+      return "invalid-marks" as const;
+    }
+    await tx.update(examSubjects).set({
+      status: "submitted",
+      submittedBy: context.user.id,
+      submittedAt: new Date(),
+      reviewNote: null,
+    }).where(and(eq(examSubjects.id, record.id), eq(examSubjects.status, "draft")));
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "examination.subject.submitted",
+      resourceType: "exam_subject",
+      resourcePublicId: record.publicId,
+      changedFields: ["status", "submittedBy"],
+    });
+    return record.examinationId;
+  });
+  if (outcome === "locked") return { error: "Only draft assessments in an open examination can be submitted." };
+  if (outcome === "invalid-marks") return { error: "Enter valid marks for every enrolled student before submitting." };
+  revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
 }
 
@@ -571,34 +722,53 @@ export async function reviewExamSubject(
   if (!parsed.success || (parsed.data.decision === "return" && !parsed.data.reviewNote)) {
     return { error: "Choose approve or return; a return must include a note for the teacher." };
   }
-  const [record] = await db.select({
-    id: examSubjects.id,
-    status: examSubjects.status,
-    publicId: examSubjects.publicId,
-    examinationId: examinations.id,
-    examinationStatus: examinations.status,
-    maxMarks: examSubjects.maxMarks,
-  }).from(examSubjects).innerJoin(examClasses, eq(examClasses.id, examSubjects.examClassId))
-    .innerJoin(examinations, eq(examinations.id, examClasses.examinationId))
-    .where(and(eq(examSubjects.id, parsed.data.examSubjectId), eq(examSubjects.schoolId, context.schoolId)))
-    .limit(1);
-  if (!record || record.status !== "submitted" || record.examinationStatus !== "open") {
-    return { error: "Only submitted assessment results in an open examination can be reviewed." };
-  }
-  const markRows = await db.select({ marks: examMarks.marks }).from(examMarks)
-    .where(and(eq(examMarks.schoolId, context.schoolId), eq(examMarks.examSubjectId, record.id)));
-  if (!markRows.length || markRows.some((mark) => mark.marks === null || Number(mark.marks) > Number(record.maxMarks))) {
-    return { error: "This assessment has incomplete or invalid marks and cannot be approved." };
-  }
   const nextStatus = parsed.data.decision === "approve" ? "approved" : "draft";
-  await db.update(examSubjects).set({
-    status: nextStatus,
-    reviewedBy: context.user.id,
-    reviewedAt: new Date(),
-    reviewNote: parsed.data.reviewNote || null,
-  }).where(and(eq(examSubjects.id, record.id), eq(examSubjects.status, "submitted")));
-  await writeAudit(context, `examination.subject.${nextStatus}`, "exam_subject", record.publicId, ["status", "reviewNote"]);
-  revalidatePath(`/admin/examinations/${record.examinationId}`);
+  const outcome = await db.transaction(async (tx) => {
+    const [record] = await tx.select({
+      id: examSubjects.id,
+      status: examSubjects.status,
+      publicId: examSubjects.publicId,
+      examinationId: examinations.id,
+      examinationStatus: examinations.status,
+      maxMarks: examSubjects.maxMarks,
+    }).from(examSubjects)
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+      ))
+      .where(and(eq(examSubjects.id, parsed.data.examSubjectId), eq(examSubjects.schoolId, context.schoolId)))
+      .for("update")
+      .limit(1);
+    if (!record || record.status !== "submitted" || record.examinationStatus !== "open") return "locked" as const;
+    const markRows = await tx.select({ marks: examMarks.marks }).from(examMarks)
+      .where(and(eq(examMarks.schoolId, context.schoolId), eq(examMarks.examSubjectId, record.id)))
+      .for("update");
+    if (!markRows.length || markRows.some((mark) => mark.marks === null || Number(mark.marks) > Number(record.maxMarks))) {
+      return "invalid-marks" as const;
+    }
+    await tx.update(examSubjects).set({
+      status: nextStatus,
+      reviewedBy: context.user.id,
+      reviewedAt: new Date(),
+      reviewNote: parsed.data.reviewNote || null,
+    }).where(and(eq(examSubjects.id, record.id), eq(examSubjects.status, "submitted")));
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: `examination.subject.${nextStatus}`,
+      resourceType: "exam_subject",
+      resourcePublicId: record.publicId,
+      changedFields: ["status", "reviewNote"],
+    });
+    return record.examinationId;
+  });
+  if (outcome === "locked") return { error: "Only submitted assessment results in an open examination can be reviewed." };
+  if (outcome === "invalid-marks") return { error: "This assessment has incomplete or invalid marks and cannot be approved." };
+  revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
 }
 
@@ -609,34 +779,39 @@ export async function publishExamination(
   const context = await requireSchoolPermission("results.publish");
   const examId = idField.safeParse(value(formData, "examinationId"));
   if (!examId.success) return { error: "Choose an examination." };
-  const [exam] = await db.select({
-    id: examinations.id,
-    publicId: examinations.publicId,
-    status: examinations.status,
-  }).from(examinations).where(and(
-    eq(examinations.id, examId.data),
-    eq(examinations.schoolId, context.schoolId),
-  )).limit(1);
-  if (!exam || exam.status !== "open") return { error: "This examination is already published or unavailable." };
-  const subjectsToPublish = await db.select({
-    id: examSubjects.id,
-    status: examSubjects.status,
-    maxMarks: examSubjects.maxMarks,
-  }).from(examSubjects).innerJoin(examClasses, eq(examClasses.id, examSubjects.examClassId))
-    .where(and(eq(examClasses.examinationId, exam.id), eq(examClasses.schoolId, context.schoolId)));
-  if (!subjectsToPublish.length || subjectsToPublish.some((subject) => subject.status !== "approved")) {
-    return { error: "Every class and subject must be submitted and approved before results can be published." };
-  }
-  for (const subject of subjectsToPublish) {
-    const marks = await db.select({ marks: examMarks.marks }).from(examMarks).where(and(
-      eq(examMarks.schoolId, context.schoolId),
-      eq(examMarks.examSubjectId, subject.id),
-    ));
-    if (!marks.length || marks.some((mark) => mark.marks === null || Number(mark.marks) > Number(subject.maxMarks))) {
-      return { error: "Incomplete or out-of-range marks prevent publication. Review every class roster." };
+  const outcome = await db.transaction(async (tx) => {
+    const [exam] = await tx.select({
+      id: examinations.id,
+      publicId: examinations.publicId,
+      status: examinations.status,
+    }).from(examinations).where(and(
+      eq(examinations.id, examId.data),
+      eq(examinations.schoolId, context.schoolId),
+    )).for("update").limit(1);
+    if (!exam || exam.status !== "open") return "locked" as const;
+    const subjectsToPublish = await tx.select({
+      id: examSubjects.id,
+      status: examSubjects.status,
+      maxMarks: examSubjects.maxMarks,
+    }).from(examSubjects).innerJoin(examClasses, and(
+      eq(examClasses.id, examSubjects.examClassId),
+      eq(examClasses.schoolId, context.schoolId),
+    )).where(and(
+      eq(examClasses.examinationId, exam.id),
+      eq(examSubjects.schoolId, context.schoolId),
+    )).orderBy(asc(examSubjects.id)).for("update");
+    if (!subjectsToPublish.length || subjectsToPublish.some((subject) => subject.status !== "approved")) {
+      return "incomplete" as const;
     }
-  }
-  await db.transaction(async (tx) => {
+    for (const subject of subjectsToPublish) {
+      const marks = await tx.select({ marks: examMarks.marks }).from(examMarks).where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        eq(examMarks.examSubjectId, subject.id),
+      )).for("update");
+      if (!marks.length || marks.some((mark) => mark.marks === null || Number(mark.marks) > Number(subject.maxMarks))) {
+        return "invalid-marks" as const;
+      }
+    }
     await tx.update(examSubjects).set({ status: "published" })
       .where(and(inArray(examSubjects.id, subjectsToPublish.map((subject) => subject.id)), eq(examSubjects.schoolId, context.schoolId)));
     await tx.update(examinations).set({
@@ -652,9 +827,13 @@ export async function publishExamination(
       resourcePublicId: exam.publicId,
       changedFields: ["status", "publishedBy", "publishedAt"],
     });
+    return exam.id;
   });
+  if (outcome === "locked") return { error: "This examination is already published or unavailable." };
+  if (outcome === "incomplete") return { error: "Every class and subject must be submitted and approved before results can be published." };
+  if (outcome === "invalid-marks") return { error: "Incomplete or out-of-range marks prevent publication. Review every class roster." };
   revalidatePath("/admin/examinations");
-  revalidatePath(`/admin/examinations/${exam.id}`);
+  revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
 }
 

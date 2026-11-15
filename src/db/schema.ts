@@ -1109,6 +1109,27 @@ export const examGradingScales = mysqlTable(
   ],
 );
 
+export const examTypes = mysqlTable(
+  "exam_types",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    averagePassing: boolean("averagePassing").notNull().default(false),
+    averageMark: decimal("averageMark", { precision: 8, scale: 2 }).notNull().default("0"),
+    createdBy: varchar("createdBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_types_school_name_uq").on(table.schoolId, table.name),
+    index("exam_types_school_created_idx").on(table.schoolId, table.createdAt),
+  ],
+);
+
 export const examGradeBands = mysqlTable(
   "exam_grade_bands",
   {
@@ -1143,6 +1164,8 @@ export const examinations = mysqlTable(
       .references(() => academicYears.id),
     academicTermId: bigint("academicTermId", { mode: "number", unsigned: true })
       .references(() => academicTerms.id),
+    examTypeId: bigint("examTypeId", { mode: "number", unsigned: true })
+      .references(() => examTypes.id),
     gradingScaleId: bigint("gradingScaleId", { mode: "number", unsigned: true })
       .notNull()
       .references(() => examGradingScales.id),
@@ -1242,6 +1265,32 @@ export const examMarks = mysqlTable(
   (table) => [
     uniqueIndex("exam_marks_school_subject_enrollment_uq").on(table.schoolId, table.examSubjectId, table.enrollmentId),
     index("exam_marks_school_enrollment_idx").on(table.schoolId, table.enrollmentId),
+  ],
+);
+
+export const examAttendance = mysqlTable(
+  "exam_attendance",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examSubjectId: bigint("examSubjectId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examSubjects.id, { onDelete: "cascade" }),
+    enrollmentId: bigint("enrollmentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => studentEnrollments.id),
+    status: varchar("status", { length: 20 }).notNull(),
+    note: varchar("note", { length: 500 }),
+    updatedBy: varchar("updatedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_attendance_school_subject_enrollment_uq").on(table.schoolId, table.examSubjectId, table.enrollmentId),
+    index("exam_attendance_school_status_idx").on(table.schoolId, table.status),
   ],
 );
 

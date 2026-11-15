@@ -72,6 +72,15 @@ const navigation: NavigationItem[] = [
     icon: BookOpen,
     permission: "examinations.create",
     permissionAlternatives: ["results.enter", "results.publish"],
+    children: [
+      { id: "types", label: "Exam Type", href: "/admin/examinations?section=types", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "types" } },
+      { id: "setup", label: "Exam Setup", href: "/admin/examinations?section=setup", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "setup" } },
+      { id: "schedule", label: "Exam Schedule", href: "/admin/examinations?section=schedule", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "schedule" } },
+      { id: "attendance", label: "Exam Attendance", href: "/admin/examinations?section=attendance", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "attendance" } },
+      { id: "marks-register", label: "Marks Register", href: "/admin/examinations?section=marks", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "marks" } },
+      { id: "marks-grade", label: "Marks Grade", href: "/admin/examinations?section=grades", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "grades" } },
+      { id: "send-marks-sms", label: "Send Marks By SMS", href: "/admin/examinations?section=sms", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "sms" } },
+    ],
   },
   {
     href: "/admin/hr",
@@ -161,6 +170,9 @@ export function AdminShell({
   const [financesOpen, setFinancesOpen] = useState(() =>
     pathname.startsWith("/admin/fees"),
   );
+  const [examinationsOpen, setExaminationsOpen] = useState(() =>
+    pathname.startsWith("/admin/examinations"),
+  );
   const router = useRouter();
   const visibleNavigation = navigation.filter((item) =>
     permissions.includes(item.permission) ||
@@ -173,10 +185,10 @@ export function AdminShell({
       ? "/admin/hr"
       : permissions.includes("roles.manage")
         ? "/admin/settings/roles"
+      : permissions.includes("examinations.create") || permissions.includes("results.enter") || permissions.includes("results.publish")
+      ? "/admin/examinations"
       : permissions.includes("fees.manage") || permissions.includes("payments.record")
         ? "/admin/fees/collection"
-      : permissions.includes("examinations.create") || permissions.includes("results.enter") || permissions.includes("results.publish")
-        ? "/admin/examinations"
         : "/admin/settings/roles";
   const schoolMonogram =
     schoolName
@@ -274,12 +286,15 @@ export function AdminShell({
             const isStudentInfo = href === "/admin/students";
             const isHumanResources = href === "/admin/hr";
             const isFinances = href === "/admin/fees/collection";
+            const isExaminations = href === "/admin/examinations";
             const sectionOpen = isStudentInfo
               ? studentInfoOpen
               : isHumanResources
                 ? humanResourcesOpen
                 : isFinances
                   ? financesOpen
+                  : isExaminations
+                    ? examinationsOpen
                   : academicsOpen;
             const setSectionOpen = isStudentInfo
               ? setStudentInfoOpen
@@ -287,6 +302,8 @@ export function AdminShell({
                 ? setHumanResourcesOpen
                 : isFinances
                   ? setFinancesOpen
+                  : isExaminations
+                    ? setExaminationsOpen
                   : setAcademicsOpen;
             const activeChild = visibleSections.find((section) => {
               if (!section.href) return false;

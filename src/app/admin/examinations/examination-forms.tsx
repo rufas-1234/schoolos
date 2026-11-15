@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import {
+  createExamType,
   createExamination,
   createGradingScale,
   publishExamination,
@@ -10,6 +11,7 @@ import {
   reviewMarkCorrection,
   saveClassTeacherRemark,
   saveExamMarks,
+  saveExamAttendance,
   savePrincipalRemark,
   submitExamSubject,
   updateExamSubjectSettings,
@@ -36,11 +38,13 @@ function SubmitButton({ children, pending }: { children: string; pending: boolea
 export function CreateExaminationForm({
   years,
   terms,
+  examTypes,
   scales,
   classes,
 }: {
   years: Array<{ id: number; name: string }>;
   terms: Array<{ id: number; academicYearId: number; name: string }>;
+  examTypes: Array<{ id: number; name: string }>;
   scales: Array<{ id: number; name: string; isDefault: boolean }>;
   classes: Array<{ id: number; name: string }>;
 }) {
@@ -52,6 +56,12 @@ export function CreateExaminationForm({
         <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="Term 1 examinations" />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm font-medium">Exam type
+          <select required name="examTypeId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
+            <option value="" disabled>Select type</option>
+            {examTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+          </select>
+        </label>
         <label className="text-sm font-medium">Academic year
           <select required name="academicYearId" className="mt-1 w-full rounded-lg border p-2.5" defaultValue="">
             <option value="" disabled>Select year</option>
@@ -98,6 +108,25 @@ export function CreateExaminationForm({
   );
 }
 
+export function CreateExamTypeForm() {
+  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createExamType, {});
+  return (
+    <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <h2 className="text-lg font-bold text-slate-900">Create exam type</h2>
+      <label className="block text-sm font-medium">Exam name
+        <input required name="name" maxLength={120} className="mt-1 w-full rounded-lg border p-2.5" placeholder="First Term" />
+      </label>
+      <label className="block text-sm font-medium">Average passing mark
+        <input required type="number" min="0" max="100" step="0.01" name="averageMark" defaultValue="0" className="mt-1 w-full rounded-lg border p-2.5" />
+      </label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="averagePassing" /> Use as the school&apos;s average-passing examination</label>
+      <p className="text-xs text-slate-500">Exam types are reusable labels such as First Term or Mid-year. This passing threshold is stored on the type; each examination still uses its selected grading scale for result grades.</p>
+      <SubmitButton pending={pending}>Save exam type</SubmitButton>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
 export function CreateGradingScaleForm() {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createGradingScale, {});
   return (
@@ -115,6 +144,45 @@ export function CreateGradingScaleForm() {
         <label className="flex items-center gap-2"><input type="checkbox" name="allowRanking" /> Enable class ranking</label>
       </div>
       <SubmitButton pending={pending}>Save grading scale</SubmitButton>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+export function SaveExamAttendanceForm({
+  examSubjectId,
+  students,
+  editable,
+}: {
+  examSubjectId: number;
+  editable: boolean;
+  students: Array<{
+    enrollmentId: number;
+    name: string;
+    admissionNumber: string | null;
+    status: string | null;
+    note: string | null;
+  }>;
+}) {
+  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamAttendance, {});
+  if (!editable) return <p className="text-sm text-slate-600">Attendance is read-only after results are published.</p>;
+  return (
+    <form action={action} className="space-y-4">
+      <input type="hidden" name="examSubjectId" value={examSubjectId} />
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Attendance</th><th className="p-3">Note</th></tr></thead>
+          <tbody>{students.map((student) => (
+            <tr key={student.enrollmentId} className="border-t">
+              <td className="p-3 font-medium">{student.name}</td>
+              <td className="p-3">{student.admissionNumber ?? "—"}</td>
+              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} defaultValue={student.status ?? ""} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></td>
+              <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} defaultValue={student.note ?? ""} className="w-full min-w-40 rounded-lg border p-2" /></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <SubmitButton pending={pending}>Save exam attendance</SubmitButton>
       <Feedback state={state} />
     </form>
   );
