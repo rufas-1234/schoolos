@@ -235,7 +235,7 @@ function ProgressCard({
       </section>
       <section className="rounded-lg border border-slate-200 p-3 text-xs">
         <h3 className="font-bold">Comments</h3>
-        <p className="mt-1"><b>Class teacher:</b> {classRemark || (overallGrade?.performanceRemark ? `Suggested from grade ${overallGrade.grade}: ${overallGrade.performanceRemark}` : "—")}</p>
+        <p className="mt-1"><b>Class teacher:</b> {classRemark || overallGrade?.performanceRemark || "—"}</p>
         <p className="mt-1"><b>Principal:</b> {principalRemark || "—"}</p>
       </section>
       <footer className="grid grid-cols-3 gap-3 pt-2 text-center text-[10px]">
@@ -822,7 +822,7 @@ export default async function ExaminationReportPage({
                           const percentage = typeof mark === "number" ? mark / Number(item.maxMarks) * 100 : null;
                           const band = percentage === null ? null : gradeForPercentage(percentage, bands);
                           const teacherRemark = teacherRemarksByMark.get(`${activeResult.enrollmentId}:${item.id}`);
-                          return <tr key={item.id}><td>{item.name}</td><td>{formatMarks(mark)} / {item.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td><td>{teacherRemark || (band?.performanceRemark ? `Suggested: ${band.performanceRemark}` : "—")}</td></tr>;
+                          return <tr key={item.id}><td>{item.name}</td><td>{formatMarks(mark)} / {item.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td><td>{teacherRemark || band?.performanceRemark || "—"}</td></tr>;
                         })}</tbody>
                         <tfoot><tr><td>Overall</td><td>{activeResult.overall ? `${activeResult.overall.totalMarks.toFixed(2)} / ${activeResult.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{activeResult.overall ? `${activeResult.overall.percentage.toFixed(2)}%` : "—"}</td><td>{activeResult.grade?.grade ?? "—"}</td><td>{activeResult.grade?.performanceRemark ?? ""}</td></tr></tfoot>
                       </table>

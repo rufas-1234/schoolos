@@ -368,7 +368,7 @@ export default async function ReportCardPage({
                 <td className="p-3">{item.marks} / {item.maxMarks}</td>
                 <td className="p-3">{item.percentage.toFixed(2)}%</td>
                 <td className="p-3">{item.grade?.grade ?? "—"}{item.grade && <span className="ml-1 text-xs text-slate-500">{item.grade.description}</span>}</td>
-                <td className="p-3">{item.teacherRemark || (item.grade?.performanceRemark ? `Suggested: ${item.grade.performanceRemark}` : "—")}</td>
+                <td className="p-3">{item.teacherRemark || item.grade?.performanceRemark || "—"}</td>
               </tr>
             ))}</tbody>
             <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
@@ -377,7 +377,7 @@ export default async function ReportCardPage({
           </table>
         </section>
         <section className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classRemark?.remark || (overallGrade?.performanceRemark ? `Suggested from grade ${overallGrade.grade}: ${overallGrade.performanceRemark}` : "—")}</p></div>
+          <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classRemark?.remark || overallGrade?.performanceRemark || "—"}</p></div>
           <div className="rounded-xl border p-4"><h3 className="font-bold">Principal&apos;s remarks</h3><p className="mt-2 text-sm">{record.principalRemark ?? "—"}</p></div>
         </section>
         <section className="grid grid-cols-3 gap-3 pt-4 text-center text-xs">
