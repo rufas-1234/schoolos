@@ -120,7 +120,7 @@ export function AdminRecordDialog({
         aria-label={`${actionLabel} ${title}`}
         title={`${actionLabel} ${title}`}
         className={triggerLabel
-          ? "text-left font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+          ? "cursor-pointer text-left text-slate-700 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
           : `inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${showLabel ? "px-2.5" : "w-9"}`}
       >
         {triggerLabel ? triggerLabel : (
