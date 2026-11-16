@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 
 export function FeeInvoiceFilters({
   search,
@@ -22,28 +22,16 @@ export function FeeInvoiceFilters({
   selectedSection: string;
   selectedStatus: string;
 }) {
-  const searchRef = useRef<HTMLInputElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
-
   return (
-    <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
+    <SmartFilterForm method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6">
       <label className="text-sm font-medium text-slate-700 sm:col-span-2">
         Search student
         <input
-          ref={searchRef}
           name="search"
           type="search"
           defaultValue={search}
           autoComplete="off"
           placeholder="Type a name, admission or roll number..."
-          onChange={() => {
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(() => searchRef.current?.form?.requestSubmit(), 400);
-          }}
           className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5"
         />
         <span className="mt-1 block text-xs font-normal text-slate-500">Results update as you type.</span>
@@ -93,6 +81,6 @@ export function FeeInvoiceFilters({
           Search invoices
         </button>
       </div>
-    </form>
+    </SmartFilterForm>
   );
 }

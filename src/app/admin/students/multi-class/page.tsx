@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { removeStudentClass } from "../class-actions";
 import { StudentClassForm } from "../student-class-form";
 
@@ -214,7 +215,7 @@ export default async function MultiClassStudentsPage({
         <p className="mt-1 text-sm text-slate-500">
           Select a branch and academic year first. Then choose a class and section to load students.
         </p>
-        <form method="get" className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <SmartFilterForm method="get" className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <SearchableSelect
             label="Branch"
             name="branchId"
@@ -265,12 +266,7 @@ export default async function MultiClassStudentsPage({
             placeholder="Search students..."
             disabled={!eligibleStudents.length}
           />
-          <div className="flex items-end">
-            <button type="submit" className="w-full rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 sm:w-auto">
-              Search
-            </button>
-          </div>
-        </form>
+        </SmartFilterForm>
         {branchId !== null && academicYearId !== null && classes.length === 0 && (
           <p role="status" className="mt-4 text-sm text-amber-700">
             No active classes are available for this branch.

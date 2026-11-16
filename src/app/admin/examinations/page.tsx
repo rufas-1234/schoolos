@@ -23,6 +23,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
   CreateExamTypeForm,
   CreateExaminationForm,
@@ -454,7 +455,7 @@ export default async function ExaminationsPage({
     classSection.academicYearId === assessment.academicYearId,
   ));
   const assessmentFilterForm = (formSection: "schedule" | "attendance" | "marks") => (
-    <form method="get" action="/admin/examinations" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+    <SmartFilterForm method="get" action="/admin/examinations" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       <input type="hidden" name="section" value={formSection} />
       <label className="min-w-0 text-sm font-medium">Search
         <input type="search" name="search" defaultValue={search} maxLength={120} placeholder="Exam, class, subject" className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
@@ -478,7 +479,7 @@ export default async function ExaminationsPage({
         <button className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Search</button>
         <Link href={`/admin/examinations?section=${formSection}`} className="rounded-lg border px-4 py-2.5 text-sm font-semibold text-slate-700">Reset</Link>
       </div>
-    </form>
+    </SmartFilterForm>
   );
 
   return (

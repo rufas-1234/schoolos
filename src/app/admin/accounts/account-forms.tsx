@@ -2,6 +2,7 @@
 
 import { useActionState, type ReactNode } from "react";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
   createAccountTransaction,
   createChartAccount,
@@ -176,10 +177,10 @@ export function ReviewTransactionForm({ transactionId }: { transactionId: number
 
 export function ProfitLossFilters({ from, to }: { from: string; to: string }) {
   return (
-    <form method="get" className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+    <SmartFilterForm method="get" className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
       <label className="text-sm text-slate-700">From<input name="from" type="date" defaultValue={from} className="mt-1 block h-10 rounded-lg border border-slate-200 px-3" /></label>
       <label className="text-sm text-slate-700">To<input name="to" type="date" defaultValue={to} className="mt-1 block h-10 rounded-lg border border-slate-200 px-3" /></label>
       <button className="h-10 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Update report</button>
-    </form>
+    </SmartFilterForm>
   );
 }

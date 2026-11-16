@@ -10,6 +10,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { LeaveBalanceForm, LeaveRequestForm, LeaveReviewForm, LeaveTypeForm } from "../hr-forms";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 
 export default async function StaffLeavePage({
   searchParams,
@@ -183,7 +184,7 @@ export default async function StaffLeavePage({
         </p>
       </header>
 
-      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <SmartFilterForm method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <SearchableSelect
           label="Branch"
           name="branchId"
@@ -193,10 +194,9 @@ export default async function StaffLeavePage({
           placeholder="Search branches..."
           disabled={!branches.length}
         />
-        <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View branch</button>
-      </form>
+      </SmartFilterForm>
 
-      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <SmartFilterForm method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         {branchId && <input type="hidden" name="branchId" value={branchId} />}
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Search staff or leave type
@@ -235,8 +235,7 @@ export default async function StaffLeavePage({
             <option value="rejected">Rejected</option>
           </select>
         </label>
-        <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
-      </form>
+      </SmartFilterForm>
 
       {!branch && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Create an active branch before managing leave.</p>}
       {branch && (

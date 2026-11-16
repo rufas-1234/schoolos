@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 
 export function FeeReportFilters({
   from,
@@ -30,7 +31,7 @@ export function FeeReportFilters({
   selectedStatus: string;
 }) {
   return (
-    <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <SmartFilterForm method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
       <label className="text-sm font-medium text-slate-700">From
         <input type="date" name="from" defaultValue={from} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
       </label>
@@ -72,13 +73,7 @@ export function FeeReportFilters({
         defaultValue={selectedStatus}
         placeholder="Search statuses..."
       />
-      <div className="flex items-end gap-2">
-        <button
-          type="submit"
-          className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800"
-        >
-          Apply filters
-        </button>
+      <div className="flex items-end">
         <a
           href="/admin/fees/reports"
           className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -86,6 +81,6 @@ export function FeeReportFilters({
           Reset
         </a>
       </div>
-    </form>
+    </SmartFilterForm>
   );
 }

@@ -17,6 +17,7 @@ import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
 import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { TablePagination } from "@/components/table-pagination";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 25;
@@ -323,7 +324,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
         ))}
       </nav>
 
-      <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+      <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <input type="hidden" name="report" value={report} />
         {(report === "stock" || report === "low-stock" || report === "movements" || report === "assets" || report === "maintenance") && (
           <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Search
@@ -367,7 +368,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
           fileName={`inventory-${report}${report === "stock" || report === "low-stock" ? "" : `-${from}-to-${to}`}.csv`}
         />
         <PrintReportButton />
-      </form>
+      </SmartFilterForm>
 
       <section className="print-report-content space-y-5">
         <header className="print-report-heading">

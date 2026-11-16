@@ -16,6 +16,7 @@ import {
   PayrollRecordPrintButton,
 } from "../hr-forms";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 
 function isPayPeriod(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
@@ -142,7 +143,7 @@ export default async function StaffPayrollPage({
         </p>
       </header>
 
-      <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <SearchableSelect
           label="Branch"
           name="branchId"
@@ -169,7 +170,7 @@ export default async function StaffPayrollPage({
           <input type="search" name="search" maxLength={120} defaultValue={staffSearch} placeholder="Name or staff number" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
         <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View report</button>
-      </form>
+      </SmartFilterForm>
 
       <div className="print:hidden">
         {branch ? (

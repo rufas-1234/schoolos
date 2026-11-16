@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { PrintButton } from "@/components/print-button";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { db } from "@/db";
 import {
   academicYears,
@@ -522,7 +523,7 @@ export default async function ExamAnalyticsPage({
         </div>
       </header>
 
-      <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5 print:hidden">
+      <SmartFilterForm method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5 print:hidden">
         <SearchableSelect label="Published examination" name="examId" required
           defaultValue={String(selectedExam?.id ?? "")}
           options={publishedExams.map((exam) => ({ value: String(exam.id), label: `${exam.name} · ${exam.yearName}` }))}
@@ -543,7 +544,7 @@ export default async function ExamAnalyticsPage({
           <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
           <a href="/admin/exam-analytics" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
         </div>
-      </form>
+      </SmartFilterForm>
 
       {!publishedExams.length ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">

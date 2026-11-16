@@ -18,6 +18,7 @@ import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
 import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOption } from "./account-forms";
 import { TablePagination } from "@/components/table-pagination";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 25;
@@ -496,7 +497,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         )}
         {section === "reports" && (
           <div className="space-y-5">
-            <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+            <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
               <input type="hidden" name="section" value="reports" />
               <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Search transactions
                 <input type="search" name="search" maxLength={120} defaultValue={search}
@@ -530,7 +531,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 fileName={`fund-transfers-${from}-to-${to}.csv`}
               />
               <PrintReportButton />
-            </form>
+            </SmartFilterForm>
 
             <section className="print-report-content space-y-5">
               <header className="print-report-heading">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { PrintButton } from "@/components/print-button";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { db } from "@/db";
 import {
   academicTerms,
@@ -748,7 +749,7 @@ export default async function ExaminationReportPage({
         </section>
       ) : (
         <>
-          <form method="get" className="grid max-w-6xl gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5 print:hidden">
+          <SmartFilterForm method="get" className="grid max-w-6xl gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5 print:hidden">
             <SearchableSelect label="Examination" name="examId" defaultValue={String(exam?.id ?? "")} required
               options={[{ value: "", label: "Select an exam" }, ...examOptions.map((option) => ({ value: String(option.id), label: `${option.name} · ${option.yearName}${option.status !== "published" ? ` · ${option.status}` : ""}` }))]}
               placeholder="Search examinations..." />
@@ -769,7 +770,7 @@ export default async function ExaminationReportPage({
               <button className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Generate report</button>
               <Link href={`/admin/examinations/report-center/${reportType}`} className="rounded-lg border px-4 py-2.5 text-sm font-semibold text-slate-700">Reset</Link>
             </div>
-          </form>
+          </SmartFilterForm>
 
           {reportType === "exam-routine" && (
             <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">

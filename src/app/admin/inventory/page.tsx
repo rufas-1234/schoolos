@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { AssetMaintenanceEditor, InventoryAssetEditor, InventoryForms, InventoryItemEditor, type InventoryOption } from "./inventory-forms";
 import { InventoryModuleNav } from "./module-nav";
 import { TablePagination } from "@/components/table-pagination";
@@ -279,7 +280,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </section>
       )}
 
-      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <SmartFilterForm method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <input type="hidden" name="section" value={section} />
         <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Search {section === "assets" ? "assets" : "items"}
           <input type="search" name="search" maxLength={120} defaultValue={search}
@@ -310,7 +311,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           <button className="h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
           <a href={`/admin/inventory${section === "assets" ? "?section=assets" : ""}`} className="h-10 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
         </div>
-      </form>
+      </SmartFilterForm>
 
       <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions}
         categoryRecords={categories} supplierRecords={suppliers} locationRecords={locations} />

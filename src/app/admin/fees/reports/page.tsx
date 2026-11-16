@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, gte, inArray, lt, lte, or, sql, sum } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, lte, or, sql, sum } from "drizzle-orm";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { db } from "@/db";
 import { PrintButton } from "@/components/print-button";
 import { FeeReportFilters } from "./fee-report-filters";
+import { TablePagination } from "@/components/table-pagination";
 import type { SearchableSelectOption } from "@/components/searchable-select";
 import {
   academicYears,
@@ -38,7 +39,18 @@ type SearchParams = {
   sectionId?: string | string[];
   feeTypeId?: string | string[];
   status?: string | string[];
+  paymentsPage?: string | string[];
+  reversalsPage?: string | string[];
+  invoicesPage?: string | string[];
+  feeTypesPage?: string | string[];
 };
+
+const PAGE_SIZE = 25;
+
+function requestedPage(value: string | string[] | undefined): number {
+  const parsed = Number(Array.isArray(value) ? value[0] : value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
+}
 
 function money(minorUnits: number): string {
   return (minorUnits / 100).toFixed(2);
@@ -62,6 +74,10 @@ export default async function FeeReportsPage({
 }) {
   const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
   const params = await searchParams;
+  const paymentPage = requestedPage(params.paymentsPage);
+  const reversalPage = requestedPage(params.reversalsPage);
+  const invoicePage = requestedPage(params.invoicesPage);
+  const feeTypePage = requestedPage(params.feeTypesPage);
   const [school, branches, classes, sections, feeTypesList] = await Promise.all([
     db.select({ currency: schools.currency, timezone: schools.timezone })
       .from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
@@ -219,7 +235,8 @@ export default async function FeeReportsPage({
         ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .orderBy(desc(feePayments.paidAt))
-      .limit(500),
+      .limit(PAGE_SIZE)
+      .offset((paymentPage - 1) * PAGE_SIZE),
     db.select({
       id: studentFeeInvoices.id,
       feeTypeId: feeTypes.id,
@@ -287,6 +304,7 @@ export default async function FeeReportsPage({
     db.select({
       amount: sum(feePayments.amount),
       fineAmount: sum(feePayments.fineAmount),
+      count: count(feePayments.id),
     })
       .from(feePayments)
       .innerJoin(studentFeeInvoices, and(
@@ -390,10 +408,12 @@ export default async function FeeReportsPage({
         ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .orderBy(desc(feePaymentReversals.createdAt))
-      .limit(500),
+      .limit(PAGE_SIZE)
+      .offset((reversalPage - 1) * PAGE_SIZE),
     db.select({
       amount: sum(feePaymentReversals.amount),
       fineAmount: sum(feePaymentReversals.fineAmount),
+      count: count(feePaymentReversals.id),
     })
       .from(feePaymentReversals)
       .innerJoin(feePayments, and(
@@ -507,6 +527,21 @@ export default async function FeeReportsPage({
   const feeTypeSummary = [...feeTypeRows.entries()].sort(([, first], [, second]) =>
     first.name.localeCompare(second.name)
   );
+  const visibleInvoices = filteredInvoices.slice((invoicePage - 1) * PAGE_SIZE, invoicePage * PAGE_SIZE);
+  const visibleFeeTypeSummary = feeTypeSummary.slice((feeTypePage - 1) * PAGE_SIZE, feeTypePage * PAGE_SIZE);
+  const reportPageHref = (parameter: string, page: number) => {
+    const query = new URLSearchParams({
+      from,
+      to,
+      ...(requestedBranch ? { branchId: String(requestedBranch) } : {}),
+      ...(requestedClass ? { classLevelId: String(requestedClass) } : {}),
+      ...(requestedSection ? { sectionId: String(requestedSection) } : {}),
+      ...(requestedFeeTypeId ? { feeTypeId: String(requestedFeeTypeId) } : {}),
+      ...(requestedStatus ? { status: requestedStatus } : {}),
+      [parameter]: String(page),
+    });
+    return `/admin/fees/reports?${query.toString()}`;
+  };
   const totalCollected =
     (parseMoneyToMinorUnits(paymentTotals?.amount ?? "0") ?? 0) -
     (parseMoneyToMinorUnits(reversalTotals?.amount ?? "0") ?? 0);
@@ -565,10 +600,14 @@ export default async function FeeReportsPage({
 
         <ReportTable
           title="Payment report"
-          description={`Payments recorded ${from} through ${to} in ${school?.timezone ?? "UTC"} local time; up to 500 most recent entries.`}
+          description={`Payments recorded ${from} through ${to} in ${school?.timezone ?? "UTC"} local time.`}
           empty="No payments were recorded during this date range."
           headings={["Student", "Class / section", "Fee type", "Date", "Method", "Payment", "Reversed", "Fine", "Receipt"]}
           hasRows={payments.length > 0}
+          pagination={payments.length || Number(paymentTotals?.count) > 0 ? (
+            <TablePagination ariaLabel="Fee payments" currentPage={paymentPage} pageSize={PAGE_SIZE}
+              totalRows={Number(paymentTotals?.count ?? 0)} hrefForPage={(page) => reportPageHref("paymentsPage", page)} />
+          ) : null}
         >
           {payments.map((payment) => (
             <tr key={payment.publicId} className="border-t border-slate-100">
@@ -587,10 +626,14 @@ export default async function FeeReportsPage({
 
         <ReportTable
           title="Reversals and refunds"
-          description={`Reversals recorded ${from} through ${to}; up to 500 most recent entries.`}
+          description={`Reversals recorded ${from} through ${to}.`}
           empty="No payment reversals or refunds were recorded during this date range."
           headings={["Student", "Class / section", "Date", "Type", "Amount", "Reason", "Receipt"]}
           hasRows={reversals.length > 0}
+          pagination={reversals.length || Number(reversalTotals?.count) > 0 ? (
+            <TablePagination ariaLabel="Fee reversals" currentPage={reversalPage} pageSize={PAGE_SIZE}
+              totalRows={Number(reversalTotals?.count ?? 0)} hrefForPage={(page) => reportPageHref("reversalsPage", page)} />
+          ) : null}
         >
           {reversals.map((reversal) => (
             <tr key={reversal.publicId} className="border-t border-slate-100">
@@ -611,8 +654,12 @@ export default async function FeeReportsPage({
           empty="No invoices match the selected filters."
           headings={["Fee type", "Invoices", "Amount due", "Amount paid", "Balance"]}
           hasRows={feeTypeSummary.length > 0}
+          pagination={feeTypeSummary.length > 0 ? (
+            <TablePagination ariaLabel="Invoice totals by fee type" currentPage={feeTypePage} pageSize={PAGE_SIZE}
+              totalRows={feeTypeSummary.length} hrefForPage={(page) => reportPageHref("feeTypesPage", page)} />
+          ) : null}
         >
-          {feeTypeSummary.map(([feeTypeId, totals]) => (
+          {visibleFeeTypeSummary.map(([feeTypeId, totals]) => (
             <tr key={feeTypeId} className="border-t border-slate-100">
               <td className="px-4 py-3 font-medium">{totals.name}</td>
               <td className="px-4 py-3">{totals.count}</td>
@@ -628,8 +675,12 @@ export default async function FeeReportsPage({
           empty={`No ${requestedStatus ? `${requestedStatus} ` : ""}invoices were issued or are due in this date range.`}
           headings={["Student", "Class / section", "Fee type", "Due date", "Paid", "Balance", "Status"]}
           hasRows={filteredInvoices.length > 0}
+          pagination={filteredInvoices.length > 0 ? (
+            <TablePagination ariaLabel="Invoice payment status" currentPage={invoicePage} pageSize={PAGE_SIZE}
+              totalRows={filteredInvoices.length} hrefForPage={(page) => reportPageHref("invoicesPage", page)} />
+          ) : null}
         >
-          {filteredInvoices.map((invoice) => (
+          {visibleInvoices.map((invoice) => (
             <tr key={invoice.id} className="border-t border-slate-100">
               <td className="px-4 py-3">{invoice.studentName} {invoice.studentLastName}<span className="block text-xs text-slate-500">{invoice.admissionNumber || "—"} · {invoice.rollNumber || "—"}</span></td>
               <td className="px-4 py-3">{invoice.branchName} / {invoice.className} / {invoice.sectionName}</td>
@@ -661,6 +712,7 @@ function ReportTable({
   headings,
   empty,
   hasRows,
+  pagination,
   children,
 }: {
   title: string;
@@ -668,6 +720,7 @@ function ReportTable({
   headings: string[];
   empty: string;
   hasRows: boolean;
+  pagination?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -686,6 +739,7 @@ function ReportTable({
           </table>
         </div>
       ) : <p className="px-5 pb-5 text-sm text-slate-500">{empty}</p>}
+      {pagination}
     </section>
   );
 }

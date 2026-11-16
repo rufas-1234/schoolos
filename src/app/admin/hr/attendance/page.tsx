@@ -6,6 +6,7 @@ import { isCalendarDate } from "@/lib/academic-policy";
 import { parseStaffRoleFilter } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { AttendanceForm, BulkAttendanceForm, StaffAttendanceSelectAll } from "../hr-forms";
 import { PrintReportButton } from "../reports/print-report-button";
 
@@ -113,7 +114,7 @@ export default async function StaffAttendancePage({
         <PrintReportButton />
       </header>
 
-      <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <SearchableSelect
           label="Branch"
           name="branchId"
@@ -142,7 +143,7 @@ export default async function StaffAttendancePage({
           <input type="search" name="search" maxLength={120} defaultValue={staffSearch} placeholder="Name or staff number" className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5" />
         </label>
         <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View date</button>
-      </form>
+      </SmartFilterForm>
 
       <section aria-label="Attendance summary" className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <SummaryCard label="Present" value={counts.present} />

@@ -7,6 +7,7 @@ import { isValidStaffReportRange, parseStaffRoleFilter, staffAttendanceStatuses 
 import { staffRoles } from "@/lib/staff-policy";
 import { PrintReportButton } from "./print-report-button";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 
 type AttendanceTotals = Record<(typeof staffAttendanceStatuses)[number], number>;
 
@@ -132,7 +133,7 @@ export default async function StaffReportsPage({
         </div>
       </header>
 
-      <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <SearchableSelect
           label="Branch"
           name="branchId"
@@ -168,7 +169,7 @@ export default async function StaffReportsPage({
         {!requestedRangeValid && (startCandidate || endCandidate) && (
           <p role="status" className="basis-full text-sm text-amber-700">Choose a valid date range of up to 367 days.</p>
         )}
-      </form>
+      </SmartFilterForm>
 
       <section className="print-report-content space-y-5">
         <header className="print-report-heading">

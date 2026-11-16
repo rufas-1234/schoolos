@@ -59,8 +59,12 @@ export function SearchableSelect({
     setShowAllOptions(false);
     setActiveIndex(-1);
     onValueChange?.(option.value);
-    if (autoSubmit) {
-      window.setTimeout(() => inputRef.current?.form?.requestSubmit(), 0);
+    const form = inputRef.current?.form;
+    if (autoSubmit || form?.hasAttribute("data-smart-filter")) {
+      window.setTimeout(() => {
+        if (form?.hasAttribute("data-smart-filter")) form.submit();
+        else form?.requestSubmit();
+      }, 0);
     }
   }
 
@@ -91,6 +95,7 @@ export function SearchableSelect({
       <input
         ref={inputRef}
         id={`${listId}-input`}
+        data-searchable-select-input=""
         type="text"
         role="combobox"
         autoComplete="off"
