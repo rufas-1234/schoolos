@@ -139,7 +139,6 @@ export default async function SubjectMarksPage({
     .where(and(
       eq(examMarks.examSubjectId, subject.id),
       eq(examMarks.schoolId, context.schoolId),
-      subject.branchId ? eq(students.branchId, subject.branchId) : undefined,
     ))
     .orderBy(asc(students.lastName), asc(students.firstName));
   const componentRows = roster.length
@@ -280,7 +279,13 @@ export default async function SubjectMarksPage({
           <h2 className="text-xl font-bold">{subject.className} · {subject.subjectName} — marks roster</h2>
           <p className="text-sm text-slate-600">{roster.length} enrolled students · {subject.examSystem === "multi" ? "component marks are summed" : "single component"} · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
         </div>
-        {editable && <SaveMarksForm examSubjectId={subject.id} maxMarks={subject.maxMarks} students={studentRows} editable />}
+        {editable && <SaveMarksForm
+          examSubjectId={subject.id}
+          maxMarks={subject.maxMarks}
+          students={studentRows}
+          componentMarkCount={componentRows.length}
+          editable
+        />}
         {!editable && (
           <div className="overflow-x-auto">
             <table className="print-report-table w-full min-w-[600px] text-left text-sm">

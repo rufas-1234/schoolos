@@ -8,6 +8,14 @@ export type GradeBand = {
 
 export type ExamComponent = { title: string; maxMarks: number };
 
+export function missingExamRosterEnrollmentIds(
+  eligibleEnrollmentIds: number[],
+  existingEnrollmentIds: number[],
+): number[] {
+  const existing = new Set(existingEnrollmentIds);
+  return eligibleEnrollmentIds.filter((enrollmentId) => !existing.has(enrollmentId));
+}
+
 export function canPreviewDraftTestReport(input: {
   requested: boolean;
   examName: string;

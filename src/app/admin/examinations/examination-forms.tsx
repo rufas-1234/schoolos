@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCheck } from "lucide-react";
 import { AdminDeleteButton } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -17,6 +18,7 @@ import {
   saveClassTeacherRemark,
   saveExamMarks,
   saveExamAttendance,
+  syncExamMarksRoster,
   savePrincipalRemark,
   submitExamSubject,
   updateExamination,
@@ -384,10 +386,12 @@ export function SaveMarksForm({
   examSubjectId,
   students,
   maxMarks,
+  componentMarkCount,
   editable,
 }: {
   examSubjectId: number;
   maxMarks: string;
+  componentMarkCount: number;
   editable: boolean;
   students: Array<{
     markId: number;
@@ -399,6 +403,10 @@ export function SaveMarksForm({
   }>;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamMarks, {});
+  const [rosterReady, setRosterReady] = useState(false);
+  const [rosterSyncError, setRosterSyncError] = useState("");
+  const [retryRosterSync, setRetryRosterSync] = useState(0);
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -420,7 +428,53 @@ export function SaveMarksForm({
   const visibleStudents = filteredStudents.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
   const firstVisible = filteredStudents.length === 0 ? 0 : currentPage * pageSize + 1;
   const lastVisible = Math.min((currentPage + 1) * pageSize, filteredStudents.length);
+  useEffect(() => {
+    if (!editable) return;
+    let active = true;
+    syncExamMarksRoster(examSubjectId).then((result) => {
+      if (!active) return;
+      if (result.error) {
+        setRosterSyncError(result.error);
+        return;
+      }
+      if (
+        (result.rosterCount ?? 0) > students.length ||
+        (result.componentMarkCount ?? 0) > componentMarkCount
+      ) {
+        router.refresh();
+        return;
+      }
+      setRosterReady(true);
+    }).catch((error: unknown) => {
+      console.error("Could not synchronize the exam marks roster.", error);
+      if (active) setRosterSyncError("Could not refresh the enrolled-student roster. Please try again.");
+    });
+    return () => {
+      active = false;
+    };
+  }, [componentMarkCount, editable, examSubjectId, retryRosterSync, router, students.length]);
   if (!editable) return null;
+  if (!rosterReady) {
+    return (
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        {rosterSyncError
+          ? <p role="alert" className="text-sm text-rose-700">{rosterSyncError}</p>
+          : <p role="status" className="text-sm text-slate-600">Refreshing marks roster from currently enrolled students…</p>}
+        {rosterSyncError && (
+          <button
+            type="button"
+            onClick={() => {
+              setRosterSyncError("");
+              setRetryRosterSync((current) => current + 1);
+            }}
+            className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white"
+          >
+            Retry roster refresh
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />

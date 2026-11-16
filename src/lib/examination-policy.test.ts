@@ -5,6 +5,7 @@ import {
   calculateWeightedAverage,
   completeSubmittedMarkIds,
   gradeForPercentage,
+  missingExamRosterEnrollmentIds,
   parseExamComponents,
   rankScores,
   validateGradeBands,
@@ -73,6 +74,11 @@ describe("examination policy", () => {
       [12, 13, 14],
       [3, 4],
     )).toBeNull();
+  });
+
+  it("finds missing eligible enrollments without removing existing mark rows", () => {
+    expect(missingExamRosterEnrollmentIds([1, 2, 3, 4], [1, 3])).toEqual([2, 4]);
+    expect(missingExamRosterEnrollmentIds([1, 2, 3, 4], [1, 2, 3, 4])).toEqual([]);
   });
 
   it("allows draft report previews only for managed, open test examinations", () => {

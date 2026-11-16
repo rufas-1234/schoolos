@@ -38,6 +38,7 @@ import { isDuplicateEntryError } from "@/lib/db-errors";
 import {
   calculateComponentTotal,
   completeSubmittedMarkIds,
+  missingExamRosterEnrollmentIds,
   parseExamComponents,
   validateGradeBands,
   type GradeBand,
@@ -477,7 +478,6 @@ export async function createExamination(
           eq(studentEnrollments.schoolId, context.schoolId),
           eq(studentEnrollments.academicYearId, year.id),
           eq(studentEnrollments.status, "enrolled"),
-          branchId ? eq(students.branchId, branchId) : undefined,
         ));
       if (enrollments.length) {
         await tx.insert(examMarks).values(newSubjects.flatMap((subject) => enrollments.map((enrollment) => ({
@@ -673,7 +673,6 @@ export async function updateExamination(
               eq(studentEnrollments.schoolId, context.schoolId),
               eq(studentEnrollments.academicYearId, exam.academicYearId),
               eq(studentEnrollments.status, "enrolled"),
-              branchId ? eq(students.branchId, branchId) : undefined,
             )),
           tx.select({ id: examMarks.enrollmentId }).from(examMarks).where(and(
             eq(examMarks.schoolId, context.schoolId),
@@ -950,6 +949,162 @@ export async function updateExamSubjectSettings(
   if (outcome === "date-range") return { error: "The subject exam date must fall within the examination date range." };
   revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
+}
+
+export async function syncExamMarksRoster(examSubjectId: number): Promise<{
+  error?: string;
+  rosterCount?: number;
+  componentMarkCount?: number;
+}> {
+  const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
+  const parsedSubjectId = idField.safeParse(String(examSubjectId));
+  if (!parsedSubjectId.success) return { error: "Choose a valid exam subject." };
+  const [record] = await db.select({
+    id: examSubjects.id,
+    status: examSubjects.status,
+    examStatus: examinations.status,
+    examId: examinations.id,
+    classLevelId: examClasses.classLevelId,
+    academicYearId: examinations.academicYearId,
+  }).from(examSubjects)
+    .innerJoin(examClasses, and(
+      eq(examClasses.id, examSubjects.examClassId),
+      eq(examClasses.schoolId, context.schoolId),
+    ))
+    .innerJoin(examinations, and(
+      eq(examinations.id, examClasses.examinationId),
+      eq(examinations.schoolId, context.schoolId),
+    ))
+    .where(and(eq(examSubjects.id, parsedSubjectId.data), eq(examSubjects.schoolId, context.schoolId)))
+    .limit(1);
+  if (!record || record.status !== "draft" || record.examStatus !== "open") {
+    return { error: "Only an open draft assessment roster can be synchronized." };
+  }
+  const canManage = context.grantedPermissions.includes("examinations.create") ||
+    context.grantedPermissions.includes("results.publish");
+  if (!canManage && !(await assignedSubject(record.id, context.schoolId, context.user.id))) {
+    return { error: "You can only synchronize the roster for your assigned subjects." };
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const [locked] = await tx.select({
+      id: examSubjects.id,
+      status: examSubjects.status,
+      examStatus: examinations.status,
+    }).from(examSubjects)
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+      ))
+      .where(and(eq(examSubjects.id, record.id), eq(examSubjects.schoolId, context.schoolId)))
+      .for("update")
+      .limit(1);
+    if (!locked || locked.status !== "draft" || locked.examStatus !== "open") return null;
+
+    const eligibleEnrollments = await tx.select({
+      id: studentEnrollments.id,
+    }).from(studentEnrollments)
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.classLevelId, record.classLevelId),
+        eq(classSections.academicYearId, record.academicYearId),
+      ))
+      .innerJoin(students, and(
+        eq(students.id, studentEnrollments.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.academicYearId, record.academicYearId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+      ));
+
+    const components = await tx.select({
+        id: examComponents.id,
+    }).from(examComponents).where(and(
+        eq(examComponents.schoolId, context.schoolId),
+        eq(examComponents.examSubjectId, record.id),
+    ));
+    if (!components.length) return { error: "This assessment has no mark components; ask an administrator to repair its setup." } as const;
+
+    const currentMarks = await tx.select({
+      id: examMarks.id,
+      enrollmentId: examMarks.enrollmentId,
+    }).from(examMarks)
+      .where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        eq(examMarks.examSubjectId, record.id),
+      ))
+      .for("update");
+    const missingEnrollmentIds = missingExamRosterEnrollmentIds(
+      eligibleEnrollments.map((enrollment) => enrollment.id),
+      currentMarks.map((mark) => mark.enrollmentId),
+    );
+    const missingEnrollments = eligibleEnrollments.filter((enrollment) =>
+      missingEnrollmentIds.includes(enrollment.id),
+    );
+    if (missingEnrollments.length) {
+      await tx.insert(examMarks).values(missingEnrollments.map((enrollment) => ({
+        publicId: randomUUID(),
+        schoolId: context.schoolId,
+        examSubjectId: record.id,
+        enrollmentId: enrollment.id,
+        marks: null,
+        updatedBy: context.user.id,
+      }))).onDuplicateKeyUpdate({
+        set: { updatedAt: new Date() },
+      });
+    }
+
+    const allMarks = await tx.select({
+      id: examMarks.id,
+    }).from(examMarks).where(and(
+      eq(examMarks.schoolId, context.schoolId),
+      eq(examMarks.examSubjectId, record.id),
+    ));
+    const currentComponentMarks = allMarks.length
+      ? await tx.select({
+        examMarkId: examComponentMarks.examMarkId,
+        examComponentId: examComponentMarks.examComponentId,
+      }).from(examComponentMarks)
+        .where(and(
+          eq(examComponentMarks.schoolId, context.schoolId),
+          inArray(examComponentMarks.examMarkId, allMarks.map((mark) => mark.id)),
+        ))
+        .for("update")
+      : [];
+    const componentKeys = new Set(currentComponentMarks.map((mark) => `${mark.examMarkId}:${mark.examComponentId}`));
+    const missingComponentMarks = allMarks.flatMap((mark) =>
+      components.filter((component) => !componentKeys.has(`${mark.id}:${component.id}`)).map((component) => ({
+        publicId: randomUUID(),
+        schoolId: context.schoolId,
+        examMarkId: mark.id,
+        examComponentId: component.id,
+        marks: null,
+        updatedBy: context.user.id,
+      })),
+    );
+    if (missingComponentMarks.length) {
+      await tx.insert(examComponentMarks).values(missingComponentMarks).onDuplicateKeyUpdate({
+        set: { updatedAt: new Date() },
+      });
+    }
+    return {
+      rosterCount: eligibleEnrollments.length,
+      componentMarkCount: currentComponentMarks.length + missingComponentMarks.length,
+    };
+  });
+
+  if (!result) return { error: "This assessment was submitted or published. Reload before continuing." };
+  if ("error" in result) return result;
+  revalidatePath(`/admin/examinations/${record.examId}/subjects/${record.id}`);
+  return result;
 }
 
 export async function saveExamMarks(
@@ -1317,6 +1472,8 @@ export async function submitExamSubject(
       examinationId: examinations.id,
       examinationStatus: examinations.status,
       maxMarks: examSubjects.maxMarks,
+      classLevelId: examClasses.classLevelId,
+      academicYearId: examinations.academicYearId,
     }).from(examSubjects)
       .innerJoin(examClasses, and(
         eq(examClasses.id, examSubjects.examClassId),
@@ -1330,6 +1487,35 @@ export async function submitExamSubject(
       .for("update")
       .limit(1);
     if (!record || record.status !== "draft" || record.examinationStatus !== "open") return "locked" as const;
+    const eligibleEnrollments = await tx.select({ id: studentEnrollments.id })
+      .from(studentEnrollments)
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.classLevelId, record.classLevelId),
+        eq(classSections.academicYearId, record.academicYearId),
+      ))
+      .innerJoin(students, and(
+        eq(students.id, studentEnrollments.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.academicYearId, record.academicYearId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+      ));
+    const existingRoster = await tx.select({ enrollmentId: examMarks.enrollmentId })
+      .from(examMarks)
+      .where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        eq(examMarks.examSubjectId, record.id),
+      ))
+      .for("update");
+    if (missingExamRosterEnrollmentIds(
+      eligibleEnrollments.map((enrollment) => enrollment.id),
+      existingRoster.map((mark) => mark.enrollmentId),
+    ).length) return "roster-incomplete" as const;
     const marks = await tx.select({ marks: examMarks.marks }).from(examMarks).where(and(
       eq(examMarks.schoolId, context.schoolId),
       eq(examMarks.examSubjectId, record.id),
@@ -1354,6 +1540,7 @@ export async function submitExamSubject(
     return record.examinationId;
   });
   if (outcome === "locked") return { error: "Only draft assessments in an open examination can be submitted." };
+  if (outcome === "roster-incomplete") return { error: "The enrolled class roster changed. Reload the marks sheet to add every currently enrolled student before submitting." };
   if (outcome === "invalid-marks") return { error: "Enter valid marks for every enrolled student before submitting." };
   revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
