@@ -178,7 +178,9 @@ export function AdminShell({
     pathname.startsWith("/admin/hr") || pathname === "/admin/settings/roles",
   );
   const [financesOpen, setFinancesOpen] = useState(() =>
-    pathname.startsWith("/admin/fees") || pathname.startsWith("/admin/accounts") || pathname.startsWith("/admin/inventory"),
+    permissions.some((permission) =>
+      ["fees.manage", "payments.record", "accounts.manage", "inventory.manage"].includes(permission)
+    ),
   );
   const [examinationsOpen, setExaminationsOpen] = useState(() =>
     pathname.startsWith("/admin/examinations") || pathname === "/admin/exam-analytics",
