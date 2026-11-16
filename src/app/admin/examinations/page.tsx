@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   academicTerms,
@@ -18,6 +18,8 @@ import {
   examinations,
   schoolBranches,
   staffMembers,
+  studentEnrollments,
+  students,
   subjects,
   teachers,
 } from "@/db/schema";
@@ -429,9 +431,39 @@ export default async function ExaminationsPage({
       inArray(examMarks.examSubjectId, assessmentIds),
     ))
     : [];
+  const attendanceRosterRows = visibleAssessments.length
+    ? await db.select({
+      enrollmentId: studentEnrollments.id,
+      classLevelId: classSections.classLevelId,
+      academicYearId: classSections.academicYearId,
+    }).from(studentEnrollments)
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(students, and(
+        eq(students.id, studentEnrollments.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+        inArray(classSections.classLevelId, [...new Set(visibleAssessments.map((row) => row.classLevelId))]),
+        inArray(classSections.academicYearId, [...new Set(visibleAssessments.map((row) => row.academicYearId))]),
+      ))
+    : [];
+  const attendanceRosterBySubjectId = new Map(visibleAssessments.map((assessment) => [
+    assessment.id,
+    attendanceRosterRows.filter((enrollment) =>
+      enrollment.classLevelId === assessment.classLevelId &&
+      enrollment.academicYearId === assessment.academicYearId,
+    ),
+  ]));
   const attendanceRows = assessmentIds.length
     ? await db.select({
       examSubjectId: examAttendance.examSubjectId,
+      enrollmentId: examAttendance.enrollmentId,
       status: examAttendance.status,
     }).from(examAttendance).where(and(
       eq(examAttendance.schoolId, context.schoolId),
@@ -661,8 +693,12 @@ export default async function ExaminationsPage({
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Date</th><th className="p-3">Branch</th><th className="p-3">Exam</th><th className="p-3">Class</th><th className="p-3">Subject</th><th className="p-3">Recorded</th><th className="p-3">Actions</th></tr></thead>
               <tbody>{visibleAssessments.map((row) => {
-                const recorded = attendanceRows.filter((attendance) => attendance.examSubjectId === row.id).length;
-                const rosterCount = markRows.filter((mark) => mark.examSubjectId === row.id).length;
+                const roster = attendanceRosterBySubjectId.get(row.id) ?? [];
+                const rosterIds = new Set(roster.map((enrollment) => enrollment.enrollmentId));
+                const recorded = attendanceRows.filter((attendance) =>
+                  attendance.examSubjectId === row.id && rosterIds.has(attendance.enrollmentId),
+                ).length;
+                const rosterCount = roster.length;
                 return <tr key={row.id} className="border-t"><td className="p-3">{row.examDate}</td><td className="p-3">{row.branchName ?? "All branches"}</td><td className="p-3">{row.examName}</td><td className="p-3">{row.className}</td><td className="p-3">{row.subjectName}</td><td className="p-3">{recorded}/{rosterCount}</td><td className="p-3"><Link className="font-semibold text-violet-700" href={`/admin/examinations/${row.examId}/attendance/${row.id}`}>Mark attendance</Link></td></tr>;
               })}</tbody>
             </table>

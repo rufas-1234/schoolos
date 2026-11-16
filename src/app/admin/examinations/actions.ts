@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -1196,6 +1196,8 @@ export async function saveExamAttendance(
     id: examSubjects.id,
     publicId: examSubjects.publicId,
     examClassId: examClasses.id,
+    classLevelId: examClasses.classLevelId,
+    academicYearId: examinations.academicYearId,
     examId: examinations.id,
     examStatus: examinations.status,
   }).from(examSubjects)
@@ -1217,8 +1219,23 @@ export async function saveExamAttendance(
   if (!canManage && !(await assignedSubject(subject.id, context.schoolId, context.user.id))) {
     return { error: "You can only mark attendance for your assigned subjects." };
   }
-  const roster = await db.select({ enrollmentId: examMarks.enrollmentId }).from(examMarks)
-    .where(and(eq(examMarks.schoolId, context.schoolId), eq(examMarks.examSubjectId, subject.id)));
+  const roster = await db.select({ enrollmentId: studentEnrollments.id }).from(studentEnrollments)
+    .innerJoin(classSections, and(
+      eq(classSections.id, studentEnrollments.classSectionId),
+      eq(classSections.schoolId, context.schoolId),
+      eq(classSections.classLevelId, subject.classLevelId),
+      eq(classSections.academicYearId, subject.academicYearId),
+    ))
+    .innerJoin(students, and(
+      eq(students.id, studentEnrollments.studentId),
+      eq(students.schoolId, context.schoolId),
+    ))
+    .where(and(
+      eq(studentEnrollments.schoolId, context.schoolId),
+      eq(studentEnrollments.academicYearId, subject.academicYearId),
+      eq(studentEnrollments.status, "enrolled"),
+      ne(students.status, "disabled"),
+    ));
   if (!roster.length) return { error: "There are no enrolled students on this exam roster." };
   const statuses = new Map<number, { status: "present" | "absent" | "late" | "excused"; note: string | null }>();
   for (const enrollment of roster) {

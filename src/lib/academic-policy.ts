@@ -125,7 +125,6 @@ export function isValidEnrollmentOperation(input: {
   if (input.operation === "transfer_in_school") {
     return (
       input.targetYearStartDate === input.sourceYearStartDate &&
-      input.targetClassLevelId === input.sourceClassLevelId &&
       input.targetClassLevelId !== undefined
     );
   }

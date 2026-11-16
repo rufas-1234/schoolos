@@ -959,9 +959,9 @@ export function EnrollmentOperationForm({
           onChange={(event) => setOperation(event.target.value)}
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
         >
-          <option value="promote">Promote to a different class in a later year</option>
+          <option value="promote">Promote or place in a different class in a later year</option>
           <option value="repeat">Repeat the same class in a later year</option>
-          <option value="transfer_in_school">Transfer to another section this year</option>
+          <option value="transfer_in_school">Transfer to another class or section this year</option>
           <option value="transfer_out">Transfer out to another school</option>
           <option value="graduate">Graduate</option>
         </select>
@@ -1028,7 +1028,7 @@ export function EnrollmentOperationForm({
       <Field label="Operation date" name="eventDate" type="date" />
       <Field label="Reason / notes" name="reason" placeholder="End-of-year result" />
       <p className="text-xs text-slate-500">
-        Promotion and repetition retain the completed enrollment and create a new year record. The destination section must belong to the destination year.
+        In-school transfers can move a student to any class or section in the same year, including a lower class. Promotion or placement and repetition create a new enrollment for a later year, and can also target a different class. The destination section must belong to the selected year.
       </p>
     </ActionForm>
   );

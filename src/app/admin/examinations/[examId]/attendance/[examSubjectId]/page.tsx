@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   classLevels,
+  classSections,
   classSubjects,
   examAttendance,
   examClasses,
-  examMarks,
   examSubjects,
   examinations,
   staffMembers,
@@ -38,6 +38,8 @@ export default async function ExamAttendancePage({
     examStatus: examinations.status,
     subjectName: subjects.name,
     className: classLevels.name,
+    classLevelId: classLevels.id,
+    academicYearId: examinations.academicYearId,
     examDate: examSubjects.examDate,
   }).from(examSubjects)
     .innerJoin(examClasses, and(
@@ -99,25 +101,28 @@ export default async function ExamAttendancePage({
     admissionNumber: students.admissionNumber,
     status: examAttendance.status,
     note: examAttendance.note,
-  }).from(examMarks)
-    .innerJoin(examSubjects, and(
-      eq(examSubjects.id, examMarks.examSubjectId),
-      eq(examSubjects.schoolId, context.schoolId),
-    ))
-    .innerJoin(studentEnrollments, and(
-      eq(studentEnrollments.id, examMarks.enrollmentId),
-      eq(studentEnrollments.schoolId, context.schoolId),
+  }).from(studentEnrollments)
+    .innerJoin(classSections, and(
+      eq(classSections.id, studentEnrollments.classSectionId),
+      eq(classSections.schoolId, context.schoolId),
+      eq(classSections.classLevelId, record.classLevelId),
+      eq(classSections.academicYearId, record.academicYearId),
     ))
     .innerJoin(students, and(
       eq(students.id, studentEnrollments.studentId),
       eq(students.schoolId, context.schoolId),
     ))
     .leftJoin(examAttendance, and(
-      eq(examAttendance.examSubjectId, examSubjects.id),
+      eq(examAttendance.examSubjectId, record.id),
       eq(examAttendance.enrollmentId, studentEnrollments.id),
       eq(examAttendance.schoolId, context.schoolId),
     ))
-    .where(and(eq(examMarks.examSubjectId, record.id), eq(examMarks.schoolId, context.schoolId)))
+    .where(and(
+      eq(studentEnrollments.schoolId, context.schoolId),
+      eq(studentEnrollments.academicYearId, record.academicYearId),
+      eq(studentEnrollments.status, "enrolled"),
+      ne(students.status, "disabled"),
+    ))
     .orderBy(asc(students.lastName), asc(students.firstName));
   const rosterStudents = roster.map((student) => ({
     enrollmentId: student.enrollmentId,

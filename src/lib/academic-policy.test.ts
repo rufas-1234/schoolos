@@ -131,6 +131,33 @@ describe("academic date policy", () => {
         targetSectionId: 11,
       }),
     ).toBe(true);
+    expect(
+      isValidEnrollmentOperation({
+        ...shared,
+        operation: "transfer_in_school",
+        targetYearStartDate: "2025-01-01",
+        targetClassLevelId: 0,
+        targetSectionId: 11,
+      }),
+    ).toBe(true);
+    expect(
+      isValidEnrollmentOperation({
+        ...shared,
+        operation: "promote",
+        targetYearStartDate: "2026-01-01",
+        targetClassLevelId: 0,
+        targetSectionId: 20,
+      }),
+    ).toBe(true);
+    expect(
+      isValidEnrollmentOperation({
+        ...shared,
+        operation: "transfer_in_school",
+        targetYearStartDate: "2026-01-01",
+        targetClassLevelId: 2,
+        targetSectionId: 20,
+      }),
+    ).toBe(false);
     expect(isValidEnrollmentOperation({ ...shared, operation: "transfer_out" })).toBe(true);
     expect(isValidEnrollmentOperation({ ...shared, operation: "graduate" })).toBe(true);
   });
