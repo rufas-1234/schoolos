@@ -13,6 +13,14 @@ export const enrollmentOperationTypes = [
 ] as const;
 export type EnrollmentOperationType = (typeof enrollmentOperationTypes)[number];
 
+export function canReceiveEnrollmentOperation(
+  studentStatus: string,
+  operation: EnrollmentOperationType,
+): boolean {
+  return studentStatus === "active" ||
+    (studentStatus === "admitted" && operation === "transfer_in_school");
+}
+
 export function normalizeClassName(name: string): string {
   return name.trim().replace(/\s+/g, " ").toLowerCase();
 }

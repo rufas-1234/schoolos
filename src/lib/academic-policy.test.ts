@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canReceiveEnrollmentOperation,
   canTransitionAcademicYear,
   doDateRangesOverlap,
   doTimeRangesOverlap,
@@ -31,6 +32,15 @@ describe("class routine time policy", () => {
   it("detects intersecting periods but permits adjacent periods", () => {
     expect(doTimeRangesOverlap("08:00", "08:45", "08:30", "09:00")).toBe(true);
     expect(doTimeRangesOverlap("08:00", "08:45", "08:45", "09:30")).toBe(false);
+  });
+});
+
+describe("enrollment operation eligibility", () => {
+  it("allows admitted students with current enrollments to transfer in-school only", () => {
+    expect(canReceiveEnrollmentOperation("active", "promote")).toBe(true);
+    expect(canReceiveEnrollmentOperation("admitted", "transfer_in_school")).toBe(true);
+    expect(canReceiveEnrollmentOperation("admitted", "promote")).toBe(false);
+    expect(canReceiveEnrollmentOperation("inactive", "transfer_in_school")).toBe(false);
   });
 });
 

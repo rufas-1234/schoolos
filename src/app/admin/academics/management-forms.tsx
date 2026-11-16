@@ -908,15 +908,18 @@ export function StudentPlacementForm({
         >
           <option value="initial_placement">Initial placement</option>
           <option value="transfer_in">Transfer in from another school</option>
+          <option value="in_school_transfer">Move an enrolled student to another class</option>
         </select>
       </label>
+      {eventType === "transfer_in" && (
+        <Field label="Previous school" name="externalInstitution" required />
+      )}
+      <Field label="Placement / transfer date" name="eventDate" type="date" />
       <Field
-        label="Previous school"
-        name="externalInstitution"
-        required={eventType === "transfer_in"}
+        label="Reason / notes"
+        name="reason"
+        placeholder={eventType === "in_school_transfer" ? "Reason for class change" : "Admission placement"}
       />
-      <Field label="Placement date" name="eventDate" type="date" />
-      <Field label="Reason / notes" name="reason" placeholder="Admission placement" />
     </ActionForm>
   );
 }

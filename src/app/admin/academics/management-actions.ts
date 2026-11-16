@@ -26,6 +26,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import {
+  canReceiveEnrollmentOperation,
   canTransitionAcademicYear,
   enrollmentOperationTypes,
   isCalendarDate,
@@ -1152,7 +1153,7 @@ export async function updateSubjectTeacher(
 const placementSchema = z.object({
   studentId: idField,
   sectionId: idField,
-  eventType: z.enum(["initial_placement", "transfer_in"]),
+  eventType: z.enum(["initial_placement", "transfer_in", "in_school_transfer"]),
   eventDate: dateField,
   reason: requiredText(1000),
   externalInstitution: z.string().trim().max(255),
@@ -1234,7 +1235,84 @@ export async function placeStudent(
       )
       .for("update")
       .limit(1);
-    if (existingYearEnrollment) return "already-enrolled-this-year";
+    if (existingYearEnrollment) {
+      if (result.data.eventType !== "in_school_transfer") return "already-enrolled-this-year";
+      const [currentYearEnrollment] = await tx
+        .select({
+          id: studentEnrollments.id,
+          classSectionId: studentEnrollments.classSectionId,
+          status: studentEnrollments.status,
+        })
+        .from(studentEnrollments)
+        .where(and(
+          eq(studentEnrollments.id, existingYearEnrollment.id),
+          eq(studentEnrollments.schoolId, context.schoolId),
+        ))
+        .for("update")
+        .limit(1);
+      if (!currentYearEnrollment || currentYearEnrollment.status !== "enrolled") {
+        return "existing-year-enrollment-not-current";
+      }
+      if (currentYearEnrollment.classSectionId === section.id) return "already-in-target-section";
+
+      if (section.capacity !== null) {
+        const [enrollmentCount] = await tx
+          .select({ total: count() })
+          .from(studentEnrollments)
+          .where(and(
+            eq(studentEnrollments.schoolId, context.schoolId),
+            eq(studentEnrollments.classSectionId, section.id),
+            eq(studentEnrollments.status, "enrolled"),
+          ));
+        if (Number(enrollmentCount.total) >= section.capacity) return "section-full";
+      }
+
+      await tx.update(studentEnrollments)
+        .set({ classSectionId: section.id })
+        .where(and(
+          eq(studentEnrollments.id, currentYearEnrollment.id),
+          eq(studentEnrollments.schoolId, context.schoolId),
+        ));
+      if (student.status === "admitted") {
+        await tx.update(students)
+          .set({ status: "active" })
+          .where(and(eq(students.id, student.id), eq(students.schoolId, context.schoolId)));
+      }
+      await tx.insert(studentAcademicEvents).values({
+        publicId: eventPublicId,
+        schoolId: context.schoolId,
+        studentId: student.id,
+        fromEnrollmentId: currentYearEnrollment.id,
+        toEnrollmentId: currentYearEnrollment.id,
+        fromClassSectionId: currentYearEnrollment.classSectionId,
+        toClassSectionId: section.id,
+        eventType: "transfer_in_school",
+        eventDate: result.data.eventDate,
+        reason: result.data.reason,
+        createdBy: context.user.id,
+      });
+      await writeAudit(
+        tx,
+        context,
+        "student.enrollment.transfer_in_school",
+        "student_academic_event",
+        eventPublicId,
+        ["classSectionId", "eventDate", "reason"],
+      );
+      if (student.status === "admitted") {
+        await writeAudit(
+          tx,
+          context,
+          "student.status.admitted.to.active",
+          "student",
+          student.publicId,
+          ["status"],
+        );
+      }
+      return "transferred";
+    }
+
+    if (result.data.eventType === "in_school_transfer") return "current-year-enrollment-not-found";
 
     const [currentEnrollment] = await tx
       .select({ id: studentEnrollments.id })
@@ -1321,15 +1399,21 @@ export async function placeStudent(
     "branch-mismatch": "Choose a class section at the student's branch.",
     "year-not-active": "Students can only be placed in a section for the active academic year.",
     "date-outside-year": "The placement date must fall within the active academic year.",
-    "already-enrolled-this-year": "This student already has an enrollment record for that academic year.",
+    "already-enrolled-this-year": "This student already has an enrollment record for that academic year. Choose In-school transfer to move them to another class.",
+    "existing-year-enrollment-not-current": "This student's record for the active year is not currently enrolled and cannot be moved.",
+    "already-in-target-section": "This student is already assigned to the selected class section.",
+    "current-year-enrollment-not-found": "An in-school transfer requires a current enrollment in the active academic year.",
     "finish-current-enrollment": "Complete or transfer the student's current enrollment before placing them again.",
     "section-full": "The selected class section has reached its capacity.",
     "enrollment-conflict": "The student's enrollment changed while placing them. Reload the page and review the current enrollment.",
   };
-  if (outcome !== "created") return { error: placementErrors[outcome] ?? "The placement could not be completed." };
+  if (outcome !== "created" && outcome !== "transferred") {
+    return { error: placementErrors[outcome] ?? "The placement could not be completed." };
+  }
 
   revalidatePath("/admin/academics");
   revalidatePath("/admin/students");
+  revalidatePath("/admin/students/promote");
   revalidatePath("/admin/students/unassigned");
   revalidatePath("/admin/dashboard");
   return { success: true };
@@ -1404,7 +1488,9 @@ export async function recordEnrollmentOperation(
       .for("update")
       .limit(1);
     if (!student) return "source-structure-invalid";
-    if (student.status !== "active") return "student-not-active";
+    if (!canReceiveEnrollmentOperation(student.status, result.data.operation)) {
+      return "student-not-active";
+    }
 
     const [source] = await tx
       .select({
@@ -1613,6 +1699,11 @@ export async function recordEnrollmentOperation(
           ),
         );
       nextEnrollmentId = source.id;
+      if (student.status === "admitted") {
+        await tx.update(students)
+          .set({ status: "active" })
+          .where(and(eq(students.id, student.id), eq(students.schoolId, context.schoolId)));
+      }
     } else {
       const nextStatus =
         result.data.operation === "promote"
@@ -1660,6 +1751,16 @@ export async function recordEnrollmentOperation(
           );
       }
     }
+    if (isInYearTransfer && student.status === "admitted") {
+      await writeAudit(
+        tx,
+        context,
+        "student.status.admitted.to.active",
+        "student",
+        student.publicId,
+        ["status"],
+      );
+    }
 
     await tx.insert(studentAcademicEvents).values({
       publicId: eventPublicId,
@@ -1702,7 +1803,7 @@ export async function recordEnrollmentOperation(
   const operationErrors: Record<string, string> = {
     "enrollment-not-found": "Choose an enrollment belonging to your school.",
     "enrollment-not-current": "Only a current enrollment can receive an academic operation.",
-    "student-not-active": "Only active students can receive an academic operation.",
+    "student-not-active": "Only active students can receive this academic operation. An admitted student with a current enrollment can use an in-school transfer.",
     "source-structure-invalid": "The enrollment's academic year or section could not be verified.",
     "source-year-not-active": "The source enrollment must belong to the active academic year.",
     "target-year-not-found": "Choose a destination academic year belonging to your school.",
