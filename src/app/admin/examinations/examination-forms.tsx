@@ -2,6 +2,7 @@
 
 import { useActionState, useState, type ReactNode } from "react";
 import { AdminDeleteButton } from "@/components/admin-data-table";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   createExamType,
   createExamination,
@@ -102,13 +103,9 @@ export function CreateExaminationForm({
         <input required name="name" maxLength={120} defaultValue={record?.name ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="First Term" />
       </label>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="text-sm font-medium">Select branch *
-          <select required={!record} name="branchId" value={branchId} onChange={(event) => setBranchId(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-            {!record && <option value="" disabled>Select branch</option>}
-            {record && <option value="">All branches</option>}
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-        </label>
+        <SearchableSelect label="Select branch *" name="branchId" defaultValue={branchId} required={!record}
+          options={[...(record ? [{ value: "", label: "All branches" }] : []), ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))]}
+          placeholder="Search branches..." onValueChange={setBranchId} />
         <label className="text-sm font-medium">Exam system
           <select name="examSystem" value={examSystem} onChange={(event) => {
             const nextSystem = event.target.value === "multi" ? "multi" : "single";
@@ -133,9 +130,9 @@ export function CreateExaminationForm({
             </p>
           </div>
         ) : <>
-        <label className="text-sm font-medium">Academic year *
-          <select required name="academicYearId" value={academicYearId} onChange={(event) => {
-            const nextYearId = event.target.value;
+        <SearchableSelect key={academicYearId} label="Academic year *" name="academicYearId" defaultValue={academicYearId} required
+          options={[{ value: "", label: "Select year" }, ...years.map((year) => ({ value: String(year.id), label: `${year.name}${year.status === "active" ? " (active)" : ""}` }))]}
+          placeholder="Search academic years..." onValueChange={(nextYearId) => {
             const nextYear = years.find((year) => year.id === Number(nextYearId));
             const nextTerm = terms.find((term) => term.academicYearId === Number(nextYearId) && term.startDate <= today && term.endDate >= today) ??
               terms.find((term) => term.academicYearId === Number(nextYearId));
@@ -143,24 +140,16 @@ export function CreateExaminationForm({
             setAcademicTermId(String(nextTerm?.id ?? ""));
             setExamStartDate(nextTerm?.startDate ?? nextYear?.startDate ?? "");
             setExamEndDate(nextTerm?.endDate ?? nextYear?.endDate ?? "");
-          }} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-            <option value="" disabled>Select year</option>
-            {years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.status === "active" ? " (active)" : ""}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium">Term
-          <select name="academicTermId" value={academicTermId} onChange={(event) => {
-            const nextTermId = event.target.value;
+          }} />
+        <SearchableSelect key={`${academicYearId}-${academicTermId}`} label="Term" name="academicTermId" defaultValue={academicTermId}
+          options={[{ value: "", label: "No term" }, ...visibleTerms.map((term) => ({ value: String(term.id), label: term.name }))]}
+          placeholder="Search terms..." onValueChange={(nextTermId) => {
             const nextTerm = visibleTerms.find((term) => term.id === Number(nextTermId));
             const year = years.find((item) => item.id === Number(academicYearId));
             setAcademicTermId(nextTermId);
             setExamStartDate(nextTerm?.startDate ?? year?.startDate ?? "");
             setExamEndDate(nextTerm?.endDate ?? year?.endDate ?? "");
-          }} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-            <option value="">No term</option>
-            {visibleTerms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
-          </select>
-        </label>
+          }} />
         </>}
         <label className="text-sm font-medium">Start date *
           <input required type="date" name="startDate" value={examStartDate} onChange={(event) => setExamStartDate(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
@@ -250,12 +239,9 @@ export function CreateExamTypeForm({ branches }: { branches: Array<{ id: number;
     <form action={action} className="max-w-3xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <h2 className="text-lg font-bold text-slate-900">Create exam type</h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm font-medium">Branch
-          <select name="branchId" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" defaultValue="">
-            <option value="">All branches</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-        </label>
+        <SearchableSelect label="Branch" name="branchId" defaultValue=""
+          options={[{ value: "", label: "All branches" }, ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))]}
+          placeholder="Search branches..." />
         <label className="block text-sm font-medium sm:col-span-2">Exam name
           <input required name="name" maxLength={120} className="mt-1 h-10 w-full max-w-xl rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="First Term" />
         </label>

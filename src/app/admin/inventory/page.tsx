@@ -11,7 +11,8 @@ import {
   schools,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { InventoryForms, AssetLocationForm, type InventoryOption } from "./inventory-forms";
+import { SearchableSelect } from "@/components/searchable-select";
+import { AssetMaintenanceEditor, InventoryAssetEditor, InventoryForms, InventoryItemEditor, type InventoryOption } from "./inventory-forms";
 import { InventoryModuleNav } from "./module-nav";
 import { TablePagination } from "@/components/table-pagination";
 
@@ -93,6 +94,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       .from(inventoryLocations).where(eq(inventoryLocations.schoolId, context.schoolId)).orderBy(asc(inventoryLocations.name)),
     db.select({
       id: inventoryItems.id,
+      categoryId: inventoryItems.categoryId,
+      supplierId: inventoryItems.supplierId,
+      locationId: inventoryItems.locationId,
       sku: inventoryItems.sku,
       name: inventoryItems.name,
       description: inventoryItems.description,
@@ -121,6 +125,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       .orderBy(asc(inventoryItems.name), asc(inventoryItems.id)),
     db.select({
       id: inventoryAssets.id,
+      itemId: inventoryAssets.itemId,
       assetTag: inventoryAssets.assetTag,
       name: inventoryAssets.name,
       description: inventoryAssets.description,
@@ -156,6 +161,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       .orderBy(desc(inventoryMovements.createdAt), desc(inventoryMovements.id)),
     db.select({
       id: assetMaintenance.id,
+      assetId: assetMaintenance.assetId,
       assetTag: inventoryAssets.assetTag,
       assetName: inventoryAssets.name,
       maintenanceDate: assetMaintenance.maintenanceDate,
@@ -176,6 +182,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const supplierOptions = options(suppliers, (row) => row.name);
   const locationOptions = options(locations, (row) => row.name);
   const itemOptions = options(items.filter((item) => item.status === "active"), (row) => `${row.sku} · ${row.name}`);
+  const allAssetOptions = options(assets, (row) => `${row.assetTag} · ${row.name}`);
   const assetOptions = options(assets.filter((asset) => asset.status !== "retired"), (row) => `${row.assetTag} · ${row.name}`);
   const stockValue = items.reduce((total, item) =>
     total + Number(item.quantityOnHand) * Number(item.averageUnitCost), 0);
@@ -281,16 +288,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </label>
         {section === "inventory" ? (
           <>
-            <label className="text-sm font-medium text-slate-700">Category
-              <select name="categoryId" defaultValue={selectedCategory} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
-                <option value="">All categories</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
-            </label>
-            <label className="text-sm font-medium text-slate-700">Supplier
-              <select name="supplierId" defaultValue={selectedSupplier} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
-                <option value="">All suppliers</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
-              </select>
-            </label>
+            <SearchableSelect label="Category" name="categoryId" defaultValue={selectedCategory}
+              options={[{ value: "", label: "All categories" }, ...categories.map((category) => ({ value: String(category.id), label: category.name }))]}
+              placeholder="Search categories..." />
+            <SearchableSelect label="Supplier" name="supplierId" defaultValue={selectedSupplier}
+              options={[{ value: "", label: "All suppliers" }, ...suppliers.map((supplier) => ({ value: String(supplier.id), label: supplier.name }))]}
+              placeholder="Search suppliers..." />
           </>
         ) : (
           <label className="text-sm font-medium text-slate-700">Asset status
@@ -300,18 +303,17 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </select>
           </label>
         )}
-        <label className="text-sm font-medium text-slate-700">Location
-          <select name="locationId" defaultValue={selectedLocation} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
-            <option value="">All locations</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-          </select>
-        </label>
+        <SearchableSelect label="Location" name="locationId" defaultValue={selectedLocation}
+          options={[{ value: "", label: "All locations" }, ...locations.map((location) => ({ value: String(location.id), label: location.name }))]}
+          placeholder="Search locations..." />
         <div className="flex items-center gap-2">
           <button className="h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
           <a href={`/admin/inventory${section === "assets" ? "?section=assets" : ""}`} className="h-10 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
         </div>
       </form>
 
-      <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions} />
+      <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions}
+        categoryRecords={categories} supplierRecords={suppliers} locationRecords={locations} />
 
       {section === "inventory" && <>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -323,7 +325,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr>
               <th className="px-4 py-3">Item</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">On hand</th>
-              <th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Avg. unit cost</th><th className="px-4 py-3">Supplier / location</th>
+              <th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Avg. unit cost</th><th className="px-4 py-3">Supplier / location</th><th className="px-4 py-3">Actions</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
               {visibleItems.map((item) => (
@@ -334,9 +336,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3 tabular-nums">{item.reorderLevel}</td>
                   <td className="px-4 py-3">{formatCurrency(item.averageUnitCost, currency)}</td>
                   <td className="px-4 py-3">{item.supplierName ?? "—"}<span className="block text-xs text-slate-500">{item.locationName ?? "No location"}</span></td>
+                  <td className="px-4 py-3"><InventoryItemEditor item={item} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} /></td>
                 </tr>
               ))}
-              {!filteredItems.length && <EmptyRow columns={6} text={items.length ? "No items match these filters." : "No inventory items have been registered."} />}
+              {!filteredItems.length && <EmptyRow columns={7} text={items.length ? "No items match these filters." : "No inventory items have been registered."} />}
             </tbody>
           </table>
         </div>
@@ -355,7 +358,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr>
               <th className="px-4 py-3">Asset</th><th className="px-4 py-3">Acquired</th><th className="px-4 py-3">Cost</th>
-              <th className="px-4 py-3">Location &amp; status</th><th className="px-4 py-3">Update asset</th>
+              <th className="px-4 py-3">Location &amp; status</th><th className="px-4 py-3">Actions</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
               {visibleAssets.map((asset) => (
@@ -364,7 +367,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3">{asset.acquiredAt}</td>
                   <td className="px-4 py-3">{formatCurrency(asset.acquisitionCost, currency)}</td>
                   <td className="px-4 py-3">{asset.locationName ?? "Unassigned"}<span className="block text-xs capitalize text-slate-500">{asset.status}</span></td>
-                  <td className="px-4 py-3"><AssetLocationForm assetId={asset.id} locations={locationOptions} currentLocationId={asset.locationId} currentStatus={asset.status} /></td>
+                  <td className="px-4 py-3"><InventoryAssetEditor asset={asset} items={itemOptions} locations={locationOptions} /></td>
                 </tr>
               ))}
               {!filteredAssets.length && <EmptyRow columns={5} text={assets.length ? "No assets match these filters." : "No school assets have been registered."} />}
@@ -405,7 +408,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Asset maintenance log</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / asset</th><th className="px-4 py-3">Work performed</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Provider</th></tr></thead>
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / asset</th><th className="px-4 py-3">Work performed</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Provider</th><th className="px-4 py-3">Actions</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {visibleMaintenance.map((record) => (
                 <tr key={record.id}>
@@ -413,9 +416,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3">{record.description}</td>
                   <td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td>
                   <td className="px-4 py-3">{record.performedBy ?? "—"}</td>
+                  <td className="px-4 py-3"><AssetMaintenanceEditor record={{ ...record, assetLabel: `${record.assetTag} · ${record.assetName}` }} assets={allAssetOptions} /></td>
                 </tr>
               ))}
-              {!maintenance.length && <EmptyRow columns={4} text="No maintenance has been logged." />}
+              {!maintenance.length && <EmptyRow columns={5} text="No maintenance has been logged." />}
             </tbody>
           </table>
         </div>

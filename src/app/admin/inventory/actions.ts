@@ -121,6 +121,78 @@ export async function createInventoryLocation(_state: InventoryActionState, form
   return createLookupRecord(formData, "location");
 }
 
+async function updateLookupRecord(formData: FormData, kind: "category" | "supplier" | "location"): Promise<InventoryActionState> {
+  const context = await requireSchoolPermission("inventory.manage");
+  const id = idField.safeParse(value(formData, "recordId"));
+  const name = nameField.safeParse(value(formData, "name"));
+  const description = z.string().trim().max(500).transform((entry) => entry || null)
+    .safeParse(value(formData, "description"));
+  if (!id.success || !name.success || !description.success) return { error: "Enter a valid name and description." };
+
+  const supplierValues = kind === "supplier" ? {
+    contactName: optionalText.safeParse(value(formData, "contactName")),
+    email: z.union([z.literal(""), z.string().trim().email().max(320)]).safeParse(value(formData, "email")),
+    phone: z.string().trim().max(40).safeParse(value(formData, "phone")),
+    address: optionalText.safeParse(value(formData, "address")),
+  } : null;
+  if (supplierValues && (!supplierValues.contactName.success || !supplierValues.email.success ||
+      !supplierValues.phone.success || !supplierValues.address.success)) {
+    return { error: "Enter valid supplier contact details." };
+  }
+
+  const resourceType = `inventory_${kind}`;
+  try {
+    await db.transaction(async (tx) => {
+      if (kind === "category") {
+        const [record] = await tx.select({ id: inventoryCategories.id, publicId: inventoryCategories.publicId })
+          .from(inventoryCategories).where(and(eq(inventoryCategories.id, id.data), eq(inventoryCategories.schoolId, context.schoolId))).limit(1);
+        if (!record) throw new Error("The selected category was not found.");
+        await tx.update(inventoryCategories).set({ name: name.data, description: description.data })
+          .where(and(eq(inventoryCategories.id, record.id), eq(inventoryCategories.schoolId, context.schoolId)));
+        await writeAudit(tx, context.schoolId, context.user.id, `${resourceType}.updated`, resourceType, record.publicId, ["name", "description"]);
+      } else if (kind === "location") {
+        const [record] = await tx.select({ id: inventoryLocations.id, publicId: inventoryLocations.publicId })
+          .from(inventoryLocations).where(and(eq(inventoryLocations.id, id.data), eq(inventoryLocations.schoolId, context.schoolId))).limit(1);
+        if (!record) throw new Error("The selected location was not found.");
+        await tx.update(inventoryLocations).set({ name: name.data, description: description.data })
+          .where(and(eq(inventoryLocations.id, record.id), eq(inventoryLocations.schoolId, context.schoolId)));
+        await writeAudit(tx, context.schoolId, context.user.id, `${resourceType}.updated`, resourceType, record.publicId, ["name", "description"]);
+      } else if (supplierValues) {
+        const [record] = await tx.select({ id: inventorySuppliers.id, publicId: inventorySuppliers.publicId })
+          .from(inventorySuppliers).where(and(eq(inventorySuppliers.id, id.data), eq(inventorySuppliers.schoolId, context.schoolId))).limit(1);
+        if (!record) throw new Error("The selected supplier was not found.");
+        await tx.update(inventorySuppliers).set({
+          name: name.data,
+          contactName: supplierValues.contactName.data,
+          email: supplierValues.email.data || null,
+          phone: supplierValues.phone.data || null,
+          address: supplierValues.address.data,
+        }).where(and(eq(inventorySuppliers.id, record.id), eq(inventorySuppliers.schoolId, context.schoolId)));
+        await writeAudit(tx, context.schoolId, context.user.id, `${resourceType}.updated`, resourceType, record.publicId,
+          ["name", "contactName", "email", "phone", "address"]);
+      }
+    });
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return { error: `A ${kind} with that name already exists.` };
+    if (error instanceof Error && error.message.startsWith("The selected ")) return { error: error.message };
+    throw error;
+  }
+  revalidateInventory();
+  return { success: true };
+}
+
+export async function updateInventoryCategory(_state: InventoryActionState, formData: FormData) {
+  return updateLookupRecord(formData, "category");
+}
+
+export async function updateInventorySupplier(_state: InventoryActionState, formData: FormData) {
+  return updateLookupRecord(formData, "supplier");
+}
+
+export async function updateInventoryLocation(_state: InventoryActionState, formData: FormData) {
+  return updateLookupRecord(formData, "location");
+}
+
 export async function createInventoryItem(_state: InventoryActionState, formData: FormData): Promise<InventoryActionState> {
   const context = await requireSchoolPermission("inventory.manage");
   const parsed = z.object({
@@ -178,6 +250,68 @@ export async function createInventoryItem(_state: InventoryActionState, formData
         resourcePublicId: publicId,
         changedFields: ["categoryId", "supplierId", "locationId", "sku", "name", "unit", "reorderLevel"],
       });
+    });
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return { error: "An inventory item with that SKU already exists." };
+    throw error;
+  }
+  revalidateInventory();
+  return { success: true };
+}
+
+export async function updateInventoryItem(_state: InventoryActionState, formData: FormData): Promise<InventoryActionState> {
+  const context = await requireSchoolPermission("inventory.manage");
+  const parsed = z.object({
+    itemId: idField,
+    categoryId: idField,
+    supplierId: z.union([z.literal(""), idField]).transform((entry) => entry === "" ? null : entry),
+    locationId: z.union([z.literal(""), idField]).transform((entry) => entry === "" ? null : entry),
+    sku: z.string().trim().min(1).max(80),
+    name: nameField,
+    description: optionalText,
+    unit: z.string().trim().min(1).max(40),
+    reorderLevel: z.string().trim(),
+    status: z.enum(["active", "inactive"]),
+  }).safeParse({
+    itemId: value(formData, "itemId"),
+    categoryId: value(formData, "categoryId"),
+    supplierId: value(formData, "supplierId"),
+    locationId: value(formData, "locationId"),
+    sku: value(formData, "sku"),
+    name: value(formData, "name"),
+    description: value(formData, "description"),
+    unit: value(formData, "unit"),
+    reorderLevel: value(formData, "reorderLevel"),
+    status: value(formData, "status"),
+  });
+  const reorderLevel = parseQuantityMilliUnits(parsed.success ? parsed.data.reorderLevel : "");
+  if (!parsed.success || reorderLevel === null) return { error: "Enter a valid SKU, item name, unit, category, and reorder level." };
+  const [item] = await db.select({ id: inventoryItems.id, publicId: inventoryItems.publicId })
+    .from(inventoryItems).where(and(eq(inventoryItems.id, parsed.data.itemId), eq(inventoryItems.schoolId, context.schoolId))).limit(1);
+  const [category] = await db.select({ id: inventoryCategories.id }).from(inventoryCategories)
+    .where(and(eq(inventoryCategories.id, parsed.data.categoryId), eq(inventoryCategories.schoolId, context.schoolId))).limit(1);
+  const [supplier] = parsed.data.supplierId === null ? [null] : await db.select({ id: inventorySuppliers.id }).from(inventorySuppliers)
+    .where(and(eq(inventorySuppliers.id, parsed.data.supplierId), eq(inventorySuppliers.schoolId, context.schoolId))).limit(1);
+  const [location] = parsed.data.locationId === null ? [null] : await db.select({ id: inventoryLocations.id }).from(inventoryLocations)
+    .where(and(eq(inventoryLocations.id, parsed.data.locationId), eq(inventoryLocations.schoolId, context.schoolId))).limit(1);
+  if (!item || !category || (parsed.data.supplierId !== null && !supplier) || (parsed.data.locationId !== null && !location)) {
+    return { error: "Choose an item, category, supplier, and location belonging to this school." };
+  }
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(inventoryItems).set({
+        categoryId: category.id,
+        supplierId: supplier?.id ?? null,
+        locationId: location?.id ?? null,
+        sku: parsed.data.sku,
+        name: parsed.data.name,
+        description: parsed.data.description,
+        unit: parsed.data.unit,
+        reorderLevel: formatQuantityMilliUnits(reorderLevel),
+        status: parsed.data.status,
+      }).where(and(eq(inventoryItems.id, item.id), eq(inventoryItems.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "inventory_item.updated", "inventory_item", item.publicId,
+        ["categoryId", "supplierId", "locationId", "sku", "name", "description", "unit", "reorderLevel", "status"]);
     });
   } catch (error) {
     if (isDuplicateEntryError(error)) return { error: "An inventory item with that SKU already exists." };
@@ -345,30 +479,100 @@ export async function updateInventoryAsset(_state: InventoryActionState, formDat
   const context = await requireSchoolPermission("inventory.manage");
   const parsed = z.object({
     assetId: idField,
+    itemId: z.union([z.literal(""), idField]).transform((entry) => entry === "" ? null : entry),
     locationId: z.union([z.literal(""), idField]).transform((value) => value === "" ? null : value),
+    assetTag: z.string().trim().min(1).max(80),
+    name: nameField,
+    description: optionalText,
+    acquiredAt: z.string().refine(isCalendarDate),
+    acquisitionCost: z.string().trim(),
     status: z.enum(["active", "maintenance", "retired"]),
   }).safeParse({
     assetId: value(formData, "assetId"),
+    itemId: value(formData, "itemId"),
     locationId: value(formData, "locationId"),
+    assetTag: value(formData, "assetTag"),
+    name: value(formData, "name"),
+    description: value(formData, "description"),
+    acquiredAt: value(formData, "acquiredAt"),
+    acquisitionCost: value(formData, "acquisitionCost"),
     status: value(formData, "status"),
   });
-  if (!parsed.success) return { error: "Select a valid asset location and status." };
+  const cost = parseCostMinorUnits(parsed.success ? parsed.data.acquisitionCost : "");
+  if (!parsed.success || cost === null) return { error: "Enter valid asset details, acquisition date, cost, location, and status." };
   const [asset] = await db.select({ id: inventoryAssets.id, publicId: inventoryAssets.publicId })
     .from(inventoryAssets).where(and(eq(inventoryAssets.id, parsed.data.assetId), eq(inventoryAssets.schoolId, context.schoolId))).limit(1);
+  const [item] = parsed.data.itemId === null ? [null] : await db.select({ id: inventoryItems.id }).from(inventoryItems)
+    .where(and(eq(inventoryItems.id, parsed.data.itemId), eq(inventoryItems.schoolId, context.schoolId))).limit(1);
   const [location] = parsed.data.locationId === null ? [null] : await db.select({ id: inventoryLocations.id }).from(inventoryLocations)
     .where(and(eq(inventoryLocations.id, parsed.data.locationId), eq(inventoryLocations.schoolId, context.schoolId))).limit(1);
-  if (!asset || (parsed.data.locationId !== null && !location)) return { error: "Choose an asset and location belonging to this school." };
-  await db.transaction(async (tx) => {
-    await tx.update(inventoryAssets).set({ locationId: location?.id ?? null, status: parsed.data.status })
-      .where(and(eq(inventoryAssets.id, asset.id), eq(inventoryAssets.schoolId, context.schoolId)));
-    await tx.insert(auditLogs).values({
-      schoolId: context.schoolId,
-      actorUserId: context.user.id,
-      action: "inventory_asset.updated",
-      resourceType: "inventory_asset",
-      resourcePublicId: asset.publicId,
-      changedFields: ["locationId", "status"],
+  if (!asset || (parsed.data.itemId !== null && !item) || (parsed.data.locationId !== null && !location)) {
+    return { error: "Choose an asset, inventory item, and location belonging to this school." };
+  }
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(inventoryAssets).set({
+        itemId: item?.id ?? null,
+        locationId: location?.id ?? null,
+        assetTag: parsed.data.assetTag,
+        name: parsed.data.name,
+        description: parsed.data.description,
+        acquiredAt: parsed.data.acquiredAt,
+        acquisitionCost: formatCostMinorUnits(cost),
+        status: parsed.data.status,
+      }).where(and(eq(inventoryAssets.id, asset.id), eq(inventoryAssets.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "inventory_asset.updated", "inventory_asset", asset.publicId,
+        ["itemId", "locationId", "assetTag", "name", "description", "acquiredAt", "acquisitionCost", "status"]);
     });
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return { error: "An asset with that tag already exists." };
+    throw error;
+  }
+  revalidateInventory();
+  return { success: true };
+}
+
+export async function updateAssetMaintenance(_state: InventoryActionState, formData: FormData): Promise<InventoryActionState> {
+  const context = await requireSchoolPermission("inventory.manage");
+  const parsed = z.object({
+    maintenanceId: idField,
+    assetId: idField,
+    maintenanceDate: z.string().refine(isCalendarDate),
+    description: z.string().trim().min(1).max(1000),
+    cost: z.string().trim(),
+    performedBy: z.string().trim().max(160),
+  }).safeParse({
+    maintenanceId: value(formData, "maintenanceId"),
+    assetId: value(formData, "assetId"),
+    maintenanceDate: value(formData, "maintenanceDate"),
+    description: value(formData, "description"),
+    cost: value(formData, "cost") || "0",
+    performedBy: value(formData, "performedBy"),
+  });
+  const cost = parseCostMinorUnits(parsed.success ? parsed.data.cost : "");
+  if (!parsed.success || cost === null) return { error: "Enter a valid maintenance date, description, and cost." };
+  const [record] = await db.select({
+    id: assetMaintenance.id,
+  }).from(assetMaintenance)
+    .innerJoin(inventoryAssets, and(
+      eq(inventoryAssets.id, assetMaintenance.assetId),
+      eq(inventoryAssets.schoolId, context.schoolId),
+    ))
+    .where(and(eq(assetMaintenance.id, parsed.data.maintenanceId), eq(assetMaintenance.schoolId, context.schoolId)))
+    .limit(1);
+  const [asset] = await db.select({ id: inventoryAssets.id, publicId: inventoryAssets.publicId })
+    .from(inventoryAssets).where(and(eq(inventoryAssets.id, parsed.data.assetId), eq(inventoryAssets.schoolId, context.schoolId))).limit(1);
+  if (!record || !asset) return { error: "Choose a maintenance record and asset belonging to this school." };
+  await db.transaction(async (tx) => {
+    await tx.update(assetMaintenance).set({
+      assetId: asset.id,
+      maintenanceDate: parsed.data.maintenanceDate,
+      description: parsed.data.description,
+      cost: formatCostMinorUnits(cost),
+      performedBy: parsed.data.performedBy || null,
+    }).where(and(eq(assetMaintenance.id, record.id), eq(assetMaintenance.schoolId, context.schoolId)));
+    await writeAudit(tx, context.schoolId, context.user.id, "asset_maintenance.updated", "inventory_asset", asset.publicId,
+      ["assetId", "maintenanceDate", "description", "cost", "performedBy"]);
   });
   revalidateInventory();
   return { success: true };

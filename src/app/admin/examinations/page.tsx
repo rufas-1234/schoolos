@@ -22,6 +22,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   CreateExamTypeForm,
   CreateExaminationForm,
@@ -458,31 +459,21 @@ export default async function ExaminationsPage({
       <label className="min-w-0 text-sm font-medium">Search
         <input type="search" name="search" defaultValue={search} maxLength={120} placeholder="Exam, class, subject" className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
-      <label className="min-w-0 text-sm font-medium">Branch
-        <select name="branchId" defaultValue={branchFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-          <option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-        </select>
-      </label>
-      <label className="min-w-0 text-sm font-medium">Exam
-        <select name="examId" defaultValue={examFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-          <option value="">All exams</option>{exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name}</option>)}
-        </select>
-      </label>
-      <label className="min-w-0 text-sm font-medium">Class
-        <select name="classLevelId" defaultValue={classFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-          <option value="">All classes</option>{classOptions.map((classLevel) => <option key={classLevel.id} value={classLevel.id}>{classLevel.name}</option>)}
-        </select>
-      </label>
-      <label className="min-w-0 text-sm font-medium">Section
-        <select name="sectionId" defaultValue={sectionFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-          <option value="">All sections</option>{sectionOptions.filter((classSection) => !classFilter || classSection.classLevelId === classFilter).map((classSection) => <option key={classSection.id} value={classSection.id}>{classSection.name}</option>)}
-        </select>
-      </label>
-      <label className="min-w-0 text-sm font-medium">Subject
-        <select name="subjectId" defaultValue={subjectFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-          <option value="">All subjects</option>{subjectOptions.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
-        </select>
-      </label>
+      <SearchableSelect label="Branch" name="branchId" defaultValue={branchFilter?.toString() ?? ""}
+        options={[{ value: "", label: "All branches" }, ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))]}
+        placeholder="Search branches..." />
+      <SearchableSelect label="Exam" name="examId" defaultValue={examFilter?.toString() ?? ""}
+        options={[{ value: "", label: "All exams" }, ...exams.map((exam) => ({ value: String(exam.id), label: exam.name }))]}
+        placeholder="Search exams..." />
+      <SearchableSelect label="Class" name="classLevelId" defaultValue={classFilter?.toString() ?? ""}
+        options={[{ value: "", label: "All classes" }, ...classOptions.map((classLevel) => ({ value: String(classLevel.id), label: classLevel.name }))]}
+        placeholder="Search classes..." />
+      <SearchableSelect label="Section" name="sectionId" defaultValue={sectionFilter?.toString() ?? ""}
+        options={[{ value: "", label: "All sections" }, ...sectionOptions.filter((classSection) => !classFilter || classSection.classLevelId === classFilter).map((classSection) => ({ value: String(classSection.id), label: classSection.name }))]}
+        placeholder="Search sections..." />
+      <SearchableSelect label="Subject" name="subjectId" defaultValue={subjectFilter?.toString() ?? ""}
+        options={[{ value: "", label: "All subjects" }, ...subjectOptions.map((subject) => ({ value: String(subject.id), label: subject.name }))]}
+        placeholder="Search subjects..." />
       <div className="flex items-end gap-2">
         <button className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Search</button>
         <Link href={`/admin/examinations?section=${formSection}`} className="rounded-lg border px-4 py-2.5 text-sm font-semibold text-slate-700">Reset</Link>

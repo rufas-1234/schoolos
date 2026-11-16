@@ -16,6 +16,7 @@ import { DownloadCsv } from "@/components/download-csv";
 import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
 import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { TablePagination } from "@/components/table-pagination";
+import { SearchableSelect } from "@/components/searchable-select";
 
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 25;
@@ -338,12 +339,9 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
           </>
         )}
         {(report === "stock" || report === "low-stock" || report === "movements") && (
-          <label className="text-sm text-slate-700">Category
-            <select name="categoryId" defaultValue={categoryId ? String(categoryId) : ""} className="mt-1 block h-10 rounded-lg border border-slate-200 bg-white px-3">
-              <option value="">All categories</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </select>
-          </label>
+          <SearchableSelect label="Category" name="categoryId" defaultValue={categoryId ? String(categoryId) : ""}
+            options={[{ value: "", label: "All categories" }, ...categories.map((category) => ({ value: String(category.id), label: category.name }))]}
+            placeholder="Search categories..." />
         )}
         {report === "movements" && (
           <label className="text-sm text-slate-700">Movement type

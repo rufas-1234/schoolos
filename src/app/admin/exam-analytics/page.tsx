@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { PrintButton } from "@/components/print-button";
+import { SearchableSelect } from "@/components/searchable-select";
 import { db } from "@/db";
 import {
   academicYears,
@@ -522,35 +523,22 @@ export default async function ExamAnalyticsPage({
       </header>
 
       <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5 print:hidden">
-        <label className="text-sm font-medium text-slate-700">Published examination
-          <select name="examId" defaultValue={selectedExam?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
-            {publishedExams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name} · {exam.yearName}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">Class
-          <select name="classId" defaultValue={selectedClass?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
-            <option value="">All classes</option>
-            {classRows.map((item) => <option key={item.id} value={item.id}>{item.branchName} · {item.className}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">Section / stream
-          <select name="sectionId" defaultValue={selectedSection?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
-            <option value="">All sections</option>
-            {sectionRows.map((item) => <option key={item.id} value={item.id}>{item.className} · {item.name}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">Subject
-          <select name="subjectId" defaultValue={assessmentRows.find((item) => item.id === requestedSubjectId)?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
-            <option value="">All subjects</option>
-            {assessmentRows.map((item) => <option key={item.id} value={item.id}>{item.className} · {item.subjectName}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-medium text-slate-700">Student
-          <select name="studentId" defaultValue={results.find((row) => row.enrollmentId === requestedStudentId)?.enrollmentId ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
-            <option value="">All students</option>
-            {roster.map((row) => <option key={row.enrollmentId} value={row.enrollmentId}>{row.firstName} {row.lastName} · {row.className} {row.sectionName}</option>)}
-          </select>
-        </label>
+        <SearchableSelect label="Published examination" name="examId" required
+          defaultValue={String(selectedExam?.id ?? "")}
+          options={publishedExams.map((exam) => ({ value: String(exam.id), label: `${exam.name} · ${exam.yearName}` }))}
+          placeholder="Search examinations..." />
+        <SearchableSelect label="Class" name="classId" defaultValue={String(selectedClass?.id ?? "")}
+          options={[{ value: "", label: "All classes" }, ...classRows.map((item) => ({ value: String(item.id), label: `${item.branchName} · ${item.className}` }))]}
+          placeholder="Search classes..." />
+        <SearchableSelect label="Section / stream" name="sectionId" defaultValue={String(selectedSection?.id ?? "")}
+          options={[{ value: "", label: "All sections" }, ...sectionRows.map((item) => ({ value: String(item.id), label: `${item.className} · ${item.name}` }))]}
+          placeholder="Search sections..." />
+        <SearchableSelect label="Subject" name="subjectId" defaultValue={String(assessmentRows.find((item) => item.id === requestedSubjectId)?.id ?? "")}
+          options={[{ value: "", label: "All subjects" }, ...assessmentRows.map((item) => ({ value: String(item.id), label: `${item.className} · ${item.subjectName}` }))]}
+          placeholder="Search subjects..." />
+        <SearchableSelect label="Student" name="studentId" defaultValue={String(results.find((row) => row.enrollmentId === requestedStudentId)?.enrollmentId ?? "")}
+          options={[{ value: "", label: "All students" }, ...roster.map((row) => ({ value: String(row.enrollmentId), label: `${row.firstName} ${row.lastName} · ${row.className} ${row.sectionName}` }))]}
+          placeholder="Search students..." />
         <div className="flex items-end gap-2 xl:col-span-5">
           <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
           <a href="/admin/exam-analytics" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>

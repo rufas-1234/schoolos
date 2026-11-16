@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { PrintButton } from "@/components/print-button";
+import { SearchableSelect } from "@/components/searchable-select";
 import { db } from "@/db";
 import {
   academicTerms,
@@ -748,33 +749,21 @@ export default async function ExaminationReportPage({
       ) : (
         <>
           <form method="get" className="grid max-w-6xl gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5 print:hidden">
-            <label className="min-w-0 text-sm font-medium">Examination
-              <select name="examId" defaultValue={exam?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-                <option value="">Select an exam</option>
-                {examOptions.map((option) => <option key={option.id} value={option.id}>{option.name} · {option.yearName}{option.status !== "published" ? ` · ${option.status}` : ""}</option>)}
-              </select>
-            </label>
-            <label className="min-w-0 text-sm font-medium">Class
-              <select name="classId" defaultValue={examClass?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-                <option value="">Select a class</option>
-                {classes.map((item) => <option key={item.id} value={item.id}>{item.className}</option>)}
-              </select>
-            </label>
+            <SearchableSelect label="Examination" name="examId" defaultValue={String(exam?.id ?? "")} required
+              options={[{ value: "", label: "Select an exam" }, ...examOptions.map((option) => ({ value: String(option.id), label: `${option.name} · ${option.yearName}${option.status !== "published" ? ` · ${option.status}` : ""}` }))]}
+              placeholder="Search examinations..." />
+            <SearchableSelect label="Class" name="classId" defaultValue={String(examClass?.id ?? "")} required
+              options={[{ value: "", label: "Select a class" }, ...classes.map((item) => ({ value: String(item.id), label: item.className }))]}
+              placeholder="Search classes..." />
             {reportType === "subject-wise-marksheet" && (
-              <label className="min-w-0 text-sm font-medium">Subject
-                <select name="subjectId" defaultValue={selectedSubject?.id ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-                  <option value="">Select a subject</option>
-                  {assessments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
+              <SearchableSelect label="Subject" name="subjectId" defaultValue={String(selectedSubject?.id ?? "")} required
+                options={[{ value: "", label: "Select a subject" }, ...assessments.map((item) => ({ value: String(item.id), label: item.name }))]}
+                placeholder="Search subjects..." />
             )}
             {needsStudent && (
-              <label className="min-w-0 text-sm font-medium">Student
-                <select name="enrollmentId" defaultValue={activeResult?.enrollmentId ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
-                  <option value="">Select a student</option>
-                  {results.map((row) => <option key={row.enrollmentId} value={row.enrollmentId}>{row.name}{row.admissionNumber ? ` · ${row.admissionNumber}` : ""}</option>)}
-                </select>
-              </label>
+              <SearchableSelect label="Student" name="enrollmentId" defaultValue={String(activeResult?.enrollmentId ?? "")} required
+                options={[{ value: "", label: "Select a student" }, ...results.map((row) => ({ value: String(row.enrollmentId), label: `${row.name}${row.admissionNumber ? ` · ${row.admissionNumber}` : ""}` }))]}
+                placeholder="Search students..." />
             )}
             <div className="flex items-end gap-2">
               <button className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Generate report</button>

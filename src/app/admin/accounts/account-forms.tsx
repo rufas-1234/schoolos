@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, type ReactNode } from "react";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   createAccountTransaction,
   createChartAccount,
@@ -72,14 +73,9 @@ function SelectField({
   required?: boolean;
 }) {
   return (
-    <label className="block text-sm text-slate-700">
-      <span className="mb-1 block font-medium">{label}</span>
-      <select name={name} required={required} defaultValue="" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
-        {required && <option value="">Choose...</option>}
-        {!required && <option value="">None</option>}
-        {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-      </select>
-    </label>
+    <SearchableSelect label={label} name={name} required={required}
+      options={[{ value: "", label: required ? "Choose..." : "None" }, ...options.map((option) => ({ value: String(option.id), label: option.label }))]}
+      placeholder={`Search ${label.toLocaleLowerCase()}...`} />
   );
 }
 
