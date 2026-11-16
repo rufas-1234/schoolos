@@ -109,20 +109,6 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    href: "/admin/inventory",
-    label: "Inventory",
-    icon: PackageOpen,
-    permission: "inventory.manage",
-    permissionAlternatives: ["accounts.manage"],
-    children: [
-      { id: "inventory", label: "Inventory", href: "/admin/inventory", matchPath: "/admin/inventory", matchQuery: { key: "section", value: null }, permission: "inventory.manage" },
-      { id: "accounts", label: "Accounts", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" }, permission: "accounts.manage" },
-      { id: "assets", label: "Assets", href: "/admin/inventory?section=assets", matchPath: "/admin/inventory", matchQuery: { key: "section", value: "assets" }, permission: "inventory.manage" },
-      { id: "expenses", label: "Expenses", href: "/admin/accounts?section=expenses", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "expenses" }, permission: "accounts.manage" },
-      { id: "inventory-reports", label: "Reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports", permission: "inventory.manage", permissionAlternatives: ["accounts.manage"] },
-    ],
-  },
-  {
     href: "/admin/fees/collection",
     label: "Fees",
     icon: CircleDollarSign,
@@ -144,6 +130,20 @@ const navigation: NavigationItem[] = [
         permission: "payments.record",
         permissionAlternatives: ["fees.manage"],
       },
+    ],
+  },
+  {
+    href: "/admin/inventory",
+    label: "Inventory",
+    icon: PackageOpen,
+    permission: "inventory.manage",
+    permissionAlternatives: ["accounts.manage"],
+    children: [
+      { id: "inventory", label: "Inventory", href: "/admin/inventory", matchPath: "/admin/inventory", matchQuery: { key: "section", value: null }, permission: "inventory.manage" },
+      { id: "accounts", label: "Accounts", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" }, permission: "accounts.manage" },
+      { id: "assets", label: "Assets", href: "/admin/inventory?section=assets", matchPath: "/admin/inventory", matchQuery: { key: "section", value: "assets" }, permission: "inventory.manage" },
+      { id: "expenses", label: "Expenses", href: "/admin/accounts?section=expenses", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "expenses" }, permission: "accounts.manage" },
+      { id: "inventory-reports", label: "Reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports", permission: "inventory.manage", permissionAlternatives: ["accounts.manage"] },
     ],
   },
   {
