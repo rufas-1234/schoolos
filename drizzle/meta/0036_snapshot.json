@@ -5278,8 +5278,8 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "fund_transfers_destinationBankAccountId_school_bank_accounts_id_fk": {
-          "name": "fund_transfers_destinationBankAccountId_school_bank_accounts_id_fk",
+        "fund_transfers_destination_bank_fk": {
+          "name": "fund_transfers_destination_bank_fk",
           "tableFrom": "fund_transfers",
           "tableTo": "school_bank_accounts",
           "columnsFrom": [

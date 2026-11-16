@@ -1952,7 +1952,7 @@ export const fundTransfers = mysqlTable(
     publicId: varchar("publicId", { length: 36 }).notNull().unique(),
     schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
     sourceBankAccountId: bigint("sourceBankAccountId", { mode: "number", unsigned: true }).notNull().references(() => schoolBankAccounts.id),
-    destinationBankAccountId: bigint("destinationBankAccountId", { mode: "number", unsigned: true }).notNull().references(() => schoolBankAccounts.id),
+    destinationBankAccountId: bigint("destinationBankAccountId", { mode: "number", unsigned: true }).notNull(),
     transferDate: date("transferDate", { mode: "string" }).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     reference: varchar("reference", { length: 120 }),
@@ -1960,5 +1960,12 @@ export const fundTransfers = mysqlTable(
     recordedBy: varchar("recordedBy", { length: 36 }).notNull().references(() => user.id),
     createdAt: createdAt(),
   },
-  (table) => [index("fund_transfers_school_date_idx").on(table.schoolId, table.transferDate)],
+  (table) => [
+    foreignKey({
+      name: "fund_transfers_destination_bank_fk",
+      columns: [table.destinationBankAccountId],
+      foreignColumns: [schoolBankAccounts.id],
+    }),
+    index("fund_transfers_school_date_idx").on(table.schoolId, table.transferDate),
+  ],
 );
