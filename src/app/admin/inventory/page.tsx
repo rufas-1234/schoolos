@@ -294,10 +294,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
 
       <SmartFilterForm method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <input type="hidden" name="section" value={section} />
-        <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Search {section === "assets" ? "assets" : "items"}
+        <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Quick search {section === "assets" ? "assets" : "items"}
           <input type="search" name="search" maxLength={120} defaultValue={search}
-            placeholder={section === "assets" ? "Asset name, tag, or location" : "Item name, SKU, or supplier"}
+          placeholder={section === "assets" ? "Type an asset name, tag, or location..." : "Type an item name, SKU, category, or supplier..."}
             className="mt-1.5 block h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3" />
+        <span className="mt-1 block text-xs font-normal text-slate-500">The register updates as you type.</span>
         </label>
         {section === "inventory" ? (
           <>

@@ -111,6 +111,7 @@ export default async function FeeCollectionPage({
     ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
     ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
     ...(search ? [or(
+      like(sql`lower(${studentFeeInvoices.invoiceNumber})`, `%${search.toLocaleLowerCase()}%`),
       like(students.firstName, `%${search}%`),
       like(students.lastName, `%${search}%`),
       like(sql`lower(concat(${students.firstName}, ' ', ${students.lastName}))`, `%${search.toLocaleLowerCase()}%`),

@@ -5,13 +5,22 @@ import { z } from "zod";
 import { db } from "@/db";
 import {
   academicYears,
+  accountTransactions,
+  chartOfAccounts,
   classLevels,
   classSections,
   classSubjects,
   examClasses,
   examSubjects,
   examinations,
+  feePayments,
+  inventoryAssets,
+  inventoryCategories,
+  inventoryItems,
+  inventoryLocations,
+  inventorySuppliers,
   staffMembers,
+  studentFeeInvoices,
   students,
   subjects,
   teachers,
@@ -32,6 +41,8 @@ const workspacePermissions = [
   "results.publish",
   "fees.manage",
   "payments.record",
+  "accounts.manage",
+  "inventory.manage",
   "dashboard.view",
   "roles.manage",
 ] as const;
@@ -41,7 +52,7 @@ export type WorkspaceSearchResult = {
   title: string;
   description: string;
   href: string;
-  category: "Pages" | "Students" | "Staff" | "Academics" | "Examinations";
+  category: "Pages" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Fees" | "Accounts";
   searchTerms?: string[];
 };
 
@@ -76,6 +87,8 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     permissions.has("examinations.create") || permissions.has("results.publish");
   const canEnterResults = canManageExaminations || permissions.has("results.enter");
   const canManageFees = permissions.has("fees.manage") || permissions.has("payments.record");
+  const canManageAccounts = permissions.has("accounts.manage");
+  const canManageInventory = permissions.has("inventory.manage");
   const results: WorkspaceSearchResult[] = [];
 
   const addPage = (
@@ -139,6 +152,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("fee-collection", "Fee collection", "Find invoices and record payments", "/admin/fees/collection", ["fees", "invoice", "payment"]);
     addPage("fee-reports", "Fee reports", "Collection and outstanding balance reports", "/admin/fees/reports", ["report", "reports", "balance", "finance"]);
   }
+  if (canManageAccounts) {
+    addPage("accounts", "Accounts", "Income, expenses, bank accounts, and accounting reports", "/admin/accounts", ["finance", "transactions"]);
+  }
   if (permissions.has("accounts.manage")) {
     addPage("accounts-profit", "Profit & Loss", "Income statement for an accounting period", "/admin/accounts?section=profit", ["profit", "loss", "income statement"]);
     addPage("accounts-income", "Income", "Record and review other school income", "/admin/accounts?section=income", ["donations", "grants"]);
@@ -168,7 +184,18 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const queryTokens = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const tokenMatch = (column: Parameters<typeof like>[0]) =>
     and(...queryTokens.map((token) => like(sql`lower(${column})`, patternFor(token))));
-  const [studentRows, staffRows, academicRows, examRows] = await Promise.all([
+  const [
+    studentRows,
+    inventoryItemRows,
+    inventoryAssetRows,
+    inventorySupplierRows,
+    invoiceRows,
+    paymentRows,
+    accountTransactionRows,
+    staffRows,
+    academicRows,
+    examRows,
+  ] = await Promise.all([
     canViewStudents
       ? db.select({
         publicId: students.publicId,
@@ -193,6 +220,173 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         ))
         .orderBy(asc(students.lastName), asc(students.firstName))
         .limit(40)
+      : Promise.resolve([]),
+    canManageInventory
+      ? db.select({
+        id: inventoryItems.id,
+        sku: inventoryItems.sku,
+        name: inventoryItems.name,
+        categoryName: inventoryCategories.name,
+        supplierId: inventoryItems.supplierId,
+        supplierName: inventorySuppliers.name,
+        locationName: inventoryLocations.name,
+        status: inventoryItems.status,
+      }).from(inventoryItems)
+        .innerJoin(inventoryCategories, and(
+          eq(inventoryCategories.id, inventoryItems.categoryId),
+          eq(inventoryCategories.schoolId, context.schoolId),
+        ))
+        .leftJoin(inventorySuppliers, and(
+          eq(inventorySuppliers.id, inventoryItems.supplierId),
+          eq(inventorySuppliers.schoolId, context.schoolId),
+        ))
+        .leftJoin(inventoryLocations, and(
+          eq(inventoryLocations.id, inventoryItems.locationId),
+          eq(inventoryLocations.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(inventoryItems.schoolId, context.schoolId),
+          or(
+            tokenMatch(inventoryItems.name),
+            tokenMatch(inventoryItems.sku),
+            tokenMatch(inventoryItems.description),
+            tokenMatch(inventoryCategories.name),
+            tokenMatch(inventorySuppliers.name),
+            tokenMatch(inventoryLocations.name),
+            fuzzyTextMatch(queryTokens, inventoryItems.name, inventoryItems.sku, inventoryItems.description, inventoryCategories.name),
+          ),
+        ))
+        .orderBy(asc(inventoryItems.name))
+        .limit(30)
+      : Promise.resolve([]),
+    canManageInventory
+      ? db.select({
+        id: inventoryAssets.id,
+        assetTag: inventoryAssets.assetTag,
+        name: inventoryAssets.name,
+        locationName: inventoryLocations.name,
+        status: inventoryAssets.status,
+      }).from(inventoryAssets)
+        .leftJoin(inventoryLocations, and(
+          eq(inventoryLocations.id, inventoryAssets.locationId),
+          eq(inventoryLocations.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(inventoryAssets.schoolId, context.schoolId),
+          or(
+            tokenMatch(inventoryAssets.name),
+            tokenMatch(inventoryAssets.assetTag),
+            tokenMatch(inventoryAssets.description),
+            tokenMatch(inventoryLocations.name),
+            fuzzyTextMatch(queryTokens, inventoryAssets.name, inventoryAssets.assetTag),
+          ),
+        ))
+        .orderBy(asc(inventoryAssets.name))
+        .limit(20)
+      : Promise.resolve([]),
+    canManageInventory
+      ? db.select({
+        id: inventorySuppliers.id,
+        name: inventorySuppliers.name,
+        contactName: inventorySuppliers.contactName,
+        phone: inventorySuppliers.phone,
+      }).from(inventorySuppliers)
+        .where(and(
+          eq(inventorySuppliers.schoolId, context.schoolId),
+          or(
+            tokenMatch(inventorySuppliers.name),
+            tokenMatch(inventorySuppliers.contactName),
+            tokenMatch(inventorySuppliers.phone),
+            fuzzyTextMatch(queryTokens, inventorySuppliers.name, inventorySuppliers.contactName),
+          ),
+        ))
+        .orderBy(asc(inventorySuppliers.name))
+        .limit(20)
+      : Promise.resolve([]),
+    canManageFees
+      ? db.select({
+        id: studentFeeInvoices.id,
+        invoiceNumber: studentFeeInvoices.invoiceNumber,
+        studentName: students.firstName,
+        studentLastName: students.lastName,
+        admissionNumber: students.admissionNumber,
+        status: studentFeeInvoices.status,
+      }).from(studentFeeInvoices)
+        .innerJoin(students, and(
+          eq(students.id, studentFeeInvoices.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(studentFeeInvoices.schoolId, context.schoolId),
+          or(
+            tokenMatch(studentFeeInvoices.invoiceNumber),
+            tokenMatch(students.firstName),
+            tokenMatch(students.lastName),
+            tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
+            like(sql`lower(${students.admissionNumber})`, pattern),
+            fuzzyTextMatch(queryTokens, students.firstName, students.lastName, sql`concat(${students.firstName}, ' ', ${students.lastName})`),
+          ),
+        ))
+        .orderBy(asc(studentFeeInvoices.dueDate), asc(studentFeeInvoices.id))
+        .limit(30)
+      : Promise.resolve([]),
+    canManageFees
+      ? db.select({
+        id: feePayments.id,
+        receiptNumber: feePayments.receiptNumber,
+        reference: feePayments.reference,
+        invoiceNumber: studentFeeInvoices.invoiceNumber,
+        studentName: students.firstName,
+        studentLastName: students.lastName,
+      }).from(feePayments)
+        .innerJoin(studentFeeInvoices, and(
+          eq(studentFeeInvoices.id, feePayments.invoiceId),
+          eq(studentFeeInvoices.schoolId, context.schoolId),
+        ))
+        .innerJoin(students, and(
+          eq(students.id, studentFeeInvoices.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(feePayments.schoolId, context.schoolId),
+          or(
+            tokenMatch(feePayments.receiptNumber),
+            tokenMatch(feePayments.reference),
+            tokenMatch(studentFeeInvoices.invoiceNumber),
+            tokenMatch(students.firstName),
+            tokenMatch(students.lastName),
+            fuzzyTextMatch(queryTokens, students.firstName, students.lastName, studentFeeInvoices.invoiceNumber),
+          ),
+        ))
+        .orderBy(asc(feePayments.paidAt))
+        .limit(20)
+      : Promise.resolve([]),
+    canManageAccounts
+      ? db.select({
+        id: accountTransactions.id,
+        transactionType: accountTransactions.transactionType,
+        transactionDate: accountTransactions.transactionDate,
+        description: accountTransactions.description,
+        payee: accountTransactions.payee,
+        reference: accountTransactions.reference,
+        accountName: chartOfAccounts.name,
+      }).from(accountTransactions)
+        .innerJoin(chartOfAccounts, and(
+          eq(chartOfAccounts.id, accountTransactions.categoryAccountId),
+          eq(chartOfAccounts.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(accountTransactions.schoolId, context.schoolId),
+          or(
+            tokenMatch(accountTransactions.description),
+            tokenMatch(accountTransactions.payee),
+            tokenMatch(accountTransactions.reference),
+            tokenMatch(chartOfAccounts.name),
+            fuzzyTextMatch(queryTokens, accountTransactions.description, accountTransactions.payee),
+          ),
+        ))
+        .orderBy(asc(accountTransactions.transactionDate))
+        .limit(20)
       : Promise.resolve([]),
     canManageStaff
       ? db.select({
@@ -339,6 +533,60 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       description: student.admissionNumber ? `Student · Admission no. ${student.admissionNumber}` : "Student profile",
       href: `/admin/students?profile=${encodeURIComponent(student.publicId)}`,
       category: "Students",
+    });
+  }
+  for (const item of inventoryItemRows) {
+    results.push({
+      id: `inventory-item-${item.id}`,
+      title: item.name,
+      description: `Inventory · ${item.sku} · ${item.categoryName} · ${item.status}`,
+      href: `/admin/inventory?search=${encodeURIComponent(query)}`,
+      category: "Inventory",
+    });
+  }
+  for (const asset of inventoryAssetRows) {
+    results.push({
+      id: `inventory-asset-${asset.id}`,
+      title: asset.name,
+      description: `Asset · ${asset.assetTag} · ${asset.locationName ?? "Unassigned"} · ${asset.status}`,
+      href: `/admin/inventory?section=assets&search=${encodeURIComponent(query)}`,
+      category: "Inventory",
+    });
+  }
+  for (const supplier of inventorySupplierRows) {
+    results.push({
+      id: `inventory-supplier-${supplier.id}`,
+      title: supplier.name,
+      description: ["Supplier", supplier.contactName, supplier.phone].filter(Boolean).join(" · "),
+      href: `/admin/inventory?supplierId=${supplier.id}`,
+      category: "Inventory",
+    });
+  }
+  for (const invoice of invoiceRows) {
+    results.push({
+      id: `fee-invoice-${invoice.id}`,
+      title: invoice.invoiceNumber,
+      description: `Fee invoice · ${invoice.studentName} ${invoice.studentLastName} · ${invoice.status}`,
+      href: `/admin/fees/collection?search=${encodeURIComponent(invoice.invoiceNumber)}`,
+      category: "Fees",
+    });
+  }
+  for (const payment of paymentRows) {
+    results.push({
+      id: `fee-payment-${payment.id}`,
+      title: payment.receiptNumber,
+      description: `Fee payment · ${payment.studentName} ${payment.studentLastName} · ${payment.invoiceNumber}`,
+      href: `/admin/fees/receipt/${payment.id}`,
+      category: "Fees",
+    });
+  }
+  for (const transaction of accountTransactionRows) {
+    results.push({
+      id: `account-transaction-${transaction.id}`,
+      title: transaction.description,
+      description: `${transaction.transactionType} · ${transaction.accountName} · ${transaction.payee ?? transaction.reference ?? transaction.transactionDate}`,
+      href: `/admin/accounts?section=reports&from=${transaction.transactionDate}&to=${transaction.transactionDate}&search=${encodeURIComponent(query)}`,
+      category: "Accounts",
     });
   }
   for (const staff of staffRows) {

@@ -22,7 +22,7 @@ export function SmartFilterForm({
     if (target.type === "hidden" || target.type === "submit" || target.type === "button") return;
 
     if (timer.current !== null) window.clearTimeout(timer.current);
-    const delay = target instanceof HTMLInputElement && ["search", "text"].includes(target.type) ? 350 : 0;
+    const delay = target instanceof HTMLInputElement && ["search", "text"].includes(target.type) ? 200 : 0;
     timer.current = window.setTimeout(() => formRef.current?.requestSubmit(), delay);
   }
 
