@@ -27,10 +27,10 @@ const sourceBankAccount = alias(schoolBankAccounts, "source_account");
 const destinationBankAccount = alias(schoolBankAccounts, "destination_account");
 
 const sections: Array<{ id: Section; label: string }> = [
+  { id: "chart", label: "Chart of accounts" },
   { id: "profit", label: "Profit & Loss" },
   { id: "income", label: "Income" },
   { id: "expenses", label: "Expenses" },
-  { id: "chart", label: "Chart of accounts" },
   { id: "bank", label: "Bank accounts" },
   { id: "transfers", label: "Fund transfers" },
   { id: "reports", label: "Reports" },
