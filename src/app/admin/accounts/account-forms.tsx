@@ -99,57 +99,67 @@ export function AccountForms({
   currentDate: string;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3">
       {section === "chart" && <ActionForm action={createChartAccount} title="Add chart of account">
-        <TextField label="Account code" name="code" placeholder="4000" />
-        <TextField label="Account name" name="name" placeholder="Donations income" />
-        <label className="block text-sm text-slate-700">
-          <span className="mb-1 block font-medium">Account type</span>
-          <select name="accountType" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
-            <option value="asset">Asset</option><option value="liability">Liability</option><option value="equity">Equity</option>
-            <option value="income">Income</option><option value="expense">Expense</option>
-          </select>
-        </label>
-        <TextField label="Description" name="description" required={false} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <TextField label="Account code" name="code" placeholder="4000" />
+          <TextField label="Account name" name="name" placeholder="Donations income" />
+          <label className="block text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Account type</span>
+            <select name="accountType" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+              <option value="asset">Asset</option><option value="liability">Liability</option><option value="equity">Equity</option>
+              <option value="income">Income</option><option value="expense">Expense</option>
+            </select>
+          </label>
+          <TextField label="Description" name="description" required={false} />
+        </div>
       </ActionForm>}
 
       {section === "bank" && <ActionForm action={createSchoolBankAccount} title="Add bank / cash account">
-        <TextField label="Bank or provider" name="bankName" />
-        <TextField label="Account display name" name="accountName" placeholder="School operating account" />
-        <TextField label="Account number (only last 4 are stored)" name="accountNumber" required={false} />
-        <SelectField label="Linked asset account" name="chartAccountId" options={assetAccounts} />
-        <TextField label="Opening balance" name="openingBalance" type="number" defaultValue="0" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <TextField label="Bank or provider" name="bankName" />
+          <TextField label="Account display name" name="accountName" placeholder="School operating account" />
+          <TextField label="Account number (only last 4 are stored)" name="accountNumber" required={false} />
+          <SelectField label="Linked asset account" name="chartAccountId" options={assetAccounts} />
+          <TextField label="Opening balance" name="openingBalance" type="number" defaultValue="0" />
+        </div>
       </ActionForm>}
 
       {section === "income" && <ActionForm action={createAccountTransaction} title="Record income">
         <input type="hidden" name="transactionType" value="income" />
-        <SelectField label="Income category" name="categoryAccountId" options={incomeAccounts} />
-        <SelectField label="Deposit to bank / cash" name="bankAccountId" options={banks} required={false} />
-        <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
-        <TextField label="Amount" name="amount" type="number" />
-        <TextField label="Description" name="description" />
-        <TextField label="Received from" name="payee" required={false} />
-        <TextField label="Reference" name="reference" required={false} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SelectField label="Income category" name="categoryAccountId" options={incomeAccounts} />
+          <SelectField label="Deposit to bank / cash" name="bankAccountId" options={banks} required={false} />
+          <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
+          <TextField label="Amount" name="amount" type="number" />
+          <TextField label="Description" name="description" />
+          <TextField label="Received from" name="payee" required={false} />
+          <TextField label="Reference" name="reference" required={false} />
+        </div>
       </ActionForm>}
 
       {section === "expenses" && <ActionForm action={createAccountTransaction} title="Record expense">
         <input type="hidden" name="transactionType" value="expense" />
-        <SelectField label="Expense category" name="categoryAccountId" options={expenseAccounts} />
-        <SelectField label="Paid from bank / cash" name="bankAccountId" options={banks} required={false} />
-        <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
-        <TextField label="Amount" name="amount" type="number" />
-        <TextField label="Description" name="description" placeholder="Staff expense, supplies, utilities..." />
-        <TextField label="Paid to" name="payee" required={false} />
-        <TextField label="Reference" name="reference" required={false} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SelectField label="Expense category" name="categoryAccountId" options={expenseAccounts} />
+          <SelectField label="Paid from bank / cash" name="bankAccountId" options={banks} required={false} />
+          <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
+          <TextField label="Amount" name="amount" type="number" />
+          <TextField label="Description" name="description" placeholder="Staff expense, supplies, utilities..." />
+          <TextField label="Paid to" name="payee" required={false} />
+          <TextField label="Reference" name="reference" required={false} />
+        </div>
       </ActionForm>}
 
       {section === "transfers" && <ActionForm action={createFundTransfer} title="Transfer funds">
-        <SelectField label="From account" name="sourceBankAccountId" options={banks} />
-        <SelectField label="To account" name="destinationBankAccountId" options={banks} />
-        <TextField label="Date" name="transferDate" type="date" defaultValue={currentDate} />
-        <TextField label="Amount" name="amount" type="number" />
-        <TextField label="Reference" name="reference" required={false} />
-        <TextField label="Note" name="note" required={false} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <SelectField label="From account" name="sourceBankAccountId" options={banks} />
+          <SelectField label="To account" name="destinationBankAccountId" options={banks} />
+          <TextField label="Date" name="transferDate" type="date" defaultValue={currentDate} />
+          <TextField label="Amount" name="amount" type="number" />
+          <TextField label="Reference" name="reference" required={false} />
+          <TextField label="Note" name="note" required={false} />
+        </div>
       </ActionForm>}
     </div>
   );

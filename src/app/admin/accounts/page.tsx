@@ -390,6 +390,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         )}
         {section === "expenses" && (
           <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Expense categories are managed as active <strong>Expense</strong> accounts in the{" "}
+              <a href="/admin/accounts?section=chart" className="font-semibold text-violet-700 underline decoration-violet-300 underline-offset-2 hover:text-violet-900">
+                Chart of accounts
+              </a>
+              . Add or update them there; only active expense accounts appear in this form.
+            </p>
             <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
             <TransactionTable transactions={transactions.filter((transaction) => transaction.transactionType === "expense")} currency={currency} reviewNeeded={reviewNeeded} />
           </div>
