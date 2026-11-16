@@ -13,8 +13,10 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { InventoryForms, AssetLocationForm, type InventoryOption } from "./inventory-forms";
 import { InventoryModuleNav } from "./module-nav";
+import { TablePagination } from "@/components/table-pagination";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 25;
 
 function formatCurrency(value: string | number, currency: string): string {
   return new Intl.NumberFormat("en", { style: "currency", currency }).format(Number(value));
@@ -31,10 +33,19 @@ type SearchParams = {
   supplierId?: string | string[];
   locationId?: string | string[];
   status?: string | string[];
+  itemPage?: string | string[];
+  lowStockPage?: string | string[];
+  assetPage?: string | string[];
+  movementPage?: string | string[];
+  maintenancePage?: string | string[];
 };
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function requestedPage(value: string | undefined): number {
+  return value && /^\d+$/.test(value) ? Math.max(1, Number(value)) : 1;
 }
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -46,6 +57,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const selectedCategory = first(query.categoryId) ?? "";
   const selectedSupplier = first(query.supplierId) ?? "";
   const selectedLocation = first(query.locationId) ?? "";
+  const requestedItemPage = requestedPage(first(query.itemPage));
+  const requestedLowStockPage = requestedPage(first(query.lowStockPage));
+  const requestedAssetPage = requestedPage(first(query.assetPage));
+  const requestedMovementPage = requestedPage(first(query.movementPage));
+  const requestedMaintenancePage = requestedPage(first(query.maintenancePage));
   const requestedStatus = first(query.status);
   const assetStatus = requestedStatus === "maintenance" || requestedStatus === "retired"
     ? requestedStatus
@@ -102,7 +118,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         eq(inventoryLocations.schoolId, context.schoolId),
       ))
       .where(eq(inventoryItems.schoolId, context.schoolId))
-      .orderBy(asc(inventoryItems.name)),
+      .orderBy(asc(inventoryItems.name), asc(inventoryItems.id)),
     db.select({
       id: inventoryAssets.id,
       assetTag: inventoryAssets.assetTag,
@@ -121,6 +137,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       .where(eq(inventoryAssets.schoolId, context.schoolId))
       .orderBy(asc(inventoryAssets.assetTag)),
     db.select({
+      id: inventoryMovements.id,
       itemName: inventoryItems.name,
       sku: inventoryItems.sku,
       unit: inventoryItems.unit,
@@ -136,8 +153,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         eq(inventoryItems.schoolId, context.schoolId),
       ))
       .where(eq(inventoryMovements.schoolId, context.schoolId))
-      .orderBy(desc(inventoryMovements.createdAt)).limit(50),
+      .orderBy(desc(inventoryMovements.createdAt), desc(inventoryMovements.id)),
     db.select({
+      id: assetMaintenance.id,
       assetTag: inventoryAssets.assetTag,
       assetName: inventoryAssets.name,
       maintenanceDate: assetMaintenance.maintenanceDate,
@@ -150,7 +168,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         eq(inventoryAssets.schoolId, context.schoolId),
       ))
       .where(eq(assetMaintenance.schoolId, context.schoolId))
-      .orderBy(desc(assetMaintenance.maintenanceDate)).limit(50),
+      .orderBy(desc(assetMaintenance.maintenanceDate), desc(assetMaintenance.id)),
   ]);
   const options = <T extends { id: number }>(rows: T[], label: (row: T) => string): InventoryOption[] =>
     rows.map((row) => ({ id: row.id, label: label(row) }));
@@ -176,9 +194,34 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     (!selectedLocation || String(locations.find((location) => location.name === asset.locationName)?.id) === selectedLocation) &&
     (assetStatus === "all" || asset.status === assetStatus)
   );
+  const itemPageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const itemPage = Math.min(requestedItemPage, itemPageCount);
+  const visibleItems = filteredItems.slice((itemPage - 1) * PAGE_SIZE, itemPage * PAGE_SIZE);
+  const assetPageCount = Math.max(1, Math.ceil(filteredAssets.length / PAGE_SIZE));
+  const assetPage = Math.min(requestedAssetPage, assetPageCount);
+  const visibleAssets = filteredAssets.slice((assetPage - 1) * PAGE_SIZE, assetPage * PAGE_SIZE);
+  const movementPageCount = Math.max(1, Math.ceil(movements.length / PAGE_SIZE));
+  const movementPage = Math.min(requestedMovementPage, movementPageCount);
+  const visibleMovements = movements.slice((movementPage - 1) * PAGE_SIZE, movementPage * PAGE_SIZE);
+  const maintenancePageCount = Math.max(1, Math.ceil(maintenance.length / PAGE_SIZE));
+  const maintenancePage = Math.min(requestedMaintenancePage, maintenancePageCount);
+  const visibleMaintenance = maintenance.slice((maintenancePage - 1) * PAGE_SIZE, maintenancePage * PAGE_SIZE);
+  const pageHref = (parameter: string, page: number) => {
+    const params = new URLSearchParams({ section });
+    if (search) params.set("search", search);
+    if (selectedCategory) params.set("categoryId", selectedCategory);
+    if (selectedSupplier) params.set("supplierId", selectedSupplier);
+    if (selectedLocation) params.set("locationId", selectedLocation);
+    if (assetStatus !== "all") params.set("status", assetStatus);
+    params.set(parameter, String(page));
+    return `/admin/inventory?${params.toString()}`;
+  };
   const lowStock = filteredItems.filter((item) =>
     item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
   );
+  const lowStockPageCount = Math.max(1, Math.ceil(lowStock.length / PAGE_SIZE));
+  const lowStockPage = Math.min(requestedLowStockPage, lowStockPageCount);
+  const visibleLowStock = lowStock.slice((lowStockPage - 1) * PAGE_SIZE, lowStockPage * PAGE_SIZE);
   const hasDemoRows = items.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
     || assets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "));
   const currency = school?.currency ?? "USD";
@@ -218,12 +261,14 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           <h2 className="font-bold text-amber-950">Low-stock notification</h2>
           <p className="mt-1 text-sm text-amber-900">Items at or below their configured reorder level need attention.</p>
           <ul className="mt-3 flex flex-wrap gap-2">
-            {lowStock.map((item) => (
+            {visibleLowStock.map((item) => (
               <li key={item.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-amber-950">
                 <strong>{item.name}</strong> · {item.quantityOnHand} {item.unit} remaining (reorder at {item.reorderLevel})
               </li>
             ))}
           </ul>
+          <TablePagination ariaLabel="Low-stock notifications" currentPage={lowStockPage} pageSize={PAGE_SIZE} totalRows={lowStock.length}
+            hrefForPage={(page) => pageHref("lowStockPage", page)} />
         </section>
       )}
 
@@ -268,7 +313,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
 
       <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions} />
 
-      {section === "inventory" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {section === "inventory" && <>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5">
           <h2 className="text-lg font-bold text-slate-900">Stock register</h2>
           <p className="mt-1 text-sm text-slate-500">Current quantities and average acquisition cost by item.</p>
@@ -280,7 +326,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               <th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Avg. unit cost</th><th className="px-4 py-3">Supplier / location</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredItems.map((item) => (
+              {visibleItems.map((item) => (
                 <tr key={item.id} className={Number(item.quantityOnHand) <= Number(item.reorderLevel) ? "bg-amber-50/60" : ""}>
                   <td className="px-4 py-3"><strong>{item.name}</strong><span className="block text-xs text-slate-500">{item.sku} · {item.status}</span></td>
                   <td className="px-4 py-3">{item.categoryName}</td>
@@ -294,9 +340,13 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-      </section>}
+        <TablePagination ariaLabel="Inventory items" currentPage={itemPage} pageSize={PAGE_SIZE} totalRows={filteredItems.length}
+          hrefForPage={(page) => pageHref("itemPage", page)} />
+        </section>
+      </>}
 
-      {section === "assets" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {section === "assets" && <>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5">
           <h2 className="text-lg font-bold text-slate-900">School asset register</h2>
           <p className="mt-1 text-sm text-slate-500">Record asset movements, lifecycle status, and maintenance history.</p>
@@ -308,7 +358,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               <th className="px-4 py-3">Location &amp; status</th><th className="px-4 py-3">Update asset</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredAssets.map((asset) => (
+              {visibleAssets.map((asset) => (
                 <tr key={asset.id}>
                   <td className="px-4 py-3"><strong>{asset.name}</strong><span className="block text-xs text-slate-500">{asset.assetTag}</span></td>
                   <td className="px-4 py-3">{asset.acquiredAt}</td>
@@ -321,16 +371,20 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-      </section>}
+        <TablePagination ariaLabel="School assets" currentPage={assetPage} pageSize={PAGE_SIZE} totalRows={filteredAssets.length}
+          hrefForPage={(page) => pageHref("assetPage", page)} />
+        </section>
+      </>}
 
-      {section === "inventory" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Recent stock movements</h2></div>
+      {section === "inventory" && <>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Stock movements</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / item</th><th className="px-4 py-3">Movement</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Balance</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {movements.map((movement, index) => (
-                <tr key={`${movement.itemName}-${movement.createdAt.toISOString()}-${index}`}>
+              {visibleMovements.map((movement) => (
+                <tr key={movement.id}>
                   <td className="px-4 py-3">{formatDate(movement.createdAt)}<span className="block text-xs text-slate-500">{movement.itemName} · {movement.sku}</span></td>
                   <td className="px-4 py-3 capitalize">{movement.movementType}</td>
                   <td className="px-4 py-3 tabular-nums">{movement.quantity} {movement.unit}</td>
@@ -341,16 +395,20 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-      </section>}
+        <TablePagination ariaLabel="Stock movements" currentPage={movementPage} pageSize={PAGE_SIZE} totalRows={movements.length}
+          hrefForPage={(page) => pageHref("movementPage", page)} />
+        </section>
+      </>}
 
-      {section === "assets" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {section === "assets" && <>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Asset maintenance log</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / asset</th><th className="px-4 py-3">Work performed</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Provider</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {maintenance.map((record, index) => (
-                <tr key={`${record.assetTag}-${record.maintenanceDate}-${index}`}>
+              {visibleMaintenance.map((record) => (
+                <tr key={record.id}>
                   <td className="px-4 py-3">{record.maintenanceDate}<span className="block text-xs text-slate-500">{record.assetTag} · {record.assetName}</span></td>
                   <td className="px-4 py-3">{record.description}</td>
                   <td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td>
@@ -361,7 +419,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-      </section>}
+        <TablePagination ariaLabel="Asset maintenance records" currentPage={maintenancePage} pageSize={PAGE_SIZE} totalRows={maintenance.length}
+          hrefForPage={(page) => pageHref("maintenancePage", page)} />
+        </section>
+      </>}
 
     </main>
   );

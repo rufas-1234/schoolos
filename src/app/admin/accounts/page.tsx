@@ -17,10 +17,25 @@ import { DownloadCsv } from "@/components/download-csv";
 import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
 import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOption } from "./account-forms";
+import { TablePagination } from "@/components/table-pagination";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 25;
 
-type SearchParams = { section?: string | string[]; from?: string | string[]; to?: string | string[]; status?: string | string[]; search?: string | string[] };
+type SearchParams = {
+  section?: string | string[];
+  from?: string | string[];
+  to?: string | string[];
+  status?: string | string[];
+  search?: string | string[];
+  incomePage?: string | string[];
+  expensePage?: string | string[];
+  chartPage?: string | string[];
+  bankPage?: string | string[];
+  transfersPage?: string | string[];
+  reportTransactionsPage?: string | string[];
+  reportTransfersPage?: string | string[];
+};
 type Section = "profit" | "income" | "expenses" | "chart" | "bank" | "transfers" | "reports";
 const approverUser = alias(user, "approver_user");
 const sourceBankAccount = alias(schoolBankAccounts, "source_account");
@@ -38,6 +53,19 @@ const sections: Array<{ id: Section; label: string }> = [
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function requestedPage(value: string | undefined): number {
+  return value && /^\d+$/.test(value) ? Math.max(1, Number(value)) : 1;
+}
+
+function paginateRows<T>(rows: T[], requested: number) {
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const page = Math.min(requested, pageCount);
+  return {
+    page,
+    rows: rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+  };
 }
 
 function validDate(value: string | undefined): value is string {
@@ -146,7 +174,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         .innerJoin(user, eq(user.id, accountTransactions.submittedBy))
         .leftJoin(approverUser, eq(approverUser.id, accountTransactions.approvedBy))
         .where(eq(accountTransactions.schoolId, context.schoolId))
-        .orderBy(desc(accountTransactions.createdAt)).limit(250),
+        .orderBy(desc(accountTransactions.createdAt), desc(accountTransactions.id)),
       db.select({
         id: fundTransfers.id,
         transferDate: fundTransfers.transferDate,
@@ -167,7 +195,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           eq(destinationBankAccount.schoolId, context.schoolId),
         ))
         .where(eq(fundTransfers.schoolId, context.schoolId))
-        .orderBy(desc(fundTransfers.transferDate), desc(fundTransfers.id)).limit(250),
+        .orderBy(desc(fundTransfers.transferDate), desc(fundTransfers.id)),
       db.select({
         type: accountTransactions.transactionType,
         amount: accountTransactions.amount,
@@ -287,6 +315,22 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     !searchTerm || `${transaction.description} ${transaction.accountName} ${transaction.accountCode} ${transaction.payee ?? ""} ${transaction.reference ?? ""}`
       .toLocaleLowerCase().includes(searchTerm)
   );
+  const incomeTransactions = transactions.filter((transaction) => transaction.transactionType === "income");
+  const expenseTransactions = transactions.filter((transaction) => transaction.transactionType === "expense");
+  const incomeTransactionPage = paginateRows(incomeTransactions, requestedPage(first(query.incomePage)));
+  const expenseTransactionPage = paginateRows(expenseTransactions, requestedPage(first(query.expensePage)));
+  const chartPage = paginateRows(accounts, requestedPage(first(query.chartPage)));
+  const bankPage = paginateRows(bankAccounts, requestedPage(first(query.bankPage)));
+  const transferPage = paginateRows(transfers, requestedPage(first(query.transfersPage)));
+  const reportTransactionPage = paginateRows(reportTransactions, requestedPage(first(query.reportTransactionsPage)));
+  const reportTransferPage = paginateRows(reportTransfers, requestedPage(first(query.reportTransfersPage)));
+  const pageHref = (parameter: string, page: number) => {
+    const params = new URLSearchParams({ section, from, to });
+    if (search) params.set("search", search);
+    if (reportStatus !== "all") params.set("status", reportStatus);
+    params.set(parameter, String(page));
+    return `/admin/accounts?${params.toString()}`;
+  };
   const currency = school?.currency ?? "USD";
   const activeAccounts = accounts.filter((account) => account.status === "active");
   const assetAccounts = accountOptions(activeAccounts.filter((account) => account.accountType === "asset"));
@@ -385,7 +429,9 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           <div className="space-y-4">
             <p className="text-sm text-slate-500">School fee receipts are included automatically from fee collections in Profit &amp; Loss. Record donations and other non-fee income here to avoid double counting.</p>
             <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
-            <TransactionTable transactions={transactions.filter((transaction) => transaction.transactionType === "income")} currency={currency} reviewNeeded={reviewNeeded} />
+            <TransactionTable transactions={incomeTransactionPage.rows} currency={currency} reviewNeeded={reviewNeeded} />
+            <TablePagination ariaLabel="Income transactions" currentPage={incomeTransactionPage.page} pageSize={PAGE_SIZE} totalRows={incomeTransactions.length}
+              hrefForPage={(page) => pageHref("incomePage", page)} />
           </div>
         )}
         {section === "expenses" && (
@@ -398,7 +444,9 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               . Add or update them there; only active expense accounts appear in this form.
             </p>
             <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
-            <TransactionTable transactions={transactions.filter((transaction) => transaction.transactionType === "expense")} currency={currency} reviewNeeded={reviewNeeded} />
+            <TransactionTable transactions={expenseTransactionPage.rows} currency={currency} reviewNeeded={reviewNeeded} />
+            <TablePagination ariaLabel="Expense transactions" currentPage={expenseTransactionPage.page} pageSize={PAGE_SIZE} totalRows={expenseTransactions.length}
+              hrefForPage={(page) => pageHref("expensePage", page)} />
           </div>
         )}
         {section === "chart" && (
@@ -407,11 +455,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account name</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Description</th><th className="px-4 py-3">Status</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{accounts.map((account) => (
+                <tbody className="divide-y divide-slate-100">{chartPage.rows.map((account) => (
                   <tr key={account.id}><td className="px-4 py-3 font-mono">{account.code}</td><td className="px-4 py-3 font-semibold">{account.name}</td><td className="px-4 py-3 capitalize">{account.accountType}</td><td className="px-4 py-3">{account.description ?? "—"}</td><td className="px-4 py-3 capitalize">{account.status}</td></tr>
                 ))}{!accounts.length && <EmptyRow columns={5} text="Create your chart of accounts to categorize income and expenses." />}</tbody>
               </table>
             </div>
+            <TablePagination ariaLabel="Chart of accounts" currentPage={chartPage.page} pageSize={PAGE_SIZE} totalRows={accounts.length}
+              hrefForPage={(page) => pageHref("chartPage", page)} />
           </div>
         )}
         {section === "bank" && (
@@ -420,11 +470,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Linked chart account</th><th className="px-4 py-3">Opening balance</th><th className="px-4 py-3">Current balance</th><th className="px-4 py-3">Status</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{bankAccounts.map((bank) => (
+                <tbody className="divide-y divide-slate-100">{bankPage.rows.map((bank) => (
                   <tr key={bank.id}><td className="px-4 py-3 font-semibold">{bank.accountName}<span className="block text-xs text-slate-500">{bank.bankName}{bank.accountNumberLast4 ? ` ···· ${bank.accountNumberLast4}` : ""}</span></td><td className="px-4 py-3">{bank.chartCode} · {bank.chartName}</td><td className="px-4 py-3">{displayAmount(bank.openingBalance, currency)}</td><td className="px-4 py-3 font-semibold">{displayCurrency(bankBalances.get(bank.id) ?? BigInt(0), currency)}</td><td className="px-4 py-3 capitalize">{bank.status}</td></tr>
                 ))}{!bankAccounts.length && <EmptyRow columns={5} text="Add a bank or cash account and link it to an asset account." />}</tbody>
               </table>
             </div>
+            <TablePagination ariaLabel="Bank accounts" currentPage={bankPage.page} pageSize={PAGE_SIZE} totalRows={bankAccounts.length}
+              hrefForPage={(page) => pageHref("bankPage", page)} />
           </div>
         )}
         {section === "transfers" && (
@@ -433,11 +485,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[650px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">From</th><th className="px-4 py-3">To</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Reference / note</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{transfers.map((transfer) => (
+                <tbody className="divide-y divide-slate-100">{transferPage.rows.map((transfer) => (
                   <tr key={transfer.id}><td className="px-4 py-3">{transfer.transferDate}</td><td className="px-4 py-3">{transfer.sourceName}</td><td className="px-4 py-3">{transfer.destinationName}</td><td className="px-4 py-3 font-semibold">{displayAmount(transfer.amount, currency)}</td><td className="px-4 py-3">{transfer.reference ?? "—"}<span className="block text-xs text-slate-500">{transfer.note ?? ""}</span></td></tr>
                 ))}{!transfers.length && <EmptyRow columns={5} text="No fund transfers have been recorded." />}</tbody>
               </table>
             </div>
+            <TablePagination ariaLabel="Fund transfers" currentPage={transferPage.page} pageSize={PAGE_SIZE} totalRows={transfers.length}
+              hrefForPage={(page) => pageHref("transfersPage", page)} />
           </div>
         )}
         {section === "reports" && (
@@ -493,10 +547,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <p className="text-xs text-slate-500">Fees are shown separately from non-fee income. Period totals use approved accounting activity for the selected dates and do not change with the transaction search or status filter; those filters apply to the transaction register and CSV export.</p>
               {hasDemoReportTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY records are included in the transaction list and applicable totals as workflow examples; they are not real income or expenses.</p>}
               <TransactionTable
-                transactions={reportTransactions}
+                transactions={reportTransactionPage.rows}
                 currency={currency}
                 reviewNeeded={reportTransactions.filter((row) => row.status === "pending")}
               />
+              <TablePagination ariaLabel="Accounts report transactions" currentPage={reportTransactionPage.page} pageSize={PAGE_SIZE} totalRows={reportTransactions.length}
+                hrefForPage={(page) => pageHref("reportTransactionsPage", page)} />
               <div className="grid gap-4 xl:grid-cols-2">
                 <SummaryTable title="Income by category" rows={[
                   { label: "School fee receipts (net of reversals)", value: displayCurrency(feeIncomeTotal, currency) },
@@ -523,11 +579,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[520px] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / reference</th><th className="px-4 py-3">From / to</th><th className="px-4 py-3">Amount</th></tr></thead>
-                      <tbody className="divide-y divide-slate-100">{reportTransfers.map((transfer) => (
+                      <tbody className="divide-y divide-slate-100">{reportTransferPage.rows.map((transfer) => (
                         <tr key={transfer.id}><td className="px-4 py-3">{transfer.transferDate}<span className="block text-xs text-slate-500">{transfer.reference ?? transfer.note ?? "—"}</span></td><td className="px-4 py-3">{transfer.sourceName ?? "Unknown"}<span className="block text-xs text-slate-500">to {transfer.destinationName ?? "Unknown"}</span></td><td className="px-4 py-3 font-semibold">{displayAmount(transfer.amount, currency)}</td></tr>
                       ))}{!reportTransfers.length && <EmptyRow columns={3} text="No transfers were recorded for this period." />}</tbody>
                     </table>
                   </div>
+                  <TablePagination ariaLabel="Accounts report transfers" currentPage={reportTransferPage.page} pageSize={PAGE_SIZE} totalRows={reportTransfers.length}
+                    hrefForPage={(page) => pageHref("reportTransfersPage", page)} />
                 </section>
               </div>
             </section>

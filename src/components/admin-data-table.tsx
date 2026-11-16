@@ -276,7 +276,7 @@ export function AdminDataTable({
   const currentPage = Math.min(page, Math.max(pageCount, 1));
   const firstRowNumber = filteredRows.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastRowNumber = Math.min(currentPage * pageSize, filteredRows.length);
-  const pageRows = filteredRows.slice(firstRowNumber - 1, lastRowNumber);
+  const pageRows = visibleRows.slice(firstRowNumber - 1, lastRowNumber);
   const pageRangeStart = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
   const pageRangeEnd = Math.min(pageCount, pageRangeStart + 4);
   const pageNumbers = Array.from(

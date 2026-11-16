@@ -15,8 +15,10 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { DownloadCsv } from "@/components/download-csv";
 import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
 import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
+import { TablePagination } from "@/components/table-pagination";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 25;
 
 type SearchParams = {
   report?: string | string[];
@@ -26,6 +28,7 @@ type SearchParams = {
   search?: string | string[];
   movementType?: string | string[];
   status?: string | string[];
+  page?: string | string[];
 };
 type ReportType = "stock" | "movements" | "low-stock" | "assets" | "maintenance";
 
@@ -39,6 +42,10 @@ const reports: Array<{ id: ReportType; label: string }> = [
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function requestedPage(value: string | undefined): number {
+  return value && /^\d+$/.test(value) ? Math.max(1, Number(value)) : 1;
 }
 
 function validDate(value: string | undefined): value is string {
@@ -84,6 +91,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
   const assetStatus = requestedAssetStatus === "active" || requestedAssetStatus === "maintenance" || requestedAssetStatus === "retired"
     ? requestedAssetStatus
     : "all";
+  const requestedPageNumber = requestedPage(first(query.page));
   const startAt = new Date(`${from}T00:00:00.000Z`);
   const endAt = new Date(`${to}T23:59:59.999Z`);
   const [school, categories, items, movements, assets, maintenance] = await Promise.all([
@@ -120,8 +128,9 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
         eq(inventoryItems.schoolId, context.schoolId),
         ...(categoryId === null ? [] : [eq(inventoryItems.categoryId, categoryId)]),
       ))
-      .orderBy(asc(inventoryItems.name)),
+      .orderBy(asc(inventoryItems.name), asc(inventoryItems.id)),
     db.select({
+      id: inventoryMovements.id,
       itemName: inventoryItems.name,
       sku: inventoryItems.sku,
       unit: inventoryItems.unit,
@@ -170,6 +179,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
       ))
       .orderBy(asc(inventoryAssets.assetTag)),
     db.select({
+      id: assetMaintenance.id,
       assetTag: inventoryAssets.assetTag,
       assetName: inventoryAssets.name,
       maintenanceDate: assetMaintenance.maintenanceDate,
@@ -210,6 +220,32 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
   const lowStock = reportItems.filter((item) =>
     item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
   );
+  const totalRows = report === "stock"
+    ? reportItems.length
+    : report === "low-stock"
+      ? lowStock.length
+      : report === "movements"
+        ? reportMovements.length
+        : report === "assets"
+          ? reportAssets.length
+          : reportMaintenance.length;
+  const pageCount = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  const page = Math.min(requestedPageNumber, pageCount);
+  const start = (page - 1) * PAGE_SIZE;
+  const visibleItems = reportItems.slice(start, start + PAGE_SIZE);
+  const visibleLowStock = lowStock.slice(start, start + PAGE_SIZE);
+  const visibleMovements = reportMovements.slice(start, start + PAGE_SIZE);
+  const visibleAssets = reportAssets.slice(start, start + PAGE_SIZE);
+  const visibleMaintenance = reportMaintenance.slice(start, start + PAGE_SIZE);
+  const pageHref = (targetPage: number) => {
+    const params = new URLSearchParams({ report, from, to });
+    if (categoryId !== null) params.set("categoryId", String(categoryId));
+    if (search) params.set("search", search);
+    if (movementType !== "all") params.set("movementType", movementType);
+    if (assetStatus !== "all") params.set("status", assetStatus);
+    params.set("page", String(targetPage));
+    return `/admin/inventory/reports?${params.toString()}`;
+  };
   const stockValue = reportItems.reduce((total, item) =>
     total + Number(item.quantityOnHand) * Number(item.averageUnitCost), 0);
   const received = reportMovements.filter((movement) => movement.movementType === "received")
@@ -358,7 +394,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                   <th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Unit cost</th><th className="px-4 py-3">Stock value</th>
                   <th className="px-4 py-3">Supplier / location</th>
                 </tr></thead>
-                <tbody className="divide-y divide-slate-100">{reportItems.map((item) => (
+                <tbody className="divide-y divide-slate-100">{visibleItems.map((item) => (
                   <tr key={item.id}>
                     <td className="px-4 py-3"><strong>{item.name}</strong><span className="block text-xs text-slate-500">{item.sku} · {item.status}</span></td>
                     <td className="px-4 py-3">{item.categoryName}</td>
@@ -371,17 +407,21 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                 ))}{!reportItems.length && <EmptyRow columns={7} text="No stock items match this report." />}</tbody>
               </table>
             </div>
+            <TablePagination ariaLabel="Stock report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportItems.length} hrefForPage={pageHref} />
           </>
         )}
 
         {report === "low-stock" && (
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-            <table className="w-full min-w-[650px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">On hand</th><th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Supplier / location</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{lowStock.map((item) => (
-                <tr key={item.id}><td className="px-4 py-3"><strong>{item.name}</strong><span className="block text-xs text-slate-500">{item.sku}</span></td><td className="px-4 py-3">{item.categoryName}</td><td className="px-4 py-3 font-semibold">{item.quantityOnHand} {item.unit}</td><td className="px-4 py-3">{item.reorderLevel} {item.unit}</td><td className="px-4 py-3">{item.supplierName ?? "—"}<span className="block text-xs text-slate-500">{item.locationName ?? "No location"}</span></td></tr>
-              ))}{!lowStock.length && <EmptyRow columns={5} text="No active items are at or below their reorder level." />}</tbody>
-            </table>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[650px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">On hand</th><th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Supplier / location</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">{visibleLowStock.map((item) => (
+                  <tr key={item.id}><td className="px-4 py-3"><strong>{item.name}</strong><span className="block text-xs text-slate-500">{item.sku}</span></td><td className="px-4 py-3">{item.categoryName}</td><td className="px-4 py-3 font-semibold">{item.quantityOnHand} {item.unit}</td><td className="px-4 py-3">{item.reorderLevel} {item.unit}</td><td className="px-4 py-3">{item.supplierName ?? "—"}<span className="block text-xs text-slate-500">{item.locationName ?? "No location"}</span></td></tr>
+                ))}{!lowStock.length && <EmptyRow columns={5} text="No active items are at or below their reorder level." />}</tbody>
+              </table>
+            </div>
+            <TablePagination ariaLabel="Low stock report" currentPage={page} pageSize={PAGE_SIZE} totalRows={lowStock.length} hrefForPage={pageHref} />
           </div>
         )}
 
@@ -390,13 +430,13 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
             <div className="grid gap-3 sm:grid-cols-3">
               <Metric label="Stock received" value={received.toLocaleString()} />
               <Metric label="Stock issued" value={issued.toLocaleString()} />
-              <Metric label="Movements" value={String(movements.length)} />
+              <Metric label="Movements" value={String(reportMovements.length)} />
             </div>
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[750px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / item</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Movement</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Balance after</th><th className="px-4 py-3">Reference / note</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{reportMovements.map((movement, index) => (
-                  <tr key={`${movement.sku}-${movement.createdAt.toISOString()}-${index}`}>
+                <tbody className="divide-y divide-slate-100">{visibleMovements.map((movement) => (
+                  <tr key={movement.id}>
                     <td className="px-4 py-3">{formatDate(movement.createdAt)}<span className="block text-xs text-slate-500">{movement.itemName} · {movement.sku}</span></td>
                     <td className="px-4 py-3">{movement.categoryName}</td><td className="px-4 py-3 capitalize">{movement.movementType}</td>
                     <td className="px-4 py-3">{movement.quantity} {movement.unit}</td><td className="px-4 py-3">{movement.quantityAfter} {movement.unit}</td>
@@ -405,6 +445,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                 ))}{!reportMovements.length && <EmptyRow columns={6} text="No stock movements match these filters." />}</tbody>
               </table>
             </div>
+            <TablePagination ariaLabel="Stock movement report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportMovements.length} hrefForPage={pageHref} />
           </>
         )}
 
@@ -414,11 +455,12 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Asset</th><th className="px-4 py-3">Acquired</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Location</th><th className="px-4 py-3">Status</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{reportAssets.map((asset) => (
+                <tbody className="divide-y divide-slate-100">{visibleAssets.map((asset) => (
                   <tr key={asset.assetTag}><td className="px-4 py-3"><strong>{asset.name}</strong><span className="block text-xs text-slate-500">{asset.assetTag}</span></td><td className="px-4 py-3">{asset.acquiredAt}</td><td className="px-4 py-3">{formatCurrency(asset.acquisitionCost, currency)}</td><td className="px-4 py-3">{asset.locationName ?? "Unassigned"}</td><td className="px-4 py-3 capitalize">{asset.status}</td></tr>
                 ))}{!reportAssets.length && <EmptyRow columns={5} text="No assets match this period and status." />}</tbody>
               </table>
             </div>
+            <TablePagination ariaLabel="Asset report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportAssets.length} hrefForPage={pageHref} />
           </>
         )}
 
@@ -428,11 +470,12 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / asset</th><th className="px-4 py-3">Work performed</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Provider</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{reportMaintenance.map((record, index) => (
-                  <tr key={`${record.assetTag}-${record.maintenanceDate}-${index}`}><td className="px-4 py-3">{record.maintenanceDate}<span className="block text-xs text-slate-500">{record.assetTag} · {record.assetName}</span></td><td className="px-4 py-3">{record.description}</td><td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td><td className="px-4 py-3">{record.performedBy ?? "—"}</td></tr>
+                <tbody className="divide-y divide-slate-100">{visibleMaintenance.map((record) => (
+                  <tr key={record.id}><td className="px-4 py-3">{record.maintenanceDate}<span className="block text-xs text-slate-500">{record.assetTag} · {record.assetName}</span></td><td className="px-4 py-3">{record.description}</td><td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td><td className="px-4 py-3">{record.performedBy ?? "—"}</td></tr>
                 ))}{!reportMaintenance.length && <EmptyRow columns={4} text="No maintenance work matches this date range and search." />}</tbody>
               </table>
             </div>
+            <TablePagination ariaLabel="Maintenance report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportMaintenance.length} hrefForPage={pageHref} />
           </>
         )}
       </section>
