@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Barlow_Condensed, Inter } from "next/font/google";
+import { Inter, Open_Sans } from "next/font/google";
 import "./globals.css";
 
 const bodyFont = Inter({
@@ -8,7 +8,7 @@ const bodyFont = Inter({
   variable: "--font-body",
 });
 
-const displayFont = Barlow_Condensed({
+const displayFont = Open_Sans({
   subsets: ["latin"],
   weight: ["500", "600", "700", "800"],
   variable: "--font-display",
