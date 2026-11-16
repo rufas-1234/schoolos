@@ -42,7 +42,7 @@ export function SearchableSelect({
   const initialValue = options.some((option) => option.value === defaultValue) ? defaultValue : "";
   const [selectedValue, setSelectedValue] = useState(initialValue);
   const selectedOption = options.find((option) => option.value === selectedValue);
-  const [query, setQuery] = useState(selectedOption?.label ?? "");
+  const [query, setQuery] = useState(selectedValue ? selectedOption?.label ?? "" : "");
   const [open, setOpen] = useState(false);
   const [showAllOptions, setShowAllOptions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -54,7 +54,7 @@ export function SearchableSelect({
 
   function choose(option: SearchableSelectOption) {
     setSelectedValue(option.value);
-    setQuery(option.label);
+    setQuery(option.value ? option.label : "");
     setOpen(false);
     setShowAllOptions(false);
     setActiveIndex(-1);
