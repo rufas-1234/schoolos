@@ -13,7 +13,15 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
-import { AssetMaintenanceEditor, InventoryAssetEditor, InventoryForms, InventoryItemEditor, type InventoryOption } from "./inventory-forms";
+import {
+  AssetMaintenanceEditor,
+  InventoryAssetEditor,
+  InventoryDeleteForm,
+  InventoryForms,
+  InventoryItemEditor,
+  InventoryRecordView,
+  type InventoryOption,
+} from "./inventory-forms";
 import { InventoryModuleNav } from "./module-nav";
 import { TablePagination } from "@/components/table-pagination";
 import { parsePageSize } from "@/components/pagination-utils";
@@ -150,9 +158,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       unit: inventoryItems.unit,
       movementType: inventoryMovements.movementType,
       quantity: inventoryMovements.quantity,
+      quantityBefore: inventoryMovements.quantityBefore,
       quantityAfter: inventoryMovements.quantityAfter,
       unitCost: inventoryMovements.unitCost,
       reference: inventoryMovements.reference,
+      note: inventoryMovements.note,
       createdAt: inventoryMovements.createdAt,
     }).from(inventoryMovements)
       .innerJoin(inventoryItems, and(
@@ -339,7 +349,24 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3 tabular-nums">{item.reorderLevel}</td>
                   <td className="px-4 py-3">{formatCurrency(item.averageUnitCost, currency)}</td>
                   <td className="px-4 py-3">{item.supplierName ?? "—"}<span className="block text-xs text-slate-500">{item.locationName ?? "No location"}</span></td>
-                  <td className="px-4 py-3"><InventoryItemEditor item={item} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <InventoryRecordView title={`Inventory item: ${item.name}`} fields={[
+                        { label: "Item", value: item.name },
+                        { label: "SKU", value: item.sku },
+                        { label: "Description", value: item.description },
+                        { label: "Category", value: item.categoryName },
+                        { label: "Quantity on hand", value: `${item.quantityOnHand} ${item.unit}` },
+                        { label: "Reorder level", value: `${item.reorderLevel} ${item.unit}` },
+                        { label: "Average unit cost", value: formatCurrency(item.averageUnitCost, currency) },
+                        { label: "Supplier", value: item.supplierName },
+                        { label: "Location", value: item.locationName },
+                        { label: "Status", value: item.status },
+                      ]} />
+                      <InventoryItemEditor item={item} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} />
+                      <InventoryDeleteForm recordId={item.id} recordType="item" label={`Delete ${item.name}`} />
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!filteredItems.length && <EmptyRow columns={7} text={items.length ? "No items match these filters." : "No inventory items have been registered."} />}
@@ -370,7 +397,22 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3">{asset.acquiredAt}</td>
                   <td className="px-4 py-3">{formatCurrency(asset.acquisitionCost, currency)}</td>
                   <td className="px-4 py-3">{asset.locationName ?? "Unassigned"}<span className="block text-xs capitalize text-slate-500">{asset.status}</span></td>
-                  <td className="px-4 py-3"><InventoryAssetEditor asset={asset} items={itemOptions} locations={locationOptions} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <InventoryRecordView title={`Asset: ${asset.name}`} fields={[
+                        { label: "Asset", value: asset.name },
+                        { label: "Asset tag", value: asset.assetTag },
+                        { label: "Description", value: asset.description },
+                        { label: "Related item", value: items.find((item) => item.id === asset.itemId)?.name },
+                        { label: "Acquired", value: asset.acquiredAt },
+                        { label: "Acquisition cost", value: formatCurrency(asset.acquisitionCost, currency) },
+                        { label: "Location", value: asset.locationName },
+                        { label: "Status", value: asset.status },
+                      ]} />
+                      <InventoryAssetEditor asset={asset} items={itemOptions} locations={locationOptions} />
+                      <InventoryDeleteForm recordId={asset.id} recordType="asset" label={`Delete ${asset.name}`} />
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!filteredAssets.length && <EmptyRow columns={5} text={assets.length ? "No assets match these filters." : "No school assets have been registered."} />}
@@ -387,7 +429,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Stock movements</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / item</th><th className="px-4 py-3">Movement</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Balance</th></tr></thead>
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / item</th><th className="px-4 py-3">Movement</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Balance</th><th className="px-4 py-3">Actions</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {visibleMovements.map((movement) => (
                 <tr key={movement.id}>
@@ -395,9 +437,22 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3 capitalize">{movement.movementType}</td>
                   <td className="px-4 py-3 tabular-nums">{movement.quantity} {movement.unit}</td>
                   <td className="px-4 py-3 tabular-nums">{movement.quantityAfter} {movement.unit}</td>
+                  <td className="px-4 py-3">
+                    <InventoryRecordView title={`Stock movement: ${movement.itemName}`} fields={[
+                      { label: "Date", value: formatDate(movement.createdAt) },
+                      { label: "Item", value: `${movement.itemName} · ${movement.sku}` },
+                      { label: "Movement type", value: movement.movementType },
+                      { label: "Quantity", value: `${movement.quantity} ${movement.unit}` },
+                      { label: "Balance before", value: `${movement.quantityBefore} ${movement.unit}` },
+                      { label: "Balance after", value: `${movement.quantityAfter} ${movement.unit}` },
+                      { label: "Unit cost", value: formatCurrency(movement.unitCost, currency) },
+                      { label: "Reference", value: movement.reference },
+                      { label: "Note", value: movement.note },
+                    ]} />
+                  </td>
                 </tr>
               ))}
-              {!movements.length && <EmptyRow columns={4} text="No stock movements have been recorded." />}
+              {!movements.length && <EmptyRow columns={5} text="No stock movements have been recorded." />}
             </tbody>
           </table>
         </div>
@@ -419,7 +474,19 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3">{record.description}</td>
                   <td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td>
                   <td className="px-4 py-3">{record.performedBy ?? "—"}</td>
-                  <td className="px-4 py-3"><AssetMaintenanceEditor record={{ ...record, assetLabel: `${record.assetTag} · ${record.assetName}` }} assets={allAssetOptions} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <InventoryRecordView title={`Maintenance: ${record.assetTag} · ${record.assetName}`} fields={[
+                        { label: "Date", value: record.maintenanceDate },
+                        { label: "Asset", value: `${record.assetTag} · ${record.assetName}` },
+                        { label: "Work performed", value: record.description },
+                        { label: "Cost", value: formatCurrency(record.cost, currency) },
+                        { label: "Provider", value: record.performedBy },
+                      ]} />
+                      <AssetMaintenanceEditor record={{ ...record, assetLabel: `${record.assetTag} · ${record.assetName}` }} assets={allAssetOptions} />
+                      <InventoryDeleteForm recordId={record.id} recordType="maintenance" label={`Delete maintenance record for ${record.assetTag}`} />
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!maintenance.length && <EmptyRow columns={5} text="No maintenance has been logged." />}

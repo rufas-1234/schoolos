@@ -193,6 +193,116 @@ export async function updateInventoryLocation(_state: InventoryActionState, form
   return updateLookupRecord(formData, "location");
 }
 
+export async function deleteInventoryRecord(
+  _state: InventoryActionState,
+  formData: FormData,
+): Promise<InventoryActionState> {
+  const context = await requireSchoolPermission("inventory.manage");
+  const id = idField.safeParse(value(formData, "recordId"));
+  const recordType = z.enum(["category", "supplier", "location", "item", "asset", "maintenance"])
+    .safeParse(value(formData, "recordType"));
+  if (!id.success || !recordType.success) return { error: "Select a valid inventory record." };
+
+  const result = await db.transaction(async (tx): Promise<InventoryActionState> => {
+    if (recordType.data === "category") {
+      const [record] = await tx.select({ id: inventoryCategories.id, publicId: inventoryCategories.publicId })
+        .from(inventoryCategories)
+        .where(and(eq(inventoryCategories.id, id.data), eq(inventoryCategories.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return { error: "The selected category was not found." };
+      const [usage] = await tx.select({ id: inventoryItems.id }).from(inventoryItems)
+        .where(eq(inventoryItems.categoryId, record.id)).limit(1);
+      if (usage) return { error: "This category is used by inventory items. Reassign them before deleting it." };
+      await tx.delete(inventoryCategories)
+        .where(and(eq(inventoryCategories.id, record.id), eq(inventoryCategories.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "inventory_category.deleted", "inventory_category", record.publicId, ["deleted"]);
+    } else if (recordType.data === "supplier") {
+      const [record] = await tx.select({ id: inventorySuppliers.id, publicId: inventorySuppliers.publicId })
+        .from(inventorySuppliers)
+        .where(and(eq(inventorySuppliers.id, id.data), eq(inventorySuppliers.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return { error: "The selected supplier was not found." };
+      const [itemUsage] = await tx.select({ id: inventoryItems.id }).from(inventoryItems)
+        .where(eq(inventoryItems.supplierId, record.id)).limit(1);
+      const [movementUsage] = await tx.select({ id: inventoryMovements.id }).from(inventoryMovements)
+        .where(eq(inventoryMovements.supplierId, record.id)).limit(1);
+      if (itemUsage || movementUsage) return { error: "This supplier is used by inventory records. Reassign them before deleting it." };
+      await tx.delete(inventorySuppliers)
+        .where(and(eq(inventorySuppliers.id, record.id), eq(inventorySuppliers.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "inventory_supplier.deleted", "inventory_supplier", record.publicId, ["deleted"]);
+    } else if (recordType.data === "location") {
+      const [record] = await tx.select({ id: inventoryLocations.id, publicId: inventoryLocations.publicId })
+        .from(inventoryLocations)
+        .where(and(eq(inventoryLocations.id, id.data), eq(inventoryLocations.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return { error: "The selected location was not found." };
+      const [itemUsage] = await tx.select({ id: inventoryItems.id }).from(inventoryItems)
+        .where(eq(inventoryItems.locationId, record.id)).limit(1);
+      const [assetUsage] = await tx.select({ id: inventoryAssets.id }).from(inventoryAssets)
+        .where(eq(inventoryAssets.locationId, record.id)).limit(1);
+      const [movementUsage] = await tx.select({ id: inventoryMovements.id }).from(inventoryMovements)
+        .where(eq(inventoryMovements.locationId, record.id)).limit(1);
+      if (itemUsage || assetUsage || movementUsage) return { error: "This location is still assigned to inventory records. Reassign them before deleting it." };
+      await tx.delete(inventoryLocations)
+        .where(and(eq(inventoryLocations.id, record.id), eq(inventoryLocations.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "inventory_location.deleted", "inventory_location", record.publicId, ["deleted"]);
+    } else if (recordType.data === "item") {
+      const [record] = await tx.select({
+        id: inventoryItems.id,
+        publicId: inventoryItems.publicId,
+        quantityOnHand: inventoryItems.quantityOnHand,
+      }).from(inventoryItems)
+        .where(and(eq(inventoryItems.id, id.data), eq(inventoryItems.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return { error: "The selected inventory item was not found." };
+      const [movement] = await tx.select({ id: inventoryMovements.id }).from(inventoryMovements)
+        .where(eq(inventoryMovements.itemId, record.id)).limit(1);
+      const [asset] = await tx.select({ id: inventoryAssets.id }).from(inventoryAssets)
+        .where(eq(inventoryAssets.itemId, record.id)).limit(1);
+      if (movement || asset) return { error: "This item has stock or asset history and cannot be deleted. Mark it inactive instead." };
+      const quantity = parseQuantityMilliUnits(record.quantityOnHand);
+      if (quantity === null) throw new Error("Stored inventory quantity is invalid.");
+      if (quantity !== BigInt(0)) return { error: "Only items with zero stock and no history can be deleted." };
+      await tx.delete(inventoryItems)
+        .where(and(eq(inventoryItems.id, record.id), eq(inventoryItems.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "inventory_item.deleted", "inventory_item", record.publicId, ["deleted"]);
+    } else if (recordType.data === "asset") {
+      const [record] = await tx.select({ id: inventoryAssets.id, publicId: inventoryAssets.publicId })
+        .from(inventoryAssets)
+        .where(and(eq(inventoryAssets.id, id.data), eq(inventoryAssets.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return { error: "The selected asset was not found." };
+      const [maintenance] = await tx.select({ id: assetMaintenance.id }).from(assetMaintenance)
+        .where(eq(assetMaintenance.assetId, record.id)).limit(1);
+      if (maintenance) return { error: "This asset has maintenance history. Keep the record and change its status instead." };
+      await tx.delete(inventoryAssets)
+        .where(and(eq(inventoryAssets.id, record.id), eq(inventoryAssets.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "inventory_asset.deleted", "inventory_asset", record.publicId, ["deleted"]);
+    } else {
+      const [record] = await tx.select({
+        id: assetMaintenance.id,
+        publicId: assetMaintenance.publicId,
+        assetPublicId: inventoryAssets.publicId,
+      }).from(assetMaintenance)
+        .innerJoin(inventoryAssets, and(
+          eq(inventoryAssets.id, assetMaintenance.assetId),
+          eq(inventoryAssets.schoolId, context.schoolId),
+        ))
+        .where(and(eq(assetMaintenance.id, id.data), eq(assetMaintenance.schoolId, context.schoolId)))
+        .for("update").limit(1);
+      if (!record) return { error: "The selected maintenance record was not found." };
+      await tx.delete(assetMaintenance)
+        .where(and(eq(assetMaintenance.id, record.id), eq(assetMaintenance.schoolId, context.schoolId)));
+      await writeAudit(tx, context.schoolId, context.user.id, "asset_maintenance.deleted", "inventory_asset", record.assetPublicId, ["maintenanceRecord"]);
+    }
+
+    return { success: true, message: "Record deleted." };
+  });
+
+  if (result.success) revalidateInventory();
+  return result;
+}
+
 export async function createInventoryItem(_state: InventoryActionState, formData: FormData): Promise<InventoryActionState> {
   const context = await requireSchoolPermission("inventory.manage");
   const parsed = z.object({

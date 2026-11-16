@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, type ReactNode } from "react";
-import { AdminRecordDialog } from "@/components/admin-data-table";
+import { AdminDeleteButton, AdminRecordDialog } from "@/components/admin-data-table";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 import {
   createInventoryAsset,
@@ -9,6 +9,7 @@ import {
   createInventoryItem,
   createInventoryLocation,
   createInventorySupplier,
+  deleteInventoryRecord,
   recordAssetMaintenance,
   recordInventoryMovement,
   updateInventoryAsset,
@@ -84,6 +85,49 @@ function ActionForm({
       <button disabled={pending} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
         {pending ? "Saving..." : submitLabel}
       </button>
+    </form>
+  );
+}
+
+export function InventoryRecordView({
+  title,
+  fields,
+}: {
+  title: string;
+  fields: Array<{ label: string; value: ReactNode }>;
+}) {
+  return (
+    <AdminRecordDialog title={title} mode="view" showLabel>
+      <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        {fields.map((field) => (
+          <div key={field.label} className="min-w-0 border-b border-slate-100 pb-3 last:border-0">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{field.label}</dt>
+            <dd className="mt-1 break-words text-sm text-slate-900">{field.value || "Not provided"}</dd>
+          </div>
+        ))}
+      </dl>
+    </AdminRecordDialog>
+  );
+}
+
+export function InventoryDeleteForm({
+  recordId,
+  recordType,
+  label,
+}: {
+  recordId: number;
+  recordType: "category" | "supplier" | "location" | "item" | "asset" | "maintenance";
+  label: string;
+}) {
+  const [state, formAction, pending] = useActionState(deleteInventoryRecord, {});
+  return (
+    <form action={formAction} className="flex items-center gap-2">
+      <input type="hidden" name="recordId" value={recordId} />
+      <input type="hidden" name="recordType" value={recordType} />
+      <AdminDeleteButton label={label} disabled={pending} />
+      {pending && <span className="text-xs text-slate-500">Deleting...</span>}
+      {state.error && <p role="alert" className="max-w-56 text-xs text-rose-700">{state.error}</p>}
+      {state.success && <p role="status" className="text-xs text-emerald-700">{state.message}</p>}
     </form>
   );
 }
@@ -209,14 +253,14 @@ export function InventoryForms({
           <h3 className="font-semibold text-slate-900">Manage categories, suppliers, and locations</h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {categoryRecords.map((record) => (
-              <LookupRecordEditor key={`category-${record.id}`} title="Edit category" recordId={record.id}
+              <LookupRecordEditor key={`category-${record.id}`} title="Edit category" recordType="category" recordId={record.id}
                 name={record.name} description={record.description} action={updateInventoryCategory} />
             ))}
             {supplierRecords.map((record) => (
               <SupplierRecordEditor key={`supplier-${record.id}`} record={record} />
             ))}
             {locationRecords.map((record) => (
-              <LookupRecordEditor key={`location-${record.id}`} title="Edit location" recordId={record.id}
+              <LookupRecordEditor key={`location-${record.id}`} title="Edit location" recordType="location" recordId={record.id}
                 name={record.name} description={record.description} action={updateInventoryLocation} />
             ))}
             {!categoryRecords.length && !supplierRecords.length && !locationRecords.length && (
@@ -276,12 +320,14 @@ export function InventoryForms({
 
 function LookupRecordEditor({
   title,
+  recordType,
   recordId,
   name,
   description,
   action,
 }: {
   title: string;
+  recordType: "category" | "location";
   recordId: number;
   name: string;
   description: string | null;
@@ -290,13 +336,20 @@ function LookupRecordEditor({
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
       <span className="min-w-0 truncate text-sm text-slate-700">{name}</span>
-      <AdminRecordDialog title={`${title}: ${name}`}>
-        <ActionForm action={action} title={title} submitLabel="Save changes">
-          <input type="hidden" name="recordId" value={recordId} />
-          <TextField label="Name" name="name" defaultValue={name} />
-          <DescriptionField defaultValue={description} />
-        </ActionForm>
-      </AdminRecordDialog>
+      <div className="flex shrink-0 items-center gap-1">
+        <InventoryRecordView title={`${title.replace("Edit ", "")}: ${name}`} fields={[
+          { label: "Name", value: name },
+          { label: "Description", value: description },
+        ]} />
+        <AdminRecordDialog title={`${title}: ${name}`} showLabel>
+          <ActionForm action={action} title={title} submitLabel="Save changes">
+            <input type="hidden" name="recordId" value={recordId} />
+            <TextField label="Name" name="name" defaultValue={name} />
+            <DescriptionField defaultValue={description} />
+          </ActionForm>
+        </AdminRecordDialog>
+        <InventoryDeleteForm recordId={recordId} recordType={recordType} label={`Delete ${name}`} />
+      </div>
     </div>
   );
 }
@@ -305,16 +358,26 @@ function SupplierRecordEditor({ record }: { record: EditableSupplier }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
       <span className="min-w-0 truncate text-sm text-slate-700">{record.name}</span>
-      <AdminRecordDialog title={`Edit supplier: ${record.name}`}>
-        <ActionForm action={updateInventorySupplier} title="Edit supplier" submitLabel="Save changes">
-          <input type="hidden" name="recordId" value={record.id} />
-          <TextField label="Supplier name" name="name" defaultValue={record.name} />
-          <TextField label="Contact person" name="contactName" required={false} defaultValue={record.contactName} />
-          <TextField label="Email" name="email" type="email" required={false} defaultValue={record.email} />
-          <TextField label="Phone" name="phone" required={false} defaultValue={record.phone} />
-          <TextField label="Address" name="address" required={false} defaultValue={record.address} />
-        </ActionForm>
-      </AdminRecordDialog>
+      <div className="flex shrink-0 items-center gap-1">
+        <InventoryRecordView title={`Supplier: ${record.name}`} fields={[
+          { label: "Supplier", value: record.name },
+          { label: "Contact person", value: record.contactName },
+          { label: "Email", value: record.email },
+          { label: "Phone", value: record.phone },
+          { label: "Address", value: record.address },
+        ]} />
+        <AdminRecordDialog title={`Edit supplier: ${record.name}`} showLabel>
+          <ActionForm action={updateInventorySupplier} title="Edit supplier" submitLabel="Save changes">
+            <input type="hidden" name="recordId" value={record.id} />
+            <TextField label="Supplier name" name="name" defaultValue={record.name} />
+            <TextField label="Contact person" name="contactName" required={false} defaultValue={record.contactName} />
+            <TextField label="Email" name="email" type="email" required={false} defaultValue={record.email} />
+            <TextField label="Phone" name="phone" required={false} defaultValue={record.phone} />
+            <TextField label="Address" name="address" required={false} defaultValue={record.address} />
+          </ActionForm>
+        </AdminRecordDialog>
+        <InventoryDeleteForm recordId={record.id} recordType="supplier" label={`Delete ${record.name}`} />
+      </div>
     </div>
   );
 }
@@ -331,7 +394,7 @@ export function InventoryItemEditor({
   locations: InventoryOption[];
 }) {
   return (
-    <AdminRecordDialog title={`Edit inventory item: ${item.name}`}>
+    <AdminRecordDialog title={`Edit inventory item: ${item.name}`} showLabel>
       <ActionForm action={updateInventoryItem} title="Edit inventory item" submitLabel="Save changes">
         <input type="hidden" name="itemId" value={item.id} />
         <TextField label="SKU / item code" name="sku" defaultValue={item.sku} />
@@ -363,7 +426,7 @@ export function InventoryAssetEditor({
   locations: InventoryOption[];
 }) {
   return (
-    <AdminRecordDialog title={`Edit asset: ${asset.name}`}>
+    <AdminRecordDialog title={`Edit asset: ${asset.name}`} showLabel>
       <ActionForm action={updateInventoryAsset} title="Edit school asset" submitLabel="Save changes">
         <input type="hidden" name="assetId" value={asset.id} />
         <TextField label="Asset tag" name="assetTag" defaultValue={asset.assetTag} />
@@ -392,7 +455,7 @@ export function AssetMaintenanceEditor({
   assets: InventoryOption[];
 }) {
   return (
-    <AdminRecordDialog title={`Edit maintenance: ${record.assetLabel}`}>
+    <AdminRecordDialog title={`Edit maintenance: ${record.assetLabel}`} showLabel>
       <ActionForm action={updateAssetMaintenance} title="Edit maintenance record" submitLabel="Save changes">
         <input type="hidden" name="maintenanceId" value={record.id} />
         <SelectField label="Asset" name="assetId" options={assets} defaultValue={record.assetId} />
