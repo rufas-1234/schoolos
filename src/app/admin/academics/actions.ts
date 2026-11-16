@@ -552,7 +552,7 @@ export async function createClassLevel(
       if (recordId !== null && !classLevel) return "class-not-found";
 
       const classesInBranch = await tx
-        .select({ id: classLevels.id, name: classLevels.name })
+        .select({ id: classLevels.id, name: classLevels.name, code: classLevels.code })
         .from(classLevels)
         .where(
           and(
@@ -568,6 +568,13 @@ export async function createClassLevel(
         )
       ) {
         return "class-name-taken";
+      }
+      if (classesInBranch.some(
+        (existingClass) =>
+          existingClass.id !== recordId &&
+          existingClass.code.toLocaleLowerCase() === result.data.code.toLocaleLowerCase(),
+      )) {
+        return "class-code-taken";
       }
 
       if (recordId !== null) {
@@ -662,6 +669,9 @@ export async function createClassLevel(
     if (outcome === "branch-not-found") return { error: "Choose an active branch belonging to your school." };
     if (outcome === "class-name-taken") {
       return { error: "A class with this name already exists in the selected branch." };
+    }
+    if (outcome === "class-code-taken") {
+      return { error: "This class code is already used in the selected branch." };
     }
     if (outcome === "class-has-assignments") {
       return { error: "A class's branch cannot be changed while it has sections or subject assignments." };

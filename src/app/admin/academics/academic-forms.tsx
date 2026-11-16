@@ -97,16 +97,30 @@ export function ClassLevelForm({
   years?: Option[];
   record?: { id: number; branchId: number; name: string; code: string };
 }) {
+  const [state, formAction, pending] = useActionState<AcademicActionState, FormData>(createClassLevel, {});
+  const [branchId, setBranchId] = useState(String(record?.branchId ?? ""));
+  const [name, setName] = useState(record?.name ?? "");
+  const [code, setCode] = useState(record?.code ?? "");
+  const [sectionsAcademicYearId, setSectionsAcademicYearId] = useState("");
+  const [sectionNames, setSectionNames] = useState("Section 1\nSection 2\nSection 3");
+
   return (
-    <ActionForm
-      title={record ? "Edit class" : "Add class"}
-      action={createClassLevel}
-      submitLabel={record ? "Save changes" : "Add class"}
-      recordId={record?.id}
-    >
-      <SelectField label="Branch" name="branchId" options={branches} defaultValue={record?.branchId} />
-      <Field label="Class name" name="name" placeholder="Grade 1" defaultValue={record?.name} />
-      <Field label="Class code" name="code" placeholder="G1" defaultValue={record?.code} />
+    <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-slate-900">{record ? "Edit class" : "Add class"}</h2>
+      <p className="text-xs text-slate-500"><RequiredMark /> Required fields</p>
+      {record && <input type="hidden" name="recordId" value={record.id} />}
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+        defaultValue={branchId}
+        required
+        onValueChange={setBranchId}
+      />
+      <Field label="Class name" name="name" placeholder="Grade 1" defaultValue={name}
+        onChange={setName} />
+      <Field label="Class code" name="code" placeholder="G1" defaultValue={code}
+        onChange={setCode} />
       {!record && (
         <div className="space-y-3 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
           <div>
@@ -119,6 +133,8 @@ export function ClassLevelForm({
             label="Academic year for sections"
             name="sectionsAcademicYearId"
             options={years}
+            defaultValue={sectionsAcademicYearId}
+            onValueChange={setSectionsAcademicYearId}
             allowEmpty
             required={false}
             emptyLabel="Skip sections for now"
@@ -128,7 +144,8 @@ export function ClassLevelForm({
             <textarea
               name="sectionNames"
               rows={3}
-              defaultValue={"Section 1\nSection 2\nSection 3"}
+              value={sectionNames}
+              onChange={(event) => setSectionNames(event.target.value)}
               placeholder={"A\nB\nC"}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400"
             />
@@ -138,7 +155,13 @@ export function ClassLevelForm({
           </label>
         </div>
       )}
-    </ActionForm>
+      {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
+      {state.success && <p role="status" className="text-sm text-emerald-700">Saved successfully.</p>}
+      <button type="submit" disabled={pending}
+        className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400">
+        {pending ? "Saving..." : record ? "Save changes" : "Add class"}
+      </button>
+    </form>
   );
 }
 
@@ -420,6 +443,7 @@ export function Field({
   type = "text",
   required = true,
   defaultValue,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -427,6 +451,7 @@ export function Field({
   type?: string;
   required?: boolean;
   defaultValue?: string | number | null;
+  onChange?: (value: string) => void;
 }) {
   return (
     <label className="block space-y-1.5 text-sm font-medium text-slate-700">
@@ -435,7 +460,9 @@ export function Field({
         name={name}
         type={type}
         required={required}
-        defaultValue={defaultValue ?? ""}
+        defaultValue={onChange ? undefined : defaultValue ?? ""}
+        value={onChange ? String(defaultValue ?? "") : undefined}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         placeholder={placeholder}
         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
       />
@@ -466,6 +493,7 @@ export function SelectField({
   allowEmpty = false,
   emptyLabel,
   defaultValue,
+  onValueChange,
 }: {
   label: string;
   name: string;
@@ -474,6 +502,7 @@ export function SelectField({
   allowEmpty?: boolean;
   emptyLabel?: string;
   defaultValue?: string | number | null;
+  onValueChange?: (value: string) => void;
 }) {
   const searchableOptions = options.map((option) => ({
     value: String(option.id),
@@ -494,6 +523,7 @@ export function SelectField({
       defaultValue={defaultValue == null ? "" : String(defaultValue)}
       disabled={options.length === 0 && required}
       placeholder={emptyLabel ?? (options.length === 0 ? "Create one first" : "Search options...")}
+      onValueChange={onValueChange}
     />
   );
 }

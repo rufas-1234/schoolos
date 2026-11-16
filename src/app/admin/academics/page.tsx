@@ -564,6 +564,17 @@ export default async function AcademicStructurePage({
     ...branchFilters,
     ...classFilters,
   ];
+  const classStatusFilters: AdminTableFilter[] = [
+    ...branchFilters,
+    {
+      key: "status",
+      label: "class status",
+      options: [
+        { value: "active", label: "Active" },
+        { value: "archived", label: "Archived" },
+      ],
+    },
+  ];
   const sectionFilterOptions = sections.filter((section) => section.classStatus === "active").map((section) => ({
     id: section.id,
     branchId: section.branchId,
@@ -794,7 +805,7 @@ export default async function AcademicStructurePage({
                     <ClassLevelDeleteForm classLevelId={classLevel.id} />
                   ) : undefined,
                 }))}
-                filters={branchFilters}
+                filters={classStatusFilters}
                 initialQuery={academicSearch}
               />
             )}

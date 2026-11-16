@@ -47,12 +47,14 @@ export function CreateExaminationForm({
   classes,
   today,
   record,
+  intent = "setup",
 }: {
   years: Array<{ id: number; name: string; status: string; startDate: string; endDate: string }>;
   terms: Array<{ id: number; academicYearId: number; name: string; startDate: string; endDate: string }>;
   branches: Array<{ id: number; name: string }>;
   classes: Array<{ id: number; name: string; branchId: number; branchName: string }>;
   today: string;
+  intent?: "setup" | "schedule";
   record?: {
     id: number;
     name: string;
@@ -96,8 +98,12 @@ export function CreateExaminationForm({
   return (
     <form action={action} className="max-w-5xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">{record ? "Edit Exam" : "Add Exam"}</h2>
-        <p className="mt-1 text-sm text-slate-600">Choose the branch and exam system, then define the mark distributions for each subject.</p>
+        <h2 className="text-xl font-bold text-slate-900">
+          {record ? "Edit Exam" : intent === "schedule" ? "Create exam schedule" : "Add Exam"}
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Choose the branch and exam system, set the exam dates, and select classes to schedule their assigned subjects.
+        </p>
       </div>
       {record && <input type="hidden" name="examinationId" value={record.id} />}
       <label className="block max-w-2xl text-sm font-medium">Exam title *
@@ -207,7 +213,9 @@ export function CreateExaminationForm({
       </fieldset>}
       {record && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Classes and subjects remain unchanged. Mark distributions can be changed only before marks are entered; a branch change must preserve the student roster.</p>}
       {!record && <p className="text-xs text-slate-500">Choose the classes that will take this exam. Currently enrolled students and assigned subjects are added automatically.</p>}
-      <SubmitButton pending={pending}>{record ? "Save changes" : "Save Exam"}</SubmitButton>
+      <SubmitButton pending={pending}>
+        {record ? "Save changes" : intent === "schedule" ? "Create exam schedule" : "Save Exam"}
+      </SubmitButton>
       <Feedback state={state} />
     </form>
   );
