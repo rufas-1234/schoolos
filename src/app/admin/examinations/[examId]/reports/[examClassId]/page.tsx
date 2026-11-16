@@ -257,10 +257,10 @@ export default async function ClassMarksheetReportPage({
 
       <section id="class-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
         <header className="print-report-heading flex items-center gap-4">
-          {schoolLogo && <Image src={schoolLogo} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="h-14 w-14 object-contain" />}
+          {schoolLogo && <Image src={schoolLogo} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="exam-report-school-logo h-14 w-14 object-contain" />}
           <div className="flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide">{exam.schoolName}</p>
-            <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className} marksheet</h2>
+            <p className="exam-report-school-name text-xs font-semibold uppercase tracking-wide">{exam.schoolName}</p>
+            <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className} Statement of Marks</h2>
             <p className="mt-1 text-sm">{exam.termName ?? exam.yearName}</p>
           </div>
         </header>

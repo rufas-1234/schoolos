@@ -329,15 +329,15 @@ export default async function ReportCardPage({
       <article id="student-report-card" className="a4-report-card a4-report-card-last print-report-content space-y-5 rounded-2xl border border-slate-200 bg-white p-7 text-slate-900 print:rounded-none print:border-0 print:p-0">
         {draftPreview && <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-center text-sm font-bold uppercase tracking-wide text-amber-950 print:border-2">Draft test preview — not official; scores are synthetic</div>}
         <header className="print-report-heading flex items-center gap-4">
-          {schoolLogo && <Image src={schoolLogo} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="h-16 w-16 rounded-lg object-contain" />}
+          {schoolLogo && <Image src={schoolLogo} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="exam-report-school-logo h-16 w-16 rounded-lg object-contain" />}
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold uppercase tracking-wide text-violet-700">{record.schoolName}</p>
-            <h2 className="mt-1 text-2xl font-bold">Academic report</h2>
+            <p className="exam-report-school-name text-sm font-semibold uppercase tracking-wide text-violet-700">{record.schoolName}</p>
+            <h2 className="mt-1 text-2xl font-bold">Statement of Marks</h2>
             <p className="mt-1 text-sm text-slate-600">{record.examinationName} · {record.termName ?? record.yearName}</p>
           </div>
-          {photoUrl && <Image src={photoUrl} unoptimized width={80} height={80} alt={`${record.studentFirstName} ${record.studentLastName}`} className="h-20 w-20 rounded-xl object-cover" />}
+          {photoUrl && <Image src={photoUrl} unoptimized width={80} height={80} alt={`${record.studentFirstName} ${record.studentLastName}`} className="exam-report-student-photo h-20 w-20 rounded-xl object-cover" />}
         </header>
-        <section className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+        <section className="exam-report-student-details grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
           <p><span className="font-semibold text-slate-500">Student</span><br />{record.studentFirstName} {record.studentLastName}</p>
           <p><span className="font-semibold text-slate-500">Admission number</span><br />{record.admissionNumber ?? "—"}</p>
           <p><span className="font-semibold text-slate-500">Class / section</span><br />{record.className} · {record.sectionName}</p>

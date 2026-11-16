@@ -122,9 +122,9 @@ function ReportHeading({
   const logoSrc = schoolLogoSource(schoolLogoUrl);
   return (
     <header className="exam-report-heading flex items-center gap-4">
-      {logoSrc && <Image src={logoSrc} unoptimized width={64} height={64} alt={`${schoolName} logo`} className="h-16 w-16 object-contain" />}
+      {logoSrc && <Image src={logoSrc} unoptimized width={64} height={64} alt={`${schoolName} logo`} className="exam-report-school-logo h-16 w-16 object-contain" />}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold uppercase tracking-wide text-slate-700">{schoolName}</p>
+        <p className="exam-report-school-name text-sm font-bold uppercase tracking-wide text-slate-700">{schoolName}</p>
         <h2 className="mt-1 text-xl font-bold text-slate-950">{title}</h2>
         <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
       </div>
@@ -196,7 +196,7 @@ function ProgressCard({
           />
         )}
       </div>
-      <section className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs sm:grid-cols-3">
+      <section className="exam-report-student-details grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs sm:grid-cols-3">
         <p><b>Student</b><br />{row.name}</p>
         <p><b>Admission no.</b><br />{row.admissionNumber ?? "—"}</p>
         <p><b>Class / section</b><br />{row.className} · {row.sectionName}</p>
@@ -811,7 +811,7 @@ export default async function ExaminationReportPage({
                   {activeResult ? (
                     <>
                       <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title="Student Mark Sheet" subtitle={`${examDetails.name} · ${examDetails.termName ?? examDetails.yearName}`} />
-                      <section className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 text-sm">
+                      <section className="exam-report-student-details grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 text-sm">
                         <p><b>Student</b><br />{activeResult.name}</p><p><b>Admission no.</b><br />{activeResult.admissionNumber ?? "—"}</p>
                         <p><b>Class / section</b><br />{examClass.className} · {activeResult.sectionName}</p><p><b>Academic year</b><br />{examDetails.yearName}</p>
                       </section>
