@@ -23,6 +23,9 @@ type SearchParams = {
   from?: string | string[];
   to?: string | string[];
   categoryId?: string | string[];
+  search?: string | string[];
+  movementType?: string | string[];
+  status?: string | string[];
 };
 type ReportType = "stock" | "movements" | "low-stock" | "assets" | "maintenance";
 
@@ -71,6 +74,16 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
   const categoryId = Number.isSafeInteger(requestedCategoryId) && requestedCategoryId > 0
     ? requestedCategoryId
     : null;
+  const search = first(query.search)?.trim().slice(0, 120) ?? "";
+  const searchTerm = search.toLocaleLowerCase();
+  const requestedMovementType = first(query.movementType);
+  const movementType = requestedMovementType === "received" || requestedMovementType === "issued" || requestedMovementType === "adjustment"
+    ? requestedMovementType
+    : "all";
+  const requestedAssetStatus = first(query.status);
+  const assetStatus = requestedAssetStatus === "active" || requestedAssetStatus === "maintenance" || requestedAssetStatus === "retired"
+    ? requestedAssetStatus
+    : "all";
   const startAt = new Date(`${from}T00:00:00.000Z`);
   const endAt = new Date(`${to}T23:59:59.999Z`);
   const [school, categories, items, movements, assets, maintenance] = await Promise.all([
@@ -176,22 +189,40 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
       .orderBy(desc(assetMaintenance.maintenanceDate), desc(assetMaintenance.id)),
   ]);
   const currency = school?.currency ?? "USD";
-  const lowStock = items.filter((item) =>
+  const reportItems = items.filter((item) =>
+    !searchTerm || `${item.sku} ${item.name} ${item.categoryName} ${item.supplierName ?? ""} ${item.locationName ?? ""}`
+      .toLocaleLowerCase().includes(searchTerm)
+  );
+  const reportMovements = movements.filter((movement) =>
+    (movementType === "all" || movement.movementType === movementType) &&
+    (!searchTerm || `${movement.sku} ${movement.itemName} ${movement.categoryName} ${movement.reference ?? ""} ${movement.note ?? ""}`
+      .toLocaleLowerCase().includes(searchTerm))
+  );
+  const reportAssets = assets.filter((asset) =>
+    (assetStatus === "all" || asset.status === assetStatus) &&
+    (!searchTerm || `${asset.assetTag} ${asset.name} ${asset.description ?? ""} ${asset.locationName ?? ""}`
+      .toLocaleLowerCase().includes(searchTerm))
+  );
+  const reportMaintenance = maintenance.filter((record) =>
+    !searchTerm || `${record.assetTag} ${record.assetName} ${record.description} ${record.performedBy ?? ""}`
+      .toLocaleLowerCase().includes(searchTerm)
+  );
+  const lowStock = reportItems.filter((item) =>
     item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
   );
-  const stockValue = items.reduce((total, item) =>
+  const stockValue = reportItems.reduce((total, item) =>
     total + Number(item.quantityOnHand) * Number(item.averageUnitCost), 0);
-  const received = movements.filter((movement) => movement.movementType === "received")
+  const received = reportMovements.filter((movement) => movement.movementType === "received")
     .reduce((total, movement) => total + Number(movement.quantity), 0);
-  const issued = movements.filter((movement) => movement.movementType === "issued")
+  const issued = reportMovements.filter((movement) => movement.movementType === "issued")
     .reduce((total, movement) => total + Number(movement.quantity), 0);
-  const maintenanceCost = maintenance.reduce((total, record) => total + Number(record.cost), 0);
-  const hasDemoRows = items.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
-    || assets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "))
-    || movements.some((movement) => movement.itemName.startsWith("DEMO TEST ONLY - "))
-    || maintenance.some((record) => record.assetName.startsWith("DEMO TEST ONLY - "));
+  const maintenanceCost = reportMaintenance.reduce((total, record) => total + Number(record.cost), 0);
+  const hasDemoRows = reportItems.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
+    || reportAssets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "))
+    || reportMovements.some((movement) => movement.itemName.startsWith("DEMO TEST ONLY - "))
+    || reportMaintenance.some((record) => record.assetName.startsWith("DEMO TEST ONLY - "));
   const activeReport = reports.find((item) => item.id === report) ?? reports[0];
-  const reportRows = report === "low-stock" ? lowStock : items;
+  const reportRows = report === "low-stock" ? lowStock : reportItems;
   const csv = report === "stock" || report === "low-stock"
     ? {
       headers: ["SKU", "Item", "Category", "Quantity on hand", "Unit", "Reorder level", "Average unit cost", "Stock value", "Supplier", "Location", "Status"],
@@ -204,7 +235,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
     : report === "movements"
       ? {
         headers: ["Date", "SKU", "Item", "Category", "Movement", "Quantity", "Balance after", "Unit cost", "Reference", "Note"],
-        rows: movements.map((movement) => [
+        rows: reportMovements.map((movement) => [
           formatDate(movement.createdAt), movement.sku, movement.itemName, movement.categoryName,
           movement.movementType, movement.quantity, movement.quantityAfter, movement.unitCost,
           movement.reference ?? "", movement.note ?? "",
@@ -213,14 +244,14 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
       : report === "assets"
         ? {
           headers: ["Asset tag", "Asset", "Acquired", "Acquisition cost", "Location", "Status", "Description"],
-          rows: assets.map((asset) => [
+          rows: reportAssets.map((asset) => [
             asset.assetTag, asset.name, asset.acquiredAt, asset.acquisitionCost,
             asset.locationName ?? "", asset.status, asset.description ?? "",
           ]),
         }
         : {
           headers: ["Date", "Asset tag", "Asset", "Work performed", "Cost", "Provider"],
-          rows: maintenance.map((record) => [
+          rows: reportMaintenance.map((record) => [
             record.maintenanceDate, record.assetTag, record.assetName, record.description,
             record.cost, record.performedBy ?? "",
           ]),
@@ -228,11 +259,11 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
 
   return (
     <main className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-sm sm:p-8 print:hidden">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 print:hidden">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Operations · Inventory module</p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Reports</h1>
-          <p className="mt-2 max-w-3xl text-sm text-violet-100">Review stock value, movements, low stock, assets, maintenance, and account activity.</p>
+          <p className="text-sm font-semibold text-violet-700">Operations · Inventory module</p>
+          <h1 className="mt-1 text-3xl font-bold text-slate-950">Reports</h1>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">Review stock value, movements, low stock, assets, maintenance, and account activity.</p>
         </div>
       </header>
 
@@ -257,6 +288,13 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
 
       <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4">
         <input type="hidden" name="report" value={report} />
+        {(report === "stock" || report === "low-stock" || report === "movements" || report === "assets" || report === "maintenance") && (
+          <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Search
+            <input type="search" name="search" maxLength={120} defaultValue={search}
+              placeholder={report === "movements" ? "Item, SKU, or reference" : report === "assets" ? "Asset name, tag, or location" : report === "maintenance" ? "Asset, work, or provider" : "Item name, SKU, or supplier"}
+              className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3" />
+          </label>
+        )}
         {report !== "stock" && report !== "low-stock" && (
           <>
             <label className="text-sm text-slate-700">From<input name="from" type="date" defaultValue={from} className="mt-1 block h-10 rounded-lg border border-slate-200 px-3" /></label>
@@ -271,7 +309,24 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
             </select>
           </label>
         )}
+        {report === "movements" && (
+          <label className="text-sm text-slate-700">Movement type
+            <select name="movementType" defaultValue={movementType} className="mt-1 block h-10 rounded-lg border border-slate-200 bg-slate-50 px-3">
+              <option value="all">All movement types</option><option value="received">Received</option>
+              <option value="issued">Issued</option><option value="adjustment">Adjustment</option>
+            </select>
+          </label>
+        )}
+        {report === "assets" && (
+          <label className="text-sm text-slate-700">Asset status
+            <select name="status" defaultValue={assetStatus} className="mt-1 block h-10 rounded-lg border border-slate-200 bg-slate-50 px-3">
+              <option value="all">All statuses</option><option value="active">Active</option>
+              <option value="maintenance">Under maintenance</option><option value="retired">Retired</option>
+            </select>
+          </label>
+        )}
         <button className="h-10 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Update report</button>
+        <Link href="/admin/inventory/reports" className="h-10 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</Link>
         <DownloadCsv
           headers={csv.headers}
           rows={csv.rows}
@@ -292,7 +347,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
         {report === "stock" && (
           <>
             <div className="grid gap-3 sm:grid-cols-3">
-              <Metric label="Items in register" value={String(items.length)} />
+              <Metric label="Items in register" value={String(reportItems.length)} />
               <Metric label="Low-stock items" value={String(lowStock.length)} />
               <Metric label="Stock on hand value" value={formatCurrency(stockValue, currency)} />
             </div>
@@ -303,7 +358,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                   <th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Unit cost</th><th className="px-4 py-3">Stock value</th>
                   <th className="px-4 py-3">Supplier / location</th>
                 </tr></thead>
-                <tbody className="divide-y divide-slate-100">{items.map((item) => (
+                <tbody className="divide-y divide-slate-100">{reportItems.map((item) => (
                   <tr key={item.id}>
                     <td className="px-4 py-3"><strong>{item.name}</strong><span className="block text-xs text-slate-500">{item.sku} · {item.status}</span></td>
                     <td className="px-4 py-3">{item.categoryName}</td>
@@ -313,7 +368,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                     <td className="px-4 py-3 font-semibold">{formatCurrency(Number(item.quantityOnHand) * Number(item.averageUnitCost), currency)}</td>
                     <td className="px-4 py-3">{item.supplierName ?? "—"}<span className="block text-xs text-slate-500">{item.locationName ?? "No location"}</span></td>
                   </tr>
-                ))}{!items.length && <EmptyRow columns={7} text="No stock items match this report." />}</tbody>
+                ))}{!reportItems.length && <EmptyRow columns={7} text="No stock items match this report." />}</tbody>
               </table>
             </div>
           </>
@@ -340,14 +395,14 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[750px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / item</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Movement</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Balance after</th><th className="px-4 py-3">Reference / note</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{movements.map((movement, index) => (
+                <tbody className="divide-y divide-slate-100">{reportMovements.map((movement, index) => (
                   <tr key={`${movement.sku}-${movement.createdAt.toISOString()}-${index}`}>
                     <td className="px-4 py-3">{formatDate(movement.createdAt)}<span className="block text-xs text-slate-500">{movement.itemName} · {movement.sku}</span></td>
                     <td className="px-4 py-3">{movement.categoryName}</td><td className="px-4 py-3 capitalize">{movement.movementType}</td>
                     <td className="px-4 py-3">{movement.quantity} {movement.unit}</td><td className="px-4 py-3">{movement.quantityAfter} {movement.unit}</td>
                     <td className="px-4 py-3">{movement.reference ?? "—"}<span className="block text-xs text-slate-500">{movement.note ?? ""}</span></td>
                   </tr>
-                ))}{!movements.length && <EmptyRow columns={6} text="No stock movements match this date range and category." />}</tbody>
+                ))}{!reportMovements.length && <EmptyRow columns={6} text="No stock movements match these filters." />}</tbody>
               </table>
             </div>
           </>
@@ -355,13 +410,13 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
 
         {report === "assets" && (
           <>
-            <Metric label="Assets acquired in period" value={String(assets.length)} />
+            <Metric label="Assets acquired in period" value={String(reportAssets.length)} />
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Asset</th><th className="px-4 py-3">Acquired</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Location</th><th className="px-4 py-3">Status</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{assets.map((asset) => (
+                <tbody className="divide-y divide-slate-100">{reportAssets.map((asset) => (
                   <tr key={asset.assetTag}><td className="px-4 py-3"><strong>{asset.name}</strong><span className="block text-xs text-slate-500">{asset.assetTag}</span></td><td className="px-4 py-3">{asset.acquiredAt}</td><td className="px-4 py-3">{formatCurrency(asset.acquisitionCost, currency)}</td><td className="px-4 py-3">{asset.locationName ?? "Unassigned"}</td><td className="px-4 py-3 capitalize">{asset.status}</td></tr>
-                ))}{!assets.length && <EmptyRow columns={5} text="No assets were acquired during this period." />}</tbody>
+                ))}{!reportAssets.length && <EmptyRow columns={5} text="No assets match this period and status." />}</tbody>
               </table>
             </div>
           </>
@@ -373,9 +428,9 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / asset</th><th className="px-4 py-3">Work performed</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Provider</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{maintenance.map((record, index) => (
+                <tbody className="divide-y divide-slate-100">{reportMaintenance.map((record, index) => (
                   <tr key={`${record.assetTag}-${record.maintenanceDate}-${index}`}><td className="px-4 py-3">{record.maintenanceDate}<span className="block text-xs text-slate-500">{record.assetTag} · {record.assetName}</span></td><td className="px-4 py-3">{record.description}</td><td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td><td className="px-4 py-3">{record.performedBy ?? "—"}</td></tr>
-                ))}{!maintenance.length && <EmptyRow columns={4} text="No maintenance work matches this date range." />}</tbody>
+                ))}{!reportMaintenance.length && <EmptyRow columns={4} text="No maintenance work matches this date range and search." />}</tbody>
               </table>
             </div>
           </>

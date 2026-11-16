@@ -24,11 +24,34 @@ function formatDate(value: Date | string): string {
   return value instanceof Date ? value.toLocaleString() : value;
 }
 
-export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ section?: string | string[] }> }) {
+type SearchParams = {
+  section?: string | string[];
+  search?: string | string[];
+  categoryId?: string | string[];
+  supplierId?: string | string[];
+  locationId?: string | string[];
+  status?: string | string[];
+};
+
+function first(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const context = await requireSchoolPermission("inventory.manage");
   const query = await searchParams;
-  const requestedSection = Array.isArray(query.section) ? query.section[0] : query.section;
+  const requestedSection = first(query.section);
   const section = requestedSection === "assets" ? "assets" : "inventory";
+  const search = first(query.search)?.trim().slice(0, 120) ?? "";
+  const selectedCategory = first(query.categoryId) ?? "";
+  const selectedSupplier = first(query.supplierId) ?? "";
+  const selectedLocation = first(query.locationId) ?? "";
+  const requestedStatus = first(query.status);
+  const assetStatus = requestedStatus === "maintenance" || requestedStatus === "retired"
+    ? requestedStatus
+    : requestedStatus === "active"
+      ? "active"
+      : "all";
   const [
     school,
     categories,
@@ -136,20 +159,36 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const locationOptions = options(locations, (row) => row.name);
   const itemOptions = options(items.filter((item) => item.status === "active"), (row) => `${row.sku} · ${row.name}`);
   const assetOptions = options(assets.filter((asset) => asset.status !== "retired"), (row) => `${row.assetTag} · ${row.name}`);
-  const lowStock = items.filter((item) => item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel));
   const stockValue = items.reduce((total, item) =>
     total + Number(item.quantityOnHand) * Number(item.averageUnitCost), 0);
   const assetValue = assets.reduce((total, asset) => total + Number(asset.acquisitionCost), 0);
+  const normalizedSearch = search.toLocaleLowerCase();
+  const filteredItems = items.filter((item) =>
+    (!normalizedSearch || `${item.name} ${item.sku} ${item.categoryName} ${item.supplierName ?? ""} ${item.locationName ?? ""}`
+      .toLocaleLowerCase().includes(normalizedSearch)) &&
+    (!selectedCategory || String(categories.find((category) => category.name === item.categoryName)?.id) === selectedCategory) &&
+    (!selectedSupplier || String(suppliers.find((supplier) => supplier.name === item.supplierName)?.id) === selectedSupplier) &&
+    (!selectedLocation || String(locations.find((location) => location.name === item.locationName)?.id) === selectedLocation)
+  );
+  const filteredAssets = assets.filter((asset) =>
+    (!normalizedSearch || `${asset.name} ${asset.assetTag} ${asset.description ?? ""} ${asset.locationName ?? ""}`
+      .toLocaleLowerCase().includes(normalizedSearch)) &&
+    (!selectedLocation || String(locations.find((location) => location.name === asset.locationName)?.id) === selectedLocation) &&
+    (assetStatus === "all" || asset.status === assetStatus)
+  );
+  const lowStock = filteredItems.filter((item) =>
+    item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
+  );
   const hasDemoRows = items.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
     || assets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "));
   const currency = school?.currency ?? "USD";
 
   return (
     <main className="space-y-6">
-      <header className="rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-sm sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Operations · Inventory module</p>
-        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{section === "assets" ? "School assets" : "Inventory"}</h1>
-        <p className="mt-2 max-w-3xl text-sm text-violet-100">
+      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <p className="text-sm font-semibold text-violet-700">Operations · Inventory module</p>
+        <h1 className="mt-1 text-3xl font-bold text-slate-950">{section === "assets" ? "School assets" : "Inventory"}</h1>
+        <p className="mt-2 max-w-3xl text-sm text-slate-600">
           {section === "assets"
             ? "Register school property, track locations and lifecycle status, and keep maintenance records together."
             : "Manage stock categories, suppliers, quantities, receipts, issues, adjustments, and reorder levels."}
@@ -188,6 +227,45 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </section>
       )}
 
+      <form method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <input type="hidden" name="section" value={section} />
+        <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Search {section === "assets" ? "assets" : "items"}
+          <input type="search" name="search" maxLength={120} defaultValue={search}
+            placeholder={section === "assets" ? "Asset name, tag, or location" : "Item name, SKU, or supplier"}
+            className="mt-1.5 block h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3" />
+        </label>
+        {section === "inventory" ? (
+          <>
+            <label className="text-sm font-medium text-slate-700">Category
+              <select name="categoryId" defaultValue={selectedCategory} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
+                <option value="">All categories</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-medium text-slate-700">Supplier
+              <select name="supplierId" defaultValue={selectedSupplier} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
+                <option value="">All suppliers</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+              </select>
+            </label>
+          </>
+        ) : (
+          <label className="text-sm font-medium text-slate-700">Asset status
+            <select name="status" defaultValue={assetStatus} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
+              <option value="all">All statuses</option><option value="active">Active</option>
+              <option value="maintenance">Under maintenance</option><option value="retired">Retired</option>
+            </select>
+          </label>
+        )}
+        <label className="text-sm font-medium text-slate-700">Location
+          <select name="locationId" defaultValue={selectedLocation} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
+            <option value="">All locations</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+          </select>
+        </label>
+        <div className="flex items-center gap-2">
+          <button className="h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
+          <a href={`/admin/inventory${section === "assets" ? "?section=assets" : ""}`} className="h-10 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
+        </div>
+      </form>
+
       <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions} />
 
       {section === "inventory" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -202,7 +280,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               <th className="px-4 py-3">Reorder level</th><th className="px-4 py-3">Avg. unit cost</th><th className="px-4 py-3">Supplier / location</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <tr key={item.id} className={Number(item.quantityOnHand) <= Number(item.reorderLevel) ? "bg-amber-50/60" : ""}>
                   <td className="px-4 py-3"><strong>{item.name}</strong><span className="block text-xs text-slate-500">{item.sku} · {item.status}</span></td>
                   <td className="px-4 py-3">{item.categoryName}</td>
@@ -212,7 +290,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3">{item.supplierName ?? "—"}<span className="block text-xs text-slate-500">{item.locationName ?? "No location"}</span></td>
                 </tr>
               ))}
-              {!items.length && <EmptyRow columns={6} text="No inventory items have been registered." />}
+              {!filteredItems.length && <EmptyRow columns={6} text={items.length ? "No items match these filters." : "No inventory items have been registered."} />}
             </tbody>
           </table>
         </div>
@@ -230,7 +308,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               <th className="px-4 py-3">Location &amp; status</th><th className="px-4 py-3">Update asset</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {assets.map((asset) => (
+              {filteredAssets.map((asset) => (
                 <tr key={asset.id}>
                   <td className="px-4 py-3"><strong>{asset.name}</strong><span className="block text-xs text-slate-500">{asset.assetTag}</span></td>
                   <td className="px-4 py-3">{asset.acquiredAt}</td>
@@ -239,7 +317,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3"><AssetLocationForm assetId={asset.id} locations={locationOptions} currentLocationId={asset.locationId} currentStatus={asset.status} /></td>
                 </tr>
               ))}
-              {!assets.length && <EmptyRow columns={5} text="No school assets have been registered." />}
+              {!filteredAssets.length && <EmptyRow columns={5} text={assets.length ? "No assets match these filters." : "No school assets have been registered."} />}
             </tbody>
           </table>
         </div>

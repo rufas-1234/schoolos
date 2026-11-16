@@ -20,7 +20,7 @@ import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOpt
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { section?: string | string[]; from?: string | string[]; to?: string | string[]; status?: string | string[] };
+type SearchParams = { section?: string | string[]; from?: string | string[]; to?: string | string[]; status?: string | string[]; search?: string | string[] };
 type Section = "profit" | "income" | "expenses" | "chart" | "bank" | "transfers" | "reports";
 const approverUser = alias(user, "approver_user");
 const sourceBankAccount = alias(schoolBankAccounts, "source_account");
@@ -82,6 +82,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const requestedFrom = first(query.from);
   const requestedTo = first(query.to);
   const requestedStatus = first(query.status);
+  const search = first(query.search)?.trim().slice(0, 120) ?? "";
+  const searchTerm = search.toLocaleLowerCase();
   const reportStatus = requestedStatus === "pending" || requestedStatus === "approved" || requestedStatus === "rejected"
     ? requestedStatus
     : "all";
@@ -91,7 +93,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const to = toCandidate >= fromCandidate ? toCandidate : today;
   const startAt = new Date(`${from}T00:00:00.000Z`);
   const endAt = new Date(`${to}T23:59:59.999Z`);
-  const [school, accounts, bankAccounts, transactions, transfers, pnlTransactions, reportTransactions, reportTransfers, feeIncomeRows, reversals, bankTotals, transferDebits, transferCredits] =
+  const [school, accounts, bankAccounts, transactions, transfers, pnlTransactions, accountReportTransactions, reportTransfers, feeIncomeRows, reversals, bankTotals, transferDebits, transferCredits] =
     await Promise.all([
       db.select({ currency: schools.currency }).from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
       db.select({
@@ -281,6 +283,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         .groupBy(fundTransfers.destinationBankAccountId),
     ]);
 
+  const reportTransactions = accountReportTransactions.filter((transaction) =>
+    !searchTerm || `${transaction.description} ${transaction.accountName} ${transaction.accountCode} ${transaction.payee ?? ""} ${transaction.reference ?? ""}`
+      .toLocaleLowerCase().includes(searchTerm)
+  );
   const currency = school?.currency ?? "USD";
   const activeAccounts = accounts.filter((account) => account.status === "active");
   const assetAccounts = accountOptions(activeAccounts.filter((account) => account.accountType === "asset"));
@@ -322,10 +328,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
 
   return (
     <main className="space-y-6">
-      <header className="rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-sm sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Operations · Inventory module</p>
-        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{section === "expenses" ? "Expenses" : section === "reports" ? "Accounts reports" : "Accounts"}</h1>
-        <p className="mt-2 max-w-3xl text-sm text-violet-100">
+      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <p className="text-sm font-semibold text-violet-700">Operations · Inventory module</p>
+        <h1 className="mt-1 text-3xl font-bold text-slate-950">{section === "expenses" ? "Expenses" : section === "reports" ? "Accounts reports" : "Accounts"}</h1>
+        <p className="mt-2 max-w-3xl text-sm text-slate-600">
           {section === "expenses"
             ? "Record and review operating expenses with approval status, categories, payees, and references."
             : section === "reports"
@@ -431,6 +437,11 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           <div className="space-y-5">
             <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
               <input type="hidden" name="section" value="reports" />
+              <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Search transactions
+                <input type="search" name="search" maxLength={120} defaultValue={search}
+                  placeholder="Description, category, payee, or reference"
+                  className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3" />
+              </label>
               <label className="text-sm text-slate-700">From<input name="from" type="date" defaultValue={from} className="mt-1 block h-10 rounded-lg border border-slate-200 px-3" /></label>
               <label className="text-sm text-slate-700">To<input name="to" type="date" defaultValue={to} className="mt-1 block h-10 rounded-lg border border-slate-200 px-3" /></label>
               <label className="text-sm text-slate-700">Transaction status
@@ -440,6 +451,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 </select>
               </label>
               <button className="h-10 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Update report</button>
+              <a href="/admin/accounts?section=reports" className="h-10 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
               <DownloadCsv
                 headers={["Date", "Type", "Account code", "Category", "Description", "Payee", "Reference", "Status", "Amount"]}
                 rows={reportTransactions.map((row) => [
@@ -463,7 +475,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <header className="print-report-heading">
                 <p className="print-report-kicker">Finance · Accounts</p>
                 <h2>Accounts activity report</h2>
-                <p>{from} through {to} · {reportStatus === "all" ? "All statuses" : `${reportStatus} transactions`} · {reportTransactions.length} transactions</p>
+                <p>{from} through {to} · {reportStatus === "all" ? "All statuses" : `${reportStatus} transactions`} · {reportTransactions.length} transactions{search ? ` · Search: ${search}` : ""}</p>
               </header>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <SummaryCard label="Net fee receipts" value={displayCurrency(feeIncomeTotal, currency)} />
@@ -471,7 +483,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 <SummaryCard label="Approved expenses" value={displayCurrency(expenseTotal, currency)} />
                 <SummaryCard label="Net surplus / (deficit)" value={displayCurrency(netProfit, currency)} tone={netProfit < BigInt(0) ? "rose" : "emerald"} />
               </div>
-              <p className="text-xs text-slate-500">Fees are shown separately from non-fee income. Only approved accounting transactions affect the income and expense totals; pending and rejected records remain visible when selected.</p>
+              <p className="text-xs text-slate-500">Fees are shown separately from non-fee income. Period totals use approved accounting activity for the selected dates and do not change with the transaction search or status filter; those filters apply to the transaction register and CSV export.</p>
               {hasDemoReportTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY records are included in the transaction list and applicable totals as workflow examples; they are not real income or expenses.</p>}
               <TransactionTable
                 transactions={reportTransactions}
