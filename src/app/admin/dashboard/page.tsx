@@ -117,17 +117,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-800 via-violet-700 to-indigo-900 p-5 text-white shadow-lg md:hidden">
-        <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full border border-white/15" />
-        <div className="pointer-events-none absolute -bottom-20 right-20 h-40 w-40 rounded-full border border-white/10" />
-        <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200">
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm md:hidden">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-700">
             {new Intl.DateTimeFormat("en", { dateStyle: "full" }).format(new Date())}
           </p>
-          <h1 className="mt-3 text-2xl font-bold leading-tight">
+          <h1 className="mt-3 text-2xl font-bold leading-tight text-slate-900">
             Hello, {context.user.name.split(" ")[0]}
           </h1>
-          <p className="mt-1 text-sm leading-6 text-violet-100">
+          <p className="mt-1 text-sm leading-6 text-slate-500">
             Your school, at a glance.
           </p>
         </div>
