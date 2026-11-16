@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PaginationPageSize } from "./pagination-page-size";
 
 export function TablePagination({
   ariaLabel,
@@ -22,29 +23,32 @@ export function TablePagination({
       <p className="text-sm text-slate-600">
         Showing {firstRow}–{lastRow} of {totalRows} · Page {currentPage} of {pageCount}
       </p>
-      <div className="flex items-center gap-2">
-        <Link
-          href={hrefForPage(Math.max(1, currentPage - 1))}
-          aria-disabled={currentPage <= 1}
-          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-            currentPage <= 1
-              ? "pointer-events-none border-slate-100 text-slate-400"
-              : "border-slate-200 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          Previous
-        </Link>
-        <Link
-          href={hrefForPage(Math.min(pageCount, currentPage + 1))}
-          aria-disabled={currentPage >= pageCount}
-          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-            currentPage >= pageCount
-              ? "pointer-events-none border-slate-100 text-slate-400"
-              : "border-slate-200 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          Next
-        </Link>
+      <div className="flex flex-wrap items-center gap-3">
+        <PaginationPageSize currentPageSize={pageSize} firstPageHref={hrefForPage(1)} ariaLabel={ariaLabel} />
+        <div className="flex items-center gap-2">
+          <Link
+            href={hrefForPage(Math.max(1, currentPage - 1))}
+            aria-disabled={currentPage <= 1}
+            className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+              currentPage <= 1
+                ? "pointer-events-none border-slate-100 text-slate-400"
+                : "border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Previous
+          </Link>
+          <Link
+            href={hrefForPage(Math.min(pageCount, currentPage + 1))}
+            aria-disabled={currentPage >= pageCount}
+            className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+              currentPage >= pageCount
+                ? "pointer-events-none border-slate-100 text-slate-400"
+                : "border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Next
+          </Link>
+        </div>
       </div>
     </nav>
   );

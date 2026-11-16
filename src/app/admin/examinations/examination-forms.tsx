@@ -3,6 +3,7 @@
 import { useActionState, useState, type ReactNode } from "react";
 import { AdminDeleteButton } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
+import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
 import {
   createExamType,
   createExamination,
@@ -360,6 +361,7 @@ export function SaveMarksForm({
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamMarks, {});
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(students.flatMap((student) => [
       ...student.components.map((component) => [
@@ -373,7 +375,6 @@ export function SaveMarksForm({
   const filteredStudents = students.filter((student) =>
     `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
   );
-  const pageSize = 20;
   const pageCount = Math.ceil(filteredStudents.length / pageSize);
   const currentPage = Math.min(page, Math.max(pageCount - 1, 0));
   const visibleStudents = filteredStudents.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
@@ -400,6 +401,15 @@ export function SaveMarksForm({
       <p className="text-xs text-slate-500" aria-live="polite">
         Showing {firstVisible}–{lastVisible} of {filteredStudents.length} matching students (page {pageCount === 0 ? 0 : currentPage + 1} of {pageCount}). Saving updates only the students shown on this page.
       </p>
+      <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+        Students per page
+        <select value={pageSize} onChange={(event) => {
+          setPageSize(Number(event.target.value));
+          setPage(0);
+        }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+          {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+        </select>
+      </label>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th>{students[0]?.components.map((component) => <th key={component.id} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Teacher remark</th></tr></thead>
@@ -438,11 +448,11 @@ export function SearchableStudentItems({
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const normalizedSearch = search.trim().toLocaleLowerCase();
   const visibleItems = items.filter((item) =>
     `${item.name} ${item.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
   );
-  const pageSize = 20;
   const pageCount = Math.ceil(visibleItems.length / pageSize);
   const currentPage = Math.min(page, Math.max(pageCount - 1, 0));
   const pageItems = visibleItems.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
@@ -466,6 +476,15 @@ export function SearchableStudentItems({
       <p className="text-xs text-slate-500" aria-live="polite">
         Showing {firstVisible}–{lastVisible} of {visibleItems.length} matching students (page {pageCount === 0 ? 0 : currentPage + 1} of {pageCount}).
       </p>
+      <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+        Students per page
+        <select value={pageSize} onChange={(event) => {
+          setPageSize(Number(event.target.value));
+          setPage(0);
+        }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+          {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+        </select>
+      </label>
       {pageItems.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
           {pageItems.map((item) => <div key={item.id}>{item.content}</div>)}

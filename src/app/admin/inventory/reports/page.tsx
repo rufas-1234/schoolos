@@ -18,10 +18,9 @@ import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { TablePagination } from "@/components/table-pagination";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
+import { parsePageSize } from "@/components/pagination-utils";
 
 export const dynamic = "force-dynamic";
-const PAGE_SIZE = 25;
-
 type SearchParams = {
   report?: string | string[];
   from?: string | string[];
@@ -31,6 +30,7 @@ type SearchParams = {
   movementType?: string | string[];
   status?: string | string[];
   page?: string | string[];
+  pageSize?: string | string[];
 };
 type ReportType = "stock" | "movements" | "low-stock" | "assets" | "maintenance";
 
@@ -67,6 +67,7 @@ function formatDate(value: Date | string): string {
 export default async function InventoryReportsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const context = await requireSchoolPermission("inventory.manage");
   const query = await searchParams;
+  const pageSize = parsePageSize(query.pageSize);
   const selectedReport = first(query.report);
   const report: ReportType = reports.some((item) => item.id === selectedReport)
     ? selectedReport as ReportType
@@ -231,20 +232,21 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
         : report === "assets"
           ? reportAssets.length
           : reportMaintenance.length;
-  const pageCount = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
   const page = Math.min(requestedPageNumber, pageCount);
-  const start = (page - 1) * PAGE_SIZE;
-  const visibleItems = reportItems.slice(start, start + PAGE_SIZE);
-  const visibleLowStock = lowStock.slice(start, start + PAGE_SIZE);
-  const visibleMovements = reportMovements.slice(start, start + PAGE_SIZE);
-  const visibleAssets = reportAssets.slice(start, start + PAGE_SIZE);
-  const visibleMaintenance = reportMaintenance.slice(start, start + PAGE_SIZE);
+  const start = (page - 1) * pageSize;
+  const visibleItems = reportItems.slice(start, start + pageSize);
+  const visibleLowStock = lowStock.slice(start, start + pageSize);
+  const visibleMovements = reportMovements.slice(start, start + pageSize);
+  const visibleAssets = reportAssets.slice(start, start + pageSize);
+  const visibleMaintenance = reportMaintenance.slice(start, start + pageSize);
   const pageHref = (targetPage: number) => {
     const params = new URLSearchParams({ report, from, to });
     if (categoryId !== null) params.set("categoryId", String(categoryId));
     if (search) params.set("search", search);
     if (movementType !== "all") params.set("movementType", movementType);
     if (assetStatus !== "all") params.set("status", assetStatus);
+    params.set("pageSize", String(pageSize));
     params.set("page", String(targetPage));
     return `/admin/inventory/reports?${params.toString()}`;
   };
@@ -406,7 +408,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                 ))}{!reportItems.length && <EmptyRow columns={7} text="No stock items match this report." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Stock report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportItems.length} hrefForPage={pageHref} />
+            <TablePagination ariaLabel="Stock report" currentPage={page} pageSize={pageSize} totalRows={reportItems.length} hrefForPage={pageHref} />
           </>
         )}
 
@@ -420,7 +422,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                 ))}{!lowStock.length && <EmptyRow columns={5} text="No active items are at or below their reorder level." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Low stock report" currentPage={page} pageSize={PAGE_SIZE} totalRows={lowStock.length} hrefForPage={pageHref} />
+            <TablePagination ariaLabel="Low stock report" currentPage={page} pageSize={pageSize} totalRows={lowStock.length} hrefForPage={pageHref} />
           </div>
         )}
 
@@ -444,7 +446,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                 ))}{!reportMovements.length && <EmptyRow columns={6} text="No stock movements match these filters." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Stock movement report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportMovements.length} hrefForPage={pageHref} />
+            <TablePagination ariaLabel="Stock movement report" currentPage={page} pageSize={pageSize} totalRows={reportMovements.length} hrefForPage={pageHref} />
           </>
         )}
 
@@ -459,7 +461,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                 ))}{!reportAssets.length && <EmptyRow columns={5} text="No assets match this period and status." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Asset report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportAssets.length} hrefForPage={pageHref} />
+            <TablePagination ariaLabel="Asset report" currentPage={page} pageSize={pageSize} totalRows={reportAssets.length} hrefForPage={pageHref} />
           </>
         )}
 
@@ -474,7 +476,7 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
                 ))}{!reportMaintenance.length && <EmptyRow columns={4} text="No maintenance work matches this date range and search." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Maintenance report" currentPage={page} pageSize={PAGE_SIZE} totalRows={reportMaintenance.length} hrefForPage={pageHref} />
+            <TablePagination ariaLabel="Maintenance report" currentPage={page} pageSize={pageSize} totalRows={reportMaintenance.length} hrefForPage={pageHref} />
           </>
         )}
       </section>

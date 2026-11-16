@@ -16,10 +16,9 @@ import { SmartFilterForm } from "@/components/smart-filter-form";
 import { AssetMaintenanceEditor, InventoryAssetEditor, InventoryForms, InventoryItemEditor, type InventoryOption } from "./inventory-forms";
 import { InventoryModuleNav } from "./module-nav";
 import { TablePagination } from "@/components/table-pagination";
+import { parsePageSize } from "@/components/pagination-utils";
 
 export const dynamic = "force-dynamic";
-const PAGE_SIZE = 25;
-
 function formatCurrency(value: string | number, currency: string): string {
   return new Intl.NumberFormat("en", { style: "currency", currency }).format(Number(value));
 }
@@ -40,6 +39,7 @@ type SearchParams = {
   assetPage?: string | string[];
   movementPage?: string | string[];
   maintenancePage?: string | string[];
+  pageSize?: string | string[];
 };
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -53,6 +53,7 @@ function requestedPage(value: string | undefined): number {
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const context = await requireSchoolPermission("inventory.manage");
   const query = await searchParams;
+  const pageSize = parsePageSize(query.pageSize);
   const requestedSection = first(query.section);
   const section = requestedSection === "assets" ? "assets" : "inventory";
   const search = first(query.search)?.trim().slice(0, 120) ?? "";
@@ -202,18 +203,18 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     (!selectedLocation || String(locations.find((location) => location.name === asset.locationName)?.id) === selectedLocation) &&
     (assetStatus === "all" || asset.status === assetStatus)
   );
-  const itemPageCount = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const itemPageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const itemPage = Math.min(requestedItemPage, itemPageCount);
-  const visibleItems = filteredItems.slice((itemPage - 1) * PAGE_SIZE, itemPage * PAGE_SIZE);
-  const assetPageCount = Math.max(1, Math.ceil(filteredAssets.length / PAGE_SIZE));
+  const visibleItems = filteredItems.slice((itemPage - 1) * pageSize, itemPage * pageSize);
+  const assetPageCount = Math.max(1, Math.ceil(filteredAssets.length / pageSize));
   const assetPage = Math.min(requestedAssetPage, assetPageCount);
-  const visibleAssets = filteredAssets.slice((assetPage - 1) * PAGE_SIZE, assetPage * PAGE_SIZE);
-  const movementPageCount = Math.max(1, Math.ceil(movements.length / PAGE_SIZE));
+  const visibleAssets = filteredAssets.slice((assetPage - 1) * pageSize, assetPage * pageSize);
+  const movementPageCount = Math.max(1, Math.ceil(movements.length / pageSize));
   const movementPage = Math.min(requestedMovementPage, movementPageCount);
-  const visibleMovements = movements.slice((movementPage - 1) * PAGE_SIZE, movementPage * PAGE_SIZE);
-  const maintenancePageCount = Math.max(1, Math.ceil(maintenance.length / PAGE_SIZE));
+  const visibleMovements = movements.slice((movementPage - 1) * pageSize, movementPage * pageSize);
+  const maintenancePageCount = Math.max(1, Math.ceil(maintenance.length / pageSize));
   const maintenancePage = Math.min(requestedMaintenancePage, maintenancePageCount);
-  const visibleMaintenance = maintenance.slice((maintenancePage - 1) * PAGE_SIZE, maintenancePage * PAGE_SIZE);
+  const visibleMaintenance = maintenance.slice((maintenancePage - 1) * pageSize, maintenancePage * pageSize);
   const pageHref = (parameter: string, page: number) => {
     const params = new URLSearchParams({ section });
     if (search) params.set("search", search);
@@ -221,15 +222,16 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     if (selectedSupplier) params.set("supplierId", selectedSupplier);
     if (selectedLocation) params.set("locationId", selectedLocation);
     if (assetStatus !== "all") params.set("status", assetStatus);
+    params.set("pageSize", String(pageSize));
     params.set(parameter, String(page));
     return `/admin/inventory?${params.toString()}`;
   };
   const lowStock = filteredItems.filter((item) =>
     item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
   );
-  const lowStockPageCount = Math.max(1, Math.ceil(lowStock.length / PAGE_SIZE));
+  const lowStockPageCount = Math.max(1, Math.ceil(lowStock.length / pageSize));
   const lowStockPage = Math.min(requestedLowStockPage, lowStockPageCount);
-  const visibleLowStock = lowStock.slice((lowStockPage - 1) * PAGE_SIZE, lowStockPage * PAGE_SIZE);
+  const visibleLowStock = lowStock.slice((lowStockPage - 1) * pageSize, lowStockPage * pageSize);
   const hasDemoRows = items.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
     || assets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "));
   const currency = school?.currency ?? "USD";
@@ -275,7 +277,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               </li>
             ))}
           </ul>
-          <TablePagination ariaLabel="Low-stock notifications" currentPage={lowStockPage} pageSize={PAGE_SIZE} totalRows={lowStock.length}
+          <TablePagination ariaLabel="Low-stock notifications" currentPage={lowStockPage} pageSize={pageSize} totalRows={lowStock.length}
             hrefForPage={(page) => pageHref("lowStockPage", page)} />
         </section>
       )}
@@ -344,7 +346,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-        <TablePagination ariaLabel="Inventory items" currentPage={itemPage} pageSize={PAGE_SIZE} totalRows={filteredItems.length}
+        <TablePagination ariaLabel="Inventory items" currentPage={itemPage} pageSize={pageSize} totalRows={filteredItems.length}
           hrefForPage={(page) => pageHref("itemPage", page)} />
         </section>
       </>}
@@ -375,7 +377,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-        <TablePagination ariaLabel="School assets" currentPage={assetPage} pageSize={PAGE_SIZE} totalRows={filteredAssets.length}
+        <TablePagination ariaLabel="School assets" currentPage={assetPage} pageSize={pageSize} totalRows={filteredAssets.length}
           hrefForPage={(page) => pageHref("assetPage", page)} />
         </section>
       </>}
@@ -399,7 +401,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-        <TablePagination ariaLabel="Stock movements" currentPage={movementPage} pageSize={PAGE_SIZE} totalRows={movements.length}
+        <TablePagination ariaLabel="Stock movements" currentPage={movementPage} pageSize={pageSize} totalRows={movements.length}
           hrefForPage={(page) => pageHref("movementPage", page)} />
         </section>
       </>}
@@ -424,7 +426,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </tbody>
           </table>
         </div>
-        <TablePagination ariaLabel="Asset maintenance records" currentPage={maintenancePage} pageSize={PAGE_SIZE} totalRows={maintenance.length}
+        <TablePagination ariaLabel="Asset maintenance records" currentPage={maintenancePage} pageSize={pageSize} totalRows={maintenance.length}
           hrefForPage={(page) => pageHref("maintenancePage", page)} />
         </section>
       </>}

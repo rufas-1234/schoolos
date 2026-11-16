@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { PrintButton } from "@/components/print-button";
 import { FeeReportFilters } from "./fee-report-filters";
 import { TablePagination } from "@/components/table-pagination";
+import { parsePageSize } from "@/components/pagination-utils";
 import type { SearchableSelectOption } from "@/components/searchable-select";
 import {
   academicYears,
@@ -43,9 +44,8 @@ type SearchParams = {
   reversalsPage?: string | string[];
   invoicesPage?: string | string[];
   feeTypesPage?: string | string[];
+  pageSize?: string | string[];
 };
-
-const PAGE_SIZE = 25;
 
 function requestedPage(value: string | string[] | undefined): number {
   const parsed = Number(Array.isArray(value) ? value[0] : value);
@@ -74,6 +74,7 @@ export default async function FeeReportsPage({
 }) {
   const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
   const params = await searchParams;
+  const pageSize = parsePageSize(params.pageSize);
   const paymentPage = requestedPage(params.paymentsPage);
   const reversalPage = requestedPage(params.reversalsPage);
   const invoicePage = requestedPage(params.invoicesPage);
@@ -235,8 +236,8 @@ export default async function FeeReportsPage({
         ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .orderBy(desc(feePayments.paidAt))
-      .limit(PAGE_SIZE)
-      .offset((paymentPage - 1) * PAGE_SIZE),
+      .limit(pageSize)
+      .offset((paymentPage - 1) * pageSize),
     db.select({
       id: studentFeeInvoices.id,
       feeTypeId: feeTypes.id,
@@ -408,8 +409,8 @@ export default async function FeeReportsPage({
         ...(requestedFeeTypeId ? [eq(feeTypes.id, requestedFeeTypeId)] : []),
       ))
       .orderBy(desc(feePaymentReversals.createdAt))
-      .limit(PAGE_SIZE)
-      .offset((reversalPage - 1) * PAGE_SIZE),
+      .limit(pageSize)
+      .offset((reversalPage - 1) * pageSize),
     db.select({
       amount: sum(feePaymentReversals.amount),
       fineAmount: sum(feePaymentReversals.fineAmount),
@@ -527,8 +528,8 @@ export default async function FeeReportsPage({
   const feeTypeSummary = [...feeTypeRows.entries()].sort(([, first], [, second]) =>
     first.name.localeCompare(second.name)
   );
-  const visibleInvoices = filteredInvoices.slice((invoicePage - 1) * PAGE_SIZE, invoicePage * PAGE_SIZE);
-  const visibleFeeTypeSummary = feeTypeSummary.slice((feeTypePage - 1) * PAGE_SIZE, feeTypePage * PAGE_SIZE);
+  const visibleInvoices = filteredInvoices.slice((invoicePage - 1) * pageSize, invoicePage * pageSize);
+  const visibleFeeTypeSummary = feeTypeSummary.slice((feeTypePage - 1) * pageSize, feeTypePage * pageSize);
   const reportPageHref = (parameter: string, page: number) => {
     const query = new URLSearchParams({
       from,
@@ -538,6 +539,7 @@ export default async function FeeReportsPage({
       ...(requestedSection ? { sectionId: String(requestedSection) } : {}),
       ...(requestedFeeTypeId ? { feeTypeId: String(requestedFeeTypeId) } : {}),
       ...(requestedStatus ? { status: requestedStatus } : {}),
+      pageSize: String(pageSize),
       [parameter]: String(page),
     });
     return `/admin/fees/reports?${query.toString()}`;
@@ -605,7 +607,7 @@ export default async function FeeReportsPage({
           headings={["Student", "Class / section", "Fee type", "Date", "Method", "Payment", "Reversed", "Fine", "Receipt"]}
           hasRows={payments.length > 0}
           pagination={payments.length || Number(paymentTotals?.count) > 0 ? (
-            <TablePagination ariaLabel="Fee payments" currentPage={paymentPage} pageSize={PAGE_SIZE}
+            <TablePagination ariaLabel="Fee payments" currentPage={paymentPage} pageSize={pageSize}
               totalRows={Number(paymentTotals?.count ?? 0)} hrefForPage={(page) => reportPageHref("paymentsPage", page)} />
           ) : null}
         >
@@ -631,7 +633,7 @@ export default async function FeeReportsPage({
           headings={["Student", "Class / section", "Date", "Type", "Amount", "Reason", "Receipt"]}
           hasRows={reversals.length > 0}
           pagination={reversals.length || Number(reversalTotals?.count) > 0 ? (
-            <TablePagination ariaLabel="Fee reversals" currentPage={reversalPage} pageSize={PAGE_SIZE}
+            <TablePagination ariaLabel="Fee reversals" currentPage={reversalPage} pageSize={pageSize}
               totalRows={Number(reversalTotals?.count ?? 0)} hrefForPage={(page) => reportPageHref("reversalsPage", page)} />
           ) : null}
         >
@@ -655,7 +657,7 @@ export default async function FeeReportsPage({
           headings={["Fee type", "Invoices", "Amount due", "Amount paid", "Balance"]}
           hasRows={feeTypeSummary.length > 0}
           pagination={feeTypeSummary.length > 0 ? (
-            <TablePagination ariaLabel="Invoice totals by fee type" currentPage={feeTypePage} pageSize={PAGE_SIZE}
+            <TablePagination ariaLabel="Invoice totals by fee type" currentPage={feeTypePage} pageSize={pageSize}
               totalRows={feeTypeSummary.length} hrefForPage={(page) => reportPageHref("feeTypesPage", page)} />
           ) : null}
         >
@@ -676,7 +678,7 @@ export default async function FeeReportsPage({
           headings={["Student", "Class / section", "Fee type", "Due date", "Paid", "Balance", "Status"]}
           hasRows={filteredInvoices.length > 0}
           pagination={filteredInvoices.length > 0 ? (
-            <TablePagination ariaLabel="Invoice payment status" currentPage={invoicePage} pageSize={PAGE_SIZE}
+            <TablePagination ariaLabel="Invoice payment status" currentPage={invoicePage} pageSize={pageSize}
               totalRows={filteredInvoices.length} hrefForPage={(page) => reportPageHref("invoicesPage", page)} />
           ) : null}
         >

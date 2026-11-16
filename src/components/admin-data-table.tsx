@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { SearchableSelect } from "@/components/searchable-select";
 import { printCurrentPage } from "@/components/print-button";
+import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -504,7 +505,7 @@ export function AdminDataTable({
                   }}
                   className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700"
                 >
-                  {[10, 25, 50].map((size) => (
+                  {PAGE_SIZE_OPTIONS.map((size) => (
                     <option key={size} value={size}>{size}</option>
                   ))}
                 </select>

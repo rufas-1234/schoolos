@@ -28,6 +28,8 @@ import {
 import type { SearchableSelectOption } from "@/components/searchable-select";
 import { FeeInvoiceFilters } from "./fee-invoice-filters";
 import { EditFeeInvoiceForm, RecordFeePaymentForm, type FeeOption } from "../fee-forms";
+import { PaginationPageSize } from "@/components/pagination-page-size";
+import { parsePageSize } from "@/components/pagination-utils";
 
 type SearchParams = {
   search?: string | string[];
@@ -36,9 +38,8 @@ type SearchParams = {
   classLevelId?: string | string[];
   sectionId?: string | string[];
   page?: string | string[];
+  pageSize?: string | string[];
 };
-
-const INVOICE_PAGE_SIZE = 10;
 
 function money(minorUnits: number): string {
   return (minorUnits / 100).toFixed(2);
@@ -62,6 +63,7 @@ export default async function FeeCollectionPage({
 }) {
   const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
   const params = await searchParams;
+  const pageSize = parsePageSize(params.pageSize);
   const search = typeof params.search === "string" ? params.search.trim().slice(0, 100) : "";
   const statusFilter = typeof params.status === "string" &&
     ["unpaid", "partial", "paid"].includes(params.status) ? params.status : "";
@@ -225,13 +227,13 @@ export default async function FeeCollectionPage({
       .orderBy(asc(schoolBranches.name), asc(classLevels.name), asc(classSections.name)),
   ]);
   const matchingCount = Number(countResult[0]?.total ?? 0);
-  const pageCount = Math.max(1, Math.ceil(matchingCount / INVOICE_PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(matchingCount / pageSize));
   const page = Math.min(requestedPage, pageCount);
   const invoices = await db.select().from(matchingInvoices)
     .where(statusFilterCondition)
     .orderBy(desc(matchingInvoices.createdAt), desc(matchingInvoices.id))
-    .limit(INVOICE_PAGE_SIZE)
-    .offset((page - 1) * INVOICE_PAGE_SIZE);
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
   const invoiceRows = invoices.map((invoice) => {
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
@@ -291,8 +293,8 @@ export default async function FeeCollectionPage({
       id: invoice.id,
       label: `${invoice.invoiceNumber} · ${invoice.studentName} ${invoice.studentLastName} · ${currency} ${money(invoice.balance)} due`,
     }));
-  const firstResult = matchingCount === 0 ? 0 : (page - 1) * INVOICE_PAGE_SIZE + 1;
-  const lastResult = Math.min(page * INVOICE_PAGE_SIZE, matchingCount);
+  const firstResult = matchingCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastResult = Math.min(page * pageSize, matchingCount);
   const pageHref = (targetPage: number) => {
     const query = new URLSearchParams();
     if (search) query.set("search", search);
@@ -301,6 +303,7 @@ export default async function FeeCollectionPage({
     if (requestedClass !== null) query.set("classLevelId", String(requestedClass));
     if (requestedSection !== null) query.set("sectionId", String(requestedSection));
     query.set("page", String(targetPage));
+    query.set("pageSize", String(pageSize));
     return `/admin/fees/collection?${query.toString()}`;
   };
 
@@ -353,6 +356,7 @@ export default async function FeeCollectionPage({
           Showing {firstResult}–{lastResult} of {matchingCount} invoices
         </p>
         <div className="flex items-center gap-2">
+          <PaginationPageSize currentPageSize={pageSize} firstPageHref={pageHref(1)} ariaLabel="Fee invoices" />
           <Link
             href={pageHref(Math.max(1, page - 1))}
             aria-disabled={page <= 1}

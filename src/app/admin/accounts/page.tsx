@@ -19,10 +19,9 @@ import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOption } from "./account-forms";
 import { TablePagination } from "@/components/table-pagination";
 import { SmartFilterForm } from "@/components/smart-filter-form";
+import { parsePageSize } from "@/components/pagination-utils";
 
 export const dynamic = "force-dynamic";
-const PAGE_SIZE = 25;
-
 type SearchParams = {
   section?: string | string[];
   from?: string | string[];
@@ -36,6 +35,7 @@ type SearchParams = {
   transfersPage?: string | string[];
   reportTransactionsPage?: string | string[];
   reportTransfersPage?: string | string[];
+  pageSize?: string | string[];
 };
 type Section = "profit" | "income" | "expenses" | "chart" | "bank" | "transfers" | "reports";
 const approverUser = alias(user, "approver_user");
@@ -60,12 +60,13 @@ function requestedPage(value: string | undefined): number {
   return value && /^\d+$/.test(value) ? Math.max(1, Number(value)) : 1;
 }
 
-function paginateRows<T>(rows: T[], requested: number) {
-  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+function paginateRows<T>(rows: T[], requested: number, pageSize: number) {
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const page = Math.min(requested, pageCount);
   return {
     page,
-    rows: rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    pageSize,
+    rows: rows.slice((page - 1) * pageSize, page * pageSize),
   };
 }
 
@@ -102,6 +103,7 @@ function accountOptions(rows: Array<{ id: number; code: string; name: string }>)
 export default async function AccountsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const context = await requireSchoolPermission("accounts.manage");
   const query = await searchParams;
+  const pageSize = parsePageSize(query.pageSize);
   const requestedSection = first(query.section);
   const section: Section = sections.some((item) => item.id === requestedSection)
     ? requestedSection as Section
@@ -318,17 +320,18 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   );
   const incomeTransactions = transactions.filter((transaction) => transaction.transactionType === "income");
   const expenseTransactions = transactions.filter((transaction) => transaction.transactionType === "expense");
-  const incomeTransactionPage = paginateRows(incomeTransactions, requestedPage(first(query.incomePage)));
-  const expenseTransactionPage = paginateRows(expenseTransactions, requestedPage(first(query.expensePage)));
-  const chartPage = paginateRows(accounts, requestedPage(first(query.chartPage)));
-  const bankPage = paginateRows(bankAccounts, requestedPage(first(query.bankPage)));
-  const transferPage = paginateRows(transfers, requestedPage(first(query.transfersPage)));
-  const reportTransactionPage = paginateRows(reportTransactions, requestedPage(first(query.reportTransactionsPage)));
-  const reportTransferPage = paginateRows(reportTransfers, requestedPage(first(query.reportTransfersPage)));
+  const incomeTransactionPage = paginateRows(incomeTransactions, requestedPage(first(query.incomePage)), pageSize);
+  const expenseTransactionPage = paginateRows(expenseTransactions, requestedPage(first(query.expensePage)), pageSize);
+  const chartPage = paginateRows(accounts, requestedPage(first(query.chartPage)), pageSize);
+  const bankPage = paginateRows(bankAccounts, requestedPage(first(query.bankPage)), pageSize);
+  const transferPage = paginateRows(transfers, requestedPage(first(query.transfersPage)), pageSize);
+  const reportTransactionPage = paginateRows(reportTransactions, requestedPage(first(query.reportTransactionsPage)), pageSize);
+  const reportTransferPage = paginateRows(reportTransfers, requestedPage(first(query.reportTransfersPage)), pageSize);
   const pageHref = (parameter: string, page: number) => {
     const params = new URLSearchParams({ section, from, to });
     if (search) params.set("search", search);
     if (reportStatus !== "all") params.set("status", reportStatus);
+    params.set("pageSize", String(pageSize));
     params.set(parameter, String(page));
     return `/admin/accounts?${params.toString()}`;
   };
@@ -431,7 +434,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             <p className="text-sm text-slate-500">School fee receipts are included automatically from fee collections in Profit &amp; Loss. Record donations and other non-fee income here to avoid double counting.</p>
             <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
             <TransactionTable transactions={incomeTransactionPage.rows} currency={currency} reviewNeeded={reviewNeeded} />
-            <TablePagination ariaLabel="Income transactions" currentPage={incomeTransactionPage.page} pageSize={PAGE_SIZE} totalRows={incomeTransactions.length}
+            <TablePagination ariaLabel="Income transactions" currentPage={incomeTransactionPage.page} pageSize={incomeTransactionPage.pageSize} totalRows={incomeTransactions.length}
               hrefForPage={(page) => pageHref("incomePage", page)} />
           </div>
         )}
@@ -446,7 +449,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             </p>
             <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
             <TransactionTable transactions={expenseTransactionPage.rows} currency={currency} reviewNeeded={reviewNeeded} />
-            <TablePagination ariaLabel="Expense transactions" currentPage={expenseTransactionPage.page} pageSize={PAGE_SIZE} totalRows={expenseTransactions.length}
+            <TablePagination ariaLabel="Expense transactions" currentPage={expenseTransactionPage.page} pageSize={expenseTransactionPage.pageSize} totalRows={expenseTransactions.length}
               hrefForPage={(page) => pageHref("expensePage", page)} />
           </div>
         )}
@@ -461,7 +464,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 ))}{!accounts.length && <EmptyRow columns={5} text="Create your chart of accounts to categorize income and expenses." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Chart of accounts" currentPage={chartPage.page} pageSize={PAGE_SIZE} totalRows={accounts.length}
+            <TablePagination ariaLabel="Chart of accounts" currentPage={chartPage.page} pageSize={chartPage.pageSize} totalRows={accounts.length}
               hrefForPage={(page) => pageHref("chartPage", page)} />
           </div>
         )}
@@ -476,7 +479,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 ))}{!bankAccounts.length && <EmptyRow columns={5} text="Add a bank or cash account and link it to an asset account." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Bank accounts" currentPage={bankPage.page} pageSize={PAGE_SIZE} totalRows={bankAccounts.length}
+            <TablePagination ariaLabel="Bank accounts" currentPage={bankPage.page} pageSize={bankPage.pageSize} totalRows={bankAccounts.length}
               hrefForPage={(page) => pageHref("bankPage", page)} />
           </div>
         )}
@@ -491,7 +494,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 ))}{!transfers.length && <EmptyRow columns={5} text="No fund transfers have been recorded." />}</tbody>
               </table>
             </div>
-            <TablePagination ariaLabel="Fund transfers" currentPage={transferPage.page} pageSize={PAGE_SIZE} totalRows={transfers.length}
+            <TablePagination ariaLabel="Fund transfers" currentPage={transferPage.page} pageSize={transferPage.pageSize} totalRows={transfers.length}
               hrefForPage={(page) => pageHref("transfersPage", page)} />
           </div>
         )}
@@ -552,7 +555,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 currency={currency}
                 reviewNeeded={reportTransactions.filter((row) => row.status === "pending")}
               />
-              <TablePagination ariaLabel="Accounts report transactions" currentPage={reportTransactionPage.page} pageSize={PAGE_SIZE} totalRows={reportTransactions.length}
+              <TablePagination ariaLabel="Accounts report transactions" currentPage={reportTransactionPage.page} pageSize={reportTransactionPage.pageSize} totalRows={reportTransactions.length}
                 hrefForPage={(page) => pageHref("reportTransactionsPage", page)} />
               <div className="grid gap-4 xl:grid-cols-2">
                 <SummaryTable title="Income by category" rows={[
@@ -585,7 +588,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                       ))}{!reportTransfers.length && <EmptyRow columns={3} text="No transfers were recorded for this period." />}</tbody>
                     </table>
                   </div>
-                  <TablePagination ariaLabel="Accounts report transfers" currentPage={reportTransferPage.page} pageSize={PAGE_SIZE} totalRows={reportTransfers.length}
+                  <TablePagination ariaLabel="Accounts report transfers" currentPage={reportTransferPage.page} pageSize={reportTransferPage.pageSize} totalRows={reportTransfers.length}
                     hrefForPage={(page) => pageHref("reportTransfersPage", page)} />
                 </section>
               </div>
