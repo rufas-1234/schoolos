@@ -56,3 +56,20 @@ export function analyticsRank(scores: Array<{ id: number; score: number }>): Map
   });
   return ranks;
 }
+
+export function analyzeSubjectLearners(
+  scores: Array<{ id: number; percentage: number }>,
+  bands: GradeBand[],
+  allowRanking: boolean,
+): Map<number, { grade: string | null; rank: number | null }> {
+  const ranks = allowRanking
+    ? analyticsRank(scores.map((entry) => ({ id: entry.id, score: entry.percentage })))
+    : new Map<number, number>();
+  return new Map(scores.map((entry) => [
+    entry.id,
+    {
+      grade: gradeForPercentage(entry.percentage, bands)?.grade ?? null,
+      rank: ranks.get(entry.id) ?? null,
+    },
+  ]));
+}

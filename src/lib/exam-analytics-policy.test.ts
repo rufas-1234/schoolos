@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  analyzeSubjectLearners,
   analyticsRank,
   gradeDistribution,
   summarizeExamScores,
@@ -48,5 +49,20 @@ describe("exam analytics policy", () => {
       { id: 1, score: 90 },
       { id: 3, score: 80 },
     ]).entries()]).toEqual([[1, 1], [2, 1], [3, 3]]);
+  });
+
+  it("calculates subject grades and class positions only when ranking is enabled", () => {
+    const scores = [
+      { id: 11, percentage: 90 },
+      { id: 12, percentage: 90 },
+      { id: 13, percentage: 55 },
+    ];
+    expect([...analyzeSubjectLearners(scores, bands, true)]).toEqual([
+      [11, { grade: "A", rank: 1 }],
+      [12, { grade: "A", rank: 1 }],
+      [13, { grade: "C", rank: 3 }],
+    ]);
+    expect([...analyzeSubjectLearners(scores, bands, false).values()])
+      .toEqual([{ grade: "A", rank: null }, { grade: "A", rank: null }, { grade: "C", rank: null }]);
   });
 });

@@ -23,7 +23,12 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { calculateWeightedAverage, gradeForPercentage, type GradeBand } from "@/lib/examination-policy";
-import { analyticsRank, gradeDistribution, summarizeExamScores } from "@/lib/exam-analytics-policy";
+import {
+  analyzeSubjectLearners,
+  analyticsRank,
+  gradeDistribution,
+  summarizeExamScores,
+} from "@/lib/exam-analytics-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { DownloadAnalyticsCsv } from "./download-analytics-csv";
 
@@ -339,6 +344,19 @@ export default async function ExamAnalyticsPage({
       enrolled: relevantResults.length,
     };
   });
+  const subjectLearnerDetails = new Map<number, Map<number, { grade: string | null; rank: number | null }>>();
+  for (const assessment of assessmentRows) {
+    const scores = cohortResults.flatMap((row) => {
+      const marks = row.marks.get(assessment.id);
+      return typeof marks === "number"
+        ? [{ id: row.enrollmentId, percentage: marks / Number(assessment.maxMarks) * 100 }]
+        : [];
+    });
+    subjectLearnerDetails.set(
+      assessment.id,
+      analyzeSubjectLearners(scores, bands, selectedExam?.allowRanking ?? false),
+    );
+  }
   const selectedSubjectIdentity = requestedSubjectId
     ? assessmentRows.find((item) => item.id === requestedSubjectId)?.subjectId ?? null
     : null;
@@ -450,7 +468,11 @@ export default async function ExamAnalyticsPage({
     "Mean grade",
     ...(selectedExam?.allowRanking ? ["Position"] : []),
     "Result status",
-    ...filteredOptions.map((item) => `${item.className} - ${item.subjectName} (%)`),
+    ...filteredOptions.flatMap((item) => [
+      `${item.className} - ${item.subjectName} (%)`,
+      `${item.className} - ${item.subjectName} grade`,
+      ...(selectedExam?.allowRanking ? [`${item.className} - ${item.subjectName} position`] : []),
+    ]),
   ];
   const csvRows = results.map((row) => [
     `${row.firstName} ${row.lastName}`,
@@ -463,9 +485,14 @@ export default async function ExamAnalyticsPage({
     row.complete ? "Complete" : "Incomplete",
     ...filteredOptions
       .filter((item) => item.classLevelId === row.classLevelId)
-      .map((item) => {
+      .flatMap((item) => {
         const marks = row.marks.get(item.id);
-        return typeof marks === "number" ? (marks / Number(item.maxMarks) * 100).toFixed(2) : "";
+        const detail = subjectLearnerDetails.get(item.id)?.get(row.enrollmentId);
+        return [
+          typeof marks === "number" ? (marks / Number(item.maxMarks) * 100).toFixed(2) : "",
+          detail?.grade ?? "",
+          ...(selectedExam?.allowRanking ? [detail?.rank ?? ""] : []),
+        ];
       }),
   ]);
   const schoolLogo = schoolLogoSource(school?.logoUrl ?? null);
@@ -662,14 +689,14 @@ export default async function ExamAnalyticsPage({
             ) : <p className="text-sm text-slate-500">No published subject marks match these filters.</p>}
           </AnalyticsPanel>
 
-          <AnalyticsPanel title={requestedStudentId ? "Student result detail" : "Student performance report"} description="Complete results are ranked using competition positions when ranking is enabled; missing marks remain visible as incomplete.">
+          <AnalyticsPanel title={requestedStudentId ? "Student result detail" : "Student performance report"} description="Subject grades use the selected examination grading scale. Subject positions use competition ranking when enabled and reflect the selected class / section cohort. Missing marks remain visible as incomplete.">
             {results.length ? (
               <div className="overflow-x-auto">
                 <table className="print-report-table w-full min-w-[780px] border-collapse text-left text-sm">
                   <thead><tr>
                     {selectedExam?.allowRanking && <th>Position</th>}
                     <th>Student</th><th>Class / section</th><th>Mean</th><th>Grade</th><th>Completion</th>
-                    {assessmentRows.map((item) => <th key={item.id}>{item.subjectName}</th>)}
+                    {assessmentRows.map((item) => <th key={item.id}>{item.subjectName}<span className="block text-xs font-normal text-slate-500">Score · Grade · Position</span></th>)}
                   </tr></thead>
                   <tbody>{[...results].sort((a, b) => {
                     if (a.mean === null && b.mean !== null) return 1;
@@ -686,7 +713,20 @@ export default async function ExamAnalyticsPage({
                       <td>{row.complete ? "Complete" : "Incomplete"}</td>
                       {assessmentRows.map((item) => {
                         const marks = row.marks.get(item.id);
-                        return <td key={item.id}>{typeof marks === "number" ? displayScore(marks / Number(item.maxMarks) * 100) : "—"}</td>;
+                        const detail = subjectLearnerDetails.get(item.id)?.get(row.enrollmentId);
+                        return (
+                          <td key={item.id}>
+                            {typeof marks === "number" ? (
+                              <>
+                                <span>{displayScore(marks / Number(item.maxMarks) * 100)}</span>
+                                <span className="block text-xs text-slate-500">
+                                  {detail?.grade ?? "Ungraded"}
+                                  {detail?.rank !== null && detail?.rank !== undefined ? ` · #${detail.rank}` : ""}
+                                </span>
+                              </>
+                            ) : "—"}
+                          </td>
+                        );
                       })}
                     </tr>
                   ))}</tbody>
