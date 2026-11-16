@@ -26,6 +26,76 @@ body {
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
 }
 
+html {
+  scroll-padding-top: 5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+.admin-shell-content,
+.admin-shell-main {
+  min-width: 0;
+}
+
+.admin-shell-content .overflow-x-auto {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.admin-shell-topbar {
+  height: auto;
+  min-height: calc(4rem + env(safe-area-inset-top));
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+  padding-top: env(safe-area-inset-top);
+}
+
+.admin-shell-sidebar {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+.admin-mobile-navigation-close {
+  right: max(1rem, env(safe-area-inset-right));
+  top: max(1rem, env(safe-area-inset-top));
+}
+
+@media (min-width: 768px) {
+  .admin-shell-topbar {
+    min-height: calc(4.75rem + env(safe-area-inset-top));
+    padding-left: max(2rem, env(safe-area-inset-left));
+    padding-right: max(2rem, env(safe-area-inset-right));
+  }
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
+  .admin-shell-topbar {
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+}
+
+@media (max-width: 639px) {
+  .admin-shell-main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  .admin-shell-main select,
+  .admin-shell-main textarea,
+  .admin-shell-topbar input {
+    font-size: 16px;
+  }
+
+  .admin-shell-main input[type="checkbox"],
+  .admin-shell-main input[type="radio"] {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .admin-quick-search-input::placeholder {
+    color: transparent;
+  }
+}
+
 h1,
 h2,
 h3,

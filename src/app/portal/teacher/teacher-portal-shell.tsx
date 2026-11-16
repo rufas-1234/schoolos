@@ -34,15 +34,15 @@ export function TeacherPortalShell({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-dvh bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4">
-          <Link href="/portal/teacher" className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4">
+          <Link href="/portal/teacher" className="flex min-w-0 items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-700 text-white">
               <GraduationCap size={24} aria-hidden="true" />
             </span>
-            <span>
-              <span className="block font-bold text-slate-950">{schoolName}</span>
+            <span className="min-w-0">
+              <span className="block max-w-[60vw] truncate font-bold text-slate-950 sm:max-w-none">{schoolName}</span>
               <span className="block text-xs text-slate-500">Teacher Portal</span>
             </span>
           </Link>
@@ -58,8 +58,8 @@ export function TeacherPortalShell({
             </button>
           </div>
         </div>
-        <nav aria-label="Teacher workspace" className="border-t border-slate-100">
-          <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 py-3">
+        <nav aria-label="Teacher workspace" className="overflow-x-auto overscroll-x-contain border-t border-slate-100">
+          <div className="mx-auto flex w-max min-w-full max-w-7xl flex-nowrap gap-2 px-3 py-3 sm:px-5">
             {[
               { href: "/admin/academics?section=years", label: "Manage academics" },
               { href: "/admin/students", label: "Student info" },

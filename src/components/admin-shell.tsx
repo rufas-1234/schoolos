@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BookOpen,
   BriefcaseBusiness,
@@ -178,6 +178,9 @@ export function AdminShell({
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const mobileNavigationRef = useRef<HTMLDivElement>(null);
+  const navigationTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeNavigationRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const routeQuery = searchParams.toString();
@@ -300,6 +303,45 @@ export function AdminShell({
       .forEach((link) => link.scrollIntoView({ block: "nearest" }));
   }, [open, pathname, routeQuery]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const navigationTrigger = navigationTriggerRef.current;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeNavigationRef.current?.focus();
+
+    function handleNavigationKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusableElements = mobileNavigationRef.current?.querySelectorAll<HTMLElement>(
+        "a[href], button:not([disabled]):not([data-drawer-backdrop])",
+      );
+      if (!focusableElements?.length) return;
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleNavigationKeyDown);
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.removeEventListener("keydown", handleNavigationKeyDown);
+      navigationTrigger?.focus();
+    };
+  }, [open]);
+
   async function signOut() {
     setSignOutError("");
     try {
@@ -316,7 +358,7 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <aside className="print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-100 bg-white px-5 py-6">
+    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-100 bg-white px-5 py-6">
       <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
           {schoolLogo
@@ -506,7 +548,7 @@ export function AdminShell({
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f7fa]">
+    <div className="min-h-dvh bg-[#f7f7fa]">
       <header className="admin-print-header" aria-label={`${schoolName} letterhead`}>
         <div className="admin-print-crest" aria-hidden="true">
           {schoolLogo
@@ -530,20 +572,36 @@ export function AdminShell({
       </header>
       <div className="print:hidden fixed inset-y-0 left-0 z-30 hidden lg:block">{sidebar}</div>
       {open && (
-        <div className="print:hidden fixed inset-0 z-40 lg:hidden">
+        <div
+          ref={mobileNavigationRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Main navigation"
+          className="print:hidden fixed inset-0 z-40 lg:hidden"
+        >
           <button
             aria-label="Close navigation"
+            data-drawer-backdrop
             className="absolute inset-0 bg-slate-950/30"
             onClick={() => setOpen(false)}
           />
-          <div className="relative h-full w-[280px]">{sidebar}</div>
+          <div className="relative h-dvh w-[min(280px,86vw)]">{sidebar}</div>
+          <button
+            ref={closeNavigationRef}
+            className="admin-mobile-navigation-close print:hidden fixed z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-lg lg:hidden"
+            onClick={() => setOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
 
       <div className="admin-shell-content lg:pl-[260px]">
-        <header className="print:hidden sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-100 bg-white/90 px-5 backdrop-blur md:px-8">
-          <div className="flex items-center gap-3">
+        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-100 bg-white/90 px-3 backdrop-blur sm:px-5 md:h-[76px] md:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <button
+              ref={navigationTriggerRef}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 lg:hidden"
               onClick={() => setOpen(true)}
               aria-label="Open navigation"
@@ -608,21 +666,12 @@ export function AdminShell({
             {signOutError}
           </p>
         )}
-        <main className="mx-auto max-w-[1500px] px-5 py-7 md:px-8 md:py-9">{children}</main>
+        <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>
       <footer className="admin-print-footer">
         <span>{schoolName} <span aria-hidden="true">•</span> Official school record</span>
         <span>Handle student information confidentially</span>
       </footer>
-      {open && (
-        <button
-          className="print:hidden fixed right-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-lg lg:hidden"
-          onClick={() => setOpen(false)}
-          aria-label="Close navigation"
-        >
-          <X size={18} />
-        </button>
-      )}
     </div>
   );
 }

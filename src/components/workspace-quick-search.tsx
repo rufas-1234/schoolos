@@ -107,7 +107,7 @@ export function WorkspaceQuickSearch() {
             : undefined
         }
         placeholder="Search students, staff, inventory, fees, accounts..."
-        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
+        className="admin-quick-search-input h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
       />
       {status === "searching" && normalizedQuery.length >= 2 && (
         <LoaderCircle

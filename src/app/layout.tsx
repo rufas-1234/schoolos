@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Inter, Open_Sans } from "next/font/google";
 import "./globals.css";
@@ -17,6 +17,13 @@ const displayFont = Open_Sans({
 export const metadata: Metadata = {
   title: "SchoolOS | School management",
   description: "A secure school management workspace.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#7027b8",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
