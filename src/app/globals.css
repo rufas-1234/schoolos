@@ -184,9 +184,8 @@ h6 {
 
 .exam-report-document .print-report-content,
 .exam-report-document .a4-report-card {
-  border: 3px double #263b63;
+  border: 1px solid #d6deea;
   background-color: #fff;
-  box-shadow: inset 0 0 0 2px #edf0f7;
 }
 
 .exam-report-document .print-report-heading,
@@ -711,8 +710,8 @@ h6 {
 
   body.print-exam-report[data-print-page-size="A4"] [data-print-target] {
     box-sizing: border-box !important;
-    width: 194mm !important;
-    max-width: 194mm !important;
+    width: 200mm !important;
+    max-width: 200mm !important;
     min-width: 0 !important;
     margin-right: auto !important;
     margin-left: auto !important;
@@ -720,8 +719,8 @@ h6 {
   }
 
   body.print-exam-report[data-print-page-size="A4"][data-print-orientation="landscape"] [data-print-target] {
-    width: 281mm !important;
-    max-width: 281mm !important;
+    width: 287mm !important;
+    max-width: 287mm !important;
   }
 
   body.print-exam-report [data-print-target] .overflow-x-auto {
@@ -771,7 +770,7 @@ h6 {
 
   .exam-report-document .print-report-content,
   .exam-report-document .a4-report-card {
-    border: 3px double #263b63 !important;
+    border: 0.35mm solid #9aa8bd !important;
     background: white !important;
   }
 
@@ -789,7 +788,7 @@ h6 {
     align-items: center;
     justify-content: center;
     min-height: 18mm;
-    border-bottom: 2px solid #263b63 !important;
+    border-bottom: 0.35mm solid #526583 !important;
     padding: 2mm 18mm 3mm !important;
     text-align: center;
   }
@@ -847,8 +846,8 @@ h6 {
   }
 
   .exam-report-document .a4-report-card {
-    border: 3px double #263b63 !important;
-    padding: 3mm !important;
+    border: 0.35mm solid #9aa8bd !important;
+    padding: 2mm !important;
     font-size: 8pt !important;
   }
 

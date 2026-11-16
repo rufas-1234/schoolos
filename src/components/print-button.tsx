@@ -41,7 +41,7 @@ export function printCurrentPage({
   const previousPrintOrientation = document.body.getAttribute("data-print-orientation");
   const pageStyle = document.createElement("style");
   pageStyle.dataset.adminPrintPage = "true";
-  pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: ${isExamReport ? "8mm" : "27mm 14mm 20mm"}; }`;
+  pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: ${isExamReport ? "5mm" : "27mm 14mm 20mm"}; }`;
   document.head.append(pageStyle);
   document.body.classList.add("print-target-active");
   if (isExamReport) document.body.classList.add("print-exam-report");
