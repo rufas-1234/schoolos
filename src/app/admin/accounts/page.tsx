@@ -15,6 +15,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { parseCostMinorUnits } from "@/lib/inventory-policy";
 import { DownloadCsv } from "@/components/download-csv";
 import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
+import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOption } from "./account-forms";
 
 export const dynamic = "force-dynamic";
@@ -321,21 +322,32 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
 
   return (
     <main className="space-y-6">
-      <header>
-        <p className="text-sm font-semibold text-violet-700">Finance</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-950">Accounts</h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">Manage income, operating expenses, bank accounts, transfers, and period-based profit and loss.</p>
+      <header className="rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-sm sm:p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Operations · Inventory module</p>
+        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{section === "expenses" ? "Expenses" : section === "reports" ? "Accounts reports" : "Accounts"}</h1>
+        <p className="mt-2 max-w-3xl text-sm text-violet-100">
+          {section === "expenses"
+            ? "Record and review operating expenses with approval status, categories, payees, and references."
+            : section === "reports"
+              ? "Review date-filtered income and expense activity, approval status, cash balances, and transfers."
+              : "Monitor school income, balances, transfers, and period-based profit and loss."}
+        </p>
       </header>
 
-      <nav aria-label="Accounts sections" className="flex flex-wrap gap-2">
-        {sections.map((item) => (
+      <InventoryModuleNav
+        active={section === "expenses" ? "expenses" : section === "reports" ? "reports" : "accounts"}
+        permissions={context.grantedPermissions}
+      />
+
+      {section !== "expenses" && section !== "reports" && <nav aria-label="Accounts sections" className="flex flex-wrap gap-2">
+        {sections.filter((item) => item.id !== "expenses" && item.id !== "reports").map((item) => (
           <a key={item.id} href={`/admin/accounts?section=${item.id}${item.id === "profit" ? `&from=${from}&to=${to}` : ""}`}
             aria-current={section === item.id ? "page" : undefined}
             className={`rounded-xl px-4 py-2 text-sm font-semibold ${section === item.id ? "bg-violet-700 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
             {item.label}
           </a>
         ))}
-      </nav>
+      </nav>}
 
       <section>
         <h2 className="mb-3 text-xl font-bold text-slate-900">{activeSection.label}</h2>

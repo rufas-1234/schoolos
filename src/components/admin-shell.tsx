@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PackageOpen,
   School,
   Settings,
   ShieldCheck,
@@ -108,11 +109,25 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
+    href: "/admin/inventory",
+    label: "Inventory",
+    icon: PackageOpen,
+    permission: "inventory.manage",
+    permissionAlternatives: ["accounts.manage"],
+    children: [
+      { id: "inventory", label: "Inventory", href: "/admin/inventory", matchPath: "/admin/inventory", matchQuery: { key: "section", value: null }, permission: "inventory.manage" },
+      { id: "accounts", label: "Accounts", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" }, permission: "accounts.manage" },
+      { id: "assets", label: "Assets", href: "/admin/inventory?section=assets", matchPath: "/admin/inventory", matchQuery: { key: "section", value: "assets" }, permission: "inventory.manage" },
+      { id: "expenses", label: "Expenses", href: "/admin/accounts?section=expenses", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "expenses" }, permission: "accounts.manage" },
+      { id: "inventory-reports", label: "Reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports", permission: "inventory.manage", permissionAlternatives: ["accounts.manage"] },
+    ],
+  },
+  {
     href: "/admin/fees/collection",
-    label: "Finances",
+    label: "Fees",
     icon: CircleDollarSign,
     permission: "fees.manage",
-    permissionAlternatives: ["payments.record", "accounts.manage", "inventory.manage"],
+    permissionAlternatives: ["payments.record"],
     children: [
       { id: "fee-setup", label: "Fee setup", href: "/admin/fees", permission: "fees.manage" },
       {
@@ -129,9 +144,6 @@ const navigation: NavigationItem[] = [
         permission: "payments.record",
         permissionAlternatives: ["fees.manage"],
       },
-      { id: "accounts", label: "Accounts", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", permission: "accounts.manage" },
-      { id: "inventory", label: "Inventory & assets", href: "/admin/inventory", matchPath: "/admin/inventory", permission: "inventory.manage" },
-      { id: "inventory-reports", label: "Inventory reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports", permission: "inventory.manage" },
     ],
   },
   {
@@ -178,19 +190,26 @@ export function AdminShell({
   const [humanResourcesOpen, setHumanResourcesOpen] = useState(() =>
     pathname.startsWith("/admin/hr") || pathname === "/admin/settings/roles",
   );
-  const [financesOpen, setFinancesOpen] = useState(() =>
-    permissions.some((permission) =>
-      ["fees.manage", "payments.record", "accounts.manage", "inventory.manage"].includes(permission)
-    ),
+  const [inventoryOpen, setInventoryOpen] = useState(() =>
+    pathname.startsWith("/admin/inventory") || pathname.startsWith("/admin/accounts") ||
+    permissions.some((permission) => ["inventory.manage", "accounts.manage"].includes(permission)),
+  );
+  const [feesOpen, setFeesOpen] = useState(() =>
+    pathname.startsWith("/admin/fees") ||
+    permissions.some((permission) => ["fees.manage", "payments.record"].includes(permission)),
   );
   const [examinationsOpen, setExaminationsOpen] = useState(() =>
     pathname.startsWith("/admin/examinations") || pathname === "/admin/exam-analytics",
   );
   const router = useRouter();
-  const visibleNavigation = navigation.filter((item) =>
-    permissions.includes(item.permission) ||
-    (item.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false)
-  );
+  const visibleNavigation = navigation
+    .filter((item) =>
+      permissions.includes(item.permission) ||
+      (item.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false)
+    )
+    .map((item) => item.label === "Inventory" && !permissions.includes("inventory.manage")
+      ? { ...item, href: "/admin/accounts?section=profit" }
+      : item);
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
   const homeHref = permissions.includes("dashboard.view")
     ? "/admin/dashboard"
@@ -204,12 +223,12 @@ export function AdminShell({
         ? "/admin/examinations"
       : permissions.includes("staff.manage")
         ? "/admin/hr"
-      : permissions.includes("fees.manage") || permissions.includes("payments.record")
-        ? "/admin/fees/collection"
-      : permissions.includes("accounts.manage")
-        ? "/admin/accounts?section=profit"
       : permissions.includes("inventory.manage")
         ? "/admin/inventory"
+      : permissions.includes("accounts.manage")
+        ? "/admin/accounts?section=profit"
+      : permissions.includes("fees.manage") || permissions.includes("payments.record")
+        ? "/admin/fees/collection"
       : permissions.includes("students.view")
         ? "/admin/students"
         : "/unauthorized";
@@ -236,8 +255,24 @@ export function AdminShell({
   const activeHrSection = navigation
     .find((item) => item.href === "/admin/hr")
     ?.children?.find((section) => section.href === pathname);
-  const activeFinanceSection = navigation
-    .find((item) => item.label === "Finances")
+  const activeInventorySection = navigation
+    .find((item) => item.label === "Inventory")
+    ?.children?.find((section) => {
+      const sectionPath = section.matchPath ?? section.href?.split("?")[0];
+      const sectionValue = section.matchQuery
+        ? searchParams.get(section.matchQuery.key)
+        : null;
+      const currentAccountsSection = searchParams.get("section");
+      return sectionPath === pathname &&
+        (!section.matchQuery || sectionValue === section.matchQuery.value ||
+          (section.id === "accounts" && (
+            sectionValue === null ||
+            (pathname === "/admin/accounts" &&
+              ["profit", "income", "chart", "bank", "transfers"].includes(currentAccountsSection ?? "profit"))
+          )));
+    });
+  const activeFeesSection = navigation
+    .find((item) => item.label === "Fees")
     ?.children?.find((section) => (section.matchPath ?? section.href?.split("?")[0]) === pathname);
   const pageLabel = pathname.startsWith("/admin/academics")
     ? activeSection?.label ?? "Academics"
@@ -247,8 +282,12 @@ export function AdminShell({
         ? activeHrSection?.label ?? "Human resources"
         : pathname === "/admin/settings/roles"
           ? activeHrSection?.label ?? "User roles"
-        : pathname.startsWith("/admin/fees") || pathname.startsWith("/admin/accounts") || pathname.startsWith("/admin/inventory")
-          ? activeFinanceSection?.label ?? "Finances"
+        : pathname.startsWith("/admin/accounts") || pathname.startsWith("/admin/inventory")
+          ? pathname.startsWith("/admin/accounts") && searchParams.get("section") === "reports"
+            ? "Reports"
+            : activeInventorySection?.label ?? "Inventory"
+        : pathname.startsWith("/admin/fees")
+          ? activeFeesSection?.label ?? "Fees"
         : pathname === "/admin/exam-analytics"
           ? "Exam Analytics"
       : visibleNavigation.find(
@@ -304,11 +343,11 @@ export function AdminShell({
             pathname === href ||
             (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
             (href === "/admin/examinations" && pathname === "/admin/exam-analytics") ||
-            (href === "/admin/fees/collection" && (
-              pathname.startsWith("/admin/fees") ||
-              pathname.startsWith("/admin/accounts") ||
-              pathname.startsWith("/admin/inventory")
+            (label === "Inventory" && (
+              pathname.startsWith("/admin/inventory") ||
+              pathname.startsWith("/admin/accounts")
             )) ||
+            (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees")) ||
             (href === "/admin/hr" && pathname === "/admin/settings/roles");
           if (children) {
             const visibleSections = children.filter(
@@ -316,16 +355,29 @@ export function AdminShell({
                 (!section.permission || permissions.includes(section.permission)) ||
                 (section.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false),
             );
+            const resolvedSections = visibleSections.map((section) =>
+              section.id === "inventory-reports" && !permissions.includes("inventory.manage")
+                ? {
+                    ...section,
+                    href: "/admin/accounts?section=reports",
+                    matchPath: "/admin/accounts",
+                    matchQuery: { key: "section", value: "reports" },
+                  }
+                : section,
+            );
             const isStudentInfo = href === "/admin/students";
             const isHumanResources = href === "/admin/hr";
-            const isFinances = href === "/admin/fees/collection";
+            const isInventory = label === "Inventory";
+            const isFees = href === "/admin/fees/collection";
             const isExaminations = href === "/admin/examinations";
             const sectionOpen = isStudentInfo
               ? studentInfoOpen
               : isHumanResources
                 ? humanResourcesOpen
-                : isFinances
-                  ? financesOpen
+                : isInventory
+                  ? inventoryOpen
+                : isFees
+                  ? feesOpen
                   : isExaminations
                     ? examinationsOpen
                   : academicsOpen;
@@ -333,18 +385,24 @@ export function AdminShell({
               ? setStudentInfoOpen
               : isHumanResources
                 ? setHumanResourcesOpen
-                : isFinances
-                  ? setFinancesOpen
+                : isInventory
+                  ? setInventoryOpen
+                : isFees
+                  ? setFeesOpen
                   : isExaminations
                     ? setExaminationsOpen
                   : setAcademicsOpen;
-            const activeChild = visibleSections.find((section) => {
+            const activeChild = resolvedSections.find((section) => {
               if (!section.href) return false;
               const sectionPath = section.matchPath ?? section.href.split("?")[0];
               return (
-                sectionPath === pathname &&
-                (!section.matchQuery ||
-                  searchParams.get(section.matchQuery.key) === section.matchQuery.value)
+                (sectionPath === pathname &&
+                  (!section.matchQuery ||
+                    searchParams.get(section.matchQuery.key) === section.matchQuery.value)) ||
+                (section.id === "inventory-reports" && pathname === "/admin/accounts" &&
+                  searchParams.get("section") === "reports") ||
+                (section.id === "accounts" && pathname === "/admin/accounts" &&
+                  ["profit", "income", "chart", "bank", "transfers"].includes(searchParams.get("section") ?? "profit"))
               );
             });
             return (
@@ -376,7 +434,7 @@ export function AdminShell({
                 </button>
                 {sectionOpen && (
                   <div className="ml-5 mt-1 space-y-1 border-l border-slate-100 pl-3">
-                    {visibleSections.map((section) => {
+                    {resolvedSections.map((section) => {
                       if (!section.href) {
                         return (
                           <span

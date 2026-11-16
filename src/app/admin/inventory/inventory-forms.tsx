@@ -96,12 +96,14 @@ function DescriptionField({ name = "description" }: { name?: string }) {
 }
 
 export function InventoryForms({
+  section,
   categories,
   suppliers,
   locations,
   items,
   assets,
 }: {
+  section: "inventory" | "assets";
   categories: InventoryOption[];
   suppliers: InventoryOption[];
   locations: InventoryOption[];
@@ -110,7 +112,7 @@ export function InventoryForms({
 }) {
   return (
     <div className="space-y-5">
-      <section>
+      {section === "inventory" && <section>
         <h2 className="mb-3 text-lg font-bold text-slate-900">Inventory setup</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <ActionForm action={createInventoryCategory} title="Add category">
@@ -140,10 +142,10 @@ export function InventoryForms({
             <DescriptionField />
           </ActionForm>
         </div>
-      </section>
+      </section>}
 
-      <section>
-        <h2 className="mb-3 text-lg font-bold text-slate-900">Stock and assets</h2>
+      {section === "inventory" && <section>
+        <h2 className="mb-3 text-lg font-bold text-slate-900">Stock movement</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <ActionForm action={recordInventoryMovement} title="Receive, issue, or adjust stock">
             <SelectField label="Item" name="itemId" options={items} />
@@ -162,6 +164,12 @@ export function InventoryForms({
             <TextField label="Reference" name="reference" required={false} />
             <TextField label="Note" name="note" required={false} />
           </ActionForm>
+        </div>
+      </section>}
+
+      {section === "assets" && <section>
+        <h2 className="mb-3 text-lg font-bold text-slate-900">Assets and maintenance</h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <ActionForm action={createInventoryAsset} title="Register school asset">
             <TextField label="Asset tag" name="assetTag" />
             <TextField label="Asset name" name="name" />
@@ -179,7 +187,7 @@ export function InventoryForms({
             <TextField label="Performed by" name="performedBy" required={false} />
           </ActionForm>
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

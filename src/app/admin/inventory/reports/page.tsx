@@ -14,6 +14,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { DownloadCsv } from "@/components/download-csv";
 import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
+import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -227,15 +228,23 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
 
   return (
     <main className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4 print:hidden">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-sm sm:p-8 print:hidden">
         <div>
-          <p className="text-sm font-semibold text-violet-700">Operations · Inventory</p>
-          <h1 className="mt-1 text-3xl font-bold text-slate-950">Inventory reports</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">Review current stock value, stock movement history, low-stock items, school assets, and maintenance costs.</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Operations · Inventory module</p>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Reports</h1>
+          <p className="mt-2 max-w-3xl text-sm text-violet-100">Review stock value, movements, low stock, assets, maintenance, and account activity.</p>
         </div>
-        <Link href="/admin/inventory" className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Inventory overview</Link>
       </header>
 
+      <InventoryModuleNav active="reports" permissions={context.grantedPermissions} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Inventory reports</h2>
+          <p className="text-sm text-slate-500">Choose a report or review accounts activity.</p>
+        </div>
+        <Link href="/admin/accounts?section=reports" className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-100 print:hidden">Open accounts reports</Link>
+      </div>
       <nav aria-label="Inventory reports" className="flex flex-wrap gap-2 print:hidden">
         {reports.map((item) => (
           <Link key={item.id} href={`/admin/inventory/reports?report=${item.id}&from=${from}&to=${to}${categoryId ? `&categoryId=${categoryId}` : ""}`}

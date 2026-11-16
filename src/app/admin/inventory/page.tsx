@@ -12,7 +12,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { InventoryForms, AssetLocationForm, type InventoryOption } from "./inventory-forms";
-import Link from "next/link";
+import { InventoryModuleNav } from "./module-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +24,11 @@ function formatDate(value: Date | string): string {
   return value instanceof Date ? value.toLocaleString() : value;
 }
 
-export default async function InventoryPage() {
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ section?: string | string[] }> }) {
   const context = await requireSchoolPermission("inventory.manage");
+  const query = await searchParams;
+  const requestedSection = Array.isArray(query.section) ? query.section[0] : query.section;
+  const section = requestedSection === "assets" ? "assets" : "inventory";
   const [
     school,
     categories,
@@ -136,30 +139,42 @@ export default async function InventoryPage() {
   const lowStock = items.filter((item) => item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel));
   const stockValue = items.reduce((total, item) =>
     total + Number(item.quantityOnHand) * Number(item.averageUnitCost), 0);
+  const assetValue = assets.reduce((total, asset) => total + Number(asset.acquisitionCost), 0);
   const hasDemoRows = items.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
     || assets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "));
   const currency = school?.currency ?? "USD";
 
   return (
-    <main className="space-y-8">
-      <header>
-        <p className="text-sm font-semibold text-violet-700">Operations</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-950">Inventory &amp; Assets</h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">
-          Track supplies from receipt to issue, monitor reorder levels, and maintain a register of school assets and repairs.
+    <main className="space-y-6">
+      <header className="rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-sm sm:p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Operations · Inventory module</p>
+        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{section === "assets" ? "School assets" : "Inventory"}</h1>
+        <p className="mt-2 max-w-3xl text-sm text-violet-100">
+          {section === "assets"
+            ? "Register school property, track locations and lifecycle status, and keep maintenance records together."
+            : "Manage stock categories, suppliers, quantities, receipts, issues, adjustments, and reorder levels."}
         </p>
-        <Link href="/admin/inventory/reports" className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View inventory reports</Link>
       </header>
+      <InventoryModuleNav active={section} permissions={context.grantedPermissions} />
       {hasDemoRows && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY items and assets are included in these counts and values as workflow examples; they are not real stock or school property.</p>}
 
-      <section aria-label="Inventory overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Active items" value={String(items.filter((item) => item.status === "active").length)} />
-        <Metric label="Low stock" value={String(lowStock.length)} tone={lowStock.length ? "amber" : "normal"} />
-        <Metric label="Stock on hand value" value={formatCurrency(stockValue, currency)} />
-        <Metric label="Registered assets" value={String(assets.length)} />
-      </section>
+      {section === "inventory" ? (
+        <section aria-label="Inventory overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Active items" value={String(items.filter((item) => item.status === "active").length)} />
+          <Metric label="Low stock" value={String(lowStock.length)} tone={lowStock.length ? "amber" : "normal"} />
+          <Metric label="Stock on hand value" value={formatCurrency(stockValue, currency)} />
+          <Metric label="Categories" value={String(categories.length)} />
+        </section>
+      ) : (
+        <section aria-label="Asset overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Registered assets" value={String(assets.length)} />
+          <Metric label="Active assets" value={String(assets.filter((asset) => asset.status === "active").length)} />
+          <Metric label="Acquisition value" value={formatCurrency(assetValue, currency)} />
+          <Metric label="Maintenance records" value={String(maintenance.length)} />
+        </section>
+      )}
 
-      {lowStock.length > 0 && (
+      {section === "inventory" && lowStock.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="font-bold text-amber-950">Low-stock notification</h2>
           <p className="mt-1 text-sm text-amber-900">Items at or below their configured reorder level need attention.</p>
@@ -173,9 +188,9 @@ export default async function InventoryPage() {
         </section>
       )}
 
-      <InventoryForms categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions} />
+      <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions} />
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {section === "inventory" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5">
           <h2 className="text-lg font-bold text-slate-900">Stock register</h2>
           <p className="mt-1 text-sm text-slate-500">Current quantities and average acquisition cost by item.</p>
@@ -201,9 +216,9 @@ export default async function InventoryPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {section === "assets" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5">
           <h2 className="text-lg font-bold text-slate-900">School asset register</h2>
           <p className="mt-1 text-sm text-slate-500">Record asset movements, lifecycle status, and maintenance history.</p>
@@ -228,48 +243,48 @@ export default async function InventoryPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Recent stock movements</h2></div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / item</th><th className="px-4 py-3">Movement</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Balance</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {movements.map((movement, index) => (
-                  <tr key={`${movement.itemName}-${movement.createdAt.toISOString()}-${index}`}>
-                    <td className="px-4 py-3">{formatDate(movement.createdAt)}<span className="block text-xs text-slate-500">{movement.itemName} · {movement.sku}</span></td>
-                    <td className="px-4 py-3 capitalize">{movement.movementType}</td>
-                    <td className="px-4 py-3 tabular-nums">{movement.quantity} {movement.unit}</td>
-                    <td className="px-4 py-3 tabular-nums">{movement.quantityAfter} {movement.unit}</td>
-                  </tr>
-                ))}
-                {!movements.length && <EmptyRow columns={4} text="No stock movements have been recorded." />}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Asset maintenance log</h2></div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / asset</th><th className="px-4 py-3">Work performed</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Provider</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {maintenance.map((record, index) => (
-                  <tr key={`${record.assetTag}-${record.maintenanceDate}-${index}`}>
-                    <td className="px-4 py-3">{record.maintenanceDate}<span className="block text-xs text-slate-500">{record.assetTag} · {record.assetName}</span></td>
-                    <td className="px-4 py-3">{record.description}</td>
-                    <td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td>
-                    <td className="px-4 py-3">{record.performedBy ?? "—"}</td>
-                  </tr>
-                ))}
-                {!maintenance.length && <EmptyRow columns={4} text="No maintenance has been logged." />}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
+      {section === "inventory" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Recent stock movements</h2></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / item</th><th className="px-4 py-3">Movement</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Balance</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {movements.map((movement, index) => (
+                <tr key={`${movement.itemName}-${movement.createdAt.toISOString()}-${index}`}>
+                  <td className="px-4 py-3">{formatDate(movement.createdAt)}<span className="block text-xs text-slate-500">{movement.itemName} · {movement.sku}</span></td>
+                  <td className="px-4 py-3 capitalize">{movement.movementType}</td>
+                  <td className="px-4 py-3 tabular-nums">{movement.quantity} {movement.unit}</td>
+                  <td className="px-4 py-3 tabular-nums">{movement.quantityAfter} {movement.unit}</td>
+                </tr>
+              ))}
+              {!movements.length && <EmptyRow columns={4} text="No stock movements have been recorded." />}
+            </tbody>
+          </table>
+        </div>
+      </section>}
+
+      {section === "assets" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Asset maintenance log</h2></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / asset</th><th className="px-4 py-3">Work performed</th><th className="px-4 py-3">Cost</th><th className="px-4 py-3">Provider</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {maintenance.map((record, index) => (
+                <tr key={`${record.assetTag}-${record.maintenanceDate}-${index}`}>
+                  <td className="px-4 py-3">{record.maintenanceDate}<span className="block text-xs text-slate-500">{record.assetTag} · {record.assetName}</span></td>
+                  <td className="px-4 py-3">{record.description}</td>
+                  <td className="px-4 py-3">{formatCurrency(record.cost, currency)}</td>
+                  <td className="px-4 py-3">{record.performedBy ?? "—"}</td>
+                </tr>
+              ))}
+              {!maintenance.length && <EmptyRow columns={4} text="No maintenance has been logged." />}
+            </tbody>
+          </table>
+        </div>
+      </section>}
+
     </main>
   );
 }
