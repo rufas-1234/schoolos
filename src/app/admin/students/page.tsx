@@ -473,6 +473,7 @@ export default async function StudentsPage({
           ) : null}
           rows={records.map((record) => ({
             id: record.id,
+            clickableColumns: ["name"],
             values: {
               studentId: record.publicId,
               admissionNumber: record.admissionNumber ?? "",

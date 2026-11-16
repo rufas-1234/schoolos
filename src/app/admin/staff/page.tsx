@@ -207,6 +207,7 @@ export default async function StaffDirectoryPage() {
           }
           rows={records.map((record) => ({
             id: record.id,
+            clickableColumns: ["name"],
             values: {
               employeeCode: record.employeeCode ?? "",
               name: `${record.firstName} ${record.lastName}`,

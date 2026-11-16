@@ -31,6 +31,7 @@ export type AdminTableRow = {
   id: string | number;
   values: Record<string, string>;
   searchableText?: string;
+  clickableColumns?: string[];
   actions?: ReactNode;
 };
 
@@ -90,6 +91,7 @@ export function AdminRecordDialog({
   mode = "edit",
   wide = false,
   showLabel = false,
+  triggerLabel,
   initialOpen = false,
   children,
 }: {
@@ -97,6 +99,7 @@ export function AdminRecordDialog({
   mode?: "view" | "edit";
   wide?: boolean;
   showLabel?: boolean;
+  triggerLabel?: string;
   initialOpen?: boolean;
   children: ReactNode;
 }) {
@@ -116,10 +119,16 @@ export function AdminRecordDialog({
         onClick={() => dialogRef.current?.showModal()}
         aria-label={`${actionLabel} ${title}`}
         title={`${actionLabel} ${title}`}
-        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${showLabel ? "px-2.5" : "w-9"}`}
+        className={triggerLabel
+          ? "text-left font-semibold text-violet-800 underline decoration-violet-300 underline-offset-2 hover:text-violet-950 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+          : `inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${showLabel ? "px-2.5" : "w-9"}`}
       >
-        <Icon size={16} aria-hidden="true" />
-        <span className={showLabel ? "" : "sr-only"}>{actionLabel}</span>
+        {triggerLabel ? triggerLabel : (
+          <>
+            <Icon size={16} aria-hidden="true" />
+            <span className={showLabel ? "" : "sr-only"}>{actionLabel}</span>
+          </>
+        )}
       </button>
       <dialog
         ref={dialogRef}
@@ -449,7 +458,17 @@ export function AdminDataTable({
                     )}
                     {columns.map((column) => (
                       <td key={column.key} className="px-4 py-3">
-                        {row.values[column.key] || <span className="text-slate-400">—</span>}
+                        {row.values[column.key] ? (
+                          row.clickableColumns?.includes(column.key) ? (
+                            <AdminRecordDialog
+                              mode="view"
+                              title={row.values[column.key]}
+                              triggerLabel={row.values[column.key]}
+                            >
+                              <RecordDetails columns={columns} values={row.values} />
+                            </AdminRecordDialog>
+                          ) : row.values[column.key]
+                        ) : <span className="text-slate-400">—</span>}
                       </td>
                     ))}
                     {hasActions && (
