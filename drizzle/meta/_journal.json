@@ -253,6 +253,13 @@
       "when": 1794787200000,
       "tag": "0035_report_card_fee_balance",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "5",
+      "when": 1794789129140,
+      "tag": "0036_whole_warlock",
+      "breakpoints": true
     }
   ]
 }

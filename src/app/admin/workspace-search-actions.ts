@@ -139,6 +139,17 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("fee-collection", "Fee collection", "Find invoices and record payments", "/admin/fees/collection", ["fees", "invoice", "payment"]);
     addPage("fee-reports", "Fee reports", "Collection and outstanding balance reports", "/admin/fees/reports", ["report", "reports", "balance", "finance"]);
   }
+  if (permissions.has("accounts.manage")) {
+    addPage("accounts-profit", "Profit & Loss", "Income statement for an accounting period", "/admin/accounts?section=profit", ["profit", "loss", "income statement"]);
+    addPage("accounts-income", "Income", "Record and review other school income", "/admin/accounts?section=income", ["donations", "grants"]);
+    addPage("accounts-expenses", "Expenses", "Record and approve operational expenses", "/admin/accounts?section=expenses", ["staff expenses", "supplies", "utilities", "transport", "maintenance"]);
+    addPage("accounts-chart", "Chart of accounts", "Manage accounting codes and reporting categories", "/admin/accounts?section=chart", ["account categories", "ledger"]);
+    addPage("accounts-bank", "Bank accounts", "School bank and cash accounts with balances", "/admin/accounts?section=bank", ["cash account"]);
+    addPage("accounts-transfers", "Fund transfers", "Move funds between school bank accounts", "/admin/accounts?section=transfers", ["bank transfer"]);
+  }
+  if (permissions.has("inventory.manage")) {
+    addPage("school-inventory", "Inventory & assets", "Stock register, suppliers, asset locations, maintenance, and low-stock alerts", "/admin/inventory", ["stock", "supplies", "supplier", "asset", "low stock"]);
+  }
   if (permissions.has("roles.manage")) {
     addPage("user-roles", "User roles", "Users, roles and permission assignments", "/admin/settings/roles", ["permissions", "accounts"]);
   }

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db, pool } from "../src/db";
 import {
   account,
+  chartOfAccounts,
   permissions,
   rolePermissions,
   roles,
@@ -35,6 +36,8 @@ const permissionCatalog = [
   ["results.enter", "Enter marks for assigned assessments"],
   ["results.publish", "Approve and publish results"],
   ["fees.manage", "Manage fee structures"],
+  ["inventory.manage", "Manage school inventory and assets"],
+  ["accounts.manage", "Manage school accounts, income, expenses, and reports"],
   ["fees.balance.view", "View outstanding student fee balances"],
   ["payments.record", "Record school payments"],
   ["reports.export", "Export school reports"],
@@ -54,6 +57,21 @@ const initialRoles = [
   "Transport manager",
   "Hostel administrator",
   "Human resources officer",
+] as const;
+
+const defaultChartAccounts = [
+  ["1000", "Cash on hand", "asset", "Cash held by the school"],
+  ["1010", "Bank account clearing", "asset", "Control account for school bank accounts"],
+  ["2000", "Accounts payable", "liability", "Amounts owed to suppliers and service providers"],
+  ["3000", "Accumulated school funds", "equity", "Opening and retained school funds"],
+  ["4000", "School fee income", "income", "Tuition and other student fee receipts"],
+  ["4100", "Other income", "income", "Donations, grants, and miscellaneous income"],
+  ["5000", "Staff expenses", "expense", "Salaries, allowances, and staff-related costs"],
+  ["5100", "School supplies", "expense", "Teaching, office, and classroom supplies"],
+  ["5200", "Utilities", "expense", "Electricity, water, internet, and other utilities"],
+  ["5300", "Transport costs", "expense", "School transport and travel costs"],
+  ["5400", "Repairs and maintenance", "expense", "School facility, equipment, and asset maintenance"],
+  ["5500", "Other operating expenses", "expense", "Other approved operating costs"],
 ] as const;
 
 async function seed() {
@@ -113,6 +131,21 @@ async function seed() {
       [school] = await tx.select({ id: schools.id }).from(schools).where(eq(schools.name, schoolName)).limit(1);
     }
     if (!school) throw new Error("The school record could not be created.");
+
+    for (const [code, accountName, accountType, description] of defaultChartAccounts) {
+      const [existingAccount] = await tx.select({ id: chartOfAccounts.id }).from(chartOfAccounts)
+        .where(and(eq(chartOfAccounts.schoolId, school.id), eq(chartOfAccounts.code, code))).limit(1);
+      if (!existingAccount) {
+        await tx.insert(chartOfAccounts).values({
+          publicId: randomUUID(),
+          schoolId: school.id,
+          code,
+          name: accountName,
+          accountType,
+          description,
+        });
+      }
+    }
 
     const [mainBranch] = await tx
       .select({ id: schoolBranches.id })
@@ -205,6 +238,8 @@ async function seed() {
       "fees.manage",
       "fees.balance.view",
       "payments.record",
+      "accounts.manage",
+      "inventory.manage",
       "reports.export",
       "examinations.create",
       "examinations.delete",
@@ -309,8 +344,14 @@ async function seed() {
     const financePermissions = await tx
       .select({ id: permissions.id })
       .from(permissions)
-      .where(inArray(permissions.key, ["fees.manage", "payments.record", "reports.export"]));
-    if (!accountantRole || financePermissions.length !== 3) {
+      .where(inArray(permissions.key, [
+        "fees.manage",
+        "payments.record",
+        "reports.export",
+        "accounts.manage",
+        "inventory.manage",
+      ]));
+    if (!accountantRole || financePermissions.length !== 5) {
       throw new Error("The Accountant role or finance permissions could not be created.");
     }
     const existingAccountantPermissions = new Set(

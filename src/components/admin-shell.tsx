@@ -112,7 +112,7 @@ const navigation: NavigationItem[] = [
     label: "Finances",
     icon: CircleDollarSign,
     permission: "fees.manage",
-    permissionAlternatives: ["payments.record"],
+    permissionAlternatives: ["payments.record", "accounts.manage", "inventory.manage"],
     children: [
       { id: "fee-setup", label: "Fee setup", href: "/admin/fees", permission: "fees.manage" },
       {
@@ -129,6 +129,8 @@ const navigation: NavigationItem[] = [
         permission: "payments.record",
         permissionAlternatives: ["fees.manage"],
       },
+      { id: "accounts", label: "Accounts", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", permission: "accounts.manage" },
+      { id: "inventory", label: "Inventory & assets", href: "/admin/inventory", matchPath: "/admin/inventory", permission: "inventory.manage" },
     ],
   },
   {
@@ -176,7 +178,7 @@ export function AdminShell({
     pathname.startsWith("/admin/hr") || pathname === "/admin/settings/roles",
   );
   const [financesOpen, setFinancesOpen] = useState(() =>
-    pathname.startsWith("/admin/fees"),
+    pathname.startsWith("/admin/fees") || pathname.startsWith("/admin/accounts") || pathname.startsWith("/admin/inventory"),
   );
   const [examinationsOpen, setExaminationsOpen] = useState(() =>
     pathname.startsWith("/admin/examinations") || pathname === "/admin/exam-analytics",
@@ -201,6 +203,10 @@ export function AdminShell({
         ? "/admin/hr"
       : permissions.includes("fees.manage") || permissions.includes("payments.record")
         ? "/admin/fees/collection"
+      : permissions.includes("accounts.manage")
+        ? "/admin/accounts?section=profit"
+      : permissions.includes("inventory.manage")
+        ? "/admin/inventory"
       : permissions.includes("students.view")
         ? "/admin/students"
         : "/unauthorized";
@@ -229,7 +235,7 @@ export function AdminShell({
     ?.children?.find((section) => section.href === pathname);
   const activeFinanceSection = navigation
     .find((item) => item.label === "Finances")
-    ?.children?.find((section) => section.href === pathname);
+    ?.children?.find((section) => (section.matchPath ?? section.href?.split("?")[0]) === pathname);
   const pageLabel = pathname.startsWith("/admin/academics")
     ? activeSection?.label ?? "Academics"
     : pathname.startsWith("/admin/students")
@@ -238,7 +244,7 @@ export function AdminShell({
         ? activeHrSection?.label ?? "Human resources"
         : pathname === "/admin/settings/roles"
           ? activeHrSection?.label ?? "User roles"
-        : pathname.startsWith("/admin/fees")
+        : pathname.startsWith("/admin/fees") || pathname.startsWith("/admin/accounts") || pathname.startsWith("/admin/inventory")
           ? activeFinanceSection?.label ?? "Finances"
         : pathname === "/admin/exam-analytics"
           ? "Exam Analytics"
@@ -295,7 +301,11 @@ export function AdminShell({
             pathname === href ||
             (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
             (href === "/admin/examinations" && pathname === "/admin/exam-analytics") ||
-            (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees")) ||
+            (href === "/admin/fees/collection" && (
+              pathname.startsWith("/admin/fees") ||
+              pathname.startsWith("/admin/accounts") ||
+              pathname.startsWith("/admin/inventory")
+            )) ||
             (href === "/admin/hr" && pathname === "/admin/settings/roles");
           if (children) {
             const visibleSections = children.filter(

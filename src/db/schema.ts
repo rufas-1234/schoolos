@@ -1729,3 +1729,236 @@ export const auditLogs = mysqlTable(
     index("audit_logs_actor_created_idx").on(table.actorUserId, table.createdAt),
   ],
 );
+
+export const inventoryCategories = mysqlTable(
+  "inventory_categories",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: varchar("description", { length: 500 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("inventory_categories_school_name_uq").on(table.schoolId, table.name),
+    index("inventory_categories_school_idx").on(table.schoolId),
+  ],
+);
+
+export const inventorySuppliers = mysqlTable(
+  "inventory_suppliers",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    name: varchar("name", { length: 160 }).notNull(),
+    contactName: varchar("contactName", { length: 160 }),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 40 }),
+    address: varchar("address", { length: 1000 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("inventory_suppliers_school_name_uq").on(table.schoolId, table.name),
+    index("inventory_suppliers_school_idx").on(table.schoolId),
+  ],
+);
+
+export const inventoryLocations = mysqlTable(
+  "inventory_locations",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: varchar("description", { length: 500 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("inventory_locations_school_name_uq").on(table.schoolId, table.name),
+    index("inventory_locations_school_idx").on(table.schoolId),
+  ],
+);
+
+export const inventoryItems = mysqlTable(
+  "inventory_items",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    categoryId: bigint("categoryId", { mode: "number", unsigned: true }).notNull().references(() => inventoryCategories.id),
+    supplierId: bigint("supplierId", { mode: "number", unsigned: true }).references(() => inventorySuppliers.id),
+    locationId: bigint("locationId", { mode: "number", unsigned: true }).references(() => inventoryLocations.id),
+    sku: varchar("sku", { length: 80 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    description: varchar("description", { length: 1000 }),
+    unit: varchar("unit", { length: 40 }).notNull(),
+    quantityOnHand: decimal("quantityOnHand", { precision: 12, scale: 3 }).notNull().default("0"),
+    reorderLevel: decimal("reorderLevel", { precision: 12, scale: 3 }).notNull().default("0"),
+    averageUnitCost: decimal("averageUnitCost", { precision: 12, scale: 2 }).notNull().default("0"),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("inventory_items_school_sku_uq").on(table.schoolId, table.sku),
+    index("inventory_items_school_category_idx").on(table.schoolId, table.categoryId),
+    index("inventory_items_school_stock_idx").on(table.schoolId, table.quantityOnHand),
+  ],
+);
+
+export const inventoryMovements = mysqlTable(
+  "inventory_movements",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    itemId: bigint("itemId", { mode: "number", unsigned: true }).notNull().references(() => inventoryItems.id),
+    supplierId: bigint("supplierId", { mode: "number", unsigned: true }).references(() => inventorySuppliers.id),
+    locationId: bigint("locationId", { mode: "number", unsigned: true }).references(() => inventoryLocations.id),
+    movementType: varchar("movementType", { length: 20 }).notNull(),
+    quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull(),
+    quantityBefore: decimal("quantityBefore", { precision: 12, scale: 3 }).notNull(),
+    quantityAfter: decimal("quantityAfter", { precision: 12, scale: 3 }).notNull(),
+    unitCost: decimal("unitCost", { precision: 12, scale: 2 }).notNull().default("0"),
+    reference: varchar("reference", { length: 120 }),
+    note: varchar("note", { length: 500 }),
+    recordedBy: varchar("recordedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("inventory_movements_school_item_date_idx").on(table.schoolId, table.itemId, table.createdAt),
+    index("inventory_movements_school_type_date_idx").on(table.schoolId, table.movementType, table.createdAt),
+  ],
+);
+
+export const inventoryAssets = mysqlTable(
+  "inventory_assets",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    itemId: bigint("itemId", { mode: "number", unsigned: true }).references(() => inventoryItems.id),
+    locationId: bigint("locationId", { mode: "number", unsigned: true }).references(() => inventoryLocations.id),
+    assetTag: varchar("assetTag", { length: 80 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    description: varchar("description", { length: 1000 }),
+    acquiredAt: date("acquiredAt", { mode: "string" }).notNull(),
+    acquisitionCost: decimal("acquisitionCost", { precision: 12, scale: 2 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("inventory_assets_school_tag_uq").on(table.schoolId, table.assetTag),
+    index("inventory_assets_school_location_idx").on(table.schoolId, table.locationId),
+  ],
+);
+
+export const assetMaintenance = mysqlTable(
+  "asset_maintenance",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    assetId: bigint("assetId", { mode: "number", unsigned: true }).notNull().references(() => inventoryAssets.id),
+    maintenanceDate: date("maintenanceDate", { mode: "string" }).notNull(),
+    description: varchar("description", { length: 1000 }).notNull(),
+    cost: decimal("cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    performedBy: varchar("performedBy", { length: 160 }),
+    recordedBy: varchar("recordedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [index("asset_maintenance_school_asset_date_idx").on(table.schoolId, table.assetId, table.maintenanceDate)],
+);
+
+export const chartOfAccounts = mysqlTable(
+  "chart_of_accounts",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    code: varchar("code", { length: 30 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    accountType: varchar("accountType", { length: 20 }).notNull(),
+    description: varchar("description", { length: 500 }),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("chart_of_accounts_school_code_uq").on(table.schoolId, table.code),
+    index("chart_of_accounts_school_type_idx").on(table.schoolId, table.accountType),
+  ],
+);
+
+export const schoolBankAccounts = mysqlTable(
+  "school_bank_accounts",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    chartAccountId: bigint("chartAccountId", { mode: "number", unsigned: true }).notNull().references(() => chartOfAccounts.id),
+    bankName: varchar("bankName", { length: 160 }).notNull(),
+    accountName: varchar("accountName", { length: 160 }).notNull(),
+    accountNumberLast4: varchar("accountNumberLast4", { length: 4 }),
+    openingBalance: decimal("openingBalance", { precision: 12, scale: 2 }).notNull().default("0"),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("school_bank_accounts_school_name_uq").on(table.schoolId, table.accountName),
+    index("school_bank_accounts_school_status_idx").on(table.schoolId, table.status),
+  ],
+);
+
+export const accountTransactions = mysqlTable(
+  "account_transactions",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    transactionType: varchar("transactionType", { length: 20 }).notNull(),
+    categoryAccountId: bigint("categoryAccountId", { mode: "number", unsigned: true }).notNull().references(() => chartOfAccounts.id),
+    bankAccountId: bigint("bankAccountId", { mode: "number", unsigned: true }).references(() => schoolBankAccounts.id),
+    transactionDate: date("transactionDate", { mode: "string" }).notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    description: varchar("description", { length: 1000 }).notNull(),
+    payee: varchar("payee", { length: 200 }),
+    reference: varchar("reference", { length: 120 }),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    submittedBy: varchar("submittedBy", { length: 36 }).notNull().references(() => user.id),
+    approvedBy: varchar("approvedBy", { length: 36 }).references(() => user.id),
+    approvedAt: timestamp("approvedAt"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("account_transactions_school_type_date_idx").on(table.schoolId, table.transactionType, table.transactionDate),
+    index("account_transactions_school_status_date_idx").on(table.schoolId, table.status, table.transactionDate),
+    index("account_transactions_school_bank_idx").on(table.schoolId, table.bankAccountId),
+  ],
+);
+
+export const fundTransfers = mysqlTable(
+  "fund_transfers",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    sourceBankAccountId: bigint("sourceBankAccountId", { mode: "number", unsigned: true }).notNull().references(() => schoolBankAccounts.id),
+    destinationBankAccountId: bigint("destinationBankAccountId", { mode: "number", unsigned: true }).notNull().references(() => schoolBankAccounts.id),
+    transferDate: date("transferDate", { mode: "string" }).notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    reference: varchar("reference", { length: 120 }),
+    note: varchar("note", { length: 500 }),
+    recordedBy: varchar("recordedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [index("fund_transfers_school_date_idx").on(table.schoolId, table.transferDate)],
+);
