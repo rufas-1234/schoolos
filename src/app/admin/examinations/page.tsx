@@ -638,19 +638,9 @@ export default async function ExaminationsPage({
       )}
 
       {section === "schedule" && (
-        <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
+        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="text-xl font-bold text-slate-950">Exam schedule</h2>
-          <p className="text-sm text-slate-500">Create an exam schedule or review assessment dates, classes, subjects, and marks status.</p>
-          {canConfigure && (
-            <CreateExaminationForm
-              years={years}
-              terms={terms}
-              branches={branches}
-              classes={classes}
-              today={today}
-              intent="schedule"
-            />
-          )}
+          <p className="text-sm text-slate-500">Review assessment dates, classes, subjects, and marks status. Create exams in Exam Setup and edit their schedules here.</p>
           {assessmentFilterForm("schedule")}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
