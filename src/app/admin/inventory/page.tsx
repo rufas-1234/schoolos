@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { InventoryForms, AssetLocationForm, type InventoryOption } from "./inventory-forms";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +136,8 @@ export default async function InventoryPage() {
   const lowStock = items.filter((item) => item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel));
   const stockValue = items.reduce((total, item) =>
     total + Number(item.quantityOnHand) * Number(item.averageUnitCost), 0);
+  const hasDemoRows = items.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
+    || assets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "));
   const currency = school?.currency ?? "USD";
 
   return (
@@ -145,7 +148,9 @@ export default async function InventoryPage() {
         <p className="mt-2 max-w-3xl text-sm text-slate-600">
           Track supplies from receipt to issue, monitor reorder levels, and maintain a register of school assets and repairs.
         </p>
+        <Link href="/admin/inventory/reports" className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View inventory reports</Link>
       </header>
+      {hasDemoRows && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY items and assets are included in these counts and values as workflow examples; they are not real stock or school property.</p>}
 
       <section aria-label="Inventory overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Active items" value={String(items.filter((item) => item.status === "active").length)} />

@@ -131,6 +131,7 @@ const navigation: NavigationItem[] = [
       },
       { id: "accounts", label: "Accounts", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", permission: "accounts.manage" },
       { id: "inventory", label: "Inventory & assets", href: "/admin/inventory", matchPath: "/admin/inventory", permission: "inventory.manage" },
+      { id: "inventory-reports", label: "Inventory reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports", permission: "inventory.manage" },
     ],
   },
   {

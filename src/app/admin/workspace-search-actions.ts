@@ -141,6 +141,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (permissions.has("accounts.manage")) {
     addPage("accounts-profit", "Profit & Loss", "Income statement for an accounting period", "/admin/accounts?section=profit", ["profit", "loss", "income statement"]);
+    addPage("accounts-reports", "Accounts reports", "Filtered income, expense, approval and net-fee reports", "/admin/accounts?section=reports", ["account reports", "transaction report", "income report", "expense report"]);
     addPage("accounts-income", "Income", "Record and review other school income", "/admin/accounts?section=income", ["donations", "grants"]);
     addPage("accounts-expenses", "Expenses", "Record and approve operational expenses", "/admin/accounts?section=expenses", ["staff expenses", "supplies", "utilities", "transport", "maintenance"]);
     addPage("accounts-chart", "Chart of accounts", "Manage accounting codes and reporting categories", "/admin/accounts?section=chart", ["account categories", "ledger"]);
@@ -149,6 +150,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (permissions.has("inventory.manage")) {
     addPage("school-inventory", "Inventory & assets", "Stock register, suppliers, asset locations, maintenance, and low-stock alerts", "/admin/inventory", ["stock", "supplies", "supplier", "asset", "low stock"]);
+    addPage("inventory-reports", "Inventory reports", "Stock valuation, low-stock, movement, asset, and maintenance reports", "/admin/inventory/reports", ["inventory reports", "stock valuation", "stock movement", "asset report", "maintenance report"]);
   }
   if (permissions.has("roles.manage")) {
     addPage("user-roles", "User roles", "Users, roles and permission assignments", "/admin/settings/roles", ["permissions", "accounts"]);

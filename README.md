@@ -82,7 +82,19 @@ Phase 2 includes tenant-scoped student and staff directories, admission review, 
 
    Fee demo seeding is blocked in production and on Vercel, requires explicit opt-in, and only permits remote writes to the verified SchoolOS demo database. It reuses existing eligible students, is safe to repeat, and creates visibly labeled test invoices and payments; the seeded payments are not real money received.
 
-8. Start the app:
+8. To add clearly labeled accounts and inventory examples to `SchoolOS Demo School`:
+
+   ```powershell
+   $env:ALLOW_ACCOUNTS_INVENTORY_DEMO_SEED = "true"
+   $env:ALLOW_DEMO_SEED_REMOTE = "true"
+   npm run db:seed-accounts-inventory-demo
+   Remove-Item Env:\ALLOW_ACCOUNTS_INVENTORY_DEMO_SEED
+   Remove-Item Env:\ALLOW_DEMO_SEED_REMOTE
+   ```
+
+   This seed is blocked in production and on Vercel, requires explicit opt-in, and restricts remote writes to the verified SchoolOS demo database. It is safe to repeat and marks every sample record as test-only; the example income and expenses are not real transactions and the sample stock is not a real count.
+
+9. Start the app:
 
    ```powershell
    npm run dev
@@ -104,6 +116,7 @@ Phase 2 includes tenant-scoped student and staff directories, admission review, 
 | `npm run db:seed` | Provision initial non-production school administrator |
 | `npm run db:seed-demo` | Add clearly labeled sample academic, student, teacher, and staff data |
 | `npm run db:seed-fees-demo` | Add clearly labeled test fees to existing demo students |
+| `npm run db:seed-accounts-inventory-demo` | Add clearly labeled accounts and inventory workflow examples |
 
 ## Configuration
 

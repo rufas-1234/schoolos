@@ -13,12 +13,14 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { parseCostMinorUnits } from "@/lib/inventory-policy";
+import { DownloadCsv } from "@/components/download-csv";
+import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
 import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOption } from "./account-forms";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { section?: string | string[]; from?: string | string[]; to?: string | string[] };
-type Section = "profit" | "income" | "expenses" | "chart" | "bank" | "transfers";
+type SearchParams = { section?: string | string[]; from?: string | string[]; to?: string | string[]; status?: string | string[] };
+type Section = "profit" | "income" | "expenses" | "chart" | "bank" | "transfers" | "reports";
 const approverUser = alias(user, "approver_user");
 const sourceBankAccount = alias(schoolBankAccounts, "source_account");
 const destinationBankAccount = alias(schoolBankAccounts, "destination_account");
@@ -30,6 +32,7 @@ const sections: Array<{ id: Section; label: string }> = [
   { id: "chart", label: "Chart of accounts" },
   { id: "bank", label: "Bank accounts" },
   { id: "transfers", label: "Fund transfers" },
+  { id: "reports", label: "Reports" },
 ];
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -77,13 +80,17 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const defaultFrom = `${today.slice(0, 4)}-01-01`;
   const requestedFrom = first(query.from);
   const requestedTo = first(query.to);
+  const requestedStatus = first(query.status);
+  const reportStatus = requestedStatus === "pending" || requestedStatus === "approved" || requestedStatus === "rejected"
+    ? requestedStatus
+    : "all";
   const fromCandidate = validDate(requestedFrom) ? requestedFrom : defaultFrom;
   const toCandidate = validDate(requestedTo) ? requestedTo : today;
   const from = toCandidate >= fromCandidate ? fromCandidate : defaultFrom;
   const to = toCandidate >= fromCandidate ? toCandidate : today;
   const startAt = new Date(`${from}T00:00:00.000Z`);
   const endAt = new Date(`${to}T23:59:59.999Z`);
-  const [school, accounts, bankAccounts, transactions, transfers, pnlTransactions, feeIncomeRows, reversals, bankTotals, transferDebits, transferCredits] =
+  const [school, accounts, bankAccounts, transactions, transfers, pnlTransactions, reportTransactions, reportTransfers, feeIncomeRows, reversals, bankTotals, transferDebits, transferCredits] =
     await Promise.all([
       db.select({ currency: schools.currency }).from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
       db.select({
@@ -164,6 +171,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         accountName: chartOfAccounts.name,
         accountCode: chartOfAccounts.code,
         transactionDate: accountTransactions.transactionDate,
+        description: accountTransactions.description,
       }).from(accountTransactions)
         .innerJoin(chartOfAccounts, and(
           eq(chartOfAccounts.id, accountTransactions.categoryAccountId),
@@ -176,19 +184,77 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           lte(accountTransactions.transactionDate, to),
         ))
         .orderBy(asc(accountTransactions.transactionDate)),
+      db.select({
+        id: accountTransactions.id,
+        transactionType: accountTransactions.transactionType,
+        transactionDate: accountTransactions.transactionDate,
+        amount: accountTransactions.amount,
+        description: accountTransactions.description,
+        payee: accountTransactions.payee,
+        reference: accountTransactions.reference,
+        status: accountTransactions.status,
+        accountName: chartOfAccounts.name,
+        accountCode: chartOfAccounts.code,
+        bankAccountId: accountTransactions.bankAccountId,
+        submitterName: user.name,
+        approvedAt: accountTransactions.approvedAt,
+        approverName: approverUser.name,
+      }).from(accountTransactions)
+        .innerJoin(chartOfAccounts, and(
+          eq(chartOfAccounts.id, accountTransactions.categoryAccountId),
+          eq(chartOfAccounts.schoolId, context.schoolId),
+        ))
+        .innerJoin(user, eq(user.id, accountTransactions.submittedBy))
+        .leftJoin(approverUser, eq(approverUser.id, accountTransactions.approvedBy))
+        .where(and(
+          eq(accountTransactions.schoolId, context.schoolId),
+          gte(accountTransactions.transactionDate, from),
+          lte(accountTransactions.transactionDate, to),
+          ...(reportStatus === "all" ? [] : [eq(accountTransactions.status, reportStatus)]),
+        ))
+        .orderBy(desc(accountTransactions.transactionDate), desc(accountTransactions.id)),
+      db.select({
+        id: fundTransfers.id,
+        transferDate: fundTransfers.transferDate,
+        amount: fundTransfers.amount,
+        reference: fundTransfers.reference,
+        note: fundTransfers.note,
+        sourceName: sourceBankAccount.accountName,
+        destinationName: destinationBankAccount.accountName,
+      }).from(fundTransfers)
+        .leftJoin(sourceBankAccount, and(
+          eq(sourceBankAccount.id, fundTransfers.sourceBankAccountId),
+          eq(sourceBankAccount.schoolId, context.schoolId),
+        ))
+        .leftJoin(destinationBankAccount, and(
+          eq(destinationBankAccount.id, fundTransfers.destinationBankAccountId),
+          eq(destinationBankAccount.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(fundTransfers.schoolId, context.schoolId),
+          gte(fundTransfers.transferDate, from),
+          lte(fundTransfers.transferDate, to),
+        ))
+        .orderBy(desc(fundTransfers.transferDate), desc(fundTransfers.id)),
       db.select({ amount: feePayments.amount, fineAmount: feePayments.fineAmount })
         .from(feePayments)
         .where(and(
           eq(feePayments.schoolId, context.schoolId),
           gte(feePayments.paidAt, startAt),
           lte(feePayments.paidAt, endAt),
+          sql`(${feePayments.notes} IS NULL OR ${feePayments.notes} NOT LIKE 'TEST DATA ONLY -%')`,
         )),
       db.select({ amount: feePaymentReversals.amount, fineAmount: feePaymentReversals.fineAmount })
         .from(feePaymentReversals)
+        .innerJoin(feePayments, and(
+          eq(feePayments.id, feePaymentReversals.paymentId),
+          eq(feePayments.schoolId, context.schoolId),
+        ))
         .where(and(
           eq(feePaymentReversals.schoolId, context.schoolId),
           gte(feePaymentReversals.createdAt, startAt),
           lte(feePaymentReversals.createdAt, endAt),
+          sql`(${feePayments.notes} IS NULL OR ${feePayments.notes} NOT LIKE 'TEST DATA ONLY -%')`,
         )),
       db.select({
         bankAccountId: accountTransactions.bankAccountId,
@@ -234,6 +300,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const incomeTotal = otherIncomeTotal + feeIncomeTotal;
   const expenseTotal = expenses.reduce((total, row) => total + moneyMinor(row.amount), BigInt(0));
   const netProfit = incomeTotal - expenseTotal;
+  const hasDemoProfitTransactions = pnlTransactions.some((row) => row.description.startsWith("DEMO TEST ONLY - "));
+  const hasDemoReportTransactions = reportTransactions.some((row) => row.description.startsWith("DEMO TEST ONLY - "));
   const bankActivity = new Map<number, { income: bigint; expense: bigint }>();
   for (const row of bankTotals) {
     if (row.bankAccountId === null) continue;
@@ -274,7 +342,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         {section === "profit" && (
           <div className="space-y-4">
             <ProfitLossFilters from={from} to={to} />
-            <p className="text-xs text-slate-500">Profit and loss includes approved income and expenses, school fee receipts net of refunds, and excludes transactions still awaiting approval.</p>
+            <p className="text-xs text-slate-500">Profit and loss includes approved income and expenses, school fee receipts net of refunds, and excludes transactions still awaiting approval and fee-module test payments.</p>
+            {hasDemoProfitTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY records are included in these totals as workflow examples; they are not real income or expenses.</p>}
             <div className="grid gap-3 sm:grid-cols-3">
               <SummaryCard label="Total income (incl. net fee receipts)" value={displayCurrency(incomeTotal, currency)} />
               <SummaryCard label="Operating expenses" value={displayCurrency(expenseTotal, currency)} />
@@ -344,6 +413,93 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 ))}{!transfers.length && <EmptyRow columns={5} text="No fund transfers have been recorded." />}</tbody>
               </table>
             </div>
+          </div>
+        )}
+        {section === "reports" && (
+          <div className="space-y-5">
+            <form method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+              <input type="hidden" name="section" value="reports" />
+              <label className="text-sm text-slate-700">From<input name="from" type="date" defaultValue={from} className="mt-1 block h-10 rounded-lg border border-slate-200 px-3" /></label>
+              <label className="text-sm text-slate-700">To<input name="to" type="date" defaultValue={to} className="mt-1 block h-10 rounded-lg border border-slate-200 px-3" /></label>
+              <label className="text-sm text-slate-700">Transaction status
+                <select name="status" defaultValue={reportStatus} className="mt-1 block h-10 rounded-lg border border-slate-200 bg-white px-3">
+                  <option value="all">All statuses</option><option value="approved">Approved</option>
+                  <option value="pending">Pending review</option><option value="rejected">Rejected</option>
+                </select>
+              </label>
+              <button className="h-10 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Update report</button>
+              <DownloadCsv
+                headers={["Date", "Type", "Account code", "Category", "Description", "Payee", "Reference", "Status", "Amount"]}
+                rows={reportTransactions.map((row) => [
+                  row.transactionDate, row.transactionType, row.accountCode, row.accountName, row.description,
+                  row.payee ?? "", row.reference ?? "", row.status, row.amount,
+                ])}
+                fileName={`accounts-report-${from}-to-${to}.csv`}
+              />
+              <DownloadCsv
+                headers={["Date", "From account", "To account", "Amount", "Reference", "Note"]}
+                rows={reportTransfers.map((transfer) => [
+                  transfer.transferDate, transfer.sourceName ?? "", transfer.destinationName ?? "",
+                  transfer.amount, transfer.reference ?? "", transfer.note ?? "",
+                ])}
+                fileName={`fund-transfers-${from}-to-${to}.csv`}
+              />
+              <PrintReportButton />
+            </form>
+
+            <section className="print-report-content space-y-5">
+              <header className="print-report-heading">
+                <p className="print-report-kicker">Finance · Accounts</p>
+                <h2>Accounts activity report</h2>
+                <p>{from} through {to} · {reportStatus === "all" ? "All statuses" : `${reportStatus} transactions`} · {reportTransactions.length} transactions</p>
+              </header>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <SummaryCard label="Net fee receipts" value={displayCurrency(feeIncomeTotal, currency)} />
+                <SummaryCard label="Other approved income" value={displayCurrency(otherIncomeTotal, currency)} />
+                <SummaryCard label="Approved expenses" value={displayCurrency(expenseTotal, currency)} />
+                <SummaryCard label="Net surplus / (deficit)" value={displayCurrency(netProfit, currency)} tone={netProfit < BigInt(0) ? "rose" : "emerald"} />
+              </div>
+              <p className="text-xs text-slate-500">Fees are shown separately from non-fee income. Only approved accounting transactions affect the income and expense totals; pending and rejected records remain visible when selected.</p>
+              {hasDemoReportTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY records are included in the transaction list and applicable totals as workflow examples; they are not real income or expenses.</p>}
+              <TransactionTable
+                transactions={reportTransactions}
+                currency={currency}
+                reviewNeeded={reportTransactions.filter((row) => row.status === "pending")}
+              />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <SummaryTable title="Income by category" rows={[
+                  { label: "School fee receipts (net of reversals)", value: displayCurrency(feeIncomeTotal, currency) },
+                  ...sumByAccount(transactionIncome).map((row) => ({ label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, currency) })),
+                ]} />
+                <SummaryTable title="Expenses by category" rows={sumByAccount(expenses).map((row) => ({
+                  label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, currency),
+                }))} />
+              </div>
+              <div className="grid gap-4 xl:grid-cols-2">
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <h3 className="border-b border-slate-100 p-4 font-bold text-slate-900">Bank and cash balances</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-left text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Opening balance</th><th className="px-4 py-3">Current balance</th></tr></thead>
+                      <tbody className="divide-y divide-slate-100">{bankAccounts.map((bank) => (
+                        <tr key={bank.id}><td className="px-4 py-3">{bank.accountName}<span className="block text-xs text-slate-500">{bank.bankName}</span></td><td className="px-4 py-3">{displayAmount(bank.openingBalance, currency)}</td><td className="px-4 py-3 font-semibold">{displayCurrency(bankBalances.get(bank.id) ?? BigInt(0), currency)}</td></tr>
+                      ))}{!bankAccounts.length && <EmptyRow columns={3} text="No bank or cash accounts have been set up." />}</tbody>
+                    </table>
+                  </div>
+                </section>
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <h3 className="border-b border-slate-100 p-4 font-bold text-slate-900">Fund transfers in period</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-left text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / reference</th><th className="px-4 py-3">From / to</th><th className="px-4 py-3">Amount</th></tr></thead>
+                      <tbody className="divide-y divide-slate-100">{reportTransfers.map((transfer) => (
+                        <tr key={transfer.id}><td className="px-4 py-3">{transfer.transferDate}<span className="block text-xs text-slate-500">{transfer.reference ?? transfer.note ?? "—"}</span></td><td className="px-4 py-3">{transfer.sourceName ?? "Unknown"}<span className="block text-xs text-slate-500">to {transfer.destinationName ?? "Unknown"}</span></td><td className="px-4 py-3 font-semibold">{displayAmount(transfer.amount, currency)}</td></tr>
+                      ))}{!reportTransfers.length && <EmptyRow columns={3} text="No transfers were recorded for this period." />}</tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            </section>
           </div>
         )}
       </section>
