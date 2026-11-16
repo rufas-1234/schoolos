@@ -30,6 +30,7 @@ import {
   CreateExamTypeForm,
   CreateExaminationForm,
   CreateGradingScaleForm,
+  EditGradingScaleForm,
   DeleteExaminationForm,
 } from "./examination-forms";
 
@@ -663,6 +664,16 @@ export default async function ExaminationsPage({
                 <div className="flex items-center justify-between gap-2"><h3 className="font-bold">{scale.name}</h3>{scale.isDefault && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">Default</span>}</div>
                 <p className="mt-1 text-xs text-slate-500">Class ranking {scale.allowRanking ? "enabled" : "disabled"}</p>
                 <div className="mt-3 flex flex-wrap gap-2">{scale.bands.map((band) => <span key={band.grade} className="rounded-lg bg-slate-50 px-3 py-2 text-xs"><b>{band.grade}</b> {band.min}%–{band.max}% · {band.description}</span>)}</div>
+                <EditGradingScaleForm scale={{
+                  ...scale,
+                  bands: scale.bands.map((band) => ({
+                    minPercent: Number(band.min),
+                    maxPercent: Number(band.max),
+                    grade: band.grade,
+                    description: band.description,
+                    performanceRemark: band.remark,
+                  })),
+                }} />
               </article>
             ))}
           </div>

@@ -49,6 +49,29 @@ const idField = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int(
 const numericField = z.string().trim().regex(/^\d{1,6}(\.\d{1,2})?$/).transform(Number);
 const text = (max: number) => z.string().trim().min(1).max(max);
 
+function parseGradingBands(rawBands: string): GradeBand[] | null {
+  const rows = rawBands.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const bands: GradeBand[] = [];
+  for (const row of rows) {
+    const [min, max, grade, description, performanceRemark, ...extra] = row.split("|").map((part) => part.trim());
+    const minimum = Number(min);
+    const maximum = Number(max);
+    if (
+      extra.length > 0 ||
+      !/^\d{1,3}(\.\d{1,2})?$/.test(min ?? "") ||
+      !/^\d{1,3}(\.\d{1,2})?$/.test(max ?? "") ||
+      !grade ||
+      grade.length > 8 ||
+      !description ||
+      description.length > 255 ||
+      !performanceRemark ||
+      performanceRemark.length > 255
+    ) return null;
+    bands.push({ minPercent: minimum, maxPercent: maximum, grade, description, performanceRemark });
+  }
+  return bands;
+}
+
 function value(formData: FormData, key: string): string {
   const field = formData.get(key);
   return typeof field === "string" ? field : "";
@@ -83,32 +106,13 @@ export async function createGradingScale(
   formData: FormData,
 ): Promise<ExaminationActionState> {
   const context = await requireSchoolPermission("examinations.create");
-  const bands = value(formData, "bands")
-    .split(/\r?\n/)
-    .map((line): GradeBand | null => {
-      const [min, max, grade, description, performanceRemark, ...extra] = line.split("|").map((part) => part.trim());
-      if (!min && !max && !grade && !description && !performanceRemark) return null;
-      const minimum = Number(min);
-      const maximum = Number(max);
-      if (
-        extra.length > 0 ||
-        !min ||
-        !max ||
-        !Number.isFinite(minimum) ||
-        !Number.isFinite(maximum) ||
-        !grade ||
-        !description ||
-        !performanceRemark
-      ) return null;
-      return { minPercent: minimum, maxPercent: maximum, grade, description, performanceRemark };
-    })
-    .filter((band): band is GradeBand => band !== null);
-  const validationError = validateGradeBands(bands);
+  const bands = parseGradingBands(value(formData, "bands"));
+  const validationError = bands ? validateGradeBands(bands) : "Complete every grade band with valid values.";
   const parsed = z.object({
     name: text(120),
   }).safeParse({ name: value(formData, "name") });
-  if (!parsed.success || validationError || bands.length !== value(formData, "bands").split(/\r?\n/).filter((line) => line.trim()).length) {
-    return { error: validationError ?? "Enter a unique scale name and one valid pipe-separated row per grade band." };
+  if (!parsed.success || !bands || validationError) {
+    return { error: validationError ?? "Enter a unique grading scale name." };
   }
   const setDefault = value(formData, "isDefault") === "on";
   const scalePublicId = randomUUID();
@@ -154,6 +158,85 @@ export async function createGradingScale(
     throw error;
   });
   if (createOutcome === "duplicate") return { error: "A grading scale with that name already exists." };
+  revalidatePath("/admin/examinations");
+  return { success: true };
+}
+
+export async function updateGradingScale(
+  _previousState: ExaminationActionState,
+  formData: FormData,
+): Promise<ExaminationActionState> {
+  const context = await requireSchoolPermission("examinations.create");
+  const parsed = z.object({
+    scaleId: idField,
+    name: text(120),
+  }).safeParse({
+    scaleId: value(formData, "scaleId"),
+    name: value(formData, "name"),
+  });
+  if (!parsed.success) return { error: "Enter a valid grading scale name." };
+  const bands = parseGradingBands(value(formData, "bands"));
+  if (!bands) return { error: "Complete every grade band with valid values." };
+  const validationError = validateGradeBands(bands);
+  if (validationError) return { error: validationError };
+
+  const duplicate = await db.select({ id: examGradingScales.id }).from(examGradingScales)
+    .where(and(
+      eq(examGradingScales.schoolId, context.schoolId),
+      eq(examGradingScales.name, parsed.data.name),
+      ne(examGradingScales.id, parsed.data.scaleId),
+    ))
+    .limit(1);
+  if (duplicate.length) return { error: "A grading scale with that name already exists." };
+
+  const publicId = await db.transaction(async (tx) => {
+    const [scale] = await tx.select({
+      id: examGradingScales.id,
+      publicId: examGradingScales.publicId,
+      isDefault: examGradingScales.isDefault,
+    }).from(examGradingScales)
+      .where(and(
+        eq(examGradingScales.id, parsed.data.scaleId),
+        eq(examGradingScales.schoolId, context.schoolId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!scale) return null;
+
+    const setDefault = value(formData, "isDefault") === "on" || scale.isDefault;
+    if (setDefault && !scale.isDefault) {
+      await tx.update(examGradingScales).set({ isDefault: false })
+        .where(eq(examGradingScales.schoolId, context.schoolId));
+    }
+    await tx.update(examGradingScales).set({
+      name: parsed.data.name,
+      allowRanking: value(formData, "allowRanking") === "on",
+      isDefault: setDefault,
+    }).where(and(
+      eq(examGradingScales.id, scale.id),
+      eq(examGradingScales.schoolId, context.schoolId),
+    ));
+    await tx.delete(examGradeBands).where(eq(examGradeBands.gradingScaleId, scale.id));
+    await tx.insert(examGradeBands).values(bands.map((band, sortOrder) => ({
+      gradingScaleId: scale.id,
+      minPercent: band.minPercent.toFixed(2),
+      maxPercent: band.maxPercent.toFixed(2),
+      grade: band.grade,
+      description: band.description,
+      performanceRemark: band.performanceRemark,
+      sortOrder,
+    })));
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "examination.grading_scale.updated",
+      resourceType: "exam_grading_scale",
+      resourcePublicId: scale.publicId,
+      changedFields: ["name", "gradeBands", "allowRanking", "isDefault"],
+    });
+    return scale.publicId;
+  });
+  if (!publicId) return { error: "That grading scale was not found. Reload and try again." };
   revalidatePath("/admin/examinations");
   return { success: true };
 }

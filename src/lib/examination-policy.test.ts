@@ -11,6 +11,7 @@ import {
   validateGradeBands,
   type GradeBand,
 } from "./examination-policy";
+import { GRADING_SCALE_PRESETS } from "./grading-scale-presets";
 
 const scale: GradeBand[] = [
   { minPercent: 0, maxPercent: 40, grade: "F", description: "Fail", performanceRemark: "Needs support" },
@@ -23,6 +24,14 @@ describe("examination policy", () => {
     expect(validateGradeBands(scale)).toBeNull();
     expect(validateGradeBands([scale[0], { ...scale[1], minPercent: 41 }, scale[2]])).toContain("gaps");
     expect(validateGradeBands([scale[0], { ...scale[1], minPercent: 39 }, scale[2]])).toContain("overlap");
+  });
+
+  it("provides complete editable starter bands for the supported grading systems", () => {
+    expect(GRADING_SCALE_PRESETS.map((preset) => preset.id)).toEqual(["south-sudan", "kenya-844"]);
+    for (const preset of GRADING_SCALE_PRESETS) {
+      expect(validateGradeBands(preset.bands)).toBeNull();
+    }
+    expect(GRADING_SCALE_PRESETS.find((preset) => preset.id === "kenya-844")?.bands).toHaveLength(12);
   });
 
   it("assigns inclusive lower bounds and the uppermost grade at 100%", () => {

@@ -22,10 +22,13 @@ import {
   syncExamMarksRoster,
   savePrincipalRemark,
   submitExamSubject,
+  updateGradingScale,
   updateExamination,
   updateExamSubjectSettings,
   type ExaminationActionState,
 } from "./actions";
+import { GRADING_SCALE_PRESETS } from "@/lib/grading-scale-presets";
+import type { GradeBand } from "@/lib/examination-policy";
 
 function Feedback({ state }: { state: ExaminationActionState }) {
   if (!state.error && !state.success) return null;
@@ -264,25 +267,142 @@ export function CreateExamTypeForm({ branches }: { branches: Array<{ id: number;
   );
 }
 
-export function CreateGradingScaleForm() {
-  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createGradingScale, {});
+type GradingScaleEditorData = {
+  id: number;
+  name: string;
+  isDefault: boolean;
+  allowRanking: boolean;
+  bands: GradeBand[];
+};
+
+function GradingScaleForm({ scale }: { scale?: GradingScaleEditorData }) {
+  const formAction = scale ? updateGradingScale : createGradingScale;
+  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(formAction, {});
+  const defaultPreset = GRADING_SCALE_PRESETS[0];
+  const [name, setName] = useState(scale?.name ?? defaultPreset.name);
+  const [presetId, setPresetId] = useState(scale ? "" : defaultPreset.id);
+  const [bands, setBands] = useState<GradeBand[]>(scale?.bands ?? defaultPreset.bands);
+  const preset = GRADING_SCALE_PRESETS.find((item) => item.id === presetId);
+  const serializedBands = bands.map((band) => [
+    band.minPercent,
+    band.maxPercent,
+    band.grade,
+    band.description,
+    band.performanceRemark,
+  ].join("|")).join("\n");
+  const updateBand = (index: number, patch: Partial<GradeBand>) => {
+    setBands((current) => current.map((band, rowIndex) =>
+      rowIndex === index ? { ...band, ...patch } : band,
+    ));
+    setPresetId("");
+  };
+  const addBand = () => {
+    setBands((current) => {
+      const last = current[current.length - 1];
+      if (!last || last.maxPercent - last.minPercent < 0.02) return current;
+      const midpoint = Math.round(((last.minPercent + last.maxPercent) / 2) * 100) / 100;
+      return [
+        ...current.slice(0, -1),
+        { ...last, maxPercent: midpoint, grade: `New${current.length}`, description: "New grade" },
+        { ...last, minPercent: midpoint },
+      ];
+    });
+    setPresetId("");
+  };
+  const removeBand = (index: number) => {
+    setBands((current) => {
+      if (current.length <= 1) return current;
+      if (index === 0) {
+        return current.slice(1).map((band, rowIndex) =>
+          rowIndex === 0 ? { ...band, minPercent: 0 } : band,
+        );
+      }
+      return current.filter((_, rowIndex) => rowIndex !== index).map((band, rowIndex) =>
+        rowIndex === index - 1
+          ? { ...band, maxPercent: current[index].maxPercent }
+          : band,
+      );
+    });
+    setPresetId("");
+  };
   return (
-    <form action={action} className="max-w-3xl space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-      <h2 className="text-lg font-bold text-slate-900">Grading scales</h2>
-      <label className="block max-w-xl text-sm font-medium">Scale name
-        <input required name="name" maxLength={120} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="Standard 0–100" />
-      </label>
-      <label className="block text-sm font-medium">Grade bands
-        <textarea required name="bands" rows={4} className="mt-1 w-full rounded-lg border border-slate-200 p-3 font-mono text-xs leading-6 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" defaultValue={"0|40|F|Needs improvement|Needs additional support\n40|70|C|Satisfactory|Good effort\n70|100|A|Excellent|Outstanding performance"} />
-      </label>
-      <p className="text-xs text-slate-500">One row per band: minimum % | maximum % | grade | description | performance remark. Bands must cover 0–100 without gaps or overlaps. Lower bounds are inclusive; the 100% maximum is inclusive.</p>
-      <div className="flex flex-wrap gap-4 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" name="isDefault" /> Make default</label>
-        <label className="flex items-center gap-2"><input type="checkbox" name="allowRanking" /> Enable class ranking</label>
+    <form action={action} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+      {scale && <input type="hidden" name="scaleId" value={scale.id} />}
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="block text-sm font-medium">Grading system
+          <select
+            value={presetId}
+            onChange={(event) => {
+              const nextPreset = GRADING_SCALE_PRESETS.find((item) => item.id === event.target.value);
+              setPresetId(event.target.value);
+              if (nextPreset) {
+                setBands(nextPreset.bands);
+                if (!scale) setName(nextPreset.name);
+              }
+            }}
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3"
+          >
+            {scale && <option value="">Keep current / custom bands</option>}
+            {GRADING_SCALE_PRESETS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            {!scale && <option value="">Custom scale</option>}
+          </select>
+        </label>
+        <label className="block text-sm font-medium">Scale name
+          <input required name="name" maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" placeholder="School grading scale" />
+        </label>
       </div>
-      <SubmitButton pending={pending}>Save grading scale</SubmitButton>
+      {preset && <p className="rounded-lg bg-violet-50 p-3 text-sm text-violet-900">{preset.note} The grade ranges, letters, descriptions, and comments below are editable.</p>}
+      {scale && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Saving changes affects every examination that uses this scale, including published report cards.</p>}
+      <input type="hidden" name="bands" value={serializedBands} />
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full min-w-[850px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr><th className="p-2">From %</th><th className="p-2">Up to %</th><th className="p-2">Grade</th><th className="p-2">Description</th><th className="p-2">Suggested comment</th><th className="p-2">Action</th></tr>
+          </thead>
+          <tbody>{bands.map((band, index) => (
+            <tr key={`${index}-${band.grade}`} className="border-t">
+              <td className="p-2"><input aria-label={`Grade ${band.grade} minimum percentage`} type="number" min="0" max="100" step="0.01" value={Number.isNaN(band.minPercent) ? "" : band.minPercent} onChange={(event) => updateBand(index, { minPercent: event.target.value === "" ? Number.NaN : Number(event.target.value) })} className="w-24 rounded border p-2" /></td>
+              <td className="p-2"><input aria-label={`Grade ${band.grade} maximum percentage`} type="number" min="0" max="100" step="0.01" value={Number.isNaN(band.maxPercent) ? "" : band.maxPercent} onChange={(event) => updateBand(index, { maxPercent: event.target.value === "" ? Number.NaN : Number(event.target.value) })} className="w-24 rounded border p-2" /></td>
+              <td className="p-2"><input required aria-label="Grade letter" maxLength={8} value={band.grade} onChange={(event) => updateBand(index, { grade: event.target.value })} className="w-20 rounded border p-2" /></td>
+              <td className="p-2"><input required aria-label="Grade description" maxLength={255} value={band.description} onChange={(event) => updateBand(index, { description: event.target.value })} className="w-40 rounded border p-2" /></td>
+              <td className="p-2"><input required aria-label="Suggested grade comment" maxLength={255} value={band.performanceRemark} onChange={(event) => updateBand(index, { performanceRemark: event.target.value })} className="w-56 rounded border p-2" /></td>
+              <td className="p-2"><button type="button" disabled={bands.length <= 1} onClick={() => removeBand(index)} className="rounded border px-2 py-1 text-xs font-medium text-rose-700 disabled:opacity-50">Remove</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <button type="button" onClick={addBand} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-800">Add grade band</button>
+      <p className="text-xs text-slate-500">Ranges must cover 0% to 100% without gaps or overlaps. A score at a boundary starts the higher grade.</p>
+      <div className="flex flex-wrap gap-4 text-sm">
+        {scale?.isDefault
+          ? <><input type="hidden" name="isDefault" value="on" /><p className="text-slate-600">This is the default scale for new exams. To change it, make another scale the default.</p></>
+          : <label className="flex items-center gap-2"><input type="checkbox" name="isDefault" /> Use as the default for new exams</label>}
+        <label className="flex items-center gap-2"><input type="checkbox" name="allowRanking" defaultChecked={scale?.allowRanking ?? false} /> Show class positions and ranking</label>
+      </div>
+      <SubmitButton pending={pending}>{scale ? "Save grading scale changes" : "Create grading scale"}</SubmitButton>
       <Feedback state={state} />
     </form>
+  );
+}
+
+export function CreateGradingScaleForm() {
+  return (
+    <section className="max-w-5xl space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+      <h2 className="text-lg font-bold text-slate-900">Create a grading scale</h2>
+      <p className="text-sm text-slate-600">Choose a ready-made system, review its bands, and adjust them to match your school.</p>
+      <GradingScaleForm />
+    </section>
+  );
+}
+
+export function EditGradingScaleForm({ scale }: { scale: GradingScaleEditorData }) {
+  return (
+    <details className="mt-4 rounded-lg border border-slate-200">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-violet-800">Edit this grading scale</summary>
+      <div className="p-3">
+        <GradingScaleForm scale={scale} />
+      </div>
+    </details>
   );
 }
 
