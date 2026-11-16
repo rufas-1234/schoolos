@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, type ReactNode } from "react";
+import { CheckCheck } from "lucide-react";
 import { AdminDeleteButton } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
 import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
@@ -298,18 +299,55 @@ export function SaveExamAttendanceForm({
   }>;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamAttendance, {});
+  const [search, setSearch] = useState("");
+  const [statuses, setStatuses] = useState<Record<number, string>>(() =>
+    Object.fromEntries(students.map((student) => [student.enrollmentId, student.status ?? ""])),
+  );
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const visibleCount = students.filter((student) =>
+    `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
+  ).length;
   if (!editable) return <p className="text-sm text-slate-600">Attendance is read-only after results are published.</p>;
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <label className="block w-full max-w-md space-y-1.5 text-sm font-medium text-slate-700">
+          Quick search students
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Name or admission number"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => setStatuses(Object.fromEntries(
+            students.map((student) => [student.enrollmentId, "present"]),
+          ))}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+        >
+          <CheckCheck size={16} aria-hidden="true" />
+          All present
+        </button>
+      </div>
+      <p className="text-xs text-slate-500" aria-live="polite">
+        Showing {visibleCount} of {students.length} students
+      </p>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Attendance</th><th className="p-3">Note</th></tr></thead>
           <tbody>{students.map((student) => (
-            <tr key={student.enrollmentId} className="border-t">
+            <tr
+              key={student.enrollmentId}
+              className="border-t"
+              hidden={!`${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch)}
+            >
               <td className="p-3 font-medium">{student.name}</td>
               <td className="p-3">{student.admissionNumber ?? "—"}</td>
-              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} defaultValue={student.status ?? ""} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></td>
+              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} value={statuses[student.enrollmentId] ?? ""} onChange={(event) => setStatuses((current) => ({ ...current, [student.enrollmentId]: event.target.value }))} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></td>
               <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} defaultValue={student.note ?? ""} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
             </tr>
           ))}</tbody>
