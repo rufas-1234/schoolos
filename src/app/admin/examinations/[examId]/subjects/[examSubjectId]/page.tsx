@@ -7,6 +7,7 @@ import {
   classSections,
   classLevels,
   examClasses,
+  examAttendance,
   examComponentMarks,
   examComponents,
   examGradeBands,
@@ -28,6 +29,7 @@ import { PrintButton } from "@/components/print-button";
 import {
   ClassTeacherRemarkForm,
   CorrectionRequestForm,
+  ReopenApprovedSubjectForm,
   SearchableStudentItems,
   SaveMarksForm,
   SubmitSubjectForm,
@@ -123,6 +125,12 @@ export default async function SubjectMarksPage({
     .innerJoin(studentEnrollments, and(
       eq(studentEnrollments.id, examMarks.enrollmentId),
       eq(studentEnrollments.schoolId, context.schoolId),
+    ))
+    .innerJoin(examAttendance, and(
+      eq(examAttendance.examSubjectId, examMarks.examSubjectId),
+      eq(examAttendance.enrollmentId, studentEnrollments.id),
+      eq(examAttendance.schoolId, context.schoolId),
+      inArray(examAttendance.status, ["present", "late"]),
     ))
     .innerJoin(students, and(eq(students.id, studentEnrollments.studentId), eq(students.schoolId, context.schoolId)))
     .innerJoin(classSections, and(
@@ -242,6 +250,10 @@ export default async function SubjectMarksPage({
         <PrintButton label="Print marks-only sheet" targetId="exam-marks-only-sheet" pageOrientation="landscape" pageSize="A4" />
       </header>
 
+      {subject.examStatus === "open" && subject.status === "approved" && canReview && (
+        <ReopenApprovedSubjectForm examSubjectId={subject.id} />
+      )}
+
       <section id="exam-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
         <header className="print-report-heading">
           <p className="text-xs font-semibold uppercase tracking-wide">{context.schoolName}</p>
@@ -277,7 +289,7 @@ export default async function SubjectMarksPage({
       <section id="exam-mark-list" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="print-report-heading">
           <h2 className="text-xl font-bold">{subject.className} · {subject.subjectName} — marks roster</h2>
-          <p className="text-sm text-slate-600">{roster.length} enrolled students · {subject.examSystem === "multi" ? "component marks are summed" : "single component"} · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
+          <p className="text-sm text-slate-600">{roster.length} students marked present or late · {subject.examSystem === "multi" ? "component marks are summed" : "single component"} · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
         </div>
         {editable && <SaveMarksForm
           examSubjectId={subject.id}
@@ -298,7 +310,7 @@ export default async function SubjectMarksPage({
             </table>
           </div>
         )}
-        {roster.length === 0 && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">No enrolled students were found in this class for the selected academic year. Results cannot be submitted without a roster.</p>}
+        {roster.length === 0 && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">No students with Present or Late exam attendance were found. Record exam attendance first; absent, excused, and unmarked students cannot receive marks.</p>}
       </section>
 
       {subject.examStatus === "open" && subject.status === "draft" && (canConfigure || canReview || assignedTeacher) && roster.length > 0 && (

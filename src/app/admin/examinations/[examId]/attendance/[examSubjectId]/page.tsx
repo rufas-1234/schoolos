@@ -36,6 +36,7 @@ export default async function ExamAttendancePage({
     examId: examinations.id,
     examName: examinations.name,
     examStatus: examinations.status,
+    subjectStatus: examSubjects.status,
     subjectName: subjects.name,
     className: classLevels.name,
     classLevelId: classLevels.id,
@@ -143,7 +144,7 @@ export default async function ExamAttendancePage({
         <SaveExamAttendanceForm
           examSubjectId={record.id}
           students={rosterStudents}
-          editable={record.examStatus === "open" && (canManage || assignedTeacher)}
+          editable={record.examStatus === "open" && record.subjectStatus === "draft" && (canManage || assignedTeacher)}
         />
       </section>
     </main>

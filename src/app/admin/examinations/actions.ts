@@ -1018,6 +1018,12 @@ export async function syncExamMarksRoster(examSubjectId: number): Promise<{
         eq(students.id, studentEnrollments.studentId),
         eq(students.schoolId, context.schoolId),
       ))
+        .innerJoin(examAttendance, and(
+          eq(examAttendance.examSubjectId, record.id),
+          eq(examAttendance.enrollmentId, studentEnrollments.id),
+          eq(examAttendance.schoolId, context.schoolId),
+          inArray(examAttendance.status, ["present", "late"]),
+        ))
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.academicYearId, record.academicYearId),
@@ -1062,12 +1068,13 @@ export async function syncExamMarksRoster(examSubjectId: number): Promise<{
       });
     }
 
-    const allMarks = await tx.select({
+    const allMarks = eligibleEnrollments.length ? await tx.select({
       id: examMarks.id,
     }).from(examMarks).where(and(
       eq(examMarks.schoolId, context.schoolId),
       eq(examMarks.examSubjectId, record.id),
-    ));
+      inArray(examMarks.enrollmentId, eligibleEnrollments.map((enrollment) => enrollment.id)),
+    )) : [];
     const currentComponentMarks = allMarks.length
       ? await tx.select({
         examMarkId: examComponentMarks.examMarkId,
@@ -1137,10 +1144,17 @@ export async function saveExamMarks(
     id: examMarks.id,
     enrollmentId: examMarks.enrollmentId,
     marks: examMarks.marks,
-  }).from(examMarks).where(and(
-    eq(examMarks.schoolId, context.schoolId),
-    eq(examMarks.examSubjectId, record.id),
-  ));
+  }).from(examMarks)
+    .innerJoin(examAttendance, and(
+      eq(examAttendance.examSubjectId, examMarks.examSubjectId),
+      eq(examAttendance.enrollmentId, examMarks.enrollmentId),
+      eq(examAttendance.schoolId, context.schoolId),
+      inArray(examAttendance.status, ["present", "late"]),
+    ))
+    .where(and(
+      eq(examMarks.schoolId, context.schoolId),
+      eq(examMarks.examSubjectId, record.id),
+    ));
   const componentDefinitions = await db.select({
     id: examComponents.id,
     title: examComponents.title,
@@ -1263,10 +1277,17 @@ export async function saveExamMarks(
       id: examMarks.id,
       enrollmentId: examMarks.enrollmentId,
       marks: examMarks.marks,
-    }).from(examMarks).where(and(
-      eq(examMarks.schoolId, context.schoolId),
-      eq(examMarks.examSubjectId, record.id),
-    )).for("update");
+    }).from(examMarks)
+      .innerJoin(examAttendance, and(
+        eq(examAttendance.examSubjectId, examMarks.examSubjectId),
+        eq(examAttendance.enrollmentId, examMarks.enrollmentId),
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.status, ["present", "late"]),
+      ))
+      .where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        eq(examMarks.examSubjectId, record.id),
+      )).for("update");
     const lockedComponents = await tx.select({
       id: examComponentMarks.id,
       examMarkId: examComponentMarks.examMarkId,
@@ -1350,6 +1371,7 @@ export async function saveExamAttendance(
   const [subject] = await db.select({
     id: examSubjects.id,
     publicId: examSubjects.publicId,
+    status: examSubjects.status,
     examClassId: examClasses.id,
     classLevelId: examClasses.classLevelId,
     academicYearId: examinations.academicYearId,
@@ -1366,8 +1388,8 @@ export async function saveExamAttendance(
     ))
     .where(and(eq(examSubjects.id, subjectId.data), eq(examSubjects.schoolId, context.schoolId)))
     .limit(1);
-  if (!subject || subject.examStatus !== "open") {
-    return { error: "Exam attendance can only be changed before results are published." };
+  if (!subject || subject.examStatus !== "open" || subject.status !== "draft") {
+    return { error: "Exam attendance can only be changed while the assessment is a draft and the examination is open." };
   }
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");
@@ -1404,6 +1426,7 @@ export async function saveExamAttendance(
   const outcome = await db.transaction(async (tx) => {
     const [locked] = await tx.select({
       id: examSubjects.id,
+      status: examSubjects.status,
       examStatus: examinations.status,
     }).from(examSubjects)
       .innerJoin(examClasses, and(
@@ -1417,7 +1440,7 @@ export async function saveExamAttendance(
       .where(and(eq(examSubjects.id, subject.id), eq(examSubjects.schoolId, context.schoolId)))
       .for("update")
       .limit(1);
-    if (!locked || locked.examStatus !== "open") return false;
+    if (!locked || locked.examStatus !== "open" || locked.status !== "draft") return false;
     for (const [enrollmentId, attendance] of statuses) {
       await tx.insert(examAttendance).values({
         publicId: randomUUID(),
@@ -1446,8 +1469,9 @@ export async function saveExamAttendance(
     });
     return true;
   });
-  if (!outcome) return { error: "Results were published while you were marking attendance. Reload the page." };
+  if (!outcome) return { error: "Attendance is locked because this assessment is no longer a draft or the examination is no longer open. Reload the page." };
   revalidatePath(`/admin/examinations/${subject.examId}/attendance/${subject.id}`);
+  revalidatePath(`/admin/examinations/${subject.examId}/subjects/${subject.id}`);
   revalidatePath(`/admin/examinations/${subject.examId}`);
   return { success: true };
 }
@@ -1499,14 +1523,27 @@ export async function submitExamSubject(
         eq(students.id, studentEnrollments.studentId),
         eq(students.schoolId, context.schoolId),
       ))
+      .innerJoin(examAttendance, and(
+        eq(examAttendance.examSubjectId, record.id),
+        eq(examAttendance.enrollmentId, studentEnrollments.id),
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.status, ["present", "late"]),
+      ))
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.academicYearId, record.academicYearId),
         eq(studentEnrollments.status, "enrolled"),
         ne(students.status, "disabled"),
       ));
+    if (!eligibleEnrollments.length) return "no-attendees" as const;
     const existingRoster = await tx.select({ enrollmentId: examMarks.enrollmentId })
       .from(examMarks)
+      .innerJoin(examAttendance, and(
+        eq(examAttendance.examSubjectId, examMarks.examSubjectId),
+        eq(examAttendance.enrollmentId, examMarks.enrollmentId),
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.status, ["present", "late"]),
+      ))
       .where(and(
         eq(examMarks.schoolId, context.schoolId),
         eq(examMarks.examSubjectId, record.id),
@@ -1516,10 +1553,17 @@ export async function submitExamSubject(
       eligibleEnrollments.map((enrollment) => enrollment.id),
       existingRoster.map((mark) => mark.enrollmentId),
     ).length) return "roster-incomplete" as const;
-    const marks = await tx.select({ marks: examMarks.marks }).from(examMarks).where(and(
-      eq(examMarks.schoolId, context.schoolId),
-      eq(examMarks.examSubjectId, record.id),
-    )).for("update");
+    const marks = await tx.select({ marks: examMarks.marks }).from(examMarks)
+      .innerJoin(examAttendance, and(
+        eq(examAttendance.examSubjectId, examMarks.examSubjectId),
+        eq(examAttendance.enrollmentId, examMarks.enrollmentId),
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.status, ["present", "late"]),
+      ))
+      .where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        eq(examMarks.examSubjectId, record.id),
+      )).for("update");
     if (!marks.length || marks.some((mark) => mark.marks === null || Number(mark.marks) > Number(record.maxMarks))) {
       return "invalid-marks" as const;
     }
@@ -1541,7 +1585,8 @@ export async function submitExamSubject(
   });
   if (outcome === "locked") return { error: "Only draft assessments in an open examination can be submitted." };
   if (outcome === "roster-incomplete") return { error: "The enrolled class roster changed. Reload the marks sheet to add every currently enrolled student before submitting." };
-  if (outcome === "invalid-marks") return { error: "Enter valid marks for every enrolled student before submitting." };
+  if (outcome === "no-attendees") return { error: "Record Present or Late exam attendance before submitting marks." };
+  if (outcome === "invalid-marks") return { error: "Enter valid marks for every student marked Present or Late before submitting." };
   revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
 }
@@ -1572,6 +1617,8 @@ export async function reviewExamSubject(
       examinationId: examinations.id,
       examinationStatus: examinations.status,
       maxMarks: examSubjects.maxMarks,
+      classLevelId: examClasses.classLevelId,
+      academicYearId: examinations.academicYearId,
     }).from(examSubjects)
       .innerJoin(examClasses, and(
         eq(examClasses.id, examSubjects.examClassId),
@@ -1585,10 +1632,50 @@ export async function reviewExamSubject(
       .for("update")
       .limit(1);
     if (!record || record.status !== "submitted" || record.examinationStatus !== "open") return "locked" as const;
-    const markRows = await tx.select({ marks: examMarks.marks }).from(examMarks)
+    const attendedEnrollments = await tx.select({ id: studentEnrollments.id })
+      .from(studentEnrollments)
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.classLevelId, record.classLevelId),
+        eq(classSections.academicYearId, record.academicYearId),
+      ))
+      .innerJoin(students, and(
+        eq(students.id, studentEnrollments.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .innerJoin(examAttendance, and(
+        eq(examAttendance.examSubjectId, record.id),
+        eq(examAttendance.enrollmentId, studentEnrollments.id),
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.status, ["present", "late"]),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.academicYearId, record.academicYearId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+      ));
+    const markRows = await tx.select({
+      enrollmentId: examMarks.enrollmentId,
+      marks: examMarks.marks,
+    }).from(examMarks)
+      .innerJoin(examAttendance, and(
+        eq(examAttendance.examSubjectId, examMarks.examSubjectId),
+        eq(examAttendance.enrollmentId, examMarks.enrollmentId),
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.status, ["present", "late"]),
+      ))
       .where(and(eq(examMarks.schoolId, context.schoolId), eq(examMarks.examSubjectId, record.id)))
       .for("update");
-    if (!markRows.length || markRows.some((mark) => mark.marks === null || Number(mark.marks) > Number(record.maxMarks))) {
+    if (
+      !attendedEnrollments.length ||
+      missingExamRosterEnrollmentIds(
+        attendedEnrollments.map((enrollment) => enrollment.id),
+        markRows.map((mark) => mark.enrollmentId),
+      ).length ||
+      markRows.some((mark) => mark.marks === null || Number(mark.marks) > Number(record.maxMarks))
+    ) {
       return "invalid-marks" as const;
     }
     await tx.update(examSubjects).set({
@@ -1613,6 +1700,75 @@ export async function reviewExamSubject(
   return { success: true };
 }
 
+export async function reopenApprovedExamSubject(
+  _previousState: ExaminationActionState,
+  formData: FormData,
+): Promise<ExaminationActionState> {
+  const context = await requireSchoolPermission("results.publish");
+  const parsed = z.object({
+    examSubjectId: idField,
+    reason: z.string().trim().min(1).max(1000),
+  }).safeParse({
+    examSubjectId: value(formData, "examSubjectId"),
+    reason: value(formData, "reason"),
+  });
+  if (!parsed.success) return { error: "Enter a reason of at most 1,000 characters for reopening this assessment." };
+
+  const outcome = await db.transaction(async (tx) => {
+    const [record] = await tx.select({
+      id: examSubjects.id,
+      publicId: examSubjects.publicId,
+      status: examSubjects.status,
+      examinationId: examinations.id,
+      examinationStatus: examinations.status,
+    }).from(examSubjects)
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(examSubjects.id, parsed.data.examSubjectId),
+        eq(examSubjects.schoolId, context.schoolId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!record || record.status !== "approved" || record.examinationStatus !== "open") return "locked" as const;
+
+    await tx.update(examSubjects).set({
+      status: "draft",
+      submittedBy: null,
+      submittedAt: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      reviewNote: parsed.data.reason,
+    }).where(and(
+      eq(examSubjects.id, record.id),
+      eq(examSubjects.status, "approved"),
+    ));
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "examination.subject.reopened",
+      resourceType: "exam_subject",
+      resourcePublicId: record.publicId,
+      changedFields: ["status", "submittedBy", "submittedAt", "reviewedBy", "reviewedAt", "reviewNote"],
+    });
+    return record.examinationId;
+  });
+
+  if (outcome === "locked") {
+    return { error: "Only an approved subject in an open examination can be reopened. Published results cannot be reopened here." };
+  }
+  revalidatePath(`/admin/examinations/${outcome}`);
+  revalidatePath(`/admin/examinations/${outcome}/subjects/${parsed.data.examSubjectId}`);
+  revalidatePath(`/admin/examinations/${outcome}/attendance/${parsed.data.examSubjectId}`);
+  return { success: true };
+}
+
 export async function publishExamination(
   _previousState: ExaminationActionState,
   formData: FormData,
@@ -1625,6 +1781,7 @@ export async function publishExamination(
       id: examinations.id,
       publicId: examinations.publicId,
       status: examinations.status,
+      academicYearId: examinations.academicYearId,
     }).from(examinations).where(and(
       eq(examinations.id, examId.data),
       eq(examinations.schoolId, context.schoolId),
@@ -1634,6 +1791,7 @@ export async function publishExamination(
       id: examSubjects.id,
       status: examSubjects.status,
       maxMarks: examSubjects.maxMarks,
+      classLevelId: examClasses.classLevelId,
     }).from(examSubjects).innerJoin(examClasses, and(
       eq(examClasses.id, examSubjects.examClassId),
       eq(examClasses.schoolId, context.schoolId),
@@ -1645,11 +1803,52 @@ export async function publishExamination(
       return "incomplete" as const;
     }
     for (const subject of subjectsToPublish) {
-      const marks = await tx.select({ marks: examMarks.marks }).from(examMarks).where(and(
-        eq(examMarks.schoolId, context.schoolId),
-        eq(examMarks.examSubjectId, subject.id),
-      )).for("update");
-      if (!marks.length || marks.some((mark) => mark.marks === null || Number(mark.marks) > Number(subject.maxMarks))) {
+      const attendedEnrollments = await tx.select({ id: studentEnrollments.id })
+        .from(studentEnrollments)
+        .innerJoin(classSections, and(
+          eq(classSections.id, studentEnrollments.classSectionId),
+          eq(classSections.schoolId, context.schoolId),
+          eq(classSections.classLevelId, subject.classLevelId),
+          eq(classSections.academicYearId, exam.academicYearId),
+        ))
+        .innerJoin(students, and(
+          eq(students.id, studentEnrollments.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .innerJoin(examAttendance, and(
+          eq(examAttendance.examSubjectId, subject.id),
+          eq(examAttendance.enrollmentId, studentEnrollments.id),
+          eq(examAttendance.schoolId, context.schoolId),
+          inArray(examAttendance.status, ["present", "late"]),
+        ))
+        .where(and(
+          eq(studentEnrollments.schoolId, context.schoolId),
+          eq(studentEnrollments.academicYearId, exam.academicYearId),
+          eq(studentEnrollments.status, "enrolled"),
+          ne(students.status, "disabled"),
+        ));
+      const marks = await tx.select({
+        enrollmentId: examMarks.enrollmentId,
+        marks: examMarks.marks,
+      }).from(examMarks)
+        .innerJoin(examAttendance, and(
+          eq(examAttendance.examSubjectId, examMarks.examSubjectId),
+          eq(examAttendance.enrollmentId, examMarks.enrollmentId),
+          eq(examAttendance.schoolId, context.schoolId),
+          inArray(examAttendance.status, ["present", "late"]),
+        ))
+        .where(and(
+          eq(examMarks.schoolId, context.schoolId),
+          eq(examMarks.examSubjectId, subject.id),
+        )).for("update");
+      if (
+        !attendedEnrollments.length ||
+        missingExamRosterEnrollmentIds(
+          attendedEnrollments.map((enrollment) => enrollment.id),
+          marks.map((mark) => mark.enrollmentId),
+        ).length ||
+        marks.some((mark) => mark.marks === null || Number(mark.marks) > Number(subject.maxMarks))
+      ) {
         return "invalid-marks" as const;
       }
     }

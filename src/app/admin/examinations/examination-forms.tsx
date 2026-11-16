@@ -13,6 +13,7 @@ import {
   deleteExamination,
   publishExamination,
   requestMarkCorrection,
+  reopenApprovedExamSubject,
   reviewExamSubject,
   reviewMarkCorrection,
   saveClassTeacherRemark,
@@ -309,7 +310,7 @@ export function SaveExamAttendanceForm({
   const visibleCount = students.filter((student) =>
     `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
   ).length;
-  if (!editable) return <p className="text-sm text-slate-600">Attendance is read-only after results are published.</p>;
+  if (!editable) return <p className="text-sm text-slate-600">Attendance can only be changed while this assessment is a draft and the examination is open.</p>;
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
@@ -478,7 +479,7 @@ export function SaveMarksForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
-      <p className="text-sm text-slate-600">Enter marks for each component. The total is calculated from the marks entered, out of {maxMarks}; grades are based on the total. Remarks are optional.</p>
+      <p className="text-sm text-slate-600">Only students marked Present or Late in exam attendance appear here. Record attendance first; absent, excused, and unmarked students cannot receive marks. The total is calculated from the components entered, out of {maxMarks}; remarks are optional.</p>
       <label className="block max-w-lg text-sm font-medium text-slate-700">
         Search students
         <input
@@ -618,6 +619,25 @@ export function ReviewSubjectForm({ examSubjectId }: { examSubjectId: number }) 
         <button name="decision" value="approve" disabled={pending} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">Approve</button>
         <button name="decision" value="return" disabled={pending} className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60">Return to teacher</button>
       </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+export function ReopenApprovedSubjectForm({ examSubjectId }: { examSubjectId: number }) {
+  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(reopenApprovedExamSubject, {});
+  return (
+    <form action={action} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <input type="hidden" name="examSubjectId" value={examSubjectId} />
+      <div>
+        <h2 className="font-bold text-amber-950">Reopen approved marks for correction</h2>
+        <p className="mt-1 text-sm text-amber-900">Existing marks are retained. The subject returns to draft, attendance-based roster sync can add missing students, and the corrected marks must be submitted and approved again. Published examinations cannot be reopened here.</p>
+      </div>
+      <label className="block text-sm font-medium text-amber-950">
+        Reason for reopening
+        <textarea required name="reason" maxLength={1000} rows={2} className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-2" />
+      </label>
+      <SubmitButton pending={pending}>Reopen for correction</SubmitButton>
       <Feedback state={state} />
     </form>
   );
