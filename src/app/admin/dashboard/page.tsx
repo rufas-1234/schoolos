@@ -2,6 +2,7 @@ import { and, count, desc, eq } from "drizzle-orm";
 import type { ReactNode } from "react";
 import {
   ArrowUpRight,
+  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
@@ -87,10 +88,52 @@ export default async function DashboardPage() {
   const staffCount = Number(staffResult[0]?.value ?? 0);
   const canManageFees = context.grantedPermissions.includes("fees.manage");
   const canRecordPayments = context.grantedPermissions.includes("payments.record");
+  const quickAccess = [
+    context.grantedPermissions.includes("students.view") && {
+      href: "/admin/students",
+      label: "Students",
+      icon: <GraduationCap size={20} />,
+      color: "bg-violet-50 text-violet-700",
+    },
+    (context.grantedPermissions.includes("academics.manage") || context.grantedPermissions.includes("school.settings.manage")) && {
+      href: "/admin/academics",
+      label: "Academics",
+      icon: <CalendarDays size={20} />,
+      color: "bg-sky-50 text-sky-700",
+    },
+    (context.grantedPermissions.includes("examinations.create") || context.grantedPermissions.includes("results.enter") || context.grantedPermissions.includes("results.publish")) && {
+      href: context.grantedPermissions.includes("results.enter") ? "/portal/teacher" : "/admin/examinations",
+      label: "Exams",
+      icon: <BookOpen size={20} />,
+      color: "bg-amber-50 text-amber-700",
+    },
+    (canManageFees || canRecordPayments) && {
+      href: canManageFees ? "/admin/fees" : "/admin/fees/collection",
+      label: "Fees",
+      icon: <CircleDollarSign size={20} />,
+      color: "bg-emerald-50 text-emerald-700",
+    },
+  ].filter((item) => item !== false);
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-800 via-violet-700 to-indigo-900 p-5 text-white shadow-lg md:hidden">
+        <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full border border-white/15" />
+        <div className="pointer-events-none absolute -bottom-20 right-20 h-40 w-40 rounded-full border border-white/10" />
+        <div className="relative">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200">
+            {new Intl.DateTimeFormat("en", { dateStyle: "full" }).format(new Date())}
+          </p>
+          <h1 className="mt-3 text-2xl font-bold leading-tight">
+            Hello, {context.user.name.split(" ")[0]}
+          </h1>
+          <p className="mt-1 text-sm leading-6 text-violet-100">
+            Your school, at a glance.
+          </p>
+        </div>
+      </section>
+
+      <div className="hidden flex-col justify-between gap-4 md:flex md:flex-row md:items-end">
         <div>
           <p className="text-sm font-medium text-violet-700">
             {new Intl.DateTimeFormat("en", { dateStyle: "full" }).format(new Date())}
@@ -135,7 +178,30 @@ export default async function DashboardPage() {
         </Link>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      {quickAccess.length > 0 && (
+        <section className="space-y-3 md:hidden">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900">Quick access</h2>
+            <span className="text-xs font-medium text-slate-400">Your workspace</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 min-[400px]:grid-cols-4">
+            {quickAccess.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white px-2 py-3 text-center shadow-sm transition active:scale-[0.98] hover:border-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+              >
+                <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.color}`}>
+                  {item.icon}
+                </span>
+                <span className="text-xs font-semibold leading-tight text-slate-700">{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
         <MetricCard
           title="School members"
           value={memberCount}
@@ -268,14 +334,14 @@ function MetricCard({
   return (
     <Link
       href={href}
-      className="block rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+      className="block min-w-0 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 sm:p-5"
     >
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-500">{title}</p>
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${styles}`}>{icon}</span>
+      <div className="flex min-w-0 items-start justify-between gap-1">
+        <p className="min-w-0 text-xs font-medium leading-4 text-slate-500 sm:text-sm">{title}</p>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl ${styles}`}>{icon}</span>
       </div>
-      <p className="mt-4 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
-      <p className="mt-1 text-xs text-slate-400">{detail}</p>
+      <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:mt-4 sm:text-3xl">{value}</p>
+      <p className="mt-1 hidden text-xs text-slate-400 sm:block">{detail}</p>
     </Link>
   );
 }

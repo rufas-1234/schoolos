@@ -37,11 +37,16 @@ export function printCurrentPage({
     target: string | null;
   }> = [];
   const previousTitle = document.title;
+  const previousPrintPageSize = document.body.getAttribute("data-print-page-size");
+  const previousPrintOrientation = document.body.getAttribute("data-print-orientation");
   const pageStyle = document.createElement("style");
   pageStyle.dataset.adminPrintPage = "true";
   pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: ${isExamReport ? "8mm" : "27mm 14mm 20mm"}; }`;
   document.head.append(pageStyle);
   document.body.classList.add("print-target-active");
+  if (isExamReport) document.body.classList.add("print-exam-report");
+  document.body.setAttribute("data-print-page-size", pageSize);
+  document.body.setAttribute("data-print-orientation", pageOrientation);
 
   if (target) {
     const heading = target.querySelector(".exam-report-heading h2, .print-report-heading h2, .payroll-record-print-kicker, h1, h2");
@@ -95,6 +100,11 @@ export function printCurrentPage({
       else change.element.setAttribute(printTargetAttribute, change.target);
     }
     document.body.classList.remove("print-target-active");
+    document.body.classList.remove("print-exam-report");
+    if (previousPrintPageSize === null) document.body.removeAttribute("data-print-page-size");
+    else document.body.setAttribute("data-print-page-size", previousPrintPageSize);
+    if (previousPrintOrientation === null) document.body.removeAttribute("data-print-orientation");
+    else document.body.setAttribute("data-print-orientation", previousPrintOrientation);
     document.title = previousTitle;
     pageStyle.remove();
   };

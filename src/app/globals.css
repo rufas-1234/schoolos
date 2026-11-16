@@ -261,6 +261,40 @@ h6 {
   font-family: var(--font-body), Arial, sans-serif;
 }
 
+@media screen and (max-width: 639px) {
+  .exam-report-document {
+    padding: 0.75rem !important;
+  }
+
+  .exam-report-document .print-report-content,
+  .exam-report-document .a4-report-card {
+    border-radius: 1.25rem;
+    padding: 1rem !important;
+  }
+
+  .exam-report-document .print-report-heading,
+  .exam-report-document .exam-report-heading {
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem !important;
+  }
+
+  .exam-report-document .exam-report-school-logo,
+  .exam-report-document .exam-report-student-photo {
+    position: static;
+    max-width: 3rem;
+    max-height: 3rem;
+    transform: none;
+  }
+
+  .exam-report-document .print-report-heading > div,
+  .exam-report-document .exam-report-heading > div {
+    flex: none;
+    width: 100%;
+  }
+}
+
 .exam-report-document .print-report-content th,
 .exam-report-document .print-report-content td,
 .exam-report-document .a4-report-card th,
@@ -675,6 +709,40 @@ h6 {
     padding-left: 0 !important;
   }
 
+  body.print-exam-report[data-print-page-size="A4"] [data-print-target] {
+    box-sizing: border-box !important;
+    width: 194mm !important;
+    max-width: 194mm !important;
+    min-width: 0 !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    overflow: visible !important;
+  }
+
+  body.print-exam-report[data-print-page-size="A4"][data-print-orientation="landscape"] [data-print-target] {
+    width: 281mm !important;
+    max-width: 281mm !important;
+  }
+
+  body.print-exam-report [data-print-target] .overflow-x-auto {
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  body.print-exam-report [data-print-target] table {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+  }
+
+  body.print-exam-report [data-print-target] th,
+  body.print-exam-report [data-print-target] td {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
   .exam-report-document,
   .student-report-document {
     color: #111 !important;
@@ -780,7 +848,7 @@ h6 {
 
   .exam-report-document .a4-report-card {
     border: 3px double #263b63 !important;
-    padding: 4mm !important;
+    padding: 3mm !important;
     font-size: 8pt !important;
   }
 
