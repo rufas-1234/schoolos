@@ -24,7 +24,7 @@ export default async function ExamReportSignaturesPage() {
     <header>
       <p className="text-sm font-semibold text-violet-700">Examinations</p>
       <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Report signatures</h1>
-      <p className="mt-1 max-w-2xl text-sm text-slate-600">Upload the signatures that appear on individual and bulk student progress cards. Images are private to this school.</p>
+      <p className="mt-1 max-w-2xl text-sm text-slate-600">Upload the signatures that appear on printable examination reports. Images are private to this school.</p>
     </header>
     <section className="grid gap-4 lg:grid-cols-3">
       {signatureRoles.map((role) => <SignatureForm key={role} role={role} configured={configuredRoles.has(role)} />)}

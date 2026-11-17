@@ -15,6 +15,7 @@ import {
   examMarkAudits,
   examMarkCorrections,
   examMarks,
+  examReportSignatures,
   examStudentRemarks,
   examSubjects,
   examinations,
@@ -26,6 +27,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { PrintButton } from "@/components/print-button";
+import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
   ClassTeacherRemarkForm,
   CorrectionRequestForm,
@@ -238,6 +240,10 @@ export default async function SubjectMarksPage({
       .where(and(eq(teachers.schoolId, context.schoolId), eq(teachers.status, "active")))
       .limit(1)
     : [];
+  const signatureRows = await db.select({ role: examReportSignatures.role })
+    .from(examReportSignatures)
+    .where(eq(examReportSignatures.schoolId, context.schoolId));
+  const signatureRoles = signatureRows.map((row) => row.role);
   return (
     <main className="exam-report-document mx-auto max-w-6xl space-y-6 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -284,6 +290,7 @@ export default async function SubjectMarksPage({
             ))}</tbody>
           </table>
         </div>
+        <ReportSignatureStrip roles={signatureRoles} />
       </section>
 
       <section id="exam-mark-list" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5">

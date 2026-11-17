@@ -32,6 +32,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
+import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
   calculateWeightedAverage,
   gradeForPercentage,
@@ -241,19 +242,7 @@ function ProgressCard({
         <p className="mt-1"><b>Class teacher:</b> {classRemark || overallGrade?.performanceRemark || "—"}</p>
         <p className="mt-1"><b>Headteacher:</b> {principalRemark || "—"}</p>
       </section>
-      <footer className="grid grid-cols-3 gap-3 pt-2 text-center text-[10px]">
-        {([
-          ["headteacher", "Headteacher"],
-          ["class-teacher", "Class teacher"],
-          ["subject-teacher", "Subject teacher"],
-        ] as const).map(([role, label]) => (
-          <div key={role} className="flex min-h-14 flex-col justify-end pt-1">
-            {signatureRoles.includes(role) && <Image src={`/api/admin/examinations/signatures/${role}`} unoptimized width={180} height={56}
-              alt={`${label} signature`} className="mx-auto mb-1 max-h-9 w-auto max-w-full object-contain" />}
-            <div className="border-t border-slate-500 pt-1">{label} signature</div>
-          </div>
-        ))}
-      </footer>
+      <ReportSignatureStrip roles={signatureRoles} />
       {(schoolAddress || schoolPhone || schoolEmail) && (
         <footer className="border-t border-slate-300 pt-2 text-center text-[9px] text-slate-600">
           {[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join(" · ")}
@@ -275,10 +264,8 @@ export default async function ExaminationReportPage({
   if (!Object.hasOwn(reportDefinitions, rawReportType)) notFound();
   const reportType = rawReportType as ReportType;
   const isProgressCard = reportType === "progress-card" || reportType === "progress-card-100-percent";
-  const configuredSignatures = isProgressCard
-    ? await db.select({ role: examReportSignatures.role }).from(examReportSignatures)
-      .where(eq(examReportSignatures.schoolId, context.schoolId))
-    : [];
+  const configuredSignatures = await db.select({ role: examReportSignatures.role }).from(examReportSignatures)
+    .where(eq(examReportSignatures.schoolId, context.schoolId));
   const signatureRoles = configuredSignatures.map((row) => row.role);
   const definition = reportDefinitions[reportType];
   const canManage = context.grantedPermissions.includes("examinations.create") ||
@@ -797,6 +784,7 @@ export default async function ExaminationReportPage({
                     <tbody>{routineRows.map((item) => <tr key={item.id}><td>{item.examDate}</td><td>{item.name} <span className="text-xs text-slate-500">{item.code}</span></td><td>{examDetails.name}</td><td>{item.maxMarks}</td><td>{item.weight}</td></tr>)}</tbody>
                   </table>
                   {routineRows.length === 0 && <p className="text-sm text-slate-600">No scheduled subjects are configured for this class.</p>}
+                  <ReportSignatureStrip roles={signatureRoles} />
                 </>
               ) : <p className="text-sm text-slate-600">Select an examination and class to create the routine.</p>}
             </section>
@@ -818,6 +806,7 @@ export default async function ExaminationReportPage({
                       <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{row.overall?.totalMarks.toFixed(2)} / {row.overall?.maxMarks.toFixed(2)}</td><td>{row.overall?.percentage.toFixed(2)}%</td><td>{row.grade?.grade ?? "—"} {row.grade?.description}</td></tr>
                     ))}</tbody>
                   </table>
+                  <ReportSignatureStrip roles={signatureRoles} />
                 </section>
               )}
 
@@ -841,6 +830,7 @@ export default async function ExaminationReportPage({
                         })}</tbody>
                         <tfoot><tr><td>Overall</td><td>{activeResult.overall ? `${activeResult.overall.totalMarks.toFixed(2)} / ${activeResult.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{activeResult.overall ? `${activeResult.overall.percentage.toFixed(2)}%` : "—"}</td><td>{activeResult.grade?.grade ?? "—"}</td><td>{activeResult.grade?.performanceRemark ?? ""}</td></tr></tfoot>
                       </table>
+                      <ReportSignatureStrip roles={signatureRoles} />
                     </>
                   ) : <p className="text-sm text-slate-600">Select a student to generate their marksheet.</p>}
                 </section>
@@ -860,6 +850,7 @@ export default async function ExaminationReportPage({
                           return <tr key={row.enrollmentId}><td>{row.rollNumber ?? "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{formatMarks(mark)} / {selectedSubject.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td></tr>;
                         })}</tbody>
                       </table>
+                      <ReportSignatureStrip roles={signatureRoles} />
                     </>
                   ) : <p className="text-sm text-slate-600">Select a subject to generate its marksheet.</p>}
                 </section>
@@ -874,6 +865,7 @@ export default async function ExaminationReportPage({
                       <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => <td key={item.id}>{formatMarks(row.marks.get(item.id))}</td>)}<td>{row.overall ? `${row.overall.totalMarks.toFixed(2)} / ${row.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{row.overall ? `${row.overall.percentage.toFixed(2)}%` : "—"}</td><td>{row.grade?.grade ?? "—"}</td></tr>)}</tbody>
                     </table>
                   </div>
+                  <ReportSignatureStrip roles={signatureRoles} />
                 </section>
               )}
 
@@ -951,6 +943,7 @@ export default async function ExaminationReportPage({
                       </table>
                     </div>
                   ) : <p className="text-sm text-slate-600">No earlier published results are available for this class.</p>}
+                  <ReportSignatureStrip roles={signatureRoles} />
                 </section>
               )}
             </>
