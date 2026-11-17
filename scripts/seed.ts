@@ -330,20 +330,12 @@ async function seed() {
       .limit(1);
     if (!teacherRole) throw new Error("The Teacher role could not be created.");
     await tx.update(roles).set({
-      description: "Manage academic setup, student records, and examinations; no delete or result-publishing access.",
+      description: "Access the teacher portal, enter marks for assigned subjects, and record attendance for appointed classes.",
     }).where(and(
       eq(roles.id, teacherRole.id),
       eq(roles.isSystem, true),
     ));
-    for (const permissionKey of [
-      "academics.manage",
-      "students.view",
-      "students.create",
-      "students.update",
-      "examinations.create",
-      "results.enter",
-      "fees.balance.view",
-    ]) {
+    for (const permissionKey of ["results.enter"]) {
       const [permission] = await tx
         .select({ id: permissions.id })
         .from(permissions)

@@ -71,6 +71,7 @@ export default async function ReportCardPage({
     examinationName: examinations.name,
     examinationStatus: examinations.status,
     academicYearId: examinations.academicYearId,
+    academicYearStatus: academicYears.status,
     branchId: examinations.branchId,
     termId: examinations.academicTermId,
     scaleId: examGradingScales.id,
@@ -195,21 +196,21 @@ export default async function ReportCardPage({
   }
 
   if (!canManage) {
-    const assignment = await db.select({ id: classSubjects.id }).from(classSubjects)
-      .innerJoin(teachers, and(
-        eq(teachers.id, classSubjects.teacherId!),
-        eq(teachers.schoolId, context.schoolId),
-        eq(teachers.status, "active"),
-      ))
+    if (record.academicYearStatus !== "active" || record.classTeacherId === null) notFound();
+    const appointedTeacher = await db.select({ id: teachers.id }).from(teachers)
       .innerJoin(staffMembers, and(
         eq(staffMembers.id, teachers.staffMemberId!),
         eq(staffMembers.schoolId, context.schoolId),
         eq(staffMembers.linkedUserId, context.user.id),
         eq(staffMembers.status, "active"),
       ))
-      .where(and(eq(classSubjects.classLevelId, record.classLevelId), eq(classSubjects.schoolId, context.schoolId)))
+      .where(and(
+        eq(teachers.id, record.classTeacherId),
+        eq(teachers.schoolId, context.schoolId),
+        eq(teachers.status, "active"),
+      ))
       .limit(1);
-    if (!assignment.length) notFound();
+    if (!appointedTeacher.length) notFound();
   }
   const marks = await db.select({
     subjectName: subjects.name,

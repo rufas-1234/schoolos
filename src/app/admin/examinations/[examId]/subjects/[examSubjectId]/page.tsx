@@ -349,7 +349,7 @@ export default async function SubjectMarksPage({
                     <p key={`${audit.examMarkId}-${index}`}>{audit.componentTitle ? `${audit.componentTitle} history` : "Total mark history"}: {audit.action} · {audit.previousMarks ?? "—"} → {audit.updatedMarks ?? "—"}{audit.reason ? ` · ${audit.reason}` : ""}</p>
                   ))}
                 </div>
-                {subject.examStatus === "published" && (
+                {subject.examStatus === "published" && (canConfigure || canReview || row.classTeacherId === myTeacher?.id) && (
                   <Link href={`/admin/examinations/${examId}/report-cards/${row.enrollmentId}`} className="mt-3 inline-block text-sm font-semibold text-violet-700">Open report card →</Link>
                 )}
                 {subject.examStatus === "open" && subject.examName.startsWith("TEST DATA - ") && (canConfigure || canReview) && (

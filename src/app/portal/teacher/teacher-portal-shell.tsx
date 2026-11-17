@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ClipboardCheck, LayoutDashboard, UsersRound } from "lucide-react";
+import { CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, UsersRound } from "lucide-react";
 import { PortalShell } from "@/components/portal-shell";
 
 export function TeacherPortalShell({
@@ -23,6 +23,7 @@ export function TeacherPortalShell({
       navigation={[
         { href: "/portal/teacher", label: "Overview", icon: LayoutDashboard },
         { href: "#classes", label: "My classes", icon: UsersRound },
+        { href: "#register", label: "Class register & attendance", icon: ClipboardList },
         { href: "#assessments", label: "Examination work", icon: ClipboardCheck },
         { href: "#timetable", label: "My timetable", icon: CalendarDays },
       ]}

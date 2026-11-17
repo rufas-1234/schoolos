@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { BookOpenCheck, CalendarDays, ClipboardCheck, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -10,15 +10,22 @@ import {
   classSections,
   classSubjects,
   examClasses,
+  examMarks,
   examSubjects,
   examinations,
   schoolBranches,
+  studentAttendance,
+  studentEnrollments,
+  students,
   staffMembers,
   subjects,
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { isCalendarDate } from "@/lib/academic-policy";
+import { isAttendanceStatus } from "@/lib/attendance-policy";
 import { TeacherPortalShell } from "./teacher-portal-shell";
+import { TeacherClassAttendance } from "./teacher-class-attendance";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +37,19 @@ const weekdays = new Map([
   [5, "Friday"],
 ]);
 
-export default async function TeacherPortalPage() {
+export default async function TeacherPortalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ classSectionId?: string | string[]; attendanceDate?: string | string[] }>;
+}) {
   const context = await requireSchoolPermission("results.enter");
+  const params = await searchParams;
+  const requestedSectionId = typeof params.classSectionId === "string" && /^\d+$/.test(params.classSectionId)
+    ? Number(params.classSectionId)
+    : null;
+  const requestedDate = typeof params.attendanceDate === "string" && isCalendarDate(params.attendanceDate)
+    ? params.attendanceDate
+    : new Date().toISOString().slice(0, 10);
   const teacherRecords = await db.select({
     id: teachers.id,
     firstName: teachers.firstName,
@@ -52,7 +70,7 @@ export default async function TeacherPortalPage() {
     ? [...new Set(teacherRecords.map((teacher) => `${teacher.firstName} ${teacher.lastName}`))].join(" · ")
     : context.user.name;
 
-  const [assignments, routines, assessments] = teacherIds.length
+  const [assignments, routines, assessments, classTeacherSections] = teacherIds.length
     ? await Promise.all([
       db.select({
         className: classLevels.name,
@@ -205,14 +223,176 @@ export default async function TeacherPortalPage() {
           inArray(classSubjects.teacherId, teacherIds),
         ))
         .orderBy(asc(examSubjects.examDate), asc(classLevels.name), asc(subjects.name)),
+      db.select({
+        id: classSections.id,
+        academicYearId: classSections.academicYearId,
+        classLevelId: classSections.classLevelId,
+        branchId: classLevels.branchId,
+        sectionName: classSections.name,
+        className: classLevels.name,
+        branchName: schoolBranches.name,
+        yearName: academicYears.name,
+      }).from(classSections)
+        .innerJoin(academicYears, and(
+          eq(academicYears.id, classSections.academicYearId),
+          eq(academicYears.schoolId, context.schoolId),
+          eq(academicYears.status, "active"),
+        ))
+        .innerJoin(classLevels, and(
+          eq(classLevels.id, classSections.classLevelId),
+          eq(classLevels.schoolId, context.schoolId),
+          eq(classLevels.status, "active"),
+        ))
+        .innerJoin(schoolBranches, and(
+          eq(schoolBranches.id, classLevels.branchId),
+          eq(schoolBranches.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(classSections.schoolId, context.schoolId),
+          inArray(classSections.classTeacherId, teacherIds),
+        ))
+        .orderBy(asc(academicYears.startDate), asc(classLevels.name), asc(classSections.name)),
     ])
-    : [[], [], []];
+    : [[], [], [], []];
 
   const uniqueAssignments = [...new Map(assignments.map((assignment) => [
     `${assignment.yearName}:${assignment.className}:${assignment.sectionName}:${assignment.subjectName}`,
     assignment,
   ])).values()];
   const hasTeacherProfile = teacherRecords.length > 0;
+  const selectedClassSection = classTeacherSections.find((section) => section.id === requestedSectionId);
+  const roster = selectedClassSection
+    ? await db.select({
+      id: students.id,
+      enrollmentId: studentEnrollments.id,
+      firstName: students.firstName,
+      lastName: students.lastName,
+      branchId: students.branchId,
+      admissionNumber: students.admissionNumber,
+      rollNumber: studentEnrollments.rollNumber,
+      attendanceStatus: studentAttendance.status,
+      attendanceNote: studentAttendance.note,
+    }).from(studentEnrollments)
+      .innerJoin(students, and(
+        eq(students.id, studentEnrollments.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .leftJoin(studentAttendance, and(
+        eq(studentAttendance.enrollmentId, studentEnrollments.id),
+        eq(studentAttendance.classSectionId, selectedClassSection.id),
+        eq(studentAttendance.attendanceDate, requestedDate),
+        eq(studentAttendance.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.classSectionId, selectedClassSection.id),
+        eq(studentEnrollments.academicYearId, selectedClassSection.academicYearId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+      ))
+      .orderBy(asc(students.lastName), asc(students.firstName))
+    : [];
+  const publishedReportExamClasses = selectedClassSection
+    ? await db.select({
+      examClassId: examClasses.id,
+      examId: examinations.id,
+      examName: examinations.name,
+      branchId: examinations.branchId,
+    }).from(examClasses)
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+        eq(examinations.academicYearId, selectedClassSection.academicYearId),
+        eq(examinations.status, "published"),
+        or(isNull(examinations.branchId), eq(examinations.branchId, selectedClassSection.branchId)),
+      ))
+      .where(and(
+        eq(examClasses.schoolId, context.schoolId),
+        eq(examClasses.classLevelId, selectedClassSection.classLevelId),
+      ))
+      .orderBy(asc(examinations.startDate), asc(examinations.name))
+    : [];
+  const publishedSubjects = publishedReportExamClasses.length
+    ? await db.select({
+      id: examSubjects.id,
+      examClassId: examSubjects.examClassId,
+    }).from(examSubjects)
+      .where(and(
+        eq(examSubjects.schoolId, context.schoolId),
+        eq(examSubjects.status, "published"),
+        inArray(examSubjects.examClassId, publishedReportExamClasses.map((examClass) => examClass.examClassId)),
+      ))
+    : [];
+  const publishedMarks = publishedSubjects.length && roster.length
+    ? await db.select({
+      enrollmentId: examMarks.enrollmentId,
+      examSubjectId: examMarks.examSubjectId,
+      marks: examMarks.marks,
+    }).from(examMarks)
+      .where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        inArray(examMarks.examSubjectId, publishedSubjects.map((subject) => subject.id)),
+        inArray(examMarks.enrollmentId, roster.map((student) => student.enrollmentId)),
+      ))
+    : [];
+  const subjectIdsByExamClass = new Map<number, number[]>();
+  for (const subject of publishedSubjects) {
+    const ids = subjectIdsByExamClass.get(subject.examClassId) ?? [];
+    ids.push(subject.id);
+    subjectIdsByExamClass.set(subject.examClassId, ids);
+  }
+  const completeMarkKeys = new Set(
+    publishedMarks.filter((mark) => mark.marks !== null).map((mark) => `${mark.enrollmentId}:${mark.examSubjectId}`),
+  );
+  const publishedReportsByEnrollment = new Map<number, { examId: number; examName: string }[]>();
+  for (const examClass of publishedReportExamClasses) {
+    const subjectIds = subjectIdsByExamClass.get(examClass.examClassId) ?? [];
+    if (!subjectIds.length) continue;
+    for (const student of roster) {
+      if (examClass.branchId !== null && examClass.branchId !== student.branchId) continue;
+      if (!subjectIds.every((subjectId) => completeMarkKeys.has(`${student.enrollmentId}:${subjectId}`))) continue;
+      const reports = publishedReportsByEnrollment.get(student.enrollmentId) ?? [];
+      reports.push({ examId: examClass.examId, examName: examClass.examName });
+      publishedReportsByEnrollment.set(student.enrollmentId, reports);
+    }
+  }
+  const historyStartDate = new Date(`${requestedDate}T00:00:00.000Z`);
+  historyStartDate.setUTCDate(historyStartDate.getUTCDate() - 29);
+  const historyStart = historyStartDate.toISOString().slice(0, 10);
+  const historyRows = roster.length && selectedClassSection
+    ? await db.select({
+      studentId: studentAttendance.studentId,
+      status: studentAttendance.status,
+    }).from(studentAttendance)
+      .where(and(
+        eq(studentAttendance.schoolId, context.schoolId),
+        eq(studentAttendance.classSectionId, selectedClassSection.id),
+        inArray(studentAttendance.studentId, roster.map((student) => student.id)),
+        gte(studentAttendance.attendanceDate, historyStart),
+        lte(studentAttendance.attendanceDate, requestedDate),
+      ))
+    : [];
+  const recentAbsences = new Map<number, number>();
+  for (const row of historyRows) {
+    if (row.status === "absent") recentAbsences.set(row.studentId, (recentAbsences.get(row.studentId) ?? 0) + 1);
+  }
+  const attendanceRoster = roster.map((student) => ({
+    id: student.id,
+    enrollmentId: student.enrollmentId,
+    firstName: student.firstName,
+    lastName: student.lastName,
+    admissionNumber: student.admissionNumber,
+    rollNumber: student.rollNumber,
+    status: student.attendanceStatus && isAttendanceStatus(student.attendanceStatus) ? student.attendanceStatus : null,
+    note: student.attendanceNote,
+    absencesInLast30Days: recentAbsences.get(student.id) ?? 0,
+    publishedReports: publishedReportsByEnrollment.get(student.enrollmentId) ?? [],
+  }));
+  const attendanceSections = classTeacherSections.map((section) => ({
+    id: section.id,
+    label: `${section.branchName} · ${section.yearName} · ${section.className} · ${section.sectionName}`,
+  }));
+  const selectedAttendanceSectionId = selectedClassSection ? String(selectedClassSection.id) : "";
 
   return (
     <TeacherPortalShell
@@ -247,7 +427,7 @@ export default async function TeacherPortalPage() {
             <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
               <h2 className="font-semibold text-slate-950">Your school access</h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                You can manage academic setup, student records, attendance, and examinations. Deleting academic or student records and publishing results remain restricted to authorized administrators.
+                Access is limited to your active teaching assignments and appointed classes. You can enter marks only for assigned subjects and record daily attendance only for a class you are appointed to lead. Student-record changes, examination approval and publication, finance, and school administration remain restricted to authorized staff.
               </p>
             </section>
 
@@ -274,6 +454,17 @@ export default async function TeacherPortalPage() {
               ) : (
                 <EmptyState>There are no subject assignments in an active academic year yet.</EmptyState>
               )}
+            </section>
+
+            <section id="register" className="space-y-4">
+              <SectionHeading title="Class register and attendance" description="View enrolled students and record daily attendance for classes where you are the appointed class teacher. Recent absences are highlighted for follow-up." />
+              <TeacherClassAttendance
+                key={`${selectedAttendanceSectionId}:${requestedDate}`}
+                sections={attendanceSections}
+                selectedSectionId={selectedAttendanceSectionId}
+                attendanceDate={requestedDate}
+                students={attendanceRoster}
+              />
             </section>
 
             <section id="assessments" className="space-y-4">

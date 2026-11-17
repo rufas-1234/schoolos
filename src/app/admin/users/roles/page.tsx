@@ -107,7 +107,7 @@ export default async function UserRolesPage() {
           Create school-specific roles, grant the least required permissions, and assign those roles to active school accounts.
         </p>
         <p className="mt-3 max-w-3xl rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
-          To enable a teacher, assign the Teacher role to their account below. It grants academic management, student record access, exam setup, and marks entry, but not deletion or result publishing. Link the account to an active teacher profile so the portal can show assigned classes and subjects.
+          To enable a teacher, assign the Teacher role and link the account to an active teacher profile. The default role allows marks entry only for assigned subjects; class attendance is available only in the teacher&apos;s appointed classes. Grant additional permissions separately when needed.
         </p>
       </header>
 
