@@ -13,6 +13,7 @@ import {
   examGradeBands,
   examGradingScales,
   examMarks,
+  examReportSignatures,
   examStudentRemarks,
   examSubjects,
   examinations,
@@ -136,6 +137,10 @@ export default async function ReportCardPage({
   });
   if (record.examinationStatus !== "published" && !draftPreview) notFound();
 
+  const signatureRows = await db.select({ role: examReportSignatures.role })
+    .from(examReportSignatures)
+    .where(eq(examReportSignatures.schoolId, context.schoolId));
+  const signatureRoles = new Set(signatureRows.map((row) => row.role));
   const canViewFeeBalance = context.grantedPermissions.includes("fees.balance.view") ||
     context.grantedPermissions.includes("payments.record") ||
     context.grantedPermissions.includes("fees.manage");
@@ -378,11 +383,17 @@ export default async function ReportCardPage({
         </section>
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classRemark?.remark || overallGrade?.performanceRemark || "—"}</p></div>
-          <div className="rounded-xl border p-4"><h3 className="font-bold">Principal&apos;s remarks</h3><p className="mt-2 text-sm">{record.principalRemark ?? "—"}</p></div>
+          <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{record.principalRemark ?? "—"}</p></div>
         </section>
         <section className="grid grid-cols-3 gap-3 pt-4 text-center text-xs">
-          {["Parent / Guardian", "Class Teacher", "Principal"].map((label) => (
-            <div key={label} className="pt-8">
+          {([
+            ["headteacher", "Headteacher"],
+            ["class-teacher", "Class teacher"],
+            ["subject-teacher", "Subject teacher"],
+          ] as const).map(([role, label]) => (
+            <div key={role} className="flex min-h-16 flex-col justify-end pt-1">
+              {signatureRoles.has(role) && <Image src={`/api/admin/examinations/signatures/${role}`} unoptimized width={180} height={56}
+                alt={`${label} signature`} className="mx-auto mb-1 max-h-10 w-auto max-w-full object-contain" />}
               <div className="border-t border-slate-500 pt-1">{label} signature</div>
             </div>
           ))}

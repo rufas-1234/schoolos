@@ -82,6 +82,7 @@ const navigation: NavigationItem[] = [
       { id: "setup", label: "Exam Setup", href: "/admin/examinations?section=setup", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "setup" } },
       { id: "schedule", label: "Exam Schedule", href: "/admin/examinations?section=schedule", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "schedule" } },
       { id: "attendance", label: "Exam Attendance", href: "/admin/examinations?section=attendance", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "attendance" } },
+      { id: "report-signatures", label: "Report Signatures", href: "/admin/examinations/signatures", permission: "examinations.create", permissionAlternatives: ["results.publish"] },
       { id: "marks-register", label: "Marks Register", href: "/admin/examinations?section=marks", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "marks" } },
       { id: "marks-grade", label: "Marks Grade", href: "/admin/examinations?section=grades", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "grades" } },
       { id: "send-marks-sms", label: "Send Marks By SMS", href: "/admin/examinations?section=sms", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "sms" } },
@@ -94,6 +95,15 @@ const navigation: NavigationItem[] = [
     label: "Library",
     icon: BookMarked,
     permission: "library.manage",
+    children: [
+      { id: "add-book", label: "Add Book", href: "/admin/library?section=add-book", matchQuery: { key: "section", value: "add-book" } },
+      { id: "books", label: "Book List", href: "/admin/library?section=books", matchQuery: { key: "section", value: "books" } },
+      { id: "categories", label: "Book Categories", href: "/admin/library?section=categories", matchQuery: { key: "section", value: "categories" } },
+      { id: "members", label: "Add Member", href: "/admin/library?section=members", matchQuery: { key: "section", value: "members" } },
+      { id: "issue", label: "Issue / Return Book", href: "/admin/library?section=issue", matchQuery: { key: "section", value: "issue" } },
+      { id: "issued", label: "All Issued Books", href: "/admin/library?section=issued", matchQuery: { key: "section", value: "issued" } },
+      { id: "subjects", label: "Subject", href: "/admin/library?section=subjects", matchQuery: { key: "section", value: "subjects" } },
+    ],
   },
   {
     href: "/admin/hr",
@@ -210,6 +220,7 @@ export function AdminShell({
   const [examinationsOpen, setExaminationsOpen] = useState(() =>
     pathname.startsWith("/admin/examinations") || pathname === "/admin/exam-analytics",
   );
+  const [libraryOpen, setLibraryOpen] = useState(() => pathname.startsWith("/admin/library"));
   const router = useRouter();
   const visibleNavigation = navigation
     .filter((item) =>
@@ -283,6 +294,9 @@ export function AdminShell({
   const activeFeesSection = navigation
     .find((item) => item.label === "Fees")
     ?.children?.find((section) => (section.matchPath ?? section.href?.split("?")[0]) === pathname);
+  const activeLibrarySection = navigation
+    .find((item) => item.label === "Library")
+    ?.children?.find((section) => section.matchQuery && searchParams.get(section.matchQuery.key) === section.matchQuery.value);
   const pageLabel = pathname.startsWith("/admin/academics")
     ? activeSection?.label ?? "Academics"
     : pathname.startsWith("/admin/students")
@@ -297,6 +311,8 @@ export function AdminShell({
             : activeInventorySection?.label ?? "Inventory"
         : pathname.startsWith("/admin/fees")
           ? activeFeesSection?.label ?? "Fees"
+        : pathname.startsWith("/admin/library")
+          ? activeLibrarySection?.label ?? "Library"
         : pathname === "/admin/exam-analytics"
           ? "Exam Analytics"
       : visibleNavigation.find(
@@ -416,6 +432,7 @@ export function AdminShell({
             const isStudentInfo = href === "/admin/students";
             const isHumanResources = href === "/admin/hr";
             const isInventory = label === "Inventory";
+            const isLibrary = label === "Library";
             const isFees = href === "/admin/fees/collection";
             const isExaminations = href === "/admin/examinations";
             const sectionOpen = isStudentInfo
@@ -424,6 +441,8 @@ export function AdminShell({
                 ? humanResourcesOpen
                 : isInventory
                   ? inventoryOpen
+                : isLibrary
+                  ? libraryOpen
                 : isFees
                   ? feesOpen
                   : isExaminations
@@ -435,6 +454,8 @@ export function AdminShell({
                 ? setHumanResourcesOpen
                 : isInventory
                   ? setInventoryOpen
+                : isLibrary
+                  ? setLibraryOpen
                 : isFees
                   ? setFeesOpen
                   : isExaminations

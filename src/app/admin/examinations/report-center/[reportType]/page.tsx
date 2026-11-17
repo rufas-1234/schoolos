@@ -16,6 +16,7 @@ import {
   examGradeBands,
   examGradingScales,
   examMarks,
+  examReportSignatures,
   examStudentRemarks,
   examSubjects,
   examTypes,
@@ -145,6 +146,7 @@ function ProgressCard({
   schoolAddress,
   schoolPhone,
   schoolEmail,
+  signatureRoles,
   currency,
   feeBalanceMinor,
   showFeeBalance,
@@ -174,6 +176,7 @@ function ProgressCard({
   schoolAddress: string | null;
   schoolPhone: string | null;
   schoolEmail: string | null;
+  signatureRoles: string[];
   currency: string;
   feeBalanceMinor: number;
   showFeeBalance: boolean;
@@ -236,11 +239,17 @@ function ProgressCard({
       <section className="rounded-lg border border-slate-200 p-3 text-xs">
         <h3 className="font-bold">Comments</h3>
         <p className="mt-1"><b>Class teacher:</b> {classRemark || overallGrade?.performanceRemark || "—"}</p>
-        <p className="mt-1"><b>Principal:</b> {principalRemark || "—"}</p>
+        <p className="mt-1"><b>Headteacher:</b> {principalRemark || "—"}</p>
       </section>
       <footer className="grid grid-cols-3 gap-3 pt-2 text-center text-[10px]">
-        {["Parent / Guardian", "Class Teacher", "Principal"].map((label) => (
-          <div key={label} className="pt-6">
+        {([
+          ["headteacher", "Headteacher"],
+          ["class-teacher", "Class teacher"],
+          ["subject-teacher", "Subject teacher"],
+        ] as const).map(([role, label]) => (
+          <div key={role} className="flex min-h-14 flex-col justify-end pt-1">
+            {signatureRoles.includes(role) && <Image src={`/api/admin/examinations/signatures/${role}`} unoptimized width={180} height={56}
+              alt={`${label} signature`} className="mx-auto mb-1 max-h-9 w-auto max-w-full object-contain" />}
             <div className="border-t border-slate-500 pt-1">{label} signature</div>
           </div>
         ))}
@@ -265,6 +274,12 @@ export default async function ExaminationReportPage({
   const [{ reportType: rawReportType }, query] = await Promise.all([params, searchParams]);
   if (!Object.hasOwn(reportDefinitions, rawReportType)) notFound();
   const reportType = rawReportType as ReportType;
+  const isProgressCard = reportType === "progress-card" || reportType === "progress-card-100-percent";
+  const configuredSignatures = isProgressCard
+    ? await db.select({ role: examReportSignatures.role }).from(examReportSignatures)
+      .where(eq(examReportSignatures.schoolId, context.schoolId))
+    : [];
+  const signatureRoles = configuredSignatures.map((row) => row.role);
   const definition = reportDefinitions[reportType];
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");
@@ -568,7 +583,7 @@ export default async function ExaminationReportPage({
     : new Map<number, number>();
   const activeResult = results.find((row) => row.enrollmentId === requestedEnrollmentId) ?? null;
   const reportIsReady = !!examDetails && examDetails.status === "published";
-  const canPrintBulkCards = reportType === "progress-card" || reportType === "progress-card-100-percent";
+  const canPrintBulkCards = isProgressCard;
   const showFeeBalance = context.grantedPermissions.includes("fees.balance.view") ||
     context.grantedPermissions.includes("payments.record") ||
     context.grantedPermissions.includes("fees.manage");
@@ -878,6 +893,7 @@ export default async function ExaminationReportPage({
                       schoolAddress={examDetails.schoolAddress}
                       schoolPhone={examDetails.schoolPhone}
                       schoolEmail={examDetails.schoolEmail}
+                      signatureRoles={signatureRoles}
                       currency={examDetails.schoolCurrency}
                       feeBalanceMinor={feeBalanceByStudent.get(activeResult.studentId) ?? 0}
                       showFeeBalance={showFeeBalance}
@@ -899,6 +915,7 @@ export default async function ExaminationReportPage({
                         schoolAddress={examDetails.schoolAddress}
                         schoolPhone={examDetails.schoolPhone}
                         schoolEmail={examDetails.schoolEmail}
+                        signatureRoles={signatureRoles}
                         currency={examDetails.schoolCurrency}
                         feeBalanceMinor={feeBalanceByStudent.get(row.studentId) ?? 0}
                         showFeeBalance={showFeeBalance}

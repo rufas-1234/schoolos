@@ -1876,18 +1876,97 @@ export const assetMaintenance = mysqlTable(
   (table) => [index("asset_maintenance_school_asset_date_idx").on(table.schoolId, table.assetId, table.maintenanceDate)],
 );
 
+export const libraryCategories = mysqlTable(
+  "library_categories",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(() => schoolBranches.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("library_categories_school_name_uq").on(table.schoolId, table.name),
+    index("library_categories_school_status_idx").on(table.schoolId, table.status),
+  ],
+);
+
+export const librarySubjects = mysqlTable(
+  "library_subjects",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(() => schoolBranches.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("library_subjects_school_name_uq").on(table.schoolId, table.name),
+    index("library_subjects_school_status_idx").on(table.schoolId, table.status),
+  ],
+);
+
+export const libraryMembers = mysqlTable(
+  "library_members",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(() => schoolBranches.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true }).notNull().references(() => students.id),
+    memberNumber: varchar("memberNumber", { length: 40 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("library_members_school_student_uq").on(table.schoolId, table.studentId),
+    uniqueIndex("library_members_school_number_uq").on(table.schoolId, table.memberNumber),
+    index("library_members_school_branch_status_idx").on(table.schoolId, table.branchId, table.status),
+  ],
+);
+
+export const examReportSignatures = mysqlTable(
+  "exam_report_signatures",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    role: varchar("role", { length: 30 }).notNull(),
+    storageKey: varchar("storageKey", { length: 500 }).notNull(),
+    fileName: varchar("fileName", { length: 160 }).notNull(),
+    contentType: varchar("contentType", { length: 100 }).notNull(),
+    updatedBy: varchar("updatedBy", { length: 36 }).notNull().references(() => user.id),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_report_signatures_school_role_uq").on(table.schoolId, table.role),
+  ],
+);
+
 export const libraryBooks = mysqlTable(
   "library_books",
   {
     id: id(),
     publicId: varchar("publicId", { length: 36 }).notNull().unique(),
     schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(() => schoolBranches.id),
+    categoryId: bigint("categoryId", { mode: "number", unsigned: true }).references(() => libraryCategories.id),
+    subjectId: bigint("subjectId", { mode: "number", unsigned: true }).references(() => librarySubjects.id),
+    bookNumber: varchar("bookNumber", { length: 40 }),
     isbn: varchar("isbn", { length: 20 }),
     title: varchar("title", { length: 200 }).notNull(),
     author: varchar("author", { length: 160 }).notNull(),
     publisher: varchar("publisher", { length: 160 }),
     category: varchar("category", { length: 100 }),
+    description: varchar("description", { length: 1000 }),
     shelfLocation: varchar("shelfLocation", { length: 80 }),
+    price: decimal("price", { precision: 12, scale: 2 }),
     totalCopies: int("totalCopies", { unsigned: true }).notNull().default(1),
     availableCopies: int("availableCopies", { unsigned: true }).notNull().default(1),
     status: varchar("status", { length: 20 }).notNull().default("active"),
@@ -1896,8 +1975,11 @@ export const libraryBooks = mysqlTable(
   },
   (table) => [
     uniqueIndex("library_books_school_isbn_uq").on(table.schoolId, table.isbn),
+    uniqueIndex("library_books_school_number_uq").on(table.schoolId, table.bookNumber),
     index("library_books_school_title_idx").on(table.schoolId, table.title),
     index("library_books_school_status_idx").on(table.schoolId, table.status),
+    index("library_books_school_category_idx").on(table.schoolId, table.categoryId),
+    index("library_books_school_subject_idx").on(table.schoolId, table.subjectId),
   ],
 );
 
@@ -1909,6 +1991,7 @@ export const libraryLoans = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
     bookId: bigint("bookId", { mode: "number", unsigned: true }).notNull().references(() => libraryBooks.id),
     studentId: bigint("studentId", { mode: "number", unsigned: true }).notNull().references(() => students.id),
+    memberId: bigint("memberId", { mode: "number", unsigned: true }).references(() => libraryMembers.id),
     issuedAt: date("issuedAt", { mode: "string" }).notNull(),
     dueDate: date("dueDate", { mode: "string" }).notNull(),
     returnedAt: date("returnedAt", { mode: "string" }),
