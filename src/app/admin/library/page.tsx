@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { and, asc, count, eq, like, or, sql } from "drizzle-orm";
-import { BookMarked, BookOpenCheck, Clock3, LibraryBig } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { db } from "@/db";
 import {
   libraryBooks,
@@ -261,10 +259,10 @@ export default async function LibraryPage({
 
       {section === "books" && <>
         <section aria-label="Library summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard icon={LibraryBig} label="Catalog titles" value={String(catalogStats?.titles ?? 0)} />
-          <SummaryCard icon={BookMarked} label="Copies available" value={String(catalogStats?.copies ?? 0)} />
-          <SummaryCard icon={BookOpenCheck} label="Books on loan" value={String(loanCount?.value ?? 0)} />
-          <SummaryCard icon={Clock3} label="Overdue loans" value={String(overdueCount?.value ?? 0)} alert={Number(overdueCount?.value ?? 0) > 0} />
+          <SummaryCard label="Catalog titles" value={String(catalogStats?.titles ?? 0)} />
+          <SummaryCard label="Copies available" value={String(catalogStats?.copies ?? 0)} />
+          <SummaryCard label="Books on loan" value={String(loanCount?.value ?? 0)} />
+          <SummaryCard label="Overdue loans" value={String(overdueCount?.value ?? 0)} alert={Number(overdueCount?.value ?? 0) > 0} />
         </section>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -429,14 +427,13 @@ function LoanHistoryTable({
   </div>;
 }
 
-function SummaryCard({ icon: Icon, label, value, alert = false }: {
-  icon: LucideIcon;
+function SummaryCard({ label, value, alert = false }: {
   label: string;
   value: string;
   alert?: boolean;
 }) {
   return <article className="rounded-2xl border border-slate-200 bg-white p-4">
-    <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-600">{label}</span><Icon size={18} className={alert ? "text-rose-600" : "text-violet-700"} aria-hidden="true" /></div>
+    <span className="text-sm font-medium text-slate-600">{label}</span>
     <p className={`mt-3 text-2xl font-bold ${alert ? "text-rose-700" : "text-slate-950"}`}>{value}</p>
   </article>;
 }
