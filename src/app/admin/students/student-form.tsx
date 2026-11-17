@@ -553,7 +553,7 @@ export function StudentForm({
             : "Admission and class placement added to the review queue."}
         </p>
       )}
-      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 border-t border-slate-200 bg-white/95 px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
+      <div className="admin-dialog-form-actions flex justify-end">
         {record
           ? <button type="submit" disabled={pending || hasPendingUploads} className="inline-flex w-full items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
               {hasPendingUploads ? "Uploading documents..." : pending ? "Saving..." : "Save changes"}

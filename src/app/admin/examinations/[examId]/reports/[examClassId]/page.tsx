@@ -71,6 +71,9 @@ export default async function ClassMarksheetReportPage({
     classBranchId: classLevels.branchId,
     schoolName: schools.name,
     schoolLogoUrl: schools.logoUrl,
+    schoolAddress: schools.address,
+    schoolPhone: schools.phone,
+    schoolEmail: schools.email,
   }).from(examinations)
     .innerJoin(academicYears, and(
       eq(academicYears.id, examinations.academicYearId),
@@ -268,6 +271,9 @@ export default async function ClassMarksheetReportPage({
           {schoolLogo && <Image src={schoolLogo} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="exam-report-school-logo h-14 w-14 object-contain" />}
           <div className="flex-1">
             <p className="exam-report-school-name text-xs font-semibold uppercase tracking-wide">{exam.schoolName}</p>
+            <p className="exam-report-school-contact mt-0.5 text-xs">
+              {[exam.schoolAddress, exam.schoolPhone, exam.schoolEmail].filter(Boolean).join(" · ")}
+            </p>
             <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className} Statement of Marks</h2>
             <p className="mt-1 text-sm">{exam.termName ?? exam.yearName}</p>
           </div>
@@ -306,6 +312,9 @@ export default async function ClassMarksheetReportPage({
           {schoolLogo && <Image src={schoolLogo} unoptimized width={56} height={56} alt={`${exam.schoolName} logo`} className="h-14 w-14 object-contain" />}
           <div className="flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">{exam.schoolName}</p>
+            <p className="exam-report-school-contact mt-0.5 text-xs text-slate-600">
+              {[exam.schoolAddress, exam.schoolPhone, exam.schoolEmail].filter(Boolean).join(" · ")}
+            </p>
             <h2 className="mt-1 text-xl font-bold">{exam.name} — {exam.className}</h2>
             <p className="mt-1 text-sm text-slate-600">{exam.termName ?? exam.yearName} · Sections: {sectionSummary} · {results.length} students · {assessmentRows.length} subjects</p>
             <p className="mt-1 text-sm text-slate-600">Pass threshold: {passMark > 0 ? `${passMark.toFixed(2)}% overall` : "not configured"} · {exam.allowRanking ? "Ranked students are ordered by weighted overall percentage." : "Position is not calculated."}</p>

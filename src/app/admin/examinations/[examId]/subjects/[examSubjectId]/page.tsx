@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -19,6 +20,7 @@ import {
   examStudentRemarks,
   examSubjects,
   examinations,
+  schools,
   studentEnrollments,
   students,
   subjects,
@@ -26,6 +28,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { schoolLogoSource } from "@/lib/school-logo";
 import { PrintButton } from "@/components/print-button";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
@@ -69,6 +72,11 @@ export default async function SubjectMarksPage({
     scaleId: examGradingScales.id,
     scaleName: examGradingScales.name,
     classLevelId: examClasses.classLevelId,
+    schoolName: schools.name,
+    schoolLogoUrl: schools.logoUrl,
+    schoolAddress: schools.address,
+    schoolPhone: schools.phone,
+    schoolEmail: schools.email,
   }).from(examSubjects)
     .innerJoin(examClasses, and(eq(examClasses.id, examSubjects.examClassId), eq(examClasses.schoolId, context.schoolId)))
     .innerJoin(examinations, and(eq(examinations.id, examClasses.examinationId), eq(examinations.schoolId, context.schoolId)))
@@ -76,6 +84,7 @@ export default async function SubjectMarksPage({
     .innerJoin(classSubjects, and(eq(classSubjects.id, examSubjects.classSubjectId), eq(classSubjects.schoolId, context.schoolId)))
     .innerJoin(subjects, and(eq(subjects.id, classSubjects.subjectId), eq(subjects.schoolId, context.schoolId)))
     .innerJoin(examGradingScales, and(eq(examGradingScales.id, examinations.gradingScaleId), eq(examGradingScales.schoolId, context.schoolId)))
+    .innerJoin(schools, eq(schools.id, context.schoolId))
     .where(and(
       eq(examSubjects.id, subjectId),
       eq(examSubjects.schoolId, context.schoolId),
@@ -246,6 +255,7 @@ export default async function SubjectMarksPage({
   })
     .from(examReportSignatures)
     .where(eq(examReportSignatures.schoolId, context.schoolId));
+  const schoolLogo = schoolLogoSource(subject.schoolLogoUrl);
   return (
     <main className="exam-report-document mx-auto max-w-6xl space-y-6 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -263,10 +273,16 @@ export default async function SubjectMarksPage({
       )}
 
       <section id="exam-marks-only-sheet" className="hidden print:block print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
-        <header className="print-report-heading">
-          <p className="text-xs font-semibold uppercase tracking-wide">{context.schoolName}</p>
-          <h2 className="mt-1 text-xl font-bold">{subject.examName} — {subject.className} · {subject.subjectName}</h2>
-          <p className="mt-1 text-sm">{subject.examDate} · Maximum {subject.maxMarks}</p>
+        <header className="print-report-heading flex items-center gap-4">
+          {schoolLogo && <Image src={schoolLogo} unoptimized width={56} height={56} alt={`${subject.schoolName} logo`} className="exam-report-school-logo h-14 w-14 object-contain" />}
+          <div className="min-w-0 flex-1">
+            <p className="exam-report-school-name text-xs font-semibold uppercase tracking-wide">{subject.schoolName}</p>
+            <p className="exam-report-school-contact mt-0.5 text-xs">
+              {[subject.schoolAddress, subject.schoolPhone, subject.schoolEmail].filter(Boolean).join(" · ")}
+            </p>
+            <h2 className="mt-1 text-xl font-bold">{subject.examName} — {subject.className} · {subject.subjectName}</h2>
+            <p className="mt-1 text-sm">{subject.examDate} · Maximum {subject.maxMarks}</p>
+          </div>
         </header>
         <div className="overflow-x-auto">
           <table className="print-report-table w-full min-w-[700px] border-collapse text-left text-sm">

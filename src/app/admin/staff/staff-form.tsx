@@ -372,7 +372,7 @@ export function StaffForm({
         </p>
       )}
       {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
-      <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+      <div className="admin-dialog-form-actions flex items-center justify-between border-t border-slate-100 pt-4">
         {state.success && (
           <p role="status" className="text-sm font-medium text-emerald-700">
             Staff profile saved.{loginAccessEnabled ? " Assign the school role under User Roles before the staff member signs in." : ""}
@@ -382,7 +382,7 @@ export function StaffForm({
         <button
           type="submit"
           disabled={pending || pendingUploads > 0 || !branches.length}
-          className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {pending ? "Saving..." : pendingUploads ? "Uploading..." : record ? "Save changes" : "Add staff"}
         </button>

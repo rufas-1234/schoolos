@@ -68,7 +68,7 @@ export function AdminActionDialog({
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
-        className="admin-record-dialog admin-resizable-dialog m-auto max-h-[90vh] w-[min(94vw,48rem)] max-w-none overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"
+        className="admin-record-dialog admin-resizable-dialog m-auto flex max-h-[90dvh] w-[min(94vw,48rem)] max-w-none flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <h2 id={titleId} className="font-semibold text-slate-900">{title}</h2>
@@ -81,7 +81,7 @@ export function AdminActionDialog({
             Close
           </button>
         </div>
-        <div className="p-5 sm:p-7">{children}</div>
+        <div className="admin-dialog-content min-h-0 flex-1 overflow-y-auto p-5 sm:p-7">{children}</div>
       </dialog>
     </>
   );
@@ -134,9 +134,9 @@ export function AdminRecordDialog({
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
-        className={`admin-record-dialog admin-resizable-dialog m-auto max-h-[90vh] ${
+        className={`admin-record-dialog admin-resizable-dialog m-auto flex max-h-[90dvh] flex-col overflow-hidden ${
           wide ? "w-[min(96vw,72rem)]" : "w-[min(94vw,48rem)]"
-        } max-w-none overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40`}
+        } max-w-none rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40`}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <h2 id={titleId} className="font-semibold text-slate-900">{title}</h2>
@@ -149,7 +149,7 @@ export function AdminRecordDialog({
             <X size={18} />
           </button>
         </div>
-        <div className="p-5 sm:p-7">{children}</div>
+        <div className="admin-dialog-content min-h-0 flex-1 overflow-y-auto p-5 sm:p-7">{children}</div>
       </dialog>
     </>
   );
@@ -211,14 +211,14 @@ export function AdminConfirmSubmitButton({
         ref={dialogRef}
         aria-labelledby={`${confirmationId}-title`}
         aria-describedby={`${confirmationId}-description`}
-        className="m-auto w-[min(92vw,28rem)] rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/40"
+        className="m-auto max-h-[90dvh] w-[min(92vw,28rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/40"
       >
         <div className="p-5 sm:p-6">
           <h2 id={`${confirmationId}-title`} className="text-lg font-semibold">{confirmationTitle}</h2>
           <p id={`${confirmationId}-description`} className="mt-2 text-sm leading-6 text-slate-600">
             {confirmationMessage}
           </p>
-          <div className="mt-6 flex justify-end gap-2">
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}

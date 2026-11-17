@@ -340,6 +340,9 @@ export default async function ReportCardPage({
           {schoolLogo && <Image src={schoolLogo} unoptimized width={64} height={64} alt={`${record.schoolName} logo`} className="exam-report-school-logo h-16 w-16 rounded-lg object-contain" />}
           <div className="min-w-0 flex-1">
             <p className="exam-report-school-name text-sm font-semibold uppercase tracking-wide text-violet-700">{record.schoolName}</p>
+            <p className="exam-report-school-contact mt-0.5 text-xs text-slate-600">
+              {[record.schoolAddress, record.schoolPhone, record.schoolEmail].filter(Boolean).join(" · ")}
+            </p>
             <h2 className="mt-1 text-2xl font-bold">Statement of Marks</h2>
             <p className="mt-1 text-sm text-slate-600">{record.examinationName} · {record.termName ?? record.yearName}</p>
           </div>
@@ -402,7 +405,7 @@ export default async function ReportCardPage({
           ))}
         </section>
         <footer className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-slate-500">
-          <span>{[record.schoolAddress, record.schoolPhone, record.schoolEmail].filter(Boolean).join(" · ") || record.schoolName}</span>
+          <span>{record.schoolName}</span>
           <span>{record.examinationName} · {record.yearName}</span>
         </footer>
       </article>

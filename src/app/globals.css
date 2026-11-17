@@ -111,6 +111,22 @@ h6 {
   overscroll-behavior: contain;
 }
 
+.admin-dialog-content {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.exam-report-school-contact,
+.exam-report-comment {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.exam-report-comment {
+  line-height: 1.35;
+}
+
 .admin-resizable-dialog {
   resize: both;
   min-width: min(94vw, 28rem);
@@ -125,6 +141,29 @@ h6 {
     min-width: 0;
     min-height: 10rem;
     max-width: calc(100vw - 1rem);
+  }
+
+  .admin-dialog-form-actions,
+  .admin-dialog-content form > div:last-child:has(> button[type="submit"]),
+  .admin-dialog-content form > div:last-child:has(> button[type="button"]),
+  .admin-dialog-content form > button[type="submit"]:last-child {
+    position: sticky;
+    bottom: -1.25rem;
+    z-index: 10;
+    margin: 0 -1.25rem -1.25rem;
+    border-top: 1px solid #e2e8f0;
+    background: rgb(255 255 255 / 96%);
+    padding: 0.75rem 1.25rem max(0.75rem, env(safe-area-inset-bottom));
+    backdrop-filter: blur(8px);
+  }
+
+  .admin-dialog-form-actions > button[type="submit"],
+  .admin-dialog-form-actions > button[type="button"] {
+    width: 100%;
+    height: auto;
+    min-height: 2.75rem;
+    line-height: 1.25;
+    white-space: normal;
   }
 }
 
@@ -757,6 +796,20 @@ h6 {
   body.print-exam-report [data-print-target] td {
     overflow-wrap: anywhere;
     word-break: normal;
+  }
+
+  body.print-exam-report [data-print-target] .exam-report-comment {
+    font-size: 7pt;
+    line-height: 1.25;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  body.print-exam-report [data-print-target] .exam-report-school-contact {
+    font-size: 7pt;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
   }
 
   .exam-report-document,

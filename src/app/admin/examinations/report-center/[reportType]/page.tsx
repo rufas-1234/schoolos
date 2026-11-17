@@ -113,11 +113,17 @@ function gradeBands(rows: Array<{
 function ReportHeading({
   schoolName,
   schoolLogoUrl,
+  schoolAddress,
+  schoolEmail,
+  schoolPhone,
   title,
   subtitle,
 }: {
   schoolName: string;
   schoolLogoUrl: string | null;
+  schoolAddress?: string | null;
+  schoolEmail?: string | null;
+  schoolPhone?: string | null;
   title: string;
   subtitle: string;
 }) {
@@ -127,6 +133,11 @@ function ReportHeading({
       {logoSrc && <Image src={logoSrc} unoptimized width={64} height={64} alt={`${schoolName} logo`} className="exam-report-school-logo h-16 w-16 object-contain" />}
       <div className="min-w-0 flex-1">
         <p className="exam-report-school-name text-sm font-bold uppercase tracking-wide text-slate-700">{schoolName}</p>
+        {(schoolAddress || schoolPhone || schoolEmail) && (
+          <p className="exam-report-school-contact mt-0.5 text-xs text-slate-600">
+            {[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join(" · ")}
+          </p>
+        )}
         <h2 className="mt-1 text-xl font-bold text-slate-950">{title}</h2>
         <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
       </div>
@@ -188,7 +199,15 @@ function ProgressCard({
   return (
     <article className={`a4-report-card${last ? " a4-report-card-last" : ""} space-y-3 rounded-xl border border-slate-200 bg-white p-5 text-slate-900`}>
       <div className="flex items-center gap-3">
-        <ReportHeading schoolName={schoolName} schoolLogoUrl={schoolLogoUrl} title="Student Progress Card" subtitle={summary} />
+        <ReportHeading
+          schoolName={schoolName}
+          schoolLogoUrl={schoolLogoUrl}
+          schoolAddress={schoolAddress}
+          schoolPhone={schoolPhone}
+          schoolEmail={schoolEmail}
+          title="Student Progress Card"
+          subtitle={summary}
+        />
         {row.photoUrl && (
           <Image
             src={row.photoUrl}
@@ -243,11 +262,6 @@ function ProgressCard({
         <p className="mt-1"><b>Headteacher:</b> {principalRemark || "—"}</p>
       </section>
       <ReportSignatureStrip signatures={signatures} />
-      {(schoolAddress || schoolPhone || schoolEmail) && (
-        <footer className="border-t border-slate-300 pt-2 text-center text-[9px] text-slate-600">
-          {[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join(" · ")}
-        </footer>
-      )}
     </article>
   );
 }
@@ -780,7 +794,7 @@ export default async function ExaminationReportPage({
             <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
               {examDetails && examClass ? (
                 <>
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examDetails.name} · Exam Routine`} subtitle={`${examClass.className} · ${examDetails.yearName} · ${examDetails.startDate} – ${examDetails.endDate}`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${examDetails.name} · Exam Routine`} subtitle={`${examClass.className} · ${examDetails.yearName} · ${examDetails.startDate} – ${examDetails.endDate}`} />
                   <table className="print-report-table w-full border-collapse text-left text-sm">
                     <thead><tr><th>Date</th><th>Subject</th><th>Assessment</th><th>Maximum marks</th><th>Weight</th></tr></thead>
                     <tbody>{routineRows.map((item) => <tr key={item.id}><td>{item.examDate}</td><td>{item.name} <span className="text-xs text-slate-500">{item.code}</span></td><td>{examDetails.name}</td><td>{item.maxMarks}</td><td>{item.weight}</td></tr>)}</tbody>
@@ -800,12 +814,24 @@ export default async function ExaminationReportPage({
             <>
               {reportType === "merit-list" && (
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examDetails.name} · Merit List`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.yearName} · ${results.filter((row) => row.complete).length} complete results`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${examDetails.name} · Merit List`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.yearName} · ${results.filter((row) => row.complete).length} complete results`} />
                   {!examDetails.allowRanking && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Ranking is disabled for this grading scale. Students are listed alphabetically.</p>}
                   <table className="print-report-table w-full border-collapse text-left text-sm">
-                    <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Total</th><th>Average</th><th>Grade</th></tr></thead>
+                    <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Total</th><th>Average</th><th>Grade</th><th>Comments</th></tr></thead>
                     <tbody>{[...results].filter((row) => row.complete).sort((a, b) => examDetails.allowRanking ? (ranking.get(a.enrollmentId) ?? 99999) - (ranking.get(b.enrollmentId) ?? 99999) : a.name.localeCompare(b.name)).map((row) => (
-                      <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{row.overall?.totalMarks.toFixed(2)} / {row.overall?.maxMarks.toFixed(2)}</td><td>{row.overall?.percentage.toFixed(2)}%</td><td>{row.grade?.grade ?? "—"} {row.grade?.description}</td></tr>
+                      <tr key={row.enrollmentId}>
+                        <td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td>
+                        <td>{row.name}</td>
+                        <td>{row.sectionName}</td>
+                        <td>{row.admissionNumber ?? "—"}</td>
+                        <td>{row.overall?.totalMarks.toFixed(2)} / {row.overall?.maxMarks.toFixed(2)}</td>
+                        <td>{row.overall?.percentage.toFixed(2)}%</td>
+                        <td>{row.grade?.grade ?? "—"} {row.grade?.description}</td>
+                        <td className="exam-report-comment">
+                          <p><b>Class teacher:</b> {row.classRemark || row.grade?.performanceRemark || "—"}</p>
+                          <p className="mt-1"><b>Headteacher:</b> {examClass.principalRemark || "—"}</p>
+                        </td>
+                      </tr>
                     ))}</tbody>
                   </table>
                   <ReportSignatureStrip signatures={configuredSignatures} />
@@ -816,7 +842,7 @@ export default async function ExaminationReportPage({
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
                   {activeResult ? (
                     <>
-                      <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title="Student Mark Sheet" subtitle={`${examDetails.name} · ${examDetails.termName ?? examDetails.yearName}`} />
+                      <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title="Student Mark Sheet" subtitle={`${examDetails.name} · ${examDetails.termName ?? examDetails.yearName}`} />
                       <section className="exam-report-student-details grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 text-sm">
                         <p><b>Student</b><br />{activeResult.name}</p><p><b>Admission no.</b><br />{activeResult.admissionNumber ?? "—"}</p>
                         <p><b>Class / section</b><br />{examClass.className} · {activeResult.sectionName}</p><p><b>Academic year</b><br />{examDetails.yearName}</p>
@@ -842,7 +868,7 @@ export default async function ExaminationReportPage({
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
                   {selectedSubject ? (
                     <>
-                      <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${selectedSubject.name} · Subject Marksheet`} subtitle={`${examDetails.name} · ${examClass.className} · Sections: ${sectionSummary || "—"} · Maximum ${selectedSubject.maxMarks}`} />
+                      <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${selectedSubject.name} · Subject Marksheet`} subtitle={`${examDetails.name} · ${examClass.className} · Sections: ${sectionSummary || "—"} · Maximum ${selectedSubject.maxMarks}`} />
                       <table className="print-report-table w-full border-collapse text-left text-sm">
                         <thead><tr><th>Roll no.</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Marks</th><th>Percentage</th><th>Grade</th></tr></thead>
                         <tbody>{results.map((row) => {
@@ -860,7 +886,7 @@ export default async function ExaminationReportPage({
 
               {reportType === "tabulation-sheet" && (
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examDetails.name} · Tabulation Sheet`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.termName ?? examDetails.yearName}`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${examDetails.name} · Tabulation Sheet`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.termName ?? examDetails.yearName}`} />
                   <div className="overflow-x-auto">
                     <table className="print-report-table w-full border-collapse text-left text-xs">
                       <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th></tr></thead>
@@ -930,7 +956,7 @@ export default async function ExaminationReportPage({
 
               {reportType === "previous-result" && (
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} title={`${examClass.className} · Previous Results`} subtitle={`Sections: ${sectionSummary || "—"} · Published examinations before ${examDetails.name}`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${examClass.className} · Previous Results`} subtitle={`Sections: ${sectionSummary || "—"} · Published examinations before ${examDetails.name}`} />
                   {previousExams.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="print-report-table w-full border-collapse text-left text-xs">
