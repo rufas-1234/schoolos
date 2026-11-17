@@ -240,10 +240,12 @@ export default async function SubjectMarksPage({
       .where(and(eq(teachers.schoolId, context.schoolId), eq(teachers.status, "active")))
       .limit(1)
     : [];
-  const signatureRows = await db.select({ role: examReportSignatures.role })
+  const signatureRows = await db.select({
+    role: examReportSignatures.role,
+    updatedAt: examReportSignatures.updatedAt,
+  })
     .from(examReportSignatures)
     .where(eq(examReportSignatures.schoolId, context.schoolId));
-  const signatureRoles = signatureRows.map((row) => row.role);
   return (
     <main className="exam-report-document mx-auto max-w-6xl space-y-6 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -290,7 +292,7 @@ export default async function SubjectMarksPage({
             ))}</tbody>
           </table>
         </div>
-        <ReportSignatureStrip roles={signatureRoles} />
+        <ReportSignatureStrip signatures={signatureRows} />
       </section>
 
       <section id="exam-mark-list" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5">

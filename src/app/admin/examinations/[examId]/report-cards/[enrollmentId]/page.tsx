@@ -137,10 +137,13 @@ export default async function ReportCardPage({
   });
   if (record.examinationStatus !== "published" && !draftPreview) notFound();
 
-  const signatureRows = await db.select({ role: examReportSignatures.role })
+  const signatureRows = await db.select({
+    role: examReportSignatures.role,
+    updatedAt: examReportSignatures.updatedAt,
+  })
     .from(examReportSignatures)
     .where(eq(examReportSignatures.schoolId, context.schoolId));
-  const signatureRoles = new Set(signatureRows.map((row) => row.role));
+  const signatureVersions = new Map(signatureRows.map((row) => [row.role, row.updatedAt.getTime()]));
   const canViewFeeBalance = context.grantedPermissions.includes("fees.balance.view") ||
     context.grantedPermissions.includes("payments.record") ||
     context.grantedPermissions.includes("fees.manage");
@@ -392,7 +395,7 @@ export default async function ReportCardPage({
             ["subject-teacher", "Subject teacher"],
           ] as const).map(([role, label]) => (
             <div key={role} className="flex min-h-16 flex-col justify-end pt-1">
-              {signatureRoles.has(role) && <Image src={`/api/admin/examinations/signatures/${role}`} unoptimized width={180} height={56}
+              {signatureVersions.has(role) && <Image src={`/api/admin/examinations/signatures/${role}?v=${signatureVersions.get(role)}`} unoptimized width={180} height={56}
                 alt={`${label} signature`} className="mx-auto mb-1 max-h-10 w-auto max-w-full object-contain" />}
               <div className="border-t border-slate-500 pt-1">{label} signature</div>
             </div>

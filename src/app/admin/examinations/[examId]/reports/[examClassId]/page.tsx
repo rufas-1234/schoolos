@@ -245,10 +245,12 @@ export default async function ClassMarksheetReportPage({
     : new Map<number, number>();
   const passMark = exam.averagePassing ? Number(exam.averageMark ?? 0) : 0;
   const schoolLogo = schoolLogoSource(exam.schoolLogoUrl);
-  const signatureRows = await db.select({ role: examReportSignatures.role })
+  const signatureRows = await db.select({
+    role: examReportSignatures.role,
+    updatedAt: examReportSignatures.updatedAt,
+  })
     .from(examReportSignatures)
     .where(eq(examReportSignatures.schoolId, context.schoolId));
-  const signatureRoles = signatureRows.map((row) => row.role);
 
   return (
     <main className="exam-report-document print-report-page mx-auto max-w-7xl space-y-5 p-6 print:max-w-none print:p-0">
@@ -295,7 +297,7 @@ export default async function ClassMarksheetReportPage({
             ))}</tbody>
           </table>
         </div>
-        <ReportSignatureStrip roles={signatureRoles} />
+        <ReportSignatureStrip signatures={signatureRows} />
       </section>
 
       <section id="class-marksheet-report" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
@@ -358,7 +360,7 @@ export default async function ClassMarksheetReportPage({
           </table>
         </div>
         <footer className="flex justify-between border-t pt-3 text-xs text-slate-500"><span>{exam.schoolName} · {exam.examTypeName ?? "Examination"}</span><span>{exam.name} · {exam.className} · {sectionSummary}</span></footer>
-        <ReportSignatureStrip roles={signatureRoles} />
+        <ReportSignatureStrip signatures={signatureRows} />
       </section>
     </main>
   );

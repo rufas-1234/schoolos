@@ -11,6 +11,13 @@ const maxFileSize = 4 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const allowedRoles = new Set(["headteacher", "class-teacher", "subject-teacher"]);
 
+function signatureNotFound() {
+  return Response.json({ error: "Signature not found." }, {
+    status: 404,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
+
 function isValidImageSignature(contentType: string, bytes: Uint8Array): boolean {
   if (contentType === "image/png") {
     return bytes.length >= 8 &&
@@ -39,7 +46,7 @@ export async function GET(
   { params }: { params: Promise<{ role: string }> },
 ) {
   const result = await signatureContext(params);
-  if (!result) return Response.json({ error: "Signature not found." }, { status: 404 });
+  if (!result) return signatureNotFound();
   const [signature] = await db.select({
     storageKey: examReportSignatures.storageKey,
     fileName: examReportSignatures.fileName,
@@ -49,7 +56,7 @@ export async function GET(
     eq(examReportSignatures.role, result.role),
   )).limit(1);
   if (!signature || !allowedTypes.has(signature.contentType)) {
-    return Response.json({ error: "Signature not found." }, { status: 404 });
+    return signatureNotFound();
   }
   const [storedFile] = await db.select({
     storageKey: uploadedFiles.storageKey,
@@ -60,14 +67,14 @@ export async function GET(
     eq(uploadedFiles.storageKey, signature.storageKey),
   )).limit(1);
   if (!storedFile || !allowedTypes.has(storedFile.contentType)) {
-    return Response.json({ error: "Signature not found." }, { status: 404 });
+    return signatureNotFound();
   }
   const response = await getObjectStorage().downloadObject({
     objectKey: storedFile.storageKey,
     fileName: storedFile.fileName,
     disposition: "inline",
   });
-  if (!response) return Response.json({ error: "Signature not found." }, { status: 404 });
+  if (!response) return signatureNotFound();
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", "private, no-store");
   headers.set("X-Content-Type-Options", "nosniff");
