@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, or } from "drizzle-orm";
+import { and, count, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -291,7 +291,7 @@ export async function saveLibraryMember(
     }).from(students).where(and(
       eq(students.id, parsed.data.personId),
       eq(students.schoolId, context.schoolId),
-      eq(students.status, "active"),
+      inArray(students.status, ["active", "admitted"]),
     )).limit(1)
     : await db.select({
       id: staffMembers.id,
@@ -446,7 +446,7 @@ export async function checkoutLibraryBook(
       const [student] = await tx.select({ id: students.id }).from(students).where(and(
         eq(students.id, member.studentId),
         eq(students.schoolId, context.schoolId),
-        eq(students.status, "active"),
+        inArray(students.status, ["active", "admitted"]),
       )).limit(1);
       if (!student) return { error: "The linked student is not currently active." };
     } else {

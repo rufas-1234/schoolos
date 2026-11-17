@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, count, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, like, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   libraryBooks,
@@ -127,7 +127,10 @@ export default async function LibraryPage({
       lastName: students.lastName,
       admissionNumber: students.admissionNumber,
       branchId: students.branchId,
-    }).from(students).where(and(eq(students.schoolId, schoolId), eq(students.status, "active")))
+    }).from(students).where(and(
+      eq(students.schoolId, schoolId),
+      inArray(students.status, ["active", "admitted"]),
+    ))
       .orderBy(asc(students.lastName), asc(students.firstName)).limit(1000),
     db.select({
       id: staffMembers.id,

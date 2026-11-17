@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { AdminDeleteButton } from "@/components/admin-data-table";
 import {
   assignSchoolRoles,
   createSchoolRole,
@@ -107,18 +108,12 @@ export function DeleteRoleForm({ roleId, roleName }: { roleId: number; roleName:
   return (
     <form action={action} className="inline-flex flex-col items-start gap-2">
       <input type="hidden" name="id" value={roleId} />
-      <button
-        type="submit"
+      <AdminDeleteButton
+        label={`Delete the ${roleName} role`}
         disabled={pending}
-        onClick={(event) => {
-          if (!window.confirm(`Delete the ${roleName} role? This cannot be undone.`)) {
-            event.preventDefault();
-          }
-        }}
-        className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-      >
-        {pending ? "Deleting..." : "Delete"}
-      </button>
+        showLabel
+        buttonText={pending ? "Deleting..." : "Delete"}
+      />
       <ActionFeedback state={state} />
     </form>
   );

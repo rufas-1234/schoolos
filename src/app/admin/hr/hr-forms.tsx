@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { RequiredMark } from "@/components/required-mark";
 import { SearchableSelect } from "@/components/searchable-select";
 import { printElementById } from "@/components/print-button";
+import { AdminDeleteButton } from "@/components/admin-data-table";
 import {
   assignStaffLeaveBalance,
   createStaffLeaveRequest,
@@ -309,23 +310,15 @@ export function DeletePayrollForm({ publicId }: { publicId: string }) {
   return (
     <form
       action={action}
-      onSubmit={(event) => {
-        if (!window.confirm("Delete this payroll record? This cannot be undone.")) {
-          event.preventDefault();
-        }
-      }}
       className="flex flex-col gap-1"
     >
       <input type="hidden" name="publicId" value={publicId} />
-      <button
-        type="submit"
+      <AdminDeleteButton
+        label="Delete payroll record"
         disabled={pending}
-        aria-label="Delete payroll record"
-        title="Delete payroll record"
-        className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-      >
-        {pending ? "Deleting..." : "Delete"}
-      </button>
+        showLabel
+        buttonText={pending ? "Deleting..." : "Delete"}
+      />
       {state.error && <span role="alert" className="max-w-40 text-xs text-rose-600">{state.error}</span>}
       {state.success && <span role="status" className="text-xs text-emerald-700">Deleted</span>}
     </form>

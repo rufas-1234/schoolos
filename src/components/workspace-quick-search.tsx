@@ -75,7 +75,7 @@ export function WorkspaceQuickSearch() {
       className="relative mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xl"
     >
       <label className="sr-only" htmlFor="workspace-quick-search">
-        Search students, staff, classes, exams, inventory items, fee invoices, accounts, and reports
+        Search students, staff, classes, exams, library books and members, inventory, fees, accounts, and reports
       </label>
       <Search
         aria-hidden="true"
@@ -106,7 +106,7 @@ export function WorkspaceQuickSearch() {
             ? `workspace-result-${results[activeIndex].id}`
             : undefined
         }
-        placeholder="Search students, staff, inventory, fees, accounts..."
+        placeholder="Search students, staff, library, inventory, fees..."
         className="admin-quick-search-input h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
       />
       {status === "searching" && normalizedQuery.length >= 2 && (
@@ -155,7 +155,7 @@ export function WorkspaceQuickSearch() {
             ))
           ) : (
             <p role="status" className="px-3 py-3 text-sm text-slate-500">
-              No students, staff, records, or pages match “{normalizedQuery}”.
+              No matching students, staff, library records, or workspace pages.
             </p>
           )}
           {results.length > 0 && (

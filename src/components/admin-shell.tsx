@@ -623,7 +623,7 @@ export function AdminShell({
       )}
 
       <div className="admin-shell-content lg:pl-[260px]">
-        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-100 bg-white/90 px-3 backdrop-blur sm:px-5 md:h-[76px] md:px-8">
+        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-violet-100 bg-[#f7f1fb]/95 px-3 backdrop-blur sm:px-5 md:h-[76px] md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
               ref={navigationTriggerRef}

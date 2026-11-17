@@ -20,6 +20,10 @@ import {
   inventoryLocations,
   inventorySuppliers,
   libraryBooks,
+  libraryLoans,
+  libraryMembers,
+  libraryCategories,
+  librarySubjects,
   staffMembers,
   studentFeeInvoices,
   students,
@@ -178,6 +182,11 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (canManageLibrary) {
     addPage("library", "Library", "Book catalog, student loans, returns, and overdue books", "/admin/library", ["books", "book loans", "lending", "borrowed", "overdue"]);
+    addPage("library-members", "Library members", "Register student and staff borrowers", "/admin/library?section=members", ["student members", "staff members", "library card", "member register"]);
+    addPage("library-circulation", "Issue and return books", "Check out, renew, and return library books", "/admin/library?section=issue", ["checkout", "check out", "book return", "circulation"]);
+    addPage("library-issued", "Issued books", "Review active, overdue, and returned book loans", "/admin/library?section=issued&status=all", ["loan register", "overdue books", "returned books"]);
+    addPage("library-categories", "Library categories", "Organize library books by category", "/admin/library?section=categories", ["book categories"]);
+    addPage("library-subjects", "Library subjects", "Organize library books by subject", "/admin/library?section=subjects", ["book subjects"]);
   }
   if (permissions.has("roles.manage")) {
     addPage("user-roles", "User roles", "Users, roles and permission assignments", "/admin/settings/roles", ["permissions", "accounts"]);
@@ -202,6 +211,8 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     academicRows,
     examRows,
     libraryRows,
+    libraryMemberRows,
+    libraryLoanRows,
   ] = await Promise.all([
     canViewStudents
       ? db.select({
@@ -536,19 +547,130 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         id: libraryBooks.id,
         title: libraryBooks.title,
         author: libraryBooks.author,
+        bookNumber: libraryBooks.bookNumber,
         isbn: libraryBooks.isbn,
         availableCopies: libraryBooks.availableCopies,
+        categoryName: libraryCategories.name,
+        subjectName: librarySubjects.name,
       }).from(libraryBooks)
+        .leftJoin(libraryCategories, and(
+          eq(libraryCategories.id, libraryBooks.categoryId),
+          eq(libraryCategories.schoolId, context.schoolId),
+        ))
+        .leftJoin(librarySubjects, and(
+          eq(librarySubjects.id, libraryBooks.subjectId),
+          eq(librarySubjects.schoolId, context.schoolId),
+        ))
         .where(and(
           eq(libraryBooks.schoolId, context.schoolId),
           or(
             tokenMatch(libraryBooks.title),
             tokenMatch(libraryBooks.author),
+            tokenMatch(libraryBooks.bookNumber),
             tokenMatch(libraryBooks.isbn),
-            fuzzyTextMatch(queryTokens, libraryBooks.title, libraryBooks.author, libraryBooks.isbn),
+            tokenMatch(libraryCategories.name),
+            tokenMatch(librarySubjects.name),
+            fuzzyTextMatch(queryTokens,
+              libraryBooks.title,
+              libraryBooks.author,
+              libraryBooks.bookNumber,
+              libraryBooks.isbn,
+              libraryCategories.name,
+              librarySubjects.name,
+            ),
           ),
         ))
         .orderBy(asc(libraryBooks.title))
+        .limit(20)
+      : Promise.resolve([]),
+    canManageLibrary
+      ? db.select({
+        id: libraryMembers.id,
+        memberNumber: libraryMembers.memberNumber,
+        memberType: libraryMembers.memberType,
+        status: libraryMembers.status,
+        firstName: sql<string | null>`coalesce(${students.firstName}, ${staffMembers.firstName})`,
+        lastName: sql<string | null>`coalesce(${students.lastName}, ${staffMembers.lastName})`,
+        admissionNumber: students.admissionNumber,
+        employeeCode: staffMembers.employeeCode,
+      }).from(libraryMembers)
+        .leftJoin(students, and(
+          eq(students.id, libraryMembers.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .leftJoin(staffMembers, and(
+          eq(staffMembers.id, libraryMembers.staffMemberId),
+          eq(staffMembers.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(libraryMembers.schoolId, context.schoolId),
+          or(
+            tokenMatch(libraryMembers.memberNumber),
+            tokenMatch(students.firstName),
+            tokenMatch(students.lastName),
+            tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
+            like(sql`lower(${students.admissionNumber})`, pattern),
+            tokenMatch(staffMembers.firstName),
+            tokenMatch(staffMembers.lastName),
+            tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
+            like(sql`lower(${staffMembers.employeeCode})`, pattern),
+            fuzzyTextMatch(queryTokens,
+              libraryMembers.memberNumber,
+              students.firstName,
+              students.lastName,
+              staffMembers.firstName,
+              staffMembers.lastName,
+            ),
+          ),
+        ))
+        .orderBy(asc(libraryMembers.memberNumber))
+        .limit(20)
+      : Promise.resolve([]),
+    canManageLibrary
+      ? db.select({
+        id: libraryLoans.id,
+        bookTitle: libraryBooks.title,
+        bookNumber: libraryBooks.bookNumber,
+        memberNumber: libraryMembers.memberNumber,
+        memberType: libraryMembers.memberType,
+        borrowerName: sql<string>`coalesce(concat(${students.firstName}, ' ', ${students.lastName}), concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}), 'Unknown member')`,
+        dueDate: libraryLoans.dueDate,
+        status: libraryLoans.status,
+      }).from(libraryLoans)
+        .innerJoin(libraryBooks, and(
+          eq(libraryBooks.id, libraryLoans.bookId),
+          eq(libraryBooks.schoolId, context.schoolId),
+        ))
+        .leftJoin(libraryMembers, and(
+          eq(libraryMembers.id, libraryLoans.memberId),
+          eq(libraryMembers.schoolId, context.schoolId),
+        ))
+        .leftJoin(students, and(
+          eq(students.id, sql`coalesce(${libraryLoans.studentId}, ${libraryMembers.studentId})`),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .leftJoin(staffMembers, and(
+          eq(staffMembers.id, libraryMembers.staffMemberId),
+          eq(staffMembers.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(libraryLoans.schoolId, context.schoolId),
+          or(
+            tokenMatch(libraryBooks.title),
+            tokenMatch(libraryBooks.author),
+            tokenMatch(libraryBooks.bookNumber),
+            tokenMatch(libraryMembers.memberNumber),
+            tokenMatch(students.firstName),
+            tokenMatch(students.lastName),
+            tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
+            tokenMatch(staffMembers.firstName),
+            tokenMatch(staffMembers.lastName),
+            tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
+            like(sql`lower(${students.admissionNumber})`, pattern),
+            like(sql`lower(${staffMembers.employeeCode})`, pattern),
+          ),
+        ))
+        .orderBy(asc(libraryLoans.dueDate))
         .limit(20)
       : Promise.resolve([]),
   ]);
@@ -665,8 +787,41 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     results.push({
       id: `library-book-${book.id}`,
       title: book.title,
-      description: `Library book · ${book.author} · ${book.availableCopies} available`,
-      href: `/admin/library?q=${encodeURIComponent(book.title)}`,
+      description: [
+        "Library book",
+        book.author,
+        book.bookNumber,
+        book.categoryName,
+        book.subjectName,
+        `${book.availableCopies} available`,
+      ].filter(Boolean).join(" · "),
+      href: `/admin/library?section=books&q=${encodeURIComponent(book.title)}`,
+      category: "Library",
+    });
+  }
+  for (const member of libraryMemberRows) {
+    results.push({
+      id: `library-member-${member.id}`,
+      title: member.firstName && member.lastName
+        ? `${member.firstName} ${member.lastName}`
+        : member.memberNumber,
+      description: [
+        member.memberType === "staff" ? "Staff library member" : "Student library member",
+        `Member ${member.memberNumber}`,
+        member.admissionNumber ? `Admission ${member.admissionNumber}` : null,
+        member.employeeCode ? `Employee ${member.employeeCode}` : null,
+        member.status,
+      ].filter(Boolean).join(" · "),
+      href: `/admin/library?section=members&q=${encodeURIComponent(query)}`,
+      category: "Library",
+    });
+  }
+  for (const loan of libraryLoanRows) {
+    results.push({
+      id: `library-loan-${loan.id}`,
+      title: loan.bookTitle,
+      description: `${loan.status === "active" ? "Book loan" : "Returned book"} · ${loan.borrowerName} · Due ${loan.dueDate}`,
+      href: `/admin/library?section=issued&status=all&q=${encodeURIComponent(query)}`,
       category: "Library",
     });
   }

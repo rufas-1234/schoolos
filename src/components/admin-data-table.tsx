@@ -155,22 +155,78 @@ export function AdminRecordDialog({
   );
 }
 
-export function AdminDeleteButton({ label, disabled = false }: { label: string; disabled?: boolean }) {
+export function AdminDeleteButton({
+  label,
+  disabled = false,
+  showLabel = false,
+  buttonText,
+  confirmationMessage,
+}: {
+  label: string;
+  disabled?: boolean;
+  showLabel?: boolean;
+  buttonText?: string;
+  confirmationMessage?: string;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const confirmationId = useId();
+  const isDelete = /^delete\b/i.test(label);
+  const action = isDelete ? "delete" : "remove";
+  const confirmationTitle = isDelete ? "Confirm deletion" : "Confirm removal";
+  const subject = label.replace(/^(delete|remove)\s+/i, "");
+
   return (
-    <button
-      type="submit"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={(event) => {
-        if (!window.confirm(`${label}? This action cannot be undone.`)) {
+    <>
+      <button
+        type="submit"
+        aria-label={label}
+        title={label}
+        disabled={disabled}
+        onClick={(event) => {
           event.preventDefault();
-        }
-      }}
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <Trash2 size={16} aria-hidden="true" />
-    </button>
+          formRef.current = event.currentTarget.form;
+          dialogRef.current?.showModal();
+        }}
+        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white text-xs font-semibold text-rose-700 transition hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50 ${showLabel ? "px-3" : "w-9"}`}
+      >
+        <Trash2 size={16} aria-hidden="true" />
+        {showLabel && <span>{buttonText ?? (isDelete ? "Delete" : "Remove")}</span>}
+      </button>
+      <dialog
+        ref={dialogRef}
+        aria-labelledby={`${confirmationId}-title`}
+        aria-describedby={`${confirmationId}-description`}
+        className="m-auto w-[min(92vw,28rem)] rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/40"
+      >
+        <div className="p-5 sm:p-6">
+          <h2 id={`${confirmationId}-title`} className="text-lg font-semibold">{confirmationTitle}</h2>
+          <p id={`${confirmationId}-description`} className="mt-2 text-sm leading-6 text-slate-600">
+            {confirmationMessage ?? `Are you sure you want to ${action} “${subject}”? This action cannot be undone.`}
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => dialogRef.current?.close()}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const form = formRef.current;
+                dialogRef.current?.close();
+                form?.requestSubmit();
+              }}
+              className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+            >
+              {buttonText ?? (isDelete ? "Delete" : "Remove")}
+            </button>
+          </div>
+        </div>
+      </dialog>
+    </>
   );
 }
 

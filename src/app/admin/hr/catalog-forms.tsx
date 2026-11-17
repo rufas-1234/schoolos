@@ -2,7 +2,7 @@
 
 import { Building2 } from "lucide-react";
 import { useActionState } from "react";
-import { AdminRecordDialog } from "@/components/admin-data-table";
+import { AdminDeleteButton, AdminRecordDialog } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   createStaffCatalogEntry,
@@ -120,17 +120,13 @@ export function CatalogEntryForm({
         <form action={deleteAction}>
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="kind" value={kind} />
-          <button
+          <AdminDeleteButton
+            label={`Delete ${name}`}
             disabled={deleting}
-            onClick={(event) => {
-              if (!window.confirm(`Delete ${name}? Staff members assigned to it must be changed first.`)) {
-                event.preventDefault();
-              }
-            }}
-            className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-          >
-            {deleting ? "Deleting..." : "Delete"}
-          </button>
+            showLabel
+            buttonText={deleting ? "Deleting..." : "Delete"}
+            confirmationMessage={`Delete “${name}” only after reassigning staff members currently assigned to it.`}
+          />
         </form>
       </div>
       <div className="sm:col-span-2">
