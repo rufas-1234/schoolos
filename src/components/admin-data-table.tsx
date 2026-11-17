@@ -51,7 +51,10 @@ export function AdminActionDialog({
   const titleId = useId();
 
   useEffect(() => {
-    if (initialOpen) dialogRef.current?.showModal();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (initialOpen && !dialog.open) dialog.showModal();
+    else if (!initialOpen && dialog.open) dialog.close();
   }, [initialOpen]);
 
   return (
@@ -110,7 +113,10 @@ export function AdminRecordDialog({
   const actionLabel = mode === "view" ? "View" : "Edit";
 
   useEffect(() => {
-    if (initialOpen) dialogRef.current?.showModal();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (initialOpen && !dialog.open) dialog.showModal();
+    else if (!initialOpen && dialog.open) dialog.close();
   }, [initialOpen]);
 
   return (
