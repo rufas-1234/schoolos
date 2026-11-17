@@ -132,6 +132,12 @@ export function StudentForm({
     submittedValues.current = null;
   }, [state]);
 
+  useEffect(() => {
+    if (!record && state.success) {
+      formRef.current?.closest("dialog")?.close();
+    }
+  }, [record, state.success]);
+
   const branchClasses = useMemo(
     () => classes.filter((item) => String(item.branchId) === branchId),
     [branchId, classes],

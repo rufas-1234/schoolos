@@ -180,10 +180,10 @@ export function AdminConfirmSubmitButton({
   const formRef = useRef<HTMLFormElement | null>(null);
   const confirmationId = useId();
   const buttonClass = variant === "danger"
-    ? "border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+    ? "border-rose-200 bg-white text-rose-700 hover:bg-rose-50 hover:text-rose-800"
     : variant === "primary"
       ? "border-violet-700 bg-violet-700 text-white hover:bg-violet-800 hover:text-white"
-      : "border-slate-200 text-slate-700 hover:bg-slate-50";
+      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
   const confirmClass = variant === "danger"
     ? "bg-rose-700 hover:bg-rose-800 focus-visible:ring-rose-500"
     : variant === "primary"
@@ -202,7 +202,7 @@ export function AdminConfirmSubmitButton({
           formRef.current = event.currentTarget.form;
           dialogRef.current?.showModal();
         }}
-        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border bg-white text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${buttonClass} ${showIcon ? "w-9" : "px-3"} ${className}`}
+        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${buttonClass} ${showIcon ? "w-9" : "px-3"} ${className}`}
       >
         {showIcon && <Trash2 size={16} aria-hidden="true" />}
         {showLabel && buttonText}
