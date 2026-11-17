@@ -161,7 +161,7 @@ export function StudentForm({
       <div
         role="tablist"
         aria-label="Student information sections"
-        className="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2 sm:grid-cols-3 lg:grid-cols-6"
+        className="flex snap-x snap-mandatory gap-2 overflow-x-auto border-b border-slate-200 pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible lg:grid-cols-6"
       >
         {studentEditTabs.map((tab) => (
           <button
@@ -172,10 +172,10 @@ export function StudentForm({
             aria-selected={activeTab === tab.id}
             aria-controls={`student-form-${formId}-${tab.id}-panel`}
             onClick={() => setActiveTab(tab.id)}
-            className={`min-w-0 rounded-lg px-2 py-2 text-xs font-semibold transition sm:px-3 sm:text-sm ${
+            className={`min-w-max shrink-0 snap-start whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition sm:min-w-0 sm:px-2 sm:text-sm lg:px-3 ${
               activeTab === tab.id
-                ? "bg-violet-100 text-violet-900"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                ? "bg-violet-700 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >
             {tab.label}
@@ -553,9 +553,9 @@ export function StudentForm({
             : "Admission and class placement added to the review queue."}
         </p>
       )}
-      <div className="flex justify-end">
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 border-t border-slate-200 bg-white/95 px-5 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
         {record
-          ? <button type="submit" disabled={pending || hasPendingUploads} className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60">
+          ? <button type="submit" disabled={pending || hasPendingUploads} className="inline-flex w-full items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
               {hasPendingUploads ? "Uploading documents..." : pending ? "Saving..." : "Save changes"}
             </button>
           : <AdminConfirmSubmitButton
@@ -565,6 +565,7 @@ export function StudentForm({
               confirmationMessage="Submit this student’s admission and class placement for review?"
               disabled={pending || hasPendingUploads}
               variant="primary"
+              className="w-full sm:w-auto"
             />}
       </div>
     </form>

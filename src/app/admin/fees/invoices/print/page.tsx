@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, eq, inArray, sql, sum } from "drizzle-orm";
+import { and, asc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/print-button";
 import { db } from "@/db";
@@ -24,6 +24,9 @@ import { calculateFineMinorUnits, feeDisplayName, feeInvoiceStatus, parseMoneyTo
 type SearchParams = {
   invoiceId?: string | string[];
   studentId?: string | string[];
+  search?: string | string[];
+  status?: string | string[];
+  branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
 };
@@ -60,15 +63,28 @@ export default async function FeeInvoicePrintPage({
     ? params.invoiceId
     : null;
   const studentId = parseId(params.studentId);
+  const search = typeof params.search === "string" ? params.search.trim().slice(0, 100) : "";
+  const status = typeof params.status === "string" &&
+    ["unpaid", "partial", "paid"].includes(params.status) ? params.status : "";
+  const branchId = parseId(params.branchId);
   const classLevelId = parseId(params.classLevelId);
   const sectionId = parseId(params.sectionId);
-  const supplied = [params.invoiceId, params.studentId, params.classLevelId, params.sectionId]
-    .filter((value) => value !== undefined).length;
-  if (supplied !== 1 ||
-    (params.invoiceId !== undefined && !invoiceId) ||
-    (params.studentId && !studentId) ||
-    (params.classLevelId && !classLevelId) ||
-    (params.sectionId && !sectionId)) notFound();
+  const invalidDirectSelector =
+    (params.invoiceId !== undefined && (!invoiceId || params.studentId !== undefined ||
+      params.search !== undefined || params.status !== undefined || params.branchId !== undefined ||
+      params.classLevelId !== undefined || params.sectionId !== undefined)) ||
+    (params.studentId !== undefined && (!studentId || params.invoiceId !== undefined ||
+      params.search !== undefined || params.status !== undefined || params.branchId !== undefined ||
+      params.classLevelId !== undefined || params.sectionId !== undefined));
+  if (
+    invalidDirectSelector ||
+    (params.search !== undefined && typeof params.search !== "string") ||
+    (params.status !== undefined && (typeof params.status !== "string" ||
+      !["unpaid", "partial", "paid"].includes(params.status))) ||
+    (params.branchId !== undefined && !branchId) ||
+    (params.classLevelId !== undefined && !classLevelId) ||
+    (params.sectionId !== undefined && !sectionId)
+  ) notFound();
 
   const [school] = await db.select({
     name: schools.name,
@@ -80,6 +96,29 @@ export default async function FeeInvoicePrintPage({
   })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   if (!school) notFound();
+  const today = todayInTimezone(school.timezone);
+  const paymentTotalsForFilter = db.select({
+    invoiceId: feePayments.invoiceId,
+    paid: sql<string>`COALESCE(SUM(${feePayments.amount} - ${feePayments.reversedAmount}), 0)`.as("paid"),
+  }).from(feePayments)
+    .where(eq(feePayments.schoolId, context.schoolId))
+    .groupBy(feePayments.invoiceId)
+    .as("invoice_filter_payment_totals");
+  const filterFine = sql`CASE
+    WHEN ${studentFeeInvoices.fineType} = 'none' OR ${studentFeeInvoices.dueDate} >= ${today} THEN 0
+    WHEN ${studentFeeInvoices.fineType} = 'fixed' THEN ${studentFeeInvoices.fineValue}
+    WHEN ${studentFeeInvoices.fineType} = 'percentage'
+      THEN ROUND((${studentFeeInvoices.amount} - ${studentFeeInvoices.discountAmount}) * ${studentFeeInvoices.fineValue} / 100, 2)
+    ELSE 0
+  END`;
+  const filterTotalDue = sql`(${studentFeeInvoices.amount} - ${studentFeeInvoices.discountAmount} + ${filterFine})`;
+  const filterPaid = sql<string>`COALESCE(${paymentTotalsForFilter.paid}, 0)`;
+  const filterStatus = sql<string>`CASE
+    WHEN ${filterPaid} < 0 OR ${filterTotalDue} < 0 OR ${filterPaid} > ${filterTotalDue} THEN 'unpaid'
+    WHEN ${filterPaid} = ${filterTotalDue} THEN 'paid'
+    WHEN ${filterPaid} = 0 THEN 'unpaid'
+    ELSE 'partial'
+  END`;
   const invoices = await db.select({
     id: studentFeeInvoices.id,
     publicId: studentFeeInvoices.publicId,
@@ -148,31 +187,45 @@ export default async function FeeInvoicePrintPage({
       eq(feeTypes.id, feeStructures.feeTypeId),
       eq(feeTypes.schoolId, context.schoolId),
     ))
+    .leftJoin(paymentTotalsForFilter, eq(paymentTotalsForFilter.invoiceId, studentFeeInvoices.id))
     .where(and(
       eq(studentFeeInvoices.schoolId, context.schoolId),
       ...(invoiceId ? [eq(studentFeeInvoices.publicId, invoiceId)] : []),
       ...(studentId ? [eq(students.id, studentId)] : []),
+      ...(branchId ? [eq(schoolBranches.id, branchId)] : []),
       ...(classLevelId ? [eq(classLevels.id, classLevelId)] : []),
       ...(sectionId ? [eq(classSections.id, sectionId)] : []),
+      ...(search ? [or(
+        like(sql`lower(${studentFeeInvoices.invoiceNumber})`, `%${search.toLocaleLowerCase()}%`),
+        like(students.firstName, `%${search}%`),
+        like(students.lastName, `%${search}%`),
+        like(sql`lower(concat(${students.firstName}, ' ', ${students.lastName}))`, `%${search.toLocaleLowerCase()}%`),
+        like(students.admissionNumber, `%${search}%`),
+        like(studentEnrollments.rollNumber, `%${search}%`),
+        like(students.phone, `%${search}%`),
+        like(students.publicId, `%${search}%`),
+      )!] : []),
+      ...(status ? [eq(filterStatus, status)] : []),
     ))
-    .orderBy(asc(students.lastName), asc(students.firstName), asc(studentFeeInvoices.dueDate));
-  if (!invoices.length) notFound();
+    .orderBy(asc(students.lastName), asc(students.firstName), asc(studentFeeInvoices.dueDate))
+    .limit(501);
+  const tooManyInvoices = invoices.length > 500;
+  const printableInvoices = tooManyInvoices ? [] : invoices;
 
-  const paymentTotals = await db.select({
+  const paymentTotals = printableInvoices.length ? await db.select({
     invoiceId: feePayments.invoiceId,
     paid: sum(sql`${feePayments.amount} - ${feePayments.reversedAmount}`),
   }).from(feePayments)
     .where(and(
       eq(feePayments.schoolId, context.schoolId),
-      inArray(feePayments.invoiceId, invoices.map((invoice) => invoice.id)),
+      inArray(feePayments.invoiceId, printableInvoices.map((invoice) => invoice.id)),
     ))
-    .groupBy(feePayments.invoiceId);
+    .groupBy(feePayments.invoiceId) : [];
   const paidByInvoice = new Map(paymentTotals.map((row) => [
     row.invoiceId,
     parseMoneyToMinorUnits(row.paid ?? "0") ?? 0,
   ]));
-  const today = todayInTimezone(school.timezone);
-  const totalOutstanding = invoices.reduce((sumDue, invoice) => {
+  const totalOutstanding = printableInvoices.reduce((sumDue, invoice) => {
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
     const fine = today > invoice.dueDate
@@ -186,17 +239,24 @@ export default async function FeeInvoicePrintPage({
       <header className="fee-invoice-overview flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 print:hidden">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Finances</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee invoice{invoices.length === 1 ? "" : "s"}</h1>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee invoice{printableInvoices.length === 1 ? "" : "s"}</h1>
           <p className="mt-2 text-sm text-slate-600">
-            {invoices.length} invoice{invoices.length === 1 ? "" : "s"} · Total outstanding {school.currency} {money(totalOutstanding)}
+            {tooManyInvoices
+              ? "More than 500 invoices match these filters. Narrow the search before printing."
+              : `${printableInvoices.length} invoice${printableInvoices.length === 1 ? "" : "s"} · Total outstanding ${school.currency} ${money(totalOutstanding)}`}
           </p>
         </div>
         <div className="flex items-center gap-3 print:hidden">
           <Link href="/admin/fees/collection" className="text-sm font-semibold text-violet-700">Back to collection</Link>
-          <PrintButton label="Print invoices" />
+          <PrintButton label="Print invoices" disabled={tooManyInvoices || printableInvoices.length === 0} />
         </div>
       </header>
-      {invoices.map((invoice) => {
+      {!tooManyInvoices && !printableInvoices.length && (
+        <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600 print:hidden">
+          No invoices match the selected search filters.
+        </p>
+      )}
+      {printableInvoices.map((invoice) => {
         const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
         const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
         const paid = paidByInvoice.get(invoice.id) ?? 0;

@@ -127,17 +127,20 @@ export function PrintButton({
   targetId,
   pageOrientation,
   pageSize,
+  disabled = false,
 }: {
   label?: string;
   targetId?: string;
   pageOrientation?: "portrait" | "landscape";
   pageSize?: "A4";
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={() => printCurrentPage({ targetId, title: label, pageOrientation, pageSize })}
-      className="print:hidden rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800"
+      className="print:hidden rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {label}
     </button>

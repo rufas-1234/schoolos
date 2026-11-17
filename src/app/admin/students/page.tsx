@@ -487,6 +487,7 @@ export default async function StudentsPage({
           showAllRecordsLabel="Show all sections"
           hideDefaultView
           showRowNumber={false}
+          mobileCardView
           toolbarActions={canCreate ? (
             <AdminActionDialog
               label="Add student"

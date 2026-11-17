@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, ne, sql, sum } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, like, ne, or, sql, sum } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -28,6 +28,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate, isDateRangeWithin } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import {
+  calculateOutstandingInvoiceBalance,
   calculateDiscountMinorUnits,
   calculateFineMinorUnits,
   feeInvoiceStatus,
@@ -81,6 +82,16 @@ const paymentSchema = z.object({
   idempotencyKey: z.string().uuid(),
   invoiceId: idField,
   amount: amountField,
+  paymentMethod: z.enum(feePaymentMethods),
+  reference: z.string().trim().max(120).transform((value) => value || null),
+  notes: optionalText,
+});
+const bulkPaymentSchema = z.object({
+  search: z.string().trim().max(100),
+  status: z.enum(["", "unpaid", "partial", "paid"]),
+  branchId: z.union([z.literal(""), idField]),
+  classLevelId: z.union([z.literal(""), idField]),
+  sectionId: z.union([z.literal(""), idField]),
   paymentMethod: z.enum(feePaymentMethods),
   reference: z.string().trim().max(120).transform((value) => value || null),
   notes: optionalText,
@@ -1004,6 +1015,187 @@ export async function recordFeePayment(
     success: true,
     message: outcome.state === "saved" ? `Payment recorded. Receipt ${outcome.receiptNumber}.` : "Payment recorded.",
     receiptUrl: `/admin/fees/receipt/${outcome.publicId}`,
+  };
+}
+
+export async function recordBulkFeePayments(
+  _previousState: FeeActionState,
+  formData: FormData,
+): Promise<FeeActionState> {
+  const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
+  const result = bulkPaymentSchema.safeParse({
+    search: value(formData, "search"),
+    status: value(formData, "status"),
+    branchId: value(formData, "branchId"),
+    classLevelId: value(formData, "classLevelId"),
+    sectionId: value(formData, "sectionId"),
+    paymentMethod: value(formData, "paymentMethod"),
+    reference: value(formData, "reference"),
+    notes: value(formData, "notes"),
+  });
+  if (!result.success) return { error: "Review the invoice filters and payment details, then try again." };
+
+  const { search, status, branchId, classLevelId, sectionId } = result.data;
+  const searchTerm = search.toLocaleLowerCase();
+  const today = await db.select({ timezone: schools.timezone })
+    .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
+  if (!today[0]) return { error: "School settings were not found." };
+  const paidDate = todayInTimezone(today[0].timezone);
+  const paymentId = () => randomUUID();
+
+  const outcome = await db.transaction(async (tx) => {
+    const paymentTotals = tx.select({
+      invoiceId: feePayments.invoiceId,
+      paid: sql<string>`COALESCE(SUM(${feePayments.amount} - ${feePayments.reversedAmount}), 0)`.as("paid"),
+    })
+      .from(feePayments)
+      .where(eq(feePayments.schoolId, context.schoolId))
+      .groupBy(feePayments.invoiceId)
+      .as("bulk_invoice_payment_totals");
+    const fineDue = sql`CASE
+      WHEN ${studentFeeInvoices.fineType} = 'none' OR ${studentFeeInvoices.dueDate} >= ${paidDate} THEN 0
+      WHEN ${studentFeeInvoices.fineType} = 'fixed' THEN ${studentFeeInvoices.fineValue}
+      WHEN ${studentFeeInvoices.fineType} = 'percentage'
+        THEN ROUND((${studentFeeInvoices.amount} - ${studentFeeInvoices.discountAmount}) * ${studentFeeInvoices.fineValue} / 100, 2)
+      ELSE 0
+    END`;
+    const totalDue = sql`(${studentFeeInvoices.amount} - ${studentFeeInvoices.discountAmount} + ${fineDue})`;
+    const paid = sql<string>`COALESCE(${paymentTotals.paid}, 0)`;
+    const computedStatus = sql<string>`CASE
+      WHEN ${paid} < 0 OR ${totalDue} < 0 OR ${paid} > ${totalDue} THEN 'unpaid'
+      WHEN ${paid} = ${totalDue} THEN 'paid'
+      WHEN ${paid} = 0 THEN 'unpaid'
+      ELSE 'partial'
+    END`;
+    const matchingIds = await tx.select({ id: studentFeeInvoices.id })
+      .from(studentFeeInvoices)
+      .innerJoin(students, and(
+        eq(students.id, studentFeeInvoices.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .innerJoin(studentEnrollments, and(
+        eq(studentEnrollments.id, studentFeeInvoices.enrollmentId),
+        eq(studentEnrollments.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSections.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+      ))
+      .innerJoin(schoolBranches, and(
+        eq(schoolBranches.id, classLevels.branchId),
+        eq(schoolBranches.schoolId, context.schoolId),
+      ))
+      .leftJoin(paymentTotals, eq(paymentTotals.invoiceId, studentFeeInvoices.id))
+      .where(and(
+        eq(studentFeeInvoices.schoolId, context.schoolId),
+        ...(branchId ? [eq(schoolBranches.id, branchId)] : []),
+        ...(classLevelId ? [eq(classLevels.id, classLevelId)] : []),
+        ...(sectionId ? [eq(classSections.id, sectionId)] : []),
+        inArray(computedStatus, ["unpaid", "partial"]),
+        ...(search ? [or(
+          like(sql`lower(${studentFeeInvoices.invoiceNumber})`, `%${searchTerm}%`),
+          like(students.firstName, `%${search}%`),
+          like(students.lastName, `%${search}%`),
+          like(sql`lower(concat(${students.firstName}, ' ', ${students.lastName}))`, `%${searchTerm}%`),
+          like(students.admissionNumber, `%${search}%`),
+          like(studentEnrollments.rollNumber, `%${search}%`),
+          like(students.phone, `%${search}%`),
+          like(students.publicId, `%${search}%`),
+        )!] : []),
+        ...(status ? [eq(computedStatus, status)] : []),
+      ))
+      .orderBy(asc(studentFeeInvoices.id))
+      .limit(501);
+    if (matchingIds.length > 500) return "too-many";
+    if (!matchingIds.length) return "no-matches";
+
+    let paymentsRecorded = 0;
+    let totalCollected = 0;
+    for (const candidate of matchingIds) {
+      const [invoice] = await tx.select().from(studentFeeInvoices)
+        .where(and(
+          eq(studentFeeInvoices.id, candidate.id),
+          eq(studentFeeInvoices.schoolId, context.schoolId),
+        ))
+        .for("update")
+        .limit(1);
+      if (!invoice) continue;
+
+      const [totals] = await tx.select({
+        paid: sum(sql`${feePayments.amount} - ${feePayments.reversedAmount}`),
+        finePaid: sum(sql`greatest(0, ${feePayments.fineAmount} - least(${feePayments.reversedAmount}, ${feePayments.fineAmount}))`),
+      }).from(feePayments)
+        .where(and(
+          eq(feePayments.schoolId, context.schoolId),
+          eq(feePayments.invoiceId, invoice.id),
+        ));
+      const paidMinor = parseMoneyToMinorUnits(totals?.paid ?? "0");
+      const finePaidMinor = parseMoneyToMinorUnits(totals?.finePaid ?? "0");
+      if (paidMinor === null || finePaidMinor === null) {
+        throw new Error("Stored invoice payment total is invalid.");
+      }
+      const balance = calculateOutstandingInvoiceBalance({
+        amount: invoice.amount,
+        discountAmount: invoice.discountAmount,
+        fineType: invoice.fineType,
+        fineValue: invoice.fineValue,
+        dueDate: invoice.dueDate,
+        paidMinor,
+        today: paidDate,
+      });
+      if (balance === null) throw new Error("Stored invoice balance is invalid.");
+      const totalDueMinor = balance + paidMinor;
+      const currentStatus = feeInvoiceStatus(totalDueMinor, paidMinor);
+      if (balance <= 0 || !currentStatus || (status && currentStatus !== status)) continue;
+
+      const amountMinor = parseMoneyToMinorUnits(invoice.amount);
+      const discountMinor = parseMoneyToMinorUnits(invoice.discountAmount);
+      if (amountMinor === null || discountMinor === null) throw new Error("Stored invoice amount is invalid.");
+      const fineMinor = paidDate > invoice.dueDate
+        ? calculateFineMinorUnits(amountMinor - discountMinor, invoice.fineType, invoice.fineValue)
+        : 0;
+      if (fineMinor === null) throw new Error("Stored fee fine is invalid.");
+      const fineAmountMinor = Math.min(
+        Math.max(0, fineMinor - finePaidMinor),
+        Math.max(0, balance - Math.max(0, amountMinor - discountMinor - paidMinor)),
+      );
+      const id = paymentId();
+      await tx.insert(feePayments).values({
+        publicId: id,
+        schoolId: context.schoolId,
+        invoiceId: invoice.id,
+        receiptNumber: `RCT-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+        idempotencyKey: randomUUID(),
+        amount: (balance / 100).toFixed(2),
+        fineAmount: (fineAmountMinor / 100).toFixed(2),
+        paymentMethod: result.data.paymentMethod,
+        reference: result.data.reference,
+        notes: result.data.notes,
+        recordedBy: context.user.id,
+      });
+      await tx.update(studentFeeInvoices).set({ status: "paid" })
+        .where(eq(studentFeeInvoices.id, invoice.id));
+      await writeAudit(tx, context.schoolId, context.user.id, "fee_payment.bulk_recorded", "fee_payment", id,
+        ["invoiceId", "amount", "fineAmount", "paymentMethod", "reference"]);
+      paymentsRecorded += 1;
+      totalCollected += balance;
+    }
+    return paymentsRecorded
+      ? { paymentsRecorded, totalCollected }
+      : "no-payable-invoices";
+  });
+
+  if (outcome === "too-many") return { error: "This filter matches more than 500 invoices. Narrow the search filters before recording bulk payments." };
+  if (outcome === "no-matches") return { error: "No invoices match the selected filters." };
+  if (outcome === "no-payable-invoices") return { error: "No matching invoices have an outstanding balance. Refresh the list and try again." };
+  revalidateFees();
+  return {
+    success: true,
+    message: `Recorded ${outcome.paymentsRecorded} payment${outcome.paymentsRecorded === 1 ? "" : "s"} totaling ${(outcome.totalCollected / 100).toFixed(2)}.`,
   };
 }
 

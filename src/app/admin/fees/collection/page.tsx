@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { AdminActionDialog, AdminRecordDialog } from "@/components/admin-data-table";
 import Link from "next/link";
@@ -27,7 +27,7 @@ import {
 } from "@/lib/fees-policy";
 import type { SearchableSelectOption } from "@/components/searchable-select";
 import { FeeInvoiceFilters } from "./fee-invoice-filters";
-import { EditFeeInvoiceForm, RecordFeePaymentForm, type FeeOption } from "../fee-forms";
+import { BulkFeePaymentForm, EditFeeInvoiceForm, RecordFeePaymentForm, type FeeOption } from "../fee-forms";
 import { PaginationPageSize } from "@/components/pagination-page-size";
 import { parsePageSize } from "@/components/pagination-utils";
 
@@ -146,6 +146,7 @@ export default async function FeeCollectionPage({
     typeName: sql<string>`${feeTypes.name}`.as("typeName"),
     paidAmount: paidSql.as("paidAmount"),
     status: invoiceStatusSql.as("status"),
+    balanceMinor: sql<string>`GREATEST(0, ROUND((${totalDueSql} - ${paidSql}) * 100))`.as("balanceMinor"),
   })
     .from(studentFeeInvoices)
     .innerJoin(students, and(
@@ -191,8 +192,15 @@ export default async function FeeCollectionPage({
   const statusFilterCondition = statusFilter
     ? eq(matchingInvoices.status, statusFilter)
     : undefined;
-  const [countResult, branches, classes, sections] = await Promise.all([
+  const [countResult, bulkSummary, branches, classes, sections] = await Promise.all([
     db.select({ total: count() }).from(matchingInvoices).where(statusFilterCondition),
+    db.select({
+      count: count(),
+      outstandingMinor: sum(matchingInvoices.balanceMinor),
+    }).from(matchingInvoices).where(and(
+      statusFilterCondition,
+      inArray(matchingInvoices.status, ["unpaid", "partial"]),
+    )),
     db.select({ id: schoolBranches.id, name: schoolBranches.name })
       .from(schoolBranches).where(eq(schoolBranches.schoolId, context.schoolId))
       .orderBy(asc(schoolBranches.name)),
@@ -228,6 +236,11 @@ export default async function FeeCollectionPage({
       .orderBy(asc(schoolBranches.name), asc(classLevels.name), asc(classSections.name)),
   ]);
   const matchingCount = Number(countResult[0]?.total ?? 0);
+  const bulkInvoiceCount = Number(bulkSummary[0]?.count ?? 0);
+  const bulkOutstandingMinor = Number(bulkSummary[0]?.outstandingMinor ?? 0);
+  if (!Number.isSafeInteger(bulkOutstandingMinor) || bulkOutstandingMinor < 0) {
+    throw new Error("Filtered invoice balance total is invalid.");
+  }
   const pageCount = Math.max(1, Math.ceil(matchingCount / pageSize));
   const page = Math.min(requestedPage, pageCount);
   const invoices = await db.select().from(matchingInvoices)
@@ -338,14 +351,28 @@ export default async function FeeCollectionPage({
           />
         </AdminActionDialog>
       </div>
-      {(requestedClass !== null || requestedSection !== null) && (
-        <Link
-          href={`/admin/fees/invoices/print?${requestedSection !== null ? `sectionId=${requestedSection}` : `classLevelId=${requestedClass}`}`}
-          className="inline-flex rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          Print filtered invoices
-        </Link>
-      )}
+      <BulkFeePaymentForm
+        search={search}
+        status={statusFilter}
+        branchId={requestedBranch === null ? "" : String(requestedBranch)}
+        classLevelId={requestedClass === null ? "" : String(requestedClass)}
+        sectionId={requestedSection === null ? "" : String(requestedSection)}
+        invoiceCount={bulkInvoiceCount}
+        outstandingMinor={bulkOutstandingMinor}
+        currency={currency}
+      />
+      <Link
+        href={`/admin/fees/invoices/print?${new URLSearchParams({
+          ...(search ? { search } : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
+          ...(requestedBranch !== null ? { branchId: String(requestedBranch) } : {}),
+          ...(requestedClass !== null ? { classLevelId: String(requestedClass) } : {}),
+          ...(requestedSection !== null ? { sectionId: String(requestedSection) } : {}),
+        }).toString()}`}
+        className="inline-flex rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+      >
+        Print all filtered invoices
+      </Link>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <SummaryCard label="Invoices matching filters" value={String(matchingCount)} />

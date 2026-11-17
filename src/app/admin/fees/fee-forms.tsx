@@ -4,7 +4,7 @@ import { useActionState, type ReactNode } from "react";
 import Link from "next/link";
 import { SearchableSelect } from "@/components/searchable-select";
 import { RequiredMark } from "@/components/required-mark";
-import { AdminDeleteButton } from "@/components/admin-data-table";
+import { AdminConfirmSubmitButton, AdminDeleteButton } from "@/components/admin-data-table";
 import {
   assignStudentFeeDiscount,
   deleteFeeDiscount,
@@ -18,6 +18,7 @@ import {
   createFeeType,
   generateStudentFeeInvoices,
   recordFeePayment,
+  recordBulkFeePayments,
   reverseFeePayment,
   updateFeeInvoice,
   type FeeActionState,
@@ -409,6 +410,71 @@ export function RecordFeePaymentForm({
       <Field label="Notes" name="notes" required={false} />
       {maxAmount && <p className="text-xs text-slate-500">Outstanding balance: {currency} {maxAmount}</p>}
     </ActionForm>
+  );
+}
+
+export function BulkFeePaymentForm({
+  search,
+  status,
+  branchId,
+  classLevelId,
+  sectionId,
+  invoiceCount,
+  outstandingMinor,
+  currency,
+}: {
+  search: string;
+  status: string;
+  branchId: string;
+  classLevelId: string;
+  sectionId: string;
+  invoiceCount: number;
+  outstandingMinor: number;
+  currency: string;
+}) {
+  const [state, formAction, pending] = useActionState(recordBulkFeePayments, {});
+  return (
+    <form action={formAction} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+      <div>
+        <h2 className="font-semibold text-slate-900">Bulk payment</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Collect each unpaid or partial invoice&apos;s full remaining balance from the current filters.
+          {` ${invoiceCount} invoice${invoiceCount === 1 ? "" : "s"} · ${currency} ${(outstandingMinor / 100).toFixed(2)} outstanding.`}
+        </p>
+      </div>
+      {invoiceCount > 500 && (
+        <p role="status" className="text-sm font-medium text-amber-800">
+          Narrow the search filters to 500 or fewer outstanding invoices before recording bulk payments.
+        </p>
+      )}
+      <input type="hidden" name="search" value={search} />
+      <input type="hidden" name="status" value={status} />
+      <input type="hidden" name="branchId" value={branchId} />
+      <input type="hidden" name="classLevelId" value={classLevelId} />
+      <input type="hidden" name="sectionId" value={sectionId} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ValueSelectField label="Payment method" name="paymentMethod" options={[
+          { value: "cash", label: "Cash" },
+          { value: "bank_transfer", label: "Bank transfer" },
+          { value: "card", label: "Card" },
+          { value: "mobile_money", label: "Mobile money" },
+          { value: "cheque", label: "Cheque" },
+          { value: "other", label: "Other" },
+        ]} />
+        <Field label="Reference" name="reference" required={false} placeholder="Optional batch or transaction reference" />
+      </div>
+      <Field label="Notes" name="notes" required={false} />
+      {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
+      {state.message && <p role="status" className="text-sm text-emerald-700">{state.message}</p>}
+      <AdminConfirmSubmitButton
+        label="Record bulk payment"
+        buttonText={pending ? "Recording..." : "Record payments"}
+        confirmationTitle="Confirm bulk invoice payment"
+        confirmationMessage={`This will record payments for up to 500 unpaid or partial invoices matching these filters, up to ${currency} ${(outstandingMinor / 100).toFixed(2)} in total. Each invoice will receive its own receipt. Continue only if this amount has been received.`}
+        disabled={pending || outstandingMinor <= 0 || invoiceCount > 500}
+        variant="primary"
+      />
+    </form>
   );
 }
 
