@@ -31,6 +31,8 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { academicSections } from "@/lib/academic-sections";
+import { studentSections } from "@/lib/student-sections";
 import { getFuzzySearchNgrams, rankWorkspaceSearchResults } from "@/lib/workspace-search-policy";
 
 const querySchema = z.string().trim().min(2).max(120);
@@ -38,6 +40,7 @@ const workspacePermissions = [
   "students.view",
   "students.create",
   "students.update",
+  "students.delete",
   "staff.manage",
   "school.settings.manage",
   "academics.manage",
@@ -96,6 +99,8 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const canManageAccounts = permissions.has("accounts.manage");
   const canManageInventory = permissions.has("inventory.manage");
   const canManageLibrary = permissions.has("library.manage");
+  const canManageStudents = permissions.has("students.view");
+  const canManageStudentSettings = permissions.has("school.settings.manage") || permissions.has("students.update");
   const results: WorkspaceSearchResult[] = [];
 
   const addPage = (
@@ -111,38 +116,46 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   if (permissions.has("dashboard.view")) {
     addPage("dashboard", "Overview dashboard", "School dashboard and activity overview", "/admin/dashboard", ["home"]);
   }
+  if (permissions.has("results.enter")) {
+    addPage("teacher-portal", "Teacher portal", "Teacher class lists, attendance, and marks entry", "/portal/teacher", ["teacher", "my classes", "class portal"]);
+  }
   if (canManageAcademics) {
-    for (const [section, title, description, aliases] of [
-      ["branches", "Branches", "School locations and branch details", ["location"]],
-      ["years", "Academic years", "School year setup and status", ["year"]],
-      ["terms", "Terms & exams", "Academic term dates and exam periods", ["term"]],
-      ["classes", "Classes", "Class or grade levels", ["class list", "grade"]],
-      ["sections", "Class sections", "Year-specific class streams", ["section list", "stream"]],
-      ["subjects", "Subjects", "School subjects and class assignments", ["subject list"]],
-      ["optional-subjects", "Optional subjects", "Elective subjects by class", ["elective"]],
-      ["classrooms", "Classrooms", "Rooms and seat capacities", ["room"]],
-      ["routines", "Class routine", "Weekly class timetable", ["timetable", "schedule"]],
-      ["teachers", "Teachers", "Teacher assignments and details", ["teacher list"]],
-      ["holidays", "Holidays", "School holidays and breaks", ["holiday list"]],
-      ["enrollment", "Student enrollment", "Placements, progression and transfers", ["enrolment", "promote"]],
-      ["attendance", "Student attendance", "Daily attendance by class and date", ["attendance register", "absent", "present"]],
-    ] as const) {
-      addPage(`academics-${section}`, title, description, `/admin/academics?section=${section}`, [...aliases, "academics"]);
+    for (const section of academicSections) {
+      addPage(
+        `academics-${section.id}`,
+        section.label,
+        section.description,
+        `/admin/academics?section=${section.id}`,
+        [section.id, "academics"],
+      );
     }
   }
-  if (canViewStudents) {
-    addPage("student-list", "Student list", "Search and manage student profiles", "/admin/students", ["students", "student records", "directory", "lists"]);
-    addPage("student-reports", "Student Reports", "Open supported student reports, attendance reports, and class routines", "/admin/students/reports", ["student report", "attendance report", "class routine", "timetable"]);
-    addPage("student-directory-report", "Student Report", "View or print the student directory", "/admin/students?action=export", ["student report", "student list", "directory"]);
-    addPage("student-groups", "Student groups", "Student group lists", "/admin/students/groups", ["group"]);
-    addPage("student-disabled", "Disabled students", "Students marked disabled", "/admin/students/disabled");
+  if (canManageStudents) {
+    for (const section of studentSections) {
+      if (
+        ("permission" in section && section.permission && !permissions.has(section.permission)) &&
+        (!("permissionAlternatives" in section) || !section.permissionAlternatives?.some((permission) => permissions.has(permission)))
+      ) continue;
+      addPage(
+        `student-${section.id}`,
+        section.label,
+        `Student management · ${section.label}`,
+        section.href,
+        [section.id, "student", "students"],
+      );
+    }
   }
   if (canEnterResults) {
-    addPage("examination-setup", "Examination setup", "Exam configuration, types and grading", "/admin/examinations?section=setup", ["exams", "exam setup"]);
-    addPage("exam-schedule", "Exam schedule", "Examination dates and subject schedules", "/admin/examinations?section=schedule", ["routine"]);
-    addPage("exam-attendance", "Exam attendance", "Attendance for examination sittings", "/admin/examinations?section=attendance", ["exam attendance"]);
+    addPage("exam-types", "Exam type", "Configure examination types", "/admin/examinations?section=types", ["examination type", "assessment type"]);
+    addPage("examination-setup", "Examination setup", "Create, configure, and manage examinations", "/admin/examinations?section=setup", ["exams", "exam setup"]);
+    addPage("exam-schedule", "Exam schedule", "Examination dates and subject schedules", "/admin/examinations?section=schedule", ["routine", "timetable"]);
+    addPage("exam-attendance", "Exam attendance", "Attendance for examination sittings", "/admin/examinations?section=attendance", ["exam attendance", "exam register"]);
     addPage("marks-register", "Marks register", "Enter or review marks by subject roster", "/admin/examinations?section=marks", ["results", "scores"]);
+    addPage("exam-grades", "Marks grade", "Configure examination grading scales and grades", "/admin/examinations?section=grades", ["grades", "grading"]);
     addPage("exam-reports", "Exams Reports", "Merit lists, marksheets, tabulation and progress cards", "/admin/examinations/report-center/exam-routine", ["report", "reports", "report cards"]);
+    if (permissions.has("examinations.create") || permissions.has("results.publish")) {
+      addPage("exam-report-signatures", "Report signatures", "Upload and manage exam report signatures", "/admin/examinations/signatures", ["signatures", "headteacher signature", "teacher signature"]);
+    }
     if (permissions.has("examinations.create") || permissions.has("results.publish")) {
       addPage("exam-analytics", "Exam Analytics", "Compare published examination results by class, stream, subject and student", "/admin/exam-analytics", ["exam analytics", "class performance", "subject performance", "student performance", "mean grade"]);
     }
@@ -150,12 +163,19 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (canManageStaff) {
     addPage("staff-list", "Staff directory", "Search staff profiles and assignments", "/admin/staff", ["staff", "employees", "personnel", "lists"]);
+    addPage("hr-overview", "HR overview", "Human resources staff summary", "/admin/hr", ["human resources", "staff summary"]);
+    addPage("hr-departments", "Departments", "Manage staff departments", "/admin/hr/departments", ["department"]);
+    addPage("hr-designations", "Designations", "Manage staff job designations", "/admin/hr/designations", ["designation", "job title"]);
     addPage("staff-attendance", "Staff attendance", "Staff daily attendance register", "/admin/hr/attendance", ["attendance register", "absent", "present"]);
     addPage("staff-attendance-reports", "Staff attendance reports", "Attendance summaries and reports", "/admin/hr/reports", ["report", "reports"]);
     addPage("staff-leave", "Leave management", "Staff leave requests and records", "/admin/hr/leave", ["leave"]);
     addPage("payroll", "Payroll records", "Staff payroll and pay history", "/admin/hr/payroll", ["salary", "pay"]);
+    addPage("hr-settings", "HR settings", "Configure staff fields and HR settings", "/admin/hr/settings", ["staff settings", "human resources settings"]);
   }
   if (canManageFees) {
+    if (permissions.has("fees.manage")) {
+      addPage("fee-setup", "Fee setup", "Configure fee groups, types, discounts, and structures", "/admin/fees", ["fees setup", "fee structure", "fee types", "discounts"]);
+    }
     addPage("fee-collection", "Fee collection", "Find invoices and record payments", "/admin/fees/collection", ["fees", "invoice", "payment"]);
     addPage("fee-reports", "Fee reports", "Collection and outstanding balance reports", "/admin/fees/reports", ["report", "reports", "balance", "finance"]);
   }
@@ -169,19 +189,22 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("accounts-chart", "Chart of accounts", "Manage accounting codes and reporting categories", "/admin/accounts?section=chart", ["account categories", "ledger"]);
     addPage("accounts-bank", "Bank accounts", "School bank and cash accounts with balances", "/admin/accounts?section=bank", ["cash account"]);
     addPage("accounts-transfers", "Fund transfers", "Move funds between school bank accounts", "/admin/accounts?section=transfers", ["bank transfer"]);
+    addPage("accounts-reports", "Accounts reports", "Filtered income, expense, approval and net-fee reports", "/admin/accounts?section=reports", ["account reports", "transaction report", "income report", "expense report"]);
   }
   if (permissions.has("inventory.manage")) {
     addPage("school-inventory", "Inventory", "Stock register, suppliers, stock movement, and low-stock alerts", "/admin/inventory", ["stock", "supplies", "supplier", "low stock"]);
     addPage("inventory-assets", "Assets", "School asset register, locations, and maintenance history", "/admin/inventory?section=assets", ["school assets", "asset location", "maintenance"]);
   }
-  if (permissions.has("accounts.manage")) {
-    addPage("accounts-reports", "Accounts reports", "Filtered income, expense, approval and net-fee reports", "/admin/accounts?section=reports", ["account reports", "transaction report", "income report", "expense report"]);
-  }
   if (permissions.has("inventory.manage")) {
     addPage("inventory-reports", "Inventory reports", "Stock valuation, low-stock, movement, asset, and maintenance reports", "/admin/inventory/reports", ["inventory reports", "stock valuation", "stock movement", "asset report", "maintenance report"]);
   }
+  if (permissions.has("inventory.manage") || canManageAccounts) {
+    addPage("inventory-locations", "Inventory locations", "Manage stock and asset storage locations", "/admin/inventory?section=inventory", ["stock location", "warehouse"]);
+    addPage("inventory-suppliers", "Inventory suppliers", "Manage inventory suppliers", "/admin/inventory?section=inventory", ["supplier", "vendor"]);
+  }
   if (canManageLibrary) {
     addPage("library", "Library", "Book catalog, student loans, returns, and overdue books", "/admin/library", ["books", "book loans", "lending", "borrowed", "overdue"]);
+    addPage("library-add-book", "Add book", "Add a new title to the library catalog", "/admin/library?section=add-book", ["new book", "catalog"]);
     addPage("library-members", "Library members", "Register student and staff borrowers", "/admin/library?section=members", ["student members", "staff members", "library card", "member register"]);
     addPage("library-circulation", "Issue and return books", "Check out, renew, and return library books", "/admin/library?section=issue", ["checkout", "check out", "book return", "circulation"]);
     addPage("library-issued", "Issued books", "Review active, overdue, and returned book loans", "/admin/library?section=issued&status=all", ["loan register", "overdue books", "returned books"]);
@@ -193,6 +216,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (permissions.has("school.settings.manage")) {
     addPage("school-profile", "School profile", "School details and configuration", "/admin/settings", ["settings", "school settings"]);
+  }
+  if (canManageStudentSettings) {
+    addPage("student-settings", "Student settings", "Configure student admission numbers, roll numbers, and profile fields", "/admin/students/settings", ["student settings", "admission format", "roll number format", "student fields"]);
   }
 
   const pattern = patternFor(query);
