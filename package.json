@@ -15,6 +15,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed-demo": "tsx scripts/seed-demo-data.ts",
     "db:seed-fees-demo": "tsx scripts/seed-fee-demo-data.ts",
+    "db:seed-library-demo": "tsx scripts/seed-library-demo-data.ts",
     "db:seed-accounts-inventory-demo": "tsx scripts/seed-accounts-inventory-demo.ts"
   },
   "dependencies": {

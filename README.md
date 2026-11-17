@@ -98,7 +98,19 @@ Library management also supports branch-aware book details, category and subject
 
    This seed is blocked in production and on Vercel, requires explicit opt-in, and restricts remote writes to the verified SchoolOS demo database. It is safe to repeat and marks every sample record as test-only; the example income and expenses are not real transactions and the sample stock is not a real count.
 
-9. Start the app:
+9. To add clearly labeled books, categories, subjects, a sample member, and loan-history examples to `SchoolOS Demo School`:
+
+   ```powershell
+   $env:ALLOW_LIBRARY_DEMO_SEED = "true"
+   $env:ALLOW_DEMO_SEED_REMOTE = "true"
+   npm run db:seed-library-demo
+   Remove-Item Env:\ALLOW_LIBRARY_DEMO_SEED
+   Remove-Item Env:\ALLOW_DEMO_SEED_REMOTE
+   ```
+
+   This seed is blocked in production and on Vercel, requires explicit opt-in, and restricts remote writes to the verified SchoolOS demo database. Sample library records are marked `DEMO TEST`, use an existing demo-school student for the sample membership, and do not modify any other student information.
+
+10. Start the app:
 
    ```powershell
    npm run dev
