@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     "roles.manage",
     "fees.manage",
     "payments.record",
+    "library.manage",
     "examinations.create",
     "examinations.delete",
     "results.enter",

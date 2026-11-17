@@ -37,6 +37,7 @@ const permissionCatalog = [
   ["results.publish", "Approve and publish results"],
   ["fees.manage", "Manage fee structures"],
   ["inventory.manage", "Manage school inventory and assets"],
+  ["library.manage", "Manage library books and lending"],
   ["accounts.manage", "Manage school accounts, income, expenses, and reports"],
   ["fees.balance.view", "View outstanding student fee balances"],
   ["payments.record", "Record school payments"],
@@ -240,6 +241,7 @@ async function seed() {
       "payments.record",
       "accounts.manage",
       "inventory.manage",
+      "library.manage",
       "reports.export",
       "examinations.create",
       "examinations.delete",
@@ -290,6 +292,34 @@ async function seed() {
       await tx.insert(rolePermissions).values({
         roleId: hrRole.id,
         permissionId: staffPermission.id,
+      });
+    }
+
+    const [librarianRole] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.schoolId, school.id), eq(roles.name, "Librarian")))
+      .limit(1);
+    const [libraryPermission] = await tx
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(eq(permissions.key, "library.manage"))
+      .limit(1);
+    if (!librarianRole || !libraryPermission) {
+      throw new Error("The Librarian role or library permission could not be created.");
+    }
+    const [librarianRolePermission] = await tx
+      .select({ roleId: rolePermissions.roleId })
+      .from(rolePermissions)
+      .where(and(
+        eq(rolePermissions.roleId, librarianRole.id),
+        eq(rolePermissions.permissionId, libraryPermission.id),
+      ))
+      .limit(1);
+    if (!librarianRolePermission) {
+      await tx.insert(rolePermissions).values({
+        roleId: librarianRole.id,
+        permissionId: libraryPermission.id,
       });
     }
 

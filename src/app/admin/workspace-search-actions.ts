@@ -19,6 +19,7 @@ import {
   inventoryItems,
   inventoryLocations,
   inventorySuppliers,
+  libraryBooks,
   staffMembers,
   studentFeeInvoices,
   students,
@@ -43,6 +44,7 @@ const workspacePermissions = [
   "payments.record",
   "accounts.manage",
   "inventory.manage",
+  "library.manage",
   "dashboard.view",
   "roles.manage",
 ] as const;
@@ -52,7 +54,7 @@ export type WorkspaceSearchResult = {
   title: string;
   description: string;
   href: string;
-  category: "Pages" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Fees" | "Accounts";
+  category: "Pages" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Library" | "Fees" | "Accounts";
   searchTerms?: string[];
 };
 
@@ -89,6 +91,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const canManageFees = permissions.has("fees.manage") || permissions.has("payments.record");
   const canManageAccounts = permissions.has("accounts.manage");
   const canManageInventory = permissions.has("inventory.manage");
+  const canManageLibrary = permissions.has("library.manage");
   const results: WorkspaceSearchResult[] = [];
 
   const addPage = (
@@ -173,6 +176,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   if (permissions.has("inventory.manage")) {
     addPage("inventory-reports", "Inventory reports", "Stock valuation, low-stock, movement, asset, and maintenance reports", "/admin/inventory/reports", ["inventory reports", "stock valuation", "stock movement", "asset report", "maintenance report"]);
   }
+  if (canManageLibrary) {
+    addPage("library", "Library", "Book catalog, student loans, returns, and overdue books", "/admin/library", ["books", "book loans", "lending", "borrowed", "overdue"]);
+  }
   if (permissions.has("roles.manage")) {
     addPage("user-roles", "User roles", "Users, roles and permission assignments", "/admin/settings/roles", ["permissions", "accounts"]);
   }
@@ -195,6 +201,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     staffRows,
     academicRows,
     examRows,
+    libraryRows,
   ] = await Promise.all([
     canViewStudents
       ? db.select({
@@ -524,6 +531,26 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           .orderBy(asc(examinations.startDate), asc(examinations.name))
           .limit(30)
         : Promise.resolve([]),
+    canManageLibrary
+      ? db.select({
+        id: libraryBooks.id,
+        title: libraryBooks.title,
+        author: libraryBooks.author,
+        isbn: libraryBooks.isbn,
+        availableCopies: libraryBooks.availableCopies,
+      }).from(libraryBooks)
+        .where(and(
+          eq(libraryBooks.schoolId, context.schoolId),
+          or(
+            tokenMatch(libraryBooks.title),
+            tokenMatch(libraryBooks.author),
+            tokenMatch(libraryBooks.isbn),
+            fuzzyTextMatch(queryTokens, libraryBooks.title, libraryBooks.author, libraryBooks.isbn),
+          ),
+        ))
+        .orderBy(asc(libraryBooks.title))
+        .limit(20)
+      : Promise.resolve([]),
   ]);
 
   for (const student of studentRows) {
@@ -632,6 +659,15 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       description: [exam.className, exam.status, exam.startDate].filter(Boolean).join(" · "),
       href: `/admin/examinations?section=setup&examId=${exam.id}`,
       category: "Examinations",
+    });
+  }
+  for (const book of libraryRows) {
+    results.push({
+      id: `library-book-${book.id}`,
+      title: book.title,
+      description: `Library book · ${book.author} · ${book.availableCopies} available`,
+      href: `/admin/library?q=${encodeURIComponent(book.title)}`,
+      category: "Library",
     });
   }
 

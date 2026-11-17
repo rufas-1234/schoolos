@@ -1876,6 +1876,55 @@ export const assetMaintenance = mysqlTable(
   (table) => [index("asset_maintenance_school_asset_date_idx").on(table.schoolId, table.assetId, table.maintenanceDate)],
 );
 
+export const libraryBooks = mysqlTable(
+  "library_books",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    isbn: varchar("isbn", { length: 20 }),
+    title: varchar("title", { length: 200 }).notNull(),
+    author: varchar("author", { length: 160 }).notNull(),
+    publisher: varchar("publisher", { length: 160 }),
+    category: varchar("category", { length: 100 }),
+    shelfLocation: varchar("shelfLocation", { length: 80 }),
+    totalCopies: int("totalCopies", { unsigned: true }).notNull().default(1),
+    availableCopies: int("availableCopies", { unsigned: true }).notNull().default(1),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("library_books_school_isbn_uq").on(table.schoolId, table.isbn),
+    index("library_books_school_title_idx").on(table.schoolId, table.title),
+    index("library_books_school_status_idx").on(table.schoolId, table.status),
+  ],
+);
+
+export const libraryLoans = mysqlTable(
+  "library_loans",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    bookId: bigint("bookId", { mode: "number", unsigned: true }).notNull().references(() => libraryBooks.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true }).notNull().references(() => students.id),
+    issuedAt: date("issuedAt", { mode: "string" }).notNull(),
+    dueDate: date("dueDate", { mode: "string" }).notNull(),
+    returnedAt: date("returnedAt", { mode: "string" }),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    issuedBy: varchar("issuedBy", { length: 36 }).notNull().references(() => user.id),
+    returnedBy: varchar("returnedBy", { length: 36 }).references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("library_loans_school_status_due_idx").on(table.schoolId, table.status, table.dueDate),
+    index("library_loans_school_student_status_idx").on(table.schoolId, table.studentId, table.status),
+    index("library_loans_school_book_status_idx").on(table.schoolId, table.bookId, table.status),
+  ],
+);
+
 export const chartOfAccounts = mysqlTable(
   "chart_of_accounts",
   {

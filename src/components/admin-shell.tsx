@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BookOpen,
+  BookMarked,
   BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
@@ -87,6 +88,12 @@ const navigation: NavigationItem[] = [
       { id: "exam-reports", label: "Exams Reports", href: "/admin/examinations/report-center/exam-routine" },
       { id: "exam-analytics", label: "Exam Analytics", href: "/admin/exam-analytics", matchPath: "/admin/exam-analytics", permission: "examinations.create", permissionAlternatives: ["results.publish"] },
     ],
+  },
+  {
+    href: "/admin/library",
+    label: "Library",
+    icon: BookMarked,
+    permission: "library.manage",
   },
   {
     href: "/admin/hr",

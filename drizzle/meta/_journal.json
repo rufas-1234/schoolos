@@ -260,6 +260,13 @@
       "when": 1794789129140,
       "tag": "0036_whole_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "5",
+      "when": 1794874733144,
+      "tag": "0037_library_management",
+      "breakpoints": true
     }
   ]
 }
