@@ -524,17 +524,11 @@ export function AdminShell({
                         <Link
                           key={section.id}
                           href={section.href}
-                          onClick={(event) => {
+                          onClick={() => {
                             setOpen(false);
-                            if (
-                              section.id === "list" &&
-                              pathname === "/admin/students" &&
-                              searchParams.get("action") === "add"
-                            ) {
-                              event.preventDefault();
+                            if (section.id === "list") {
                               document.querySelectorAll<HTMLDialogElement>("dialog[open]")
                                 .forEach((dialog) => dialog.close());
-                              router.push("/admin/students");
                             }
                           }}
                           aria-current={sectionActive ? "page" : undefined}
