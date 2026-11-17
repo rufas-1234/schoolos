@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -13,6 +13,7 @@ import {
   libraryMembers,
   librarySubjects,
   schoolBranches,
+  staffMembers,
   students,
 } from "@/db/schema";
 import { isDuplicateEntryError } from "@/lib/db-errors";
@@ -272,25 +273,46 @@ export async function saveLibraryMember(
 ): Promise<LibraryActionState> {
   const context = await requireSchoolPermission("library.manage");
   const parsed = z.object({
-    studentId: idField,
+    memberType: z.enum(["student", "staff"]),
+    personId: idField,
     memberNumber: z.string().trim().min(1).max(40),
     branchId: optionalId,
   }).safeParse({
-    studentId: value(formData, "studentId"),
+    memberType: value(formData, "memberType"),
+    personId: value(formData, "personId"),
     memberNumber: value(formData, "memberNumber"),
     branchId: value(formData, "branchId"),
   });
-  if (!parsed.success) return { error: "Choose an active student and enter a member number." };
-  const [student] = await db.select({ id: students.id, branchId: students.branchId }).from(students)
-    .where(and(
-      eq(students.id, parsed.data.studentId),
+  if (!parsed.success) return { error: "Choose an active student or staff member and enter a member number." };
+  const [person] = parsed.data.memberType === "student"
+    ? await db.select({
+      id: students.id,
+      branchId: students.branchId,
+    }).from(students).where(and(
+      eq(students.id, parsed.data.personId),
       eq(students.schoolId, context.schoolId),
       eq(students.status, "active"),
+    )).limit(1)
+    : await db.select({
+      id: staffMembers.id,
+      branchId: staffMembers.branchId,
+    }).from(staffMembers).where(and(
+      eq(staffMembers.id, parsed.data.personId),
+      eq(staffMembers.schoolId, context.schoolId),
+      eq(staffMembers.status, "active"),
     )).limit(1);
-  if (!student) return { error: "Choose an active student from this school." };
-  const branchId = parsed.data.branchId ?? student.branchId;
-  if (parsed.data.branchId && student.branchId && parsed.data.branchId !== student.branchId) {
-    return { error: "Choose the student's assigned branch." };
+  if (!person) return { error: `Choose an active ${parsed.data.memberType} from this school.` };
+  const branchId = parsed.data.branchId ?? person.branchId;
+  if (parsed.data.branchId) {
+    const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
+      eq(schoolBranches.id, parsed.data.branchId),
+      eq(schoolBranches.schoolId, context.schoolId),
+      eq(schoolBranches.status, "active"),
+    )).limit(1);
+    if (!branch) return { error: "Choose an active branch belonging to this school." };
+  }
+  if (parsed.data.branchId && person.branchId && parsed.data.branchId !== person.branchId) {
+    return { error: `Choose the ${parsed.data.memberType}'s assigned branch.` };
   }
   const publicId = randomUUID();
   try {
@@ -298,11 +320,13 @@ export async function saveLibraryMember(
       publicId,
       schoolId: context.schoolId,
       branchId,
-      studentId: student.id,
+      memberType: parsed.data.memberType,
+      studentId: parsed.data.memberType === "student" ? person.id : null,
+      staffMemberId: parsed.data.memberType === "staff" ? person.id : null,
       memberNumber: parsed.data.memberNumber,
     });
   } catch (error) {
-    if (isDuplicateEntryError(error)) return { error: "This student is already a library member or that member number is in use." };
+    if (isDuplicateEntryError(error)) return { error: "This person is already a library member or that member number is in use." };
     throw error;
   }
   await db.insert(auditLogs).values({
@@ -311,7 +335,7 @@ export async function saveLibraryMember(
     action: "library_member.created",
     resourceType: "library_member",
     resourcePublicId: publicId,
-    changedFields: ["branchId", "studentId", "memberNumber"],
+    changedFields: ["branchId", "memberType", "studentId", "staffMemberId", "memberNumber"],
   });
   revalidateLibrary();
   return { success: true, message: "Library member added." };
@@ -330,6 +354,7 @@ export async function setLibraryMemberStatus(
       id: libraryMembers.id,
       publicId: libraryMembers.publicId,
       studentId: libraryMembers.studentId,
+      staffMemberId: libraryMembers.staffMemberId,
     }).from(libraryMembers).where(and(
       eq(libraryMembers.id, memberId.data),
       eq(libraryMembers.schoolId, context.schoolId),
@@ -339,7 +364,10 @@ export async function setLibraryMemberStatus(
       const [activeLoan] = await tx.select({ id: libraryLoans.id }).from(libraryLoans)
         .where(and(
           eq(libraryLoans.schoolId, context.schoolId),
-          eq(libraryLoans.studentId, member.studentId),
+          or(
+            eq(libraryLoans.memberId, member.id),
+            member.studentId !== null ? eq(libraryLoans.studentId, member.studentId) : undefined,
+          ),
           eq(libraryLoans.status, "active"),
         )).limit(1);
       if (activeLoan) return { error: "Return this member's active books before deactivating the membership." };
@@ -400,7 +428,9 @@ export async function checkoutLibraryBook(
 
     const [member] = await tx.select({
       id: libraryMembers.id,
+      memberType: libraryMembers.memberType,
       studentId: libraryMembers.studentId,
+      staffMemberId: libraryMembers.staffMemberId,
       branchId: libraryMembers.branchId,
     }).from(libraryMembers).where(and(
       eq(libraryMembers.id, parsed.data.memberId),
@@ -411,12 +441,23 @@ export async function checkoutLibraryBook(
     if (book.branchId !== null && book.branchId !== member.branchId) {
       return { error: "This book is assigned to a different branch." };
     }
-    const [student] = await tx.select({ id: students.id }).from(students).where(and(
-      eq(students.id, member.studentId),
-      eq(students.schoolId, context.schoolId),
-      eq(students.status, "active"),
-    )).limit(1);
-    if (!student) return { error: "The linked student is not currently active." };
+    if (member.memberType === "student") {
+      if (member.studentId === null) throw new Error("A student library member is missing its student record.");
+      const [student] = await tx.select({ id: students.id }).from(students).where(and(
+        eq(students.id, member.studentId),
+        eq(students.schoolId, context.schoolId),
+        eq(students.status, "active"),
+      )).limit(1);
+      if (!student) return { error: "The linked student is not currently active." };
+    } else {
+      if (member.staffMemberId === null) throw new Error("A staff library member is missing its staff record.");
+      const [staff] = await tx.select({ id: staffMembers.id }).from(staffMembers).where(and(
+        eq(staffMembers.id, member.staffMemberId),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.status, "active"),
+      )).limit(1);
+      if (!staff) return { error: "The linked staff member is not currently active." };
+    }
 
     await tx.update(libraryBooks).set({
       availableCopies: book.availableCopies - 1,
@@ -425,7 +466,7 @@ export async function checkoutLibraryBook(
       publicId: loanPublicId,
       schoolId: context.schoolId,
       bookId: book.id,
-      studentId: student.id,
+      studentId: member.studentId,
       memberId: member.id,
       issuedAt: today(),
       dueDate: parsed.data.dueDate,
@@ -437,7 +478,7 @@ export async function checkoutLibraryBook(
       action: "library_loan.issued",
       resourceType: "library_loan",
       resourcePublicId: loanPublicId,
-      changedFields: ["bookId", "studentId", "memberId", "issuedAt", "dueDate"],
+      changedFields: ["bookId", "memberId", "issuedAt", "dueDate"],
     });
     return { success: true, message: "Book checked out successfully." };
   });

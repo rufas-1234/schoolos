@@ -8,6 +8,7 @@ import {
   libraryMembers,
   librarySubjects,
   schoolBranches,
+  staffMembers,
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -66,6 +67,7 @@ export default async function LibraryPage({
     section?: string;
     status?: string;
     branchId?: string;
+    memberType?: string;
     bookId?: string;
     subjectId?: string;
   }>;
@@ -101,6 +103,7 @@ export default async function LibraryPage({
     subjectRows,
     branchRows,
     studentRows,
+    staffRows,
     memberRows,
     loanRows,
     [loanCount],
@@ -127,21 +130,38 @@ export default async function LibraryPage({
     }).from(students).where(and(eq(students.schoolId, schoolId), eq(students.status, "active")))
       .orderBy(asc(students.lastName), asc(students.firstName)).limit(1000),
     db.select({
+      id: staffMembers.id,
+      firstName: staffMembers.firstName,
+      lastName: staffMembers.lastName,
+      employeeCode: staffMembers.employeeCode,
+      branchId: staffMembers.branchId,
+    }).from(staffMembers).where(and(
+      eq(staffMembers.schoolId, schoolId),
+      eq(staffMembers.status, "active"),
+    )).orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)).limit(1000),
+    db.select({
       id: libraryMembers.id,
       memberNumber: libraryMembers.memberNumber,
+      memberType: libraryMembers.memberType,
       status: libraryMembers.status,
       branchId: libraryMembers.branchId,
-      studentId: students.id,
-      firstName: students.firstName,
-      lastName: students.lastName,
+      studentId: libraryMembers.studentId,
+      staffMemberId: libraryMembers.staffMemberId,
+      firstName: sql<string>`coalesce(${students.firstName}, ${staffMembers.firstName})`,
+      lastName: sql<string>`coalesce(${students.lastName}, ${staffMembers.lastName})`,
       admissionNumber: students.admissionNumber,
+      employeeCode: staffMembers.employeeCode,
     }).from(libraryMembers)
-      .innerJoin(students, and(
+      .leftJoin(students, and(
         eq(students.id, libraryMembers.studentId),
         eq(students.schoolId, schoolId),
       ))
+      .leftJoin(staffMembers, and(
+        eq(staffMembers.id, libraryMembers.staffMemberId),
+        eq(staffMembers.schoolId, schoolId),
+      ))
       .where(eq(libraryMembers.schoolId, schoolId))
-      .orderBy(asc(students.lastName), asc(students.firstName)).limit(1000),
+      .orderBy(asc(libraryMembers.memberNumber)).limit(1000),
     db.select({
       id: libraryLoans.id,
       bookId: libraryBooks.id,
@@ -150,10 +170,12 @@ export default async function LibraryPage({
       subjectId: libraryBooks.subjectId,
       branchId: libraryBooks.branchId,
       memberId: libraryMembers.id,
+      memberType: libraryMembers.memberType,
       memberNumber: libraryMembers.memberNumber,
       studentId: students.id,
-      studentName: sql<string>`concat(${students.firstName}, ' ', ${students.lastName})`,
+      studentName: sql<string>`coalesce(concat(${students.firstName}, ' ', ${students.lastName}), concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}))`,
       admissionNumber: students.admissionNumber,
+      employeeCode: staffMembers.employeeCode,
       issuedAt: libraryLoans.issuedAt,
       dueDate: libraryLoans.dueDate,
       returnedAt: libraryLoans.returnedAt,
@@ -163,13 +185,17 @@ export default async function LibraryPage({
         eq(libraryBooks.id, libraryLoans.bookId),
         eq(libraryBooks.schoolId, schoolId),
       ))
-      .innerJoin(students, and(
+      .leftJoin(students, and(
         eq(students.id, libraryLoans.studentId),
         eq(students.schoolId, schoolId),
       ))
       .leftJoin(libraryMembers, and(
         eq(libraryMembers.id, libraryLoans.memberId),
         eq(libraryMembers.schoolId, schoolId),
+      ))
+      .leftJoin(staffMembers, and(
+        eq(staffMembers.id, libraryMembers.staffMemberId),
+        eq(staffMembers.schoolId, schoolId),
       ))
       .where(and(
         eq(libraryLoans.schoolId, schoolId),
@@ -186,7 +212,9 @@ export default async function LibraryPage({
           like(libraryBooks.bookNumber, `%${query}%`),
           like(libraryMembers.memberNumber, `%${query}%`),
           sql`concat(${students.firstName}, ' ', ${students.lastName}) like ${`%${query}%`}`,
+          sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}) like ${`%${query}%`}`,
           like(students.admissionNumber, `%${query}%`),
+          like(staffMembers.employeeCode, `%${query}%`),
         ) : undefined,
       ))
       .orderBy(asc(libraryLoans.dueDate)).limit(500),
@@ -215,18 +243,27 @@ export default async function LibraryPage({
   const branchNames = new Map(branches.map((branch) => [branch.id, branch.label]));
   const categoryNames = new Map(categoryRows.map((category) => [category.id, category.name]));
   const subjectNames = new Map(subjectRows.map((subject) => [subject.id, subject.name]));
-  const registeredStudentIds = new Set(memberRows.map((member) => member.studentId));
+  const registeredStudentIds = new Set(memberRows.filter((member) => member.memberType === "student")
+    .map((member) => member.studentId).filter((id): id is number => id !== null));
+  const registeredStaffIds = new Set(memberRows.filter((member) => member.memberType === "staff")
+    .map((member) => member.staffMemberId).filter((id): id is number => id !== null));
   const unregisteredStudents: LibraryStudentOption[] = studentRows
     .filter((student) => !registeredStudentIds.has(student.id))
     .map((student) => ({
       id: student.id,
       label: `${student.firstName} ${student.lastName}${student.admissionNumber ? ` (${student.admissionNumber})` : ""}`,
     }));
+  const unregisteredStaff: LibraryStudentOption[] = staffRows
+    .filter((staff) => !registeredStaffIds.has(staff.id))
+    .map((staff) => ({
+      id: staff.id,
+      label: `${staff.firstName} ${staff.lastName}${staff.employeeCode ? ` (${staff.employeeCode})` : ""}`,
+    }));
   const activeMembers: LibraryMemberOption[] = memberRows
     .filter((member) => member.status === "active")
     .map((member) => ({
       id: member.id,
-      label: `${member.memberNumber} · ${member.firstName} ${member.lastName}${member.admissionNumber ? ` (${member.admissionNumber})` : ""}`,
+      label: `${member.memberNumber} · ${member.firstName} ${member.lastName} · ${member.memberType === "staff" ? "Staff" : "Student"}`,
     }));
   const activeLoans = loanRows.map((loan) => ({ ...loan, overdue: loan.dueDate < today }));
   const addAction = section === "books" || section === "add-book"
@@ -236,7 +273,7 @@ export default async function LibraryPage({
       : section === "subjects"
         ? <LibraryTermDialog type="subject" branches={branches} />
         : section === "members"
-          ? <LibraryMemberDialog students={unregisteredStudents} branches={branches} />
+          ? <LibraryMemberDialog students={unregisteredStudents} staff={unregisteredStaff} branches={branches} />
           : null;
 
   return (
@@ -320,14 +357,14 @@ export default async function LibraryPage({
         </div>
         <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Member</th><th className="px-4 py-3">Member ID</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{memberRows.filter((member) => !query || `${member.firstName} ${member.lastName} ${member.memberNumber} ${member.admissionNumber ?? ""}`.toLowerCase().includes(query.toLowerCase())).map((member) => <tr key={member.id}>
-            <td className="px-4 py-4 font-medium text-slate-900">{member.firstName} {member.lastName}<span className="block text-xs font-normal text-slate-400">{member.admissionNumber ?? "No admission number"}</span></td>
-            <td className="px-4 py-4 text-slate-700">{member.memberNumber}</td><td className="px-4 py-4 text-slate-600">Student</td>
+          <tbody className="divide-y divide-slate-100">{memberRows.filter((member) => !query || `${member.firstName} ${member.lastName} ${member.memberNumber} ${member.admissionNumber ?? ""} ${member.employeeCode ?? ""}`.toLowerCase().includes(query.toLowerCase())).map((member) => <tr key={member.id}>
+            <td className="px-4 py-4 font-medium text-slate-900">{member.firstName} {member.lastName}<span className="block text-xs font-normal text-slate-400">{member.memberType === "staff" ? member.employeeCode ? `Employee ${member.employeeCode}` : "Staff member" : member.admissionNumber ?? "Student"}</span></td>
+            <td className="px-4 py-4 text-slate-700">{member.memberNumber}</td><td className="px-4 py-4 text-slate-600">{member.memberType === "staff" ? "Staff" : "Student"}</td>
             <td className="px-4 py-4 text-slate-600">{member.branchId ? branchNames.get(member.branchId) ?? "Branch" : "—"}</td>
             <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${member.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{member.status}</span></td>
             <td className="px-4 py-4"><LibraryMemberStatusButton memberId={member.id} active={member.status === "active"} /></td>
           </tr>)}
-            {memberRows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">Register a student to enable book lending.</td></tr>}
+            {memberRows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">Register a student or staff member to enable book lending.</td></tr>}
           </tbody>
         </table></div>
       </section>}
@@ -376,9 +413,11 @@ type LoanRow = {
   branchId: number | null;
   memberId: number | null;
   memberNumber: string | null;
-  studentId: number;
-  studentName: string;
+  memberType: string | null;
+  studentId: number | null;
+  studentName: string | null;
   admissionNumber: string | null;
+  employeeCode: string | null;
   issuedAt: string;
   dueDate: string;
   returnedAt: string | null;
@@ -414,7 +453,7 @@ function LoanHistoryTable({
           const overdue = loan.status === "active" && loan.dueDate < today;
           return <tr key={loan.id} className="align-top">
             <td className="px-4 py-4 font-medium text-slate-900">{loan.title}<span className="block text-xs font-normal text-slate-400">{loan.bookNumber ? `Book ID ${loan.bookNumber}` : "No book number"}</span></td>
-            <td className="px-4 py-4 text-slate-700">{loan.studentName}<span className="block text-xs text-slate-400">{loan.memberNumber ? `Member ${loan.memberNumber}` : loan.admissionNumber ?? "No member number"}</span></td>
+            <td className="px-4 py-4 text-slate-700">{loan.studentName ?? "Unknown member"}<span className="block text-xs text-slate-400">{loan.memberNumber ? `Member ${loan.memberNumber} · ${loan.memberType === "staff" ? "Staff" : "Student"}` : loan.admissionNumber ?? loan.employeeCode ?? "No member number"}</span></td>
             <td className="px-4 py-4 text-slate-600">{loan.issuedAt}</td>
             <td className={`px-4 py-4 font-medium ${overdue ? "text-rose-700" : "text-slate-600"}`}>{loan.dueDate}{overdue && <span className="ml-2 text-xs font-semibold">Overdue</span>}{loan.returnedAt && <span className="block text-xs text-slate-400">Returned {loan.returnedAt}</span>}</td>
             <td className="px-4 py-4 text-slate-600">{loan.status}</td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { AdminActionDialog } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
@@ -188,21 +188,32 @@ export function LibraryTermDialog({
 
 export function LibraryMemberDialog({
   students,
+  staff = [],
   branches = [],
 }: {
   students: LibraryStudentOption[];
+  staff?: LibraryStudentOption[];
   branches?: LibraryBranchOption[];
 }) {
   const [state, formAction, pending] = useActionState(saveLibraryMember, {});
+  const [memberType, setMemberType] = useState<"student" | "staff">("student");
+  const people = memberType === "student" ? students : staff;
   return <AdminActionDialog label="Add member" title="Register a library member">
     <form action={formAction} className="space-y-3">
-      <SearchableSelect label="Student" name="studentId" required
-        options={students.map((student) => ({ value: String(student.id), label: student.label }))}
-        placeholder={students.length ? "Search students..." : "No unregistered students"} />
+      <label className="block text-sm">Member type<select name="memberType" value={memberType}
+        onChange={(event) => setMemberType(event.target.value === "staff" ? "staff" : "student")}
+        className="mt-1 h-10 w-full rounded-lg border bg-white px-3">
+        <option value="student">Student</option>
+        <option value="staff">Staff</option>
+      </select></label>
+      <SearchableSelect key={memberType} label={memberType === "student" ? "Student" : "Staff member"}
+        name="personId" required
+        options={people.map((person) => ({ value: String(person.id), label: person.label }))}
+        placeholder={people.length ? `Search ${memberType === "student" ? "students" : "staff"}...` : `No unregistered ${memberType === "student" ? "students" : "staff"}`} />
       <label className="block text-sm">Member ID<input name="memberNumber" required maxLength={40} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
-      {branches.length > 0 && <label className="block text-sm">Branch<select name="branchId" className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="">Use student branch</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select></label>}
+      {branches.length > 0 && <label className="block text-sm">Branch<select name="branchId" className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="">Use {memberType} branch</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select></label>}
       <ActionFeedback state={state} />
-      <button disabled={pending || students.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : "Register member"}</button>
+      <button disabled={pending || people.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : `Register ${memberType}`}</button>
     </form>
   </AdminActionDialog>;
 }
