@@ -548,10 +548,8 @@ export function AdminShell({
                           href={section.href}
                           onClick={() => {
                             setOpen(false);
-                            if (section.id === "list") {
-                              document.querySelectorAll<HTMLDialogElement>("dialog[open]")
-                                .forEach((dialog) => dialog.close());
-                            }
+                            document.querySelectorAll<HTMLDialogElement>("dialog[open]")
+                              .forEach((dialog) => dialog.close());
                           }}
                           aria-current={sectionActive ? "page" : undefined}
                           className={cn(
