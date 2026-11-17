@@ -133,7 +133,9 @@ export function CheckoutForm({
       placeholder={members.length ? "Search students and staff..." : "No active students or staff"} />
     <label className="block text-sm">Due date<input name="dueDate" type="date" required min={minDate} defaultValue={dueDate} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
     <ActionFeedback state={state} />
-    <button disabled={pending || members.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Checking out..." : "Check out book"}</button>
+    <div className="library-dialog-actions">
+      <button type="submit" disabled={pending || members.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Checking out..." : "Check out book"}</button>
+    </div>
   </form>;
 }
 
@@ -149,7 +151,7 @@ export function LibraryIssueForm({
   minDate: string;
 }) {
   const [state, formAction, pending] = useActionState(checkoutLibraryBook, {});
-  return <form action={formAction} className="space-y-3">
+  return <form action={formAction} className="library-issue-form space-y-3">
     <SearchableSelect label="Book" name="bookId" required
       options={books.map((book) => ({ value: String(book.id), label: book.label }))}
       placeholder={books.length ? "Search available books..." : "No available books"} />
@@ -158,7 +160,7 @@ export function LibraryIssueForm({
       placeholder={members.length ? "Search students and staff..." : "No active students or staff"} />
     <label className="block text-sm">Due date<input name="dueDate" type="date" required min={minDate} defaultValue={dueDate} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
     <ActionFeedback state={state} />
-    <button disabled={pending || books.length === 0 || members.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Issuing..." : "Issue book"}</button>
+    <button type="submit" disabled={pending || books.length === 0 || members.length === 0} className="w-full rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Issuing..." : "Issue book"}</button>
   </form>;
 }
 
@@ -199,7 +201,8 @@ export function LibraryTermDialog({
       {term && <label className="block text-sm">Status<select name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="active">Active</option><option value="archived">Archived</option></select></label>}
       <ActionFeedback state={state} />
       {term && status !== term.status
-        ? <AdminConfirmSubmitButton
+        ? <div className="library-dialog-actions">
+          <AdminConfirmSubmitButton
             label={`${status === "archived" ? "Archive" : "Restore"} ${label.toLowerCase()} ${term.name}`}
             buttonText={pending ? "Saving..." : "Save changes"}
             confirmationTitle={status === "archived" ? `Confirm ${label.toLowerCase()} archive` : `Confirm ${label.toLowerCase()} restoration`}
@@ -209,7 +212,10 @@ export function LibraryTermDialog({
             disabled={pending}
             variant="primary"
           />
-        : <button disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : term ? "Save changes" : `Add ${label.toLowerCase()}`}</button>}
+        </div>
+        : <div className="library-dialog-actions">
+          <button type="submit" disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : term ? "Save changes" : `Add ${label.toLowerCase()}`}</button>
+        </div>}
     </form>
   </AdminActionDialog>;
 }
@@ -241,7 +247,9 @@ export function LibraryMemberDialog({
       <label className="block text-sm">Member ID<input name="memberNumber" required maxLength={40} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
       {branches.length > 0 && <label className="block text-sm">Branch<select name="branchId" className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="">Use {memberType} branch</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select></label>}
       <ActionFeedback state={state} />
-      <button disabled={pending || people.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : `Register ${memberType}`}</button>
+      <div className="library-dialog-actions">
+        <button type="submit" disabled={pending || people.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : `Register ${memberType}`}</button>
+      </div>
     </form>
   </AdminActionDialog>;
 }

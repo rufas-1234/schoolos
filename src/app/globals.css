@@ -180,25 +180,77 @@ h6 {
   }
 
   .admin-library-dialog {
-    width: calc(100vw - 1rem);
-    min-width: calc(100vw - 1rem);
-    max-width: calc(100vw - 1rem);
-    max-height: calc(100dvh - 1rem);
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-radius: 0 !important;
     resize: none;
   }
 
   .admin-library-dialog > .admin-dialog-content {
-    padding: 1rem;
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
   }
 
   .admin-library-dialog > div:first-child {
+    position: sticky;
+    top: 0;
+    flex: none;
     padding: 0.875rem 1rem;
   }
 
-  .admin-library-dialog .admin-dialog-form-actions {
-    bottom: -1rem;
-    margin: 0 -1rem -1rem;
+  .admin-library-dialog .admin-dialog-content input:not([type="hidden"]),
+  .admin-library-dialog .admin-dialog-content select,
+  .admin-library-dialog .admin-dialog-content textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+  }
+
+  .admin-library-dialog .admin-dialog-form-actions,
+  .admin-library-dialog .library-dialog-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    margin: 0 -1rem;
+    border-top: 1px solid #e2e8f0;
+    background: rgb(255 255 255 / 96%);
     padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+    backdrop-filter: blur(8px);
+  }
+
+  .admin-library-dialog .admin-dialog-form-actions > button,
+  .admin-library-dialog .library-dialog-actions > button {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .library-workspace form input:not([type="hidden"]),
+  .library-workspace form select,
+  .library-workspace form button {
+    min-width: 0;
+    min-height: 2.75rem;
+  }
+
+  .library-workspace form[action="/admin/library"] input:not([type="hidden"]),
+  .library-workspace form[action="/admin/library"] select {
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .library-issue-form > button[type="submit"] {
+    min-height: 2.75rem;
   }
 }
 

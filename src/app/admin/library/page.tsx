@@ -308,7 +308,7 @@ export default async function LibraryPage({
           : null;
 
   return (
-    <main className="space-y-6 p-4 sm:p-6">
+    <main className="library-workspace min-w-0 space-y-6 p-4 sm:p-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-violet-700">School operations</p>
@@ -411,13 +411,13 @@ export default async function LibraryPage({
       {section === "issued" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="space-y-4 border-b border-slate-100 p-4">
           <div><h2 className="font-semibold text-slate-950">Issued book register</h2><p className="mt-1 text-sm text-slate-500">Search and filter current and returned loans.</p></div>
-          <form action="/admin/library" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <form action="/admin/library" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-5">
             <input type="hidden" name="section" value="issued" />
-            <input name="q" defaultValue={query} placeholder="Member, book, or ID" className="h-10 rounded-lg border border-slate-200 px-3 text-sm" />
-            <select name="branchId" defaultValue={branchId ?? ""} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select>
-            <select name="bookId" defaultValue={bookId ?? ""} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All books</option>{books.map((book) => <option key={book.id} value={book.id}>{book.title}</option>)}</select>
-            <select name="subjectId" defaultValue={subjectId ?? ""} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All subjects</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.label}</option>)}</select>
-            <div className="flex gap-2"><select name="status" defaultValue={selectedStatus} className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="all">All statuses</option><option value="active">Active</option><option value="returned">Returned</option></select><button className="rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Filter</button></div>
+            <input name="q" defaultValue={query} placeholder="Member, book, or ID" className="h-11 min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
+            <select name="branchId" defaultValue={branchId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select>
+            <select name="bookId" defaultValue={bookId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All books</option>{books.map((book) => <option key={book.id} value={book.id}>{book.title}</option>)}</select>
+            <select name="subjectId" defaultValue={subjectId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All subjects</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.label}</option>)}</select>
+            <div className="grid gap-2 sm:flex"><select name="status" defaultValue={selectedStatus} className="h-11 min-w-0 w-full flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="all">All statuses</option><option value="active">Active</option><option value="returned">Returned</option></select><button className="h-11 w-full rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white sm:w-auto">Filter</button></div>
           </form>
         </div>
         <LoanHistoryTable loans={activeLoans} today={today} dueDate={dueDate} />
@@ -427,10 +427,10 @@ export default async function LibraryPage({
 }
 
 function SearchForm({ section, query, placeholder }: { section: LibrarySection; query: string; placeholder: string }) {
-  return <form action="/admin/library" className="flex gap-2">
+  return <form action="/admin/library" className="flex min-w-0 w-full gap-2">
     <input type="hidden" name="section" value={section} />
-    <input name="q" defaultValue={query} placeholder={placeholder} className="h-10 min-w-0 rounded-lg border border-slate-200 px-3 text-sm sm:w-72" />
-    <button className="rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700">Search</button>
+    <input name="q" defaultValue={query} placeholder={placeholder} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm sm:w-72" />
+    <button className="h-11 shrink-0 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700">Search</button>
     {query && <Link href={sectionHref(section)} className="self-center text-sm text-violet-700">Clear</Link>}
   </form>;
 }
