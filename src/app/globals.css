@@ -107,6 +107,10 @@ h6 {
   letter-spacing: -0.025em;
 }
 
+.admin-record-dialog:not([open]) {
+  display: none;
+}
+
 .admin-record-dialog {
   overscroll-behavior: contain;
 }
