@@ -396,11 +396,11 @@ export async function checkoutLibraryBook(
   const context = await requireSchoolPermission("library.manage");
   const parsed = z.object({
     bookId: idField,
-    memberId: idField,
+    personRef: z.string().regex(/^(student|staff):[1-9]\d*$/),
     dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   }).safeParse({
     bookId: value(formData, "bookId"),
-    memberId: value(formData, "memberId"),
+    personRef: value(formData, "personRef"),
     dueDate: value(formData, "dueDate"),
   });
   if (!parsed.success) {
@@ -409,6 +409,12 @@ export async function checkoutLibraryBook(
   if (!isFutureLibraryDueDate(parsed.data.dueDate, today())) {
     return { error: "Choose a book, an active library member, and a valid future due date." };
   }
+  const [memberType, personIdText] = parsed.data.personRef.split(":");
+  const parsedPersonId = idField.safeParse(personIdText);
+  if (!parsedPersonId.success || (memberType !== "student" && memberType !== "staff")) {
+    return { error: "Choose an active student or staff member from this school." };
+  }
+  const personId = parsedPersonId.data;
 
   const loanPublicId = randomUUID();
   const outcome = await db.transaction(async (tx): Promise<LibraryActionState> => {
@@ -426,37 +432,87 @@ export async function checkoutLibraryBook(
     if (!book || book.status !== "active") return { error: "This book is not available for lending." };
     if (book.availableCopies < 1) return { error: "No copies are currently available." };
 
-    const [member] = await tx.select({
+    let branchId: number | null;
+    let studentId: number | null = null;
+    let staffMemberId: number | null = null;
+    if (memberType === "student") {
+      const [student] = await tx.select({
+        id: students.id,
+        branchId: students.branchId,
+      }).from(students).where(and(
+        eq(students.id, personId),
+        eq(students.schoolId, context.schoolId),
+        inArray(students.status, ["active", "admitted"]),
+      )).for("update").limit(1);
+      if (!student) return { error: "Choose an active student from this school." };
+      studentId = student.id;
+      branchId = student.branchId;
+    } else {
+      const [staff] = await tx.select({
+        id: staffMembers.id,
+        branchId: staffMembers.branchId,
+      }).from(staffMembers).where(and(
+        eq(staffMembers.id, personId),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.status, "active"),
+      )).for("update").limit(1);
+      if (!staff) return { error: "Choose an active staff member from this school." };
+      staffMemberId = staff.id;
+      branchId = staff.branchId;
+    }
+
+    let [member] = await tx.select({
       id: libraryMembers.id,
       memberType: libraryMembers.memberType,
       studentId: libraryMembers.studentId,
       staffMemberId: libraryMembers.staffMemberId,
       branchId: libraryMembers.branchId,
+      status: libraryMembers.status,
     }).from(libraryMembers).where(and(
-      eq(libraryMembers.id, parsed.data.memberId),
       eq(libraryMembers.schoolId, context.schoolId),
-      eq(libraryMembers.status, "active"),
+      memberType === "student"
+        ? eq(libraryMembers.studentId, personId)
+        : eq(libraryMembers.staffMemberId, personId),
     )).for("update").limit(1);
-    if (!member) return { error: "Choose an active library member from this school." };
-    if (book.branchId !== null && book.branchId !== member.branchId) {
+    if (member?.status === "inactive") {
+      return { error: "This person's library access is inactive. Reactivate their membership before issuing a book." };
+    }
+    if (book.branchId !== null && book.branchId !== (member?.branchId ?? branchId)) {
       return { error: "This book is assigned to a different branch." };
     }
-    if (member.memberType === "student") {
-      if (member.studentId === null) throw new Error("A student library member is missing its student record.");
-      const [student] = await tx.select({ id: students.id }).from(students).where(and(
-        eq(students.id, member.studentId),
-        eq(students.schoolId, context.schoolId),
-        inArray(students.status, ["active", "admitted"]),
-      )).limit(1);
-      if (!student) return { error: "The linked student is not currently active." };
-    } else {
-      if (member.staffMemberId === null) throw new Error("A staff library member is missing its staff record.");
-      const [staff] = await tx.select({ id: staffMembers.id }).from(staffMembers).where(and(
-        eq(staffMembers.id, member.staffMemberId),
-        eq(staffMembers.schoolId, context.schoolId),
-        eq(staffMembers.status, "active"),
-      )).limit(1);
-      if (!staff) return { error: "The linked staff member is not currently active." };
+    if (!member) {
+      const memberPublicId = randomUUID();
+      await tx.insert(libraryMembers).values({
+        publicId: memberPublicId,
+        schoolId: context.schoolId,
+        branchId,
+        memberType,
+        studentId,
+        staffMemberId,
+        memberNumber: `AUTO-${memberType === "student" ? "STU" : "STAFF"}-${personId}-${randomUUID().slice(0, 8)}`,
+      });
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: "library_member.created_on_checkout",
+        resourceType: "library_member",
+        resourcePublicId: memberPublicId,
+        changedFields: ["branchId", "memberType", "studentId", "staffMemberId", "memberNumber"],
+      });
+      [member] = await tx.select({
+        id: libraryMembers.id,
+        memberType: libraryMembers.memberType,
+        studentId: libraryMembers.studentId,
+        staffMemberId: libraryMembers.staffMemberId,
+        branchId: libraryMembers.branchId,
+        status: libraryMembers.status,
+      }).from(libraryMembers).where(and(
+        eq(libraryMembers.schoolId, context.schoolId),
+        memberType === "student"
+          ? eq(libraryMembers.studentId, personId)
+          : eq(libraryMembers.staffMemberId, personId),
+      )).for("update").limit(1);
+      if (!member) throw new Error("The new library membership could not be loaded.");
     }
 
     await tx.update(libraryBooks).set({

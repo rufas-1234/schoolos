@@ -16,7 +16,7 @@ import {
 
 export type LibraryBookOption = { id: number; label: string };
 export type LibraryStudentOption = { id: number; label: string };
-export type LibraryMemberOption = { id: number; label: string };
+export type LibraryMemberOption = { id: string; label: string };
 export type LibraryTermOption = { id: number; label: string };
 export type LibraryBranchOption = { id: number; label: string };
 export type EditableLibraryTerm = { id: number; name: string; branchId: number | null; status: string };
@@ -124,9 +124,9 @@ export function CheckoutForm({
   const [state, formAction, pending] = useActionState(checkoutLibraryBook, {});
   return <form action={formAction} className="space-y-3">
     <input type="hidden" name="bookId" value={book.id} />
-    <SearchableSelect label="Member" name="memberId" required
+    <SearchableSelect label="Student or staff member" name="personRef" required
       options={members.map((member) => ({ value: String(member.id), label: member.label }))}
-      placeholder={members.length ? "Search library members..." : "No active members"} />
+      placeholder={members.length ? "Search students and staff..." : "No active students or staff"} />
     <label className="block text-sm">Due date<input name="dueDate" type="date" required min={minDate} defaultValue={dueDate} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
     <ActionFeedback state={state} />
     <button disabled={pending || members.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Checking out..." : "Check out book"}</button>
@@ -149,9 +149,9 @@ export function LibraryIssueForm({
     <SearchableSelect label="Book" name="bookId" required
       options={books.map((book) => ({ value: String(book.id), label: book.label }))}
       placeholder={books.length ? "Search available books..." : "No available books"} />
-    <SearchableSelect label="Member" name="memberId" required
+    <SearchableSelect label="Student or staff member" name="personRef" required
       options={members.map((member) => ({ value: String(member.id), label: member.label }))}
-      placeholder={members.length ? "Search library members..." : "No active members"} />
+      placeholder={members.length ? "Search students and staff..." : "No active students or staff"} />
     <label className="block text-sm">Due date<input name="dueDate" type="date" required min={minDate} defaultValue={dueDate} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
     <ActionFeedback state={state} />
     <button disabled={pending || books.length === 0 || members.length === 0} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Issuing..." : "Issue book"}</button>

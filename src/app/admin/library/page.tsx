@@ -131,7 +131,7 @@ export default async function LibraryPage({
       eq(students.schoolId, schoolId),
       inArray(students.status, ["active", "admitted"]),
     ))
-      .orderBy(asc(students.lastName), asc(students.firstName)).limit(1000),
+      .orderBy(asc(students.lastName), asc(students.firstName)),
     db.select({
       id: staffMembers.id,
       firstName: staffMembers.firstName,
@@ -141,7 +141,7 @@ export default async function LibraryPage({
     }).from(staffMembers).where(and(
       eq(staffMembers.schoolId, schoolId),
       eq(staffMembers.status, "active"),
-    )).orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)).limit(1000),
+    )).orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db.select({
       id: libraryMembers.id,
       memberNumber: libraryMembers.memberNumber,
@@ -164,7 +164,7 @@ export default async function LibraryPage({
         eq(staffMembers.schoolId, schoolId),
       ))
       .where(eq(libraryMembers.schoolId, schoolId))
-      .orderBy(asc(libraryMembers.memberNumber)).limit(1000),
+      .orderBy(asc(libraryMembers.memberNumber)),
     db.select({
       id: libraryLoans.id,
       bookId: libraryBooks.id,
@@ -262,17 +262,40 @@ export default async function LibraryPage({
       id: staff.id,
       label: `${staff.firstName} ${staff.lastName}${staff.employeeCode ? ` (${staff.employeeCode})` : ""}`,
     }));
-  const activeMembers: LibraryMemberOption[] = memberRows
-    .filter((member) => member.status === "active")
-    .map((member) => ({
-      id: member.id,
-      label: [
-        member.memberNumber,
-        `${member.firstName} ${member.lastName}`,
-        member.memberType === "staff" ? "Staff" : "Student",
-        member.memberType === "staff" ? member.employeeCode : member.admissionNumber,
-      ].filter(Boolean).join(" · "),
-    }));
+  const studentMemberships = new Map(memberRows
+    .filter((member) => member.studentId !== null)
+    .map((member) => [member.studentId!, member]));
+  const staffMemberships = new Map(memberRows
+    .filter((member) => member.staffMemberId !== null)
+    .map((member) => [member.staffMemberId!, member]));
+  const activeMembers: LibraryMemberOption[] = [
+    ...studentRows.map((student) => {
+      const membership = studentMemberships.get(student.id);
+      return {
+        id: `student:${student.id}`,
+        label: [
+          `${student.firstName} ${student.lastName}`,
+          "Student",
+          student.admissionNumber,
+          membership?.memberNumber,
+          membership?.status === "inactive" ? "Library access inactive" : null,
+        ].filter(Boolean).join(" · "),
+      };
+    }),
+    ...staffRows.map((staff) => {
+      const membership = staffMemberships.get(staff.id);
+      return {
+        id: `staff:${staff.id}`,
+        label: [
+          `${staff.firstName} ${staff.lastName}`,
+          "Staff",
+          staff.employeeCode,
+          membership?.memberNumber,
+          membership?.status === "inactive" ? "Library access inactive" : null,
+        ].filter(Boolean).join(" · "),
+      };
+    }),
+  ].sort((a, b) => a.label.localeCompare(b.label));
   const activeLoans = loanRows.map((loan) => ({ ...loan, overdue: loan.dueDate < today }));
   const addAction = section === "books" || section === "add-book"
     ? <LibraryBookDialog categories={categories} subjects={subjects} branches={branches} initialOpen={section === "add-book"} />
@@ -379,7 +402,7 @@ export default async function LibraryPage({
 
       {section === "issue" && <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
-          <h2 className="font-semibold text-slate-950">Issue a book</h2><p className="mt-1 text-sm text-slate-500">Only active library members can borrow books.</p>
+          <h2 className="font-semibold text-slate-950">Issue a book</h2><p className="mt-1 text-sm text-slate-500">Search active students or staff. First-time borrowers are registered as library members automatically.</p>
           <div className="mt-4"><LibraryIssueForm books={books.filter((book) => book.status === "active" && book.availableCopies > 0).map((book) => ({ id: book.id, label: book.title }))} members={activeMembers} dueDate={dueDate} minDate={today} /></div>
         </div>
         <LoanTable loans={activeLoans} today={today} dueDate={dueDate} />

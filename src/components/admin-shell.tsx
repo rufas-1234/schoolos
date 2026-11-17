@@ -380,20 +380,20 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-white/15 bg-[#8950b5] px-5 py-6">
+    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-violet-900/15 bg-[#eadcf4] px-5 py-6">
       <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white shadow-lg shadow-violet-950/20">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/75 text-violet-900 shadow-sm">
           {schoolLogo
             ? <Image src={schoolLogo} unoptimized width={44} height={44} alt={`${schoolName} logo`} className="h-full w-full rounded-2xl bg-white object-contain" />
             : <GraduationCap size={24} />}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-bold text-white">{schoolName}</span>
-          <span className="mt-0.5 block text-xs text-white/80">School workspace</span>
+          <span className="block truncate text-sm font-bold text-violet-950">{schoolName}</span>
+          <span className="mt-0.5 block text-xs text-violet-900/75">School workspace</span>
         </span>
       </Link>
 
-      <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">
+      <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-900/75">
         Workspace
       </p>
       <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
@@ -490,8 +490,8 @@ export function AdminShell({
                   className={cn(
                     "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition",
                     active
-                      ? "bg-white text-violet-900"
-                      : "text-white/90 hover:bg-white/10 hover:text-white",
+                      ? "bg-white/85 text-violet-950 shadow-sm"
+                      : "text-violet-950/85 hover:bg-white/50 hover:text-violet-950",
                   )}
                 >
                   <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
@@ -502,7 +502,7 @@ export function AdminShell({
                   />
                 </button>
                 {sectionOpen && (
-                  <div className="ml-5 mt-1 space-y-1 border-l border-white/30 pl-3">
+                  <div className="ml-5 mt-1 space-y-1 border-l border-violet-900/20 pl-3">
                     {resolvedSections.map((section) => {
                       if (!section.href) {
                         return (
@@ -510,7 +510,7 @@ export function AdminShell({
                             key={section.id}
                             aria-disabled="true"
                             title={`${section.label} is not available yet`}
-                            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-white/55"
+                            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-violet-900/55"
                           >
                             {section.label}
                             <span className="text-[10px] font-semibold uppercase tracking-wide">
@@ -529,8 +529,8 @@ export function AdminShell({
                           className={cn(
                             "block rounded-lg px-3 py-2 text-sm transition",
                             sectionActive
-                              ? "bg-white font-semibold text-violet-900"
-                              : "text-white/90 hover:bg-white/10 hover:text-white",
+                              ? "bg-white/85 font-semibold text-violet-950 shadow-sm"
+                              : "text-violet-950/85 hover:bg-white/50 hover:text-violet-950",
                           )}
                         >
                           {section.label}
@@ -550,8 +550,8 @@ export function AdminShell({
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
                 active
-                  ? "bg-white text-violet-900"
-                  : "text-white/90 hover:bg-white/10 hover:text-white",
+                  ? "bg-white/85 text-violet-950 shadow-sm"
+                  : "text-violet-950/85 hover:bg-white/50 hover:text-violet-950",
               )}
             >
               <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
@@ -562,8 +562,8 @@ export function AdminShell({
         })}
       </nav>
 
-      <div className="mt-auto flex justify-center border-t border-white/30 pt-4">
-        <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/15 text-xs font-bold text-white" title={schoolName}>
+      <div className="mt-auto flex justify-center border-t border-violet-900/20 pt-4">
+        <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/75 text-xs font-bold text-violet-900" title={schoolName}>
           {schoolLogo
             ? <Image src={schoolLogo} unoptimized width={36} height={36} alt={`${schoolName} logo`} className="h-full w-full object-contain" />
             : schoolMonogram}
@@ -623,44 +623,44 @@ export function AdminShell({
       )}
 
       <div className="admin-shell-content lg:pl-[260px]">
-        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/15 bg-[#8950b5] px-3 text-white shadow-sm shadow-violet-950/10 sm:px-5 md:h-[76px] md:px-8">
+        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-violet-900/15 bg-[#eadcf4] px-3 text-violet-950 shadow-sm shadow-violet-950/10 sm:px-5 md:h-[76px] md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
               ref={navigationTriggerRef}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-white hover:bg-white/10 lg:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-violet-900 hover:bg-white/50 lg:hidden"
               onClick={() => setOpen(true)}
               aria-label="Open navigation"
             >
               <Menu size={20} />
             </button>
-            <div className="hidden items-center gap-2 text-sm text-white/85 sm:flex">
+            <div className="hidden items-center gap-2 text-sm text-violet-900/70 sm:flex">
               <BookOpen size={16} />
               <span>Administration</span>
               <span>/</span>
-              <span className="font-semibold text-white">{pageLabel}</span>
+              <span className="font-semibold text-violet-950">{pageLabel}</span>
             </div>
-            <span className="text-sm font-semibold text-white sm:hidden">SchoolOS</span>
+            <span className="text-sm font-semibold text-violet-950 sm:hidden">SchoolOS</span>
           </div>
 
           <WorkspaceQuickSearch />
 
           <div className="flex items-center gap-2">
-            <div className="mx-1 hidden h-8 w-px bg-white/25 sm:block" />
+            <div className="mx-1 hidden h-8 w-px bg-violet-900/15 sm:block" />
             <div className="relative">
               <button
-                className="flex items-center gap-2 rounded-xl p-1.5 pr-2 hover:bg-white/10"
+                className="flex items-center gap-2 rounded-xl p-1.5 pr-2 hover:bg-white/50"
                 onClick={() => setMenuOpen((value) => !value)}
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-sm font-bold text-white">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-700 text-sm font-bold text-white">
                   {userName.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="hidden max-w-36 text-left sm:block">
-                  <span className="block truncate text-sm font-semibold text-white">{userName}</span>
-                  <span className="block truncate text-xs text-white/85">{roleLabel}</span>
+                  <span className="block truncate text-sm font-semibold text-violet-950">{userName}</span>
+                  <span className="block truncate text-xs text-violet-900/70">{roleLabel}</span>
                 </span>
-                <ChevronDown size={16} className="hidden text-white/85 sm:block" />
+                <ChevronDown size={16} className="hidden text-violet-900/70 sm:block" />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl">
