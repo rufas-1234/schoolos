@@ -427,18 +427,20 @@ export function ActionForm({
       {children}
       {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
       {state.success && <p role="status" className="text-sm text-emerald-700">Saved successfully.</p>}
-      {confirmation
-        ? <AdminConfirmSubmitButton
-            label={submitLabel}
-            buttonText={pending ? "Saving..." : submitLabel}
-            confirmationTitle={confirmation.title}
-            confirmationMessage={confirmation.message}
-            disabled={pending}
-            variant="primary"
-          />
-        : <button type="submit" disabled={pending} className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400">
-            {pending ? "Saving..." : submitLabel}
-          </button>}
+      <div className="admin-dialog-form-actions flex justify-end">
+        {confirmation
+          ? <AdminConfirmSubmitButton
+              label={submitLabel}
+              buttonText={pending ? "Saving..." : submitLabel}
+              confirmationTitle={confirmation.title}
+              confirmationMessage={confirmation.message}
+              disabled={pending}
+              variant="primary"
+            />
+          : <button type="submit" disabled={pending} className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400">
+              {pending ? "Saving..." : submitLabel}
+            </button>}
+      </div>
     </form>
   );
 }
