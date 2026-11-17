@@ -5,8 +5,9 @@ import Link from "next/link";
 import { Printer } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { printCurrentPage } from "@/components/print-button";
+import { LibraryLoanHistory, type LibraryLoanHistoryItem } from "@/components/library-loan-history";
 
-type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams";
+type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams" | "library";
 type ProfileField = {
   label: string;
   value: string | null;
@@ -26,6 +27,7 @@ const tabs: { id: ProfileTab; label: string; emptyMessage?: string }[] = [
   { id: "other", label: "Other Info", emptyMessage: "No additional student information has been added." },
   { id: "custom", label: "Custom Field", emptyMessage: "No custom student fields are configured." },
   { id: "exams", label: "Exam Results", emptyMessage: "No published exam results are attached to this student." },
+  { id: "library", label: "Library", emptyMessage: "No library borrowing history is recorded." },
 ];
 
 export function StudentProfileDetails({
@@ -34,6 +36,7 @@ export function StudentProfileDetails({
   admissionNumber,
   photoUrl,
   examHistory = [],
+  libraryHistory = [],
 }: {
   fields: ProfileField[];
   studentName: string;
@@ -47,6 +50,7 @@ export function StudentProfileDetails({
     termName: string | null;
     href: string | null;
   }>;
+  libraryHistory?: LibraryLoanHistoryItem[];
 }) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
   const [printing, setPrinting] = useState(false);
@@ -124,6 +128,16 @@ export function StudentProfileDetails({
             <ul>{examHistory.map((exam) => <li key={`${exam.examId}-${exam.enrollmentId}`}>{exam.examName} · {exam.termName ?? exam.yearName}</li>)}</ul>
           </section>
         )}
+        {libraryHistory.length > 0 && (
+          <section className="student-profile-print-section">
+            <h4>Library borrowing history</h4>
+            <ul>{libraryHistory.map((loan) => (
+              <li key={loan.id}>
+                {loan.bookTitle} · {loan.status === "active" ? "Borrowed" : "Returned"} · Due {loan.dueDate}
+              </li>
+            ))}</ul>
+          </section>
+        )}
       </div>
       <div
         role="tablist"
@@ -173,6 +187,8 @@ export function StudentProfileDetails({
               {activeTabDetails?.emptyMessage}
             </p>
           )
+        ) : activeTab === "library" ? (
+          <LibraryLoanHistory loans={libraryHistory} />
         ) : visibleFields.length > 0 ? (
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             {visibleFields.map((field) => (

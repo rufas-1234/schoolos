@@ -17,6 +17,8 @@ import {
   examMarks,
   examSubjects,
   examinations,
+  libraryBooks,
+  libraryLoans,
   schoolBranches,
   studentCategories,
   studentEnrollments,
@@ -191,6 +193,33 @@ export default async function StudentsPage({
     rollNumber: [...rollNumbers].join(", ") || null,
   }));
   const studentIds = records.map((record) => record.id);
+  const libraryHistoryRows = studentIds.length
+    ? await db.select({
+      id: libraryLoans.id,
+      studentId: libraryLoans.studentId,
+      bookTitle: libraryBooks.title,
+      issuedAt: libraryLoans.issuedAt,
+      dueDate: libraryLoans.dueDate,
+      returnedAt: libraryLoans.returnedAt,
+      status: libraryLoans.status,
+    }).from(libraryLoans)
+      .innerJoin(libraryBooks, and(
+        eq(libraryBooks.id, libraryLoans.bookId),
+        eq(libraryBooks.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(libraryLoans.schoolId, context.schoolId),
+        inArray(libraryLoans.studentId, studentIds),
+      ))
+      .orderBy(desc(libraryLoans.issuedAt), desc(libraryLoans.id))
+    : [];
+  const libraryHistoryByStudent = new Map<number, typeof libraryHistoryRows>();
+  for (const loan of libraryHistoryRows) {
+    if (loan.studentId === null) continue;
+    const history = libraryHistoryByStudent.get(loan.studentId) ?? [];
+    history.push(loan);
+    libraryHistoryByStudent.set(loan.studentId, history);
+  }
   const publishedExamRows = studentIds.length
     ? await db.select({
       studentId: studentEnrollments.studentId,
@@ -541,6 +570,7 @@ export default async function StudentsPage({
                         ? `/admin/examinations/${exam.examId}/report-cards/${exam.enrollmentId}`
                         : null,
                     }))}
+                    libraryHistory={libraryHistoryByStudent.get(record.id) ?? []}
                     fields={[
                       { tab: "personal", label: "Student ID", value: record.publicId },
                       { tab: "personal", label: "Admission number", value: record.admissionNumber },

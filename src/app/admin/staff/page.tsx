@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { BriefcaseBusiness } from "lucide-react";
 import {
   AdminConfirmSubmitButton,
@@ -9,6 +9,9 @@ import {
 } from "@/components/admin-data-table";
 import { db } from "@/db";
 import {
+  libraryBooks,
+  libraryLoans,
+  libraryMembers,
   schoolMemberships,
   schoolBranches,
   staffDepartments,
@@ -26,6 +29,7 @@ import {
 } from "@/lib/staff-settings";
 import { transitionStaffStatus } from "./actions";
 import { StaffForm } from "./staff-form";
+import { LibraryLoanHistory } from "@/components/library-loan-history";
 const employmentTypeLabels: Record<string, string> = {
   full_time: "Full-time",
   part_time: "Part-time",
@@ -141,6 +145,39 @@ export default async function StaffDirectoryPage({
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
+  const staffIds = records.map((record) => record.id);
+  const libraryHistoryRows = staffIds.length
+    ? await db.select({
+      id: libraryLoans.id,
+      staffMemberId: libraryMembers.staffMemberId,
+      bookTitle: libraryBooks.title,
+      issuedAt: libraryLoans.issuedAt,
+      dueDate: libraryLoans.dueDate,
+      returnedAt: libraryLoans.returnedAt,
+      status: libraryLoans.status,
+    }).from(libraryLoans)
+      .innerJoin(libraryBooks, and(
+        eq(libraryBooks.id, libraryLoans.bookId),
+        eq(libraryBooks.schoolId, context.schoolId),
+      ))
+      .innerJoin(libraryMembers, and(
+        eq(libraryMembers.id, libraryLoans.memberId),
+        eq(libraryMembers.schoolId, context.schoolId),
+        eq(libraryMembers.memberType, "staff"),
+      ))
+      .where(and(
+        eq(libraryLoans.schoolId, context.schoolId),
+        inArray(libraryMembers.staffMemberId, staffIds),
+      ))
+      .orderBy(desc(libraryLoans.issuedAt), desc(libraryLoans.id))
+    : [];
+  const libraryHistoryByStaff = new Map<number, typeof libraryHistoryRows>();
+  for (const loan of libraryHistoryRows) {
+    if (loan.staffMemberId === null) continue;
+    const history = libraryHistoryByStaff.get(loan.staffMemberId) ?? [];
+    history.push(loan);
+    libraryHistoryByStaff.set(loan.staffMemberId, history);
+  }
   const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]));
   const loginAccessByUserId = new Map(accounts.map((account) => [
     account.id,
@@ -266,6 +303,13 @@ export default async function StaffDirectoryPage({
                       </div>
                     ))}
                   </dl>
+                  <section className="mt-8 space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Library borrowing history</h3>
+                      <p className="mt-1 text-sm text-slate-500">Books currently borrowed and previous returns.</p>
+                    </div>
+                    <LibraryLoanHistory loans={libraryHistoryByStaff.get(record.id) ?? []} />
+                  </section>
                 </AdminRecordDialog>
                 <AdminRecordDialog showLabel title={`Edit ${record.firstName} ${record.lastName}`}>
                   <StaffForm
