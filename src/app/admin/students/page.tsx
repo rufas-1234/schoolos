@@ -493,6 +493,7 @@ export default async function StudentsPage({
               label="Add student"
               title="Add student record"
               initialOpen={openAddStudent}
+              openWhenSearchParam={{ name: "action", value: "add" }}
             >
               <StudentForm
                 branches={branchOptions}

@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import { SearchableSelect } from "@/components/searchable-select";
 import { printCurrentPage } from "@/components/print-button";
 import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
+import { useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -41,21 +42,27 @@ export function AdminActionDialog({
   title,
   children,
   initialOpen = false,
+  openWhenSearchParam,
 }: {
   label: string;
   title: string;
   children: ReactNode;
   initialOpen?: boolean;
+  openWhenSearchParam?: { name: string; value: string };
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const searchParams = useSearchParams();
+  const shouldOpen = openWhenSearchParam
+    ? searchParams.get(openWhenSearchParam.name) === openWhenSearchParam.value
+    : initialOpen;
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (initialOpen && !dialog.open) dialog.showModal();
-    else if (!initialOpen && dialog.open) dialog.close();
-  }, [initialOpen]);
+    if (shouldOpen && !dialog.open) dialog.showModal();
+    else if (!shouldOpen && dialog.open) dialog.close();
+  }, [shouldOpen]);
 
   return (
     <>
