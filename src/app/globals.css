@@ -111,6 +111,23 @@ h6 {
   overscroll-behavior: contain;
 }
 
+.admin-resizable-dialog {
+  resize: both;
+  min-width: min(94vw, 28rem);
+  min-height: 14rem;
+  max-width: 98vw;
+  max-height: 94dvh;
+}
+
+@media (max-width: 639px) {
+  .admin-resizable-dialog {
+    resize: vertical;
+    min-width: 0;
+    min-height: 10rem;
+    max-width: calc(100vw - 1rem);
+  }
+}
+
 .admin-sidebar-nav {
   scroll-padding-block: 0.75rem;
   scrollbar-color: #cbd5e1 transparent;

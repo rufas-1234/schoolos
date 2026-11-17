@@ -68,7 +68,7 @@ export function AdminActionDialog({
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
-        className="admin-record-dialog m-auto max-h-[90vh] w-[min(94vw,48rem)] max-w-none overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"
+        className="admin-record-dialog admin-resizable-dialog m-auto max-h-[90vh] w-[min(94vw,48rem)] max-w-none overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <h2 id={titleId} className="font-semibold text-slate-900">{title}</h2>
@@ -134,7 +134,7 @@ export function AdminRecordDialog({
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
-        className={`admin-record-dialog m-auto max-h-[90vh] ${
+        className={`admin-record-dialog admin-resizable-dialog m-auto max-h-[90vh] ${
           wide ? "w-[min(96vw,72rem)]" : "w-[min(94vw,48rem)]"
         } max-w-none overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40`}
       >

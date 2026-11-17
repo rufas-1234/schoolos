@@ -161,7 +161,7 @@ export function StudentForm({
       <div
         role="tablist"
         aria-label="Student information sections"
-        className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-2"
+        className="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2 sm:grid-cols-3 lg:grid-cols-6"
       >
         {studentEditTabs.map((tab) => (
           <button
@@ -172,7 +172,7 @@ export function StudentForm({
             aria-selected={activeTab === tab.id}
             aria-controls={`student-form-${formId}-${tab.id}-panel`}
             onClick={() => setActiveTab(tab.id)}
-            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+            className={`min-w-0 rounded-lg px-2 py-2 text-xs font-semibold transition sm:px-3 sm:text-sm ${
               activeTab === tab.id
                 ? "bg-violet-100 text-violet-900"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"

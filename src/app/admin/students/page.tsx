@@ -29,6 +29,7 @@ import { normalizeStudentFieldSettings } from "@/lib/student-settings";
 import { StudentForm } from "./student-form";
 import { StudentProfileDetails } from "./student-profile-details";
 import { StudentStatusForm } from "./student-status-form";
+import { StudentPlacementForm } from "../academics/management-forms";
 
 const statusLabels: Record<string, string> = {
   pending: "Pending review",
@@ -296,6 +297,7 @@ export default async function StudentsPage({
         id: classSections.id,
         academicYearId: classSections.academicYearId,
         classLevelId: classSections.classLevelId,
+        branchId: classLevels.branchId,
         name: classSections.name,
         className: classLevels.name,
         yearName: academicYears.name,
@@ -335,6 +337,7 @@ export default async function StudentsPage({
   }));
   const sectionOptions = sections.map((section) => ({
     id: section.id,
+    branchId: section.branchId,
     academicYearId: section.academicYearId,
     classLevelId: section.classLevelId,
     label: `${section.className} ${section.name} · ${section.yearName}`,
@@ -611,6 +614,24 @@ export default async function StudentsPage({
                       record={record}
                     />
                   </AdminRecordDialog>
+                )}
+                {canUpdate && (record.status === "admitted" || record.status === "active") && (
+                  <AdminActionDialog
+                    label="Assign student"
+                    title={`Assign ${record.firstName} ${record.lastName} to a class`}
+                  >
+                    <StudentPlacementForm
+                      branches={branchOptions}
+                      students={[{
+                        id: record.id,
+                        label: `${record.firstName} ${record.lastName}${record.admissionNumber ? ` · ${record.admissionNumber}` : ""}`,
+                      }]}
+                      sections={sectionOptions}
+                      fixedStudentId={record.id}
+                      fixedStudentLabel={`${record.firstName} ${record.lastName}`}
+                      fixedBranchId={record.branchId}
+                    />
+                  </AdminActionDialog>
                 )}
                 {canUpdate && getStudentStatusTransitions(record.status).map((nextStatus) => (
                   <StudentStatusForm

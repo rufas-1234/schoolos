@@ -266,7 +266,12 @@ export default async function LibraryPage({
     .filter((member) => member.status === "active")
     .map((member) => ({
       id: member.id,
-      label: `${member.memberNumber} · ${member.firstName} ${member.lastName} · ${member.memberType === "staff" ? "Staff" : "Student"}`,
+      label: [
+        member.memberNumber,
+        `${member.firstName} ${member.lastName}`,
+        member.memberType === "staff" ? "Staff" : "Student",
+        member.memberType === "staff" ? member.employeeCode : member.admissionNumber,
+      ].filter(Boolean).join(" · "),
     }));
   const activeLoans = loanRows.map((loan) => ({ ...loan, overdue: loan.dueDate < today }));
   const addAction = section === "books" || section === "add-book"

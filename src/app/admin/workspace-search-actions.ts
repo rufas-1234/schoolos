@@ -743,7 +743,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       id: `staff-${staff.publicId}`,
       title: `${staff.firstName} ${staff.lastName}`,
       description: [staff.jobTitle, staff.department, staff.employeeCode].filter(Boolean).join(" · "),
-      href: `/admin/staff?search=${encodeURIComponent(`${staff.firstName} ${staff.lastName}`)}`,
+      href: `/admin/staff?profile=${encodeURIComponent(staff.publicId)}`,
       category: "Staff",
     });
   }

@@ -877,32 +877,47 @@ export function StudentPlacementForm({
   branches,
   students,
   sections,
+  fixedStudentId,
+  fixedStudentLabel,
+  fixedBranchId,
 }: {
   branches: Option[];
   students: Option[];
   sections: (Option & { branchId: number })[];
+  fixedStudentId?: number;
+  fixedStudentLabel?: string;
+  fixedBranchId?: number | null;
 }) {
   const [eventType, setEventType] = useState("initial_placement");
-  const [branchId, setBranchId] = useState("");
+  const [branchId, setBranchId] = useState(fixedBranchId ? String(fixedBranchId) : "");
   const [sectionId, setSectionId] = useState("");
   const availableSections = sections.filter((section) => String(section.branchId) === branchId);
 
   return (
     <ActionForm title="Place a student in a class" action={placeStudent} submitLabel="Place student">
-      <SelectField label="Admitted / active student" name="studentId" options={students} />
-      <SearchableSelect
-        label="Branch"
-        name="branchId"
-        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
-        defaultValue={branchId}
-        required
-        disabled={branches.length === 0}
-        placeholder={branches.length === 0 ? "Create a branch first" : "Search branches..."}
-        onValueChange={(value) => {
-          setBranchId(value);
-          setSectionId("");
-        }}
-      />
+      {fixedStudentId ? (
+        <>
+          <input type="hidden" name="studentId" value={fixedStudentId} />
+          <p className="text-sm text-slate-600">Student: <span className="font-semibold text-slate-900">{fixedStudentLabel}</span></p>
+        </>
+      ) : (
+        <SelectField label="Admitted / active student" name="studentId" options={students} />
+      )}
+      {!fixedBranchId && (
+        <SearchableSelect
+          label="Branch"
+          name="branchId"
+          options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+          defaultValue={branchId}
+          required
+          disabled={branches.length === 0}
+          placeholder={branches.length === 0 ? "Create a branch first" : "Search branches..."}
+          onValueChange={(value) => {
+            setBranchId(value);
+            setSectionId("");
+          }}
+        />
+      )}
       <SearchableSelect
         key={branchId}
         label="Active-year class section"

@@ -33,7 +33,13 @@ const employmentTypeLabels: Record<string, string> = {
   temporary: "Temporary",
 };
 
-export default async function StaffDirectoryPage() {
+export default async function StaffDirectoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ profile?: string | string[] }>;
+}) {
+  const { profile } = await searchParams;
+  const profilePublicId = typeof profile === "string" && profile.length <= 36 ? profile : "";
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
 
   const [records, totals, accounts, branches, departments, designations, settings] = await Promise.all([
@@ -226,6 +232,41 @@ export default async function StaffDirectoryPage() {
             },
             actions: (
               <div className="flex min-w-36 flex-wrap items-center gap-2">
+                <AdminRecordDialog
+                  mode="view"
+                  wide
+                  title={`${record.firstName} ${record.lastName}`}
+                  initialOpen={profilePublicId === record.publicId}
+                >
+                  <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                    {[
+                      ["Employee ID", record.employeeCode],
+                      ["Status", record.status],
+                      ["Role", record.personnelRole],
+                      ["Job title", record.jobTitle],
+                      ["Department", record.department],
+                      ["Branch", record.branchId ? branchNameById.get(record.branchId) : null],
+                      ["Employment type", employmentTypeLabels[record.employmentType] ?? record.employmentType],
+                      ["Start date", record.startDate],
+                      ["Email", record.email],
+                      ["Phone", record.phone],
+                      ["Date of birth", record.dateOfBirth],
+                      ["Gender", record.gender],
+                      ["Marital status", record.maritalStatus],
+                      ["Address", record.address],
+                      ["Permanent address", record.permanentAddress],
+                      ["Emergency contact", record.emergencyContactName],
+                      ["Emergency contact phone", record.emergencyContactPhone],
+                      ["Qualification", record.qualification],
+                      ["Experience", record.experience],
+                    ].map(([label, value]) => (
+                      <div key={label} className="min-w-0 border-b border-slate-100 pb-3 last:border-0">
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+                        <dd className="mt-1 break-words text-sm text-slate-900">{value || "Not provided"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </AdminRecordDialog>
                 <AdminRecordDialog showLabel title={`Edit ${record.firstName} ${record.lastName}`}>
                   <StaffForm
                     record={{
