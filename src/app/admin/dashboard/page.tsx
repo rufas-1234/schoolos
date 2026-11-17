@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Users,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { db } from "@/db";
 import {
@@ -24,6 +25,7 @@ import {
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { schoolLogoSource } from "@/lib/school-logo";
 
 export default async function DashboardPage() {
   const context = await requireSchoolPermission("dashboard.view");
@@ -88,6 +90,14 @@ export default async function DashboardPage() {
   const staffCount = Number(staffResult[0]?.value ?? 0);
   const canManageFees = context.grantedPermissions.includes("fees.manage");
   const canRecordPayments = context.grantedPermissions.includes("payments.record");
+  const schoolLogo = schoolLogoSource(context.schoolLogoUrl);
+  const schoolMonogram = context.schoolName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toLocaleUpperCase() || "S";
   const quickAccess = [
     context.grantedPermissions.includes("students.view") && {
       href: "/admin/students",
@@ -245,9 +255,10 @@ export default async function DashboardPage() {
       <div className="grid gap-5 xl:grid-cols-[1.4fr_0.9fr]">
         <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">School administration</h2>
-              <p className="mt-1 text-sm text-slate-500">Quick access to the records and tools you manage most.</p>
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-violet-50 text-xs font-bold text-violet-800" title={context.schoolName}>
+              {schoolLogo
+                ? <Image src={schoolLogo} unoptimized width={36} height={36} alt={`${context.schoolName} logo`} className="h-full w-full object-contain" />
+                : schoolMonogram}
             </div>
             <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
               {context.schoolName}
