@@ -380,20 +380,20 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-100 bg-white px-5 py-6">
+    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-violet-950 bg-[#4f1d78] px-5 py-6">
       <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-200">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white shadow-lg shadow-violet-950/20">
           {schoolLogo
             ? <Image src={schoolLogo} unoptimized width={44} height={44} alt={`${schoolName} logo`} className="h-full w-full rounded-2xl bg-white object-contain" />
             : <GraduationCap size={24} />}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-bold text-slate-900">{schoolName}</span>
-          <span className="mt-0.5 block text-xs text-slate-400">School workspace</span>
+          <span className="block truncate text-sm font-bold text-white">{schoolName}</span>
+          <span className="mt-0.5 block text-xs text-violet-200">School workspace</span>
         </span>
       </Link>
 
-      <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+      <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-200">
         Workspace
       </p>
       <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
@@ -490,8 +490,8 @@ export function AdminShell({
                   className={cn(
                     "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition",
                     active
-                      ? "bg-violet-50 text-violet-800"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                      ? "bg-white text-violet-900"
+                      : "text-violet-100 hover:bg-white/10 hover:text-white",
                   )}
                 >
                   <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
@@ -502,7 +502,7 @@ export function AdminShell({
                   />
                 </button>
                 {sectionOpen && (
-                  <div className="ml-5 mt-1 space-y-1 border-l border-slate-100 pl-3">
+                  <div className="ml-5 mt-1 space-y-1 border-l border-violet-300/40 pl-3">
                     {resolvedSections.map((section) => {
                       if (!section.href) {
                         return (
@@ -510,7 +510,7 @@ export function AdminShell({
                             key={section.id}
                             aria-disabled="true"
                             title={`${section.label} is not available yet`}
-                            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-400"
+                            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-violet-300"
                           >
                             {section.label}
                             <span className="text-[10px] font-semibold uppercase tracking-wide">
@@ -529,8 +529,8 @@ export function AdminShell({
                           className={cn(
                             "block rounded-lg px-3 py-2 text-sm transition",
                             sectionActive
-                              ? "bg-violet-50 font-semibold text-violet-800"
-                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                              ? "bg-white font-semibold text-violet-900"
+                              : "text-violet-100 hover:bg-white/10 hover:text-white",
                           )}
                         >
                           {section.label}
@@ -550,8 +550,8 @@ export function AdminShell({
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
                 active
-                  ? "bg-violet-50 text-violet-800"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                  ? "bg-white text-violet-900"
+                  : "text-violet-100 hover:bg-white/10 hover:text-white",
               )}
             >
               <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
@@ -562,8 +562,8 @@ export function AdminShell({
         })}
       </nav>
 
-      <div className="mt-auto flex justify-center border-t border-slate-100 pt-4">
-        <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-violet-50 text-xs font-bold text-violet-800" title={schoolName}>
+      <div className="mt-auto flex justify-center border-t border-violet-300/30 pt-4">
+        <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/15 text-xs font-bold text-white" title={schoolName}>
           {schoolLogo
             ? <Image src={schoolLogo} unoptimized width={36} height={36} alt={`${schoolName} logo`} className="h-full w-full object-contain" />
             : schoolMonogram}
