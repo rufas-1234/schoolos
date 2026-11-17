@@ -15,11 +15,21 @@ describe("workspace home policy", () => {
 
   it("prefers administration for accounts with administrator access", () => {
     expect(getWorkspaceHomePath(["dashboard.view", "results.enter"])).toBe("/admin/dashboard");
-    expect(getWorkspaceHomePath(["roles.manage", "results.enter"])).toBe("/admin/settings/roles");
+    expect(getWorkspaceHomePath(["roles.manage", "results.enter"])).toBe("/admin/users");
   });
 
   it("routes other least-privilege accounts to an allowed workspace", () => {
     expect(getWorkspaceHomePath(["students.view"])).toBe("/admin/students");
     expect(getWorkspaceHomePath([])).toBe("/unauthorized");
+  });
+
+  it("routes linked students and parents to their own portals", () => {
+    expect(getWorkspaceHomePath([], { student: true })).toBe("/portal/student");
+    expect(getWorkspaceHomePath([], { parent: true })).toBe("/portal/parent");
+  });
+
+  it("keeps administrator and teacher workspaces ahead of linked family portals", () => {
+    expect(getWorkspaceHomePath(["dashboard.view"], { student: true })).toBe("/admin/dashboard");
+    expect(getWorkspaceHomePath(["results.enter"], { parent: true })).toBe("/portal/teacher");
   });
 });

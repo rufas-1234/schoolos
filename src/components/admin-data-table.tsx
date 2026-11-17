@@ -43,12 +43,14 @@ export function AdminActionDialog({
   children,
   initialOpen = false,
   openWhenSearchParam,
+  className = "",
 }: {
   label: string;
   title: string;
   children: ReactNode;
   initialOpen?: boolean;
   openWhenSearchParam?: { name: string; value: string };
+  className?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -78,7 +80,7 @@ export function AdminActionDialog({
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
-        className="admin-record-dialog admin-resizable-dialog m-auto flex max-h-[90dvh] w-[min(94vw,48rem)] max-w-none flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"
+        className={`admin-record-dialog admin-resizable-dialog m-auto flex max-h-[90dvh] w-[min(94vw,48rem)] max-w-none flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40 ${className}`}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <h2 id={titleId} className="font-semibold text-slate-900">{title}</h2>

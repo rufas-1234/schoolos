@@ -14,8 +14,7 @@ import {
   userRoles,
 } from "@/db/schema";
 
-export async function requireSchoolPermission(permissionKey: string | readonly string[]) {
-  const requiredPermissions = typeof permissionKey === "string" ? [permissionKey] : permissionKey;
+export async function requireSchoolMember() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
 
@@ -49,6 +48,22 @@ export async function requireSchoolPermission(permissionKey: string | readonly s
     .limit(2);
 
   const membership = requireSingleSchoolMembership(memberships);
+  return {
+    user: session.user,
+    schoolId: membership.schoolId,
+    schoolPublicId: membership.schoolPublicId,
+    schoolName: membership.schoolName,
+    schoolLogoUrl: membership.schoolLogoUrl,
+    schoolEmail: membership.schoolEmail,
+    schoolPhone: membership.schoolPhone,
+    schoolAddress: membership.schoolAddress,
+    membershipId: membership.membershipId,
+  };
+}
+
+export async function requireSchoolPermission(permissionKey: string | readonly string[]) {
+  const requiredPermissions = typeof permissionKey === "string" ? [permissionKey] : permissionKey;
+  const context = await requireSchoolMember();
   const granted = await db
     .select({ permissionKey: permissions.key })
     .from(userRoles)
@@ -57,8 +72,8 @@ export async function requireSchoolPermission(permissionKey: string | readonly s
     .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
     .where(
       and(
-        eq(userRoles.membershipId, membership.membershipId),
-        eq(roles.schoolId, membership.schoolId),
+        eq(userRoles.membershipId, context.membershipId),
+        eq(roles.schoolId, context.schoolId),
       ),
     );
 
@@ -70,18 +85,10 @@ export async function requireSchoolPermission(permissionKey: string | readonly s
     .select({ name: roles.name })
     .from(userRoles)
     .innerJoin(roles, eq(userRoles.roleId, roles.id))
-    .where(and(eq(userRoles.membershipId, membership.membershipId), eq(roles.schoolId, membership.schoolId)));
+    .where(and(eq(userRoles.membershipId, context.membershipId), eq(roles.schoolId, context.schoolId)));
 
   return {
-    user: session.user,
-    schoolId: membership.schoolId,
-    schoolPublicId: membership.schoolPublicId,
-    schoolName: membership.schoolName,
-    schoolLogoUrl: membership.schoolLogoUrl,
-    schoolEmail: membership.schoolEmail,
-    schoolPhone: membership.schoolPhone,
-    schoolAddress: membership.schoolAddress,
-    membershipId: membership.membershipId,
+    ...context,
     grantedPermissions: granted.map((permission) => permission.permissionKey),
     roleNames: roleNames.map((role) => role.name),
   };

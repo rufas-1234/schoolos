@@ -19,6 +19,7 @@ import {
   School,
   Settings,
   Users,
+  UserRoundCog,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -51,6 +52,16 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
   { href: "/portal/teacher", label: "Teacher Portal", icon: GraduationCap, permission: "results.enter" },
+  {
+    href: "/admin/users",
+    label: "Users",
+    icon: UserRoundCog,
+    permission: "roles.manage",
+    children: [
+      { id: "user-list", label: "User list", href: "/admin/users" },
+      { id: "user-roles", label: "User roles", href: "/admin/users/roles" },
+    ],
+  },
   {
     href: "/admin/academics",
     label: "Academics",
@@ -120,7 +131,6 @@ const navigation: NavigationItem[] = [
       { id: "leave", label: "Leave management", href: "/admin/hr/leave", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "reports", label: "Staff attendance reports", href: "/admin/hr/reports", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
-      { id: "user-roles", label: "User roles", href: "/admin/settings/roles", permission: "roles.manage" },
       { id: "settings", label: "HR settings", href: "/admin/hr/settings", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
     ],
   },
@@ -206,6 +216,9 @@ export function AdminShell({
   const [studentInfoOpen, setStudentInfoOpen] = useState(() =>
     pathname.startsWith("/admin/students"),
   );
+  const [usersOpen, setUsersOpen] = useState(() =>
+    pathname.startsWith("/admin/users") || pathname === "/admin/settings/roles",
+  );
   const [humanResourcesOpen, setHumanResourcesOpen] = useState(() =>
     pathname.startsWith("/admin/hr") || pathname === "/admin/settings/roles",
   );
@@ -234,7 +247,7 @@ export function AdminShell({
   const homeHref = permissions.includes("dashboard.view")
     ? "/admin/dashboard"
     : permissions.includes("roles.manage")
-        ? "/admin/settings/roles"
+        ? "/admin/users"
       : permissions.includes("school.settings.manage")
         ? "/admin/settings"
       : permissions.includes("results.enter")
@@ -275,6 +288,9 @@ export function AdminShell({
   const activeHrSection = navigation
     .find((item) => item.href === "/admin/hr")
     ?.children?.find((section) => section.href === pathname);
+  const activeUserSection = navigation
+    .find((item) => item.href === "/admin/users")
+    ?.children?.find((section) => section.href === pathname);
   const activeInventorySection = navigation
     .find((item) => item.label === "Inventory")
     ?.children?.find((section) => {
@@ -303,8 +319,8 @@ export function AdminShell({
       ? activeStudentSection?.label ?? "Student Info"
       : pathname.startsWith("/admin/hr")
         ? activeHrSection?.label ?? "Human resources"
-        : pathname === "/admin/settings/roles"
-          ? activeHrSection?.label ?? "User roles"
+        : pathname.startsWith("/admin/users") || pathname === "/admin/settings/roles"
+          ? activeUserSection?.label ?? "Users"
         : pathname.startsWith("/admin/accounts") || pathname.startsWith("/admin/inventory")
           ? pathname.startsWith("/admin/accounts") && searchParams.get("section") === "reports"
             ? "Reports"
@@ -406,6 +422,7 @@ export function AdminShell({
           const active =
             pathname === href ||
             (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
+            (href === "/admin/users" && pathname.startsWith("/admin/users")) ||
             (href === "/admin/examinations" && pathname === "/admin/exam-analytics") ||
             (label === "Inventory" && (
               pathname.startsWith("/admin/inventory") ||
@@ -430,6 +447,7 @@ export function AdminShell({
                 : section,
             );
             const isStudentInfo = href === "/admin/students";
+            const isUsers = href === "/admin/users";
             const isHumanResources = href === "/admin/hr";
             const isInventory = label === "Inventory";
             const isLibrary = label === "Library";
@@ -437,6 +455,8 @@ export function AdminShell({
             const isExaminations = href === "/admin/examinations";
             const sectionOpen = isStudentInfo
               ? studentInfoOpen
+              : isUsers
+                ? usersOpen
               : isHumanResources
                 ? humanResourcesOpen
                 : isInventory
@@ -450,6 +470,8 @@ export function AdminShell({
                   : academicsOpen;
             const setSectionOpen = isStudentInfo
               ? setStudentInfoOpen
+              : isUsers
+                ? setUsersOpen
               : isHumanResources
                 ? setHumanResourcesOpen
                 : isInventory

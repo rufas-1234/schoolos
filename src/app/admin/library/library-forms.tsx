@@ -78,7 +78,8 @@ function BookForm({
     {book && <label className="block text-sm">Catalog status<select name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="active">Active</option><option value="archived">Archived</option></select></label>}
     <ActionFeedback state={state} />
     {book && status !== book.status
-      ? <AdminConfirmSubmitButton
+      ? <div className="admin-dialog-form-actions">
+        <AdminConfirmSubmitButton
           label={status === "archived" ? `Archive ${book.title}` : `Restore ${book.title}`}
           buttonText={pending ? "Saving..." : "Save changes"}
           confirmationTitle={status === "archived" ? "Confirm book archive" : "Confirm book restoration"}
@@ -88,7 +89,10 @@ function BookForm({
           disabled={pending}
           variant="primary"
         />
-      : <button disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : book ? "Save changes" : "Add book"}</button>}
+      </div>
+      : <div className="admin-dialog-form-actions">
+        <button type="submit" disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : book ? "Save changes" : "Add book"}</button>
+      </div>}
   </form>;
 }
 
@@ -105,7 +109,7 @@ export function LibraryBookDialog({
   branches?: LibraryBranchOption[];
   initialOpen?: boolean;
 }) {
-  return <AdminActionDialog initialOpen={initialOpen} label={book ? "Edit" : "Add book"} title={book ? "Edit book details" : "Add a book to the catalog"}>
+  return <AdminActionDialog className="admin-library-dialog" initialOpen={initialOpen} label={book ? "Edit" : "Add book"} title={book ? "Edit book details" : "Add a book to the catalog"}>
     <BookForm book={book} categories={categories} subjects={subjects} branches={branches} />
   </AdminActionDialog>;
 }
@@ -169,7 +173,7 @@ export function CheckoutDialog({
   dueDate: string;
   minDate: string;
 }) {
-  return <AdminActionDialog label="Issue" title={`Issue ${book.label}`}>
+  return <AdminActionDialog className="admin-library-dialog" label="Issue" title={`Issue ${book.label}`}>
     <CheckoutForm book={book} members={members} dueDate={dueDate} minDate={minDate} />
   </AdminActionDialog>;
 }
@@ -186,7 +190,7 @@ export function LibraryTermDialog({
   const [state, formAction, pending] = useActionState(saveLibraryTerm, {});
   const [status, setStatus] = useState(term?.status ?? "active");
   const label = type === "category" ? "Category" : "Subject";
-  return <AdminActionDialog label={term ? "Edit" : `Add ${label.toLowerCase()}`} title={`${term ? "Edit" : "Add a book"} ${label.toLowerCase()}`}>
+  return <AdminActionDialog className="admin-library-dialog" label={term ? "Edit" : `Add ${label.toLowerCase()}`} title={`${term ? "Edit" : "Add a book"} ${label.toLowerCase()}`}>
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="type" value={type} />
       {term && <input type="hidden" name="termId" value={term.id} />}
@@ -222,7 +226,7 @@ export function LibraryMemberDialog({
   const [state, formAction, pending] = useActionState(saveLibraryMember, {});
   const [memberType, setMemberType] = useState<"student" | "staff">("student");
   const people = memberType === "student" ? students : staff;
-  return <AdminActionDialog label="Add member" title="Register a library member">
+  return <AdminActionDialog className="admin-library-dialog" label="Add member" title="Register a library member">
     <form action={formAction} className="space-y-3">
       <label className="block text-sm">Member type<select name="memberType" value={memberType}
         onChange={(event) => setMemberType(event.target.value === "staff" ? "staff" : "student")}

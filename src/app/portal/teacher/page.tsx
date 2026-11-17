@@ -215,8 +215,12 @@ export default async function TeacherPortalPage() {
   const hasTeacherProfile = teacherRecords.length > 0;
 
   return (
-    <TeacherPortalShell schoolName={context.schoolName} teacherName={teacherName}>
-      <main className="mx-auto max-w-7xl space-y-6 px-3 py-6 sm:space-y-8 sm:px-5 sm:py-8">
+    <TeacherPortalShell
+      schoolName={context.schoolName}
+      schoolLogoUrl={context.schoolLogoUrl}
+      teacherName={teacherName}
+    >
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
         <header className="rounded-3xl bg-gradient-to-br from-violet-800 to-indigo-900 p-7 text-white shadow-lg sm:p-9">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Your teaching workspace</p>
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Welcome, {teacherName}</h1>

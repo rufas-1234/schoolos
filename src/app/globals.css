@@ -178,6 +178,28 @@ h6 {
     line-height: 1.25;
     white-space: normal;
   }
+
+  .admin-library-dialog {
+    width: calc(100vw - 1rem);
+    min-width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+    resize: none;
+  }
+
+  .admin-library-dialog > .admin-dialog-content {
+    padding: 1rem;
+  }
+
+  .admin-library-dialog > div:first-child {
+    padding: 0.875rem 1rem;
+  }
+
+  .admin-library-dialog .admin-dialog-form-actions {
+    bottom: -1rem;
+    margin: 0 -1rem -1rem;
+    padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+  }
 }
 
 .admin-sidebar-nav {

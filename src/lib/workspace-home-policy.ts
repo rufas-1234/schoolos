@@ -1,7 +1,10 @@
-export function getWorkspaceHomePath(permissions: readonly string[]): string {
+export function getWorkspaceHomePath(
+  permissions: readonly string[],
+  linkedPortals: { student?: boolean; parent?: boolean } = {},
+): string {
   const granted = new Set(permissions);
   if (granted.has("dashboard.view")) return "/admin/dashboard";
-  if (granted.has("roles.manage")) return "/admin/settings/roles";
+  if (granted.has("roles.manage")) return "/admin/users";
   if (granted.has("school.settings.manage")) return "/admin/settings";
   if (granted.has("results.enter")) return "/portal/teacher";
   if (granted.has("examinations.create") || granted.has("results.publish")) {
@@ -11,6 +14,8 @@ export function getWorkspaceHomePath(permissions: readonly string[]): string {
   if (granted.has("fees.manage") || granted.has("payments.record")) {
     return "/admin/fees/collection";
   }
+  if (linkedPortals.student) return "/portal/student";
+  if (linkedPortals.parent) return "/portal/parent";
   if (granted.has("students.view")) return "/admin/students";
   return "/unauthorized";
 }

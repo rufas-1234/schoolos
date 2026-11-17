@@ -91,7 +91,8 @@ export async function createSchoolRole(
     throw error;
   }
 
-  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
   return { success: true };
 }
 
@@ -189,7 +190,8 @@ export async function updateSchoolRole(
     throw error;
   }
 
-  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
   revalidatePath("/admin");
   return { success: true };
 }
@@ -239,7 +241,8 @@ export async function deleteSchoolRole(
   if (outcome === "not-found") return { error: "That role was not found in this school." };
   if (outcome === "system-role") return { error: "System roles cannot be deleted." };
   if (outcome === "in-use") return { error: "Unassign this role from all accounts before deleting it." };
-  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
   revalidatePath("/admin");
   return { success: true };
 }
@@ -320,7 +323,8 @@ export async function assignSchoolRoles(
   if (outcome === "cannot-remove-own-access") {
     return { error: "Keep at least one role that grants you permission to manage roles." };
   }
-  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
   revalidatePath("/admin");
   return { success: true };
 }
@@ -407,7 +411,8 @@ export async function setSchoolAccountAccess(
   if (outcome === "last-role-manager") {
     return { error: "Keep at least one other active account with role-management permission." };
   }
-  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
   revalidatePath("/admin");
   return { success: true };
 }

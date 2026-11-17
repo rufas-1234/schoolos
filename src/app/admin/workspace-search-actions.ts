@@ -29,6 +29,8 @@ import {
   students,
   subjects,
   teachers,
+  schoolMemberships,
+  user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { academicSections } from "@/lib/academic-sections";
@@ -61,7 +63,7 @@ export type WorkspaceSearchResult = {
   title: string;
   description: string;
   href: string;
-  category: "Pages" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Library" | "Fees" | "Accounts";
+  category: "Pages" | "Users" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Library" | "Fees" | "Accounts";
   searchTerms?: string[];
 };
 
@@ -212,7 +214,8 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("library-subjects", "Library subjects", "Organize library books by subject", "/admin/library?section=subjects", ["book subjects"]);
   }
   if (permissions.has("roles.manage")) {
-    addPage("user-roles", "User roles", "Users, roles and permission assignments", "/admin/settings/roles", ["permissions", "accounts"]);
+    addPage("users", "Users", "School user accounts and access", "/admin/users", ["user list", "accounts"]);
+    addPage("user-roles", "User roles", "Create roles and manage account permissions", "/admin/users/roles", ["permissions", "roles"]);
   }
   if (permissions.has("school.settings.manage")) {
     addPage("school-profile", "School profile", "School details and configuration", "/admin/settings", ["settings", "school settings"]);
@@ -226,6 +229,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const tokenMatch = (column: Parameters<typeof like>[0]) =>
     and(...queryTokens.map((token) => like(sql`lower(${column})`, patternFor(token))));
   const [
+    userRows,
     studentRows,
     inventoryItemRows,
     inventoryAssetRows,
@@ -240,6 +244,19 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     libraryMemberRows,
     libraryLoanRows,
   ] = await Promise.all([
+    permissions.has("roles.manage")
+      ? db.select({
+        name: user.name,
+        email: user.email,
+      }).from(schoolMemberships)
+        .innerJoin(user, eq(schoolMemberships.userId, user.id))
+        .where(and(
+          eq(schoolMemberships.schoolId, context.schoolId),
+          or(tokenMatch(user.name), tokenMatch(user.email)),
+        ))
+        .orderBy(asc(user.name))
+        .limit(20)
+      : Promise.resolve([]),
     canViewStudents
       ? db.select({
         publicId: students.publicId,
@@ -701,6 +718,16 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       : Promise.resolve([]),
   ]);
 
+  for (const account of userRows) {
+    results.push({
+      id: `user-${account.email}`,
+      title: account.name,
+      description: `School user · ${account.email}`,
+      href: `/admin/users?search=${encodeURIComponent(account.email)}`,
+      category: "Users",
+      searchTerms: [account.email],
+    });
+  }
   for (const student of studentRows) {
     results.push({
       id: `student-${student.publicId}`,

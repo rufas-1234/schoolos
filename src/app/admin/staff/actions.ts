@@ -746,7 +746,8 @@ export async function createStaffMember(
   }
 
   revalidatePath("/admin/staff");
-  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
   revalidatePath("/admin/hr");
   revalidatePath("/admin/hr/attendance");
   revalidatePath("/admin/hr/leave");
@@ -940,7 +941,8 @@ export async function updateStaffMember(
   }
 
   revalidatePath("/admin/staff");
-  revalidatePath("/admin/settings/roles");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
   revalidatePath("/admin/hr");
   revalidatePath("/admin/hr/attendance");
   revalidatePath("/admin/hr/leave");
