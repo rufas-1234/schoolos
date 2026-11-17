@@ -380,7 +380,7 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-violet-950 bg-[#4f1d78] px-5 py-6">
+    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-violet-800 bg-[#7027b8] px-5 py-6">
       <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white shadow-lg shadow-violet-950/20">
           {schoolLogo
