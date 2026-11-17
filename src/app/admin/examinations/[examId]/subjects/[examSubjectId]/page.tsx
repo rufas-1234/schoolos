@@ -14,7 +14,6 @@ import {
   examGradeBands,
   examGradingScales,
   examMarkAudits,
-  examMarkCorrections,
   examMarks,
   examReportSignatures,
   examStudentRemarks,
@@ -33,7 +32,6 @@ import { PrintButton } from "@/components/print-button";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
   ClassTeacherRemarkForm,
-  CorrectionRequestForm,
   ReopenApprovedSubjectForm,
   SearchableStudentItems,
   SaveMarksForm,
@@ -209,21 +207,7 @@ export default async function SubjectMarksPage({
       ))
       .orderBy(asc(examMarkAudits.createdAt))
     : [];
-  const corrections = roster.length
-    ? await db.select({
-      examMarkId: examMarkCorrections.examMarkId,
-      requestedMarks: examMarkCorrections.requestedMarks,
-      previousMarks: examMarkCorrections.previousMarks,
-      reason: examMarkCorrections.reason,
-      status: examMarkCorrections.status,
-      reviewNote: examMarkCorrections.reviewNote,
-    }).from(examMarkCorrections).where(and(
-      eq(examMarkCorrections.schoolId, context.schoolId),
-      inArray(examMarkCorrections.examMarkId, roster.map((row) => row.markId)),
-    ))
-    : [];
   const editable = subject.examStatus === "open" && subject.status === "draft" && (canConfigure || canReview || assignedTeacher);
-  const canRequestCorrection = subject.examStatus === "published" && context.grantedPermissions.includes("results.enter") && assignedTeacher;
   const studentRows = roster.map((row) => ({
     markId: row.markId,
     enrollmentId: row.enrollmentId,
@@ -341,40 +325,8 @@ export default async function SubjectMarksPage({
       {subject.examStatus === "open" && subject.status === "draft" && (canConfigure || canReview || assignedTeacher) && roster.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-bold text-slate-900">Submit for approval</h2>
-          <p className="mt-1 text-sm text-slate-600">All marks must be saved and complete. After submission, you cannot edit marks unless a reviewer returns the assessment.</p>
+          <p className="mt-1 text-sm text-slate-600">All marks must be saved and complete. After submission, you cannot edit marks unless a reviewer returns the assessment for correction. Published results cannot be changed through a teacher correction request.</p>
           <SubmitSubjectForm examSubjectId={subject.id} />
-        </section>
-      )}
-
-      {canRequestCorrection && (
-        <section className="rounded-2xl border border-amber-200 bg-white p-5">
-          <h2 className="font-bold text-slate-900">Request a published-mark correction</h2>
-          <p className="mt-1 text-sm text-slate-600">The published score stays unchanged until an authorized reviewer approves a request.</p>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {roster.map((row) => {
-              const markCorrections = corrections.filter((correction) => correction.examMarkId === row.markId);
-              const pending = markCorrections.find((correction) => correction.status === "pending");
-              return row.marks === null ? null : (
-                <article key={row.markId} className="rounded-xl border p-3">
-                  <p className="font-semibold">{row.firstName} {row.lastName} · {row.marks}/{subject.maxMarks}</p>
-                  {pending
-                    ? <p className="mt-1 text-xs text-amber-800">Pending request: {pending.previousMarks} → {pending.requestedMarks}. {pending.reason}</p>
-                    : <CorrectionRequestForm examMarkId={row.markId} previousMarks={row.marks} maxMarks={subject.maxMarks} />}
-                  {markCorrections.length > 0 && (
-                    <div className="mt-3 space-y-1 border-t pt-2 text-xs text-slate-600">
-                      <p className="font-semibold">Correction history</p>
-                      {markCorrections.map((correction, index) => (
-                        <p key={`${correction.examMarkId}-${index}`}>
-                          {correction.status}: {correction.previousMarks} → {correction.requestedMarks} · {correction.reason}
-                          {correction.reviewNote ? ` · Reviewer: ${correction.reviewNote}` : ""}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
         </section>
       )}
 

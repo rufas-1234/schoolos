@@ -2050,56 +2050,6 @@ export async function savePrincipalRemark(
   return { success: true };
 }
 
-export async function requestMarkCorrection(
-  _previousState: ExaminationActionState,
-  formData: FormData,
-): Promise<ExaminationActionState> {
-  const context = await requireSchoolPermission("results.enter");
-  const parsed = z.object({
-    examMarkId: idField,
-    requestedMarks: numericField.pipe(z.number().nonnegative().max(999999)),
-    reason: text(1000),
-  }).safeParse({
-    examMarkId: value(formData, "examMarkId"),
-    requestedMarks: value(formData, "requestedMarks"),
-    reason: value(formData, "reason"),
-  });
-  if (!parsed.success) return { error: "Provide a valid correction mark and a reason." };
-  const [mark] = await db.select({
-    id: examMarks.id,
-    marks: examMarks.marks,
-    maxMarks: examSubjects.maxMarks,
-    examSubjectId: examSubjects.id,
-    examId: examinations.id,
-    status: examinations.status,
-    publicId: examMarks.publicId,
-  }).from(examMarks).innerJoin(examSubjects, eq(examSubjects.id, examMarks.examSubjectId))
-    .innerJoin(examClasses, eq(examClasses.id, examSubjects.examClassId))
-    .innerJoin(examinations, eq(examinations.id, examClasses.examinationId))
-    .where(and(eq(examMarks.id, parsed.data.examMarkId), eq(examMarks.schoolId, context.schoolId)))
-    .limit(1);
-  if (!mark || mark.status !== "published" || mark.marks === null) return { error: "Corrections are only available for published marks." };
-  if (parsed.data.requestedMarks > Number(mark.maxMarks)) return { error: `Marks cannot exceed ${mark.maxMarks}.` };
-  if (!(await assignedSubject(mark.examSubjectId, context.schoolId, context.user.id))) {
-    return { error: "Only the assigned subject teacher may request this correction." };
-  }
-  const pending = await db.select({ id: examMarkCorrections.id }).from(examMarkCorrections)
-    .where(and(eq(examMarkCorrections.schoolId, context.schoolId), eq(examMarkCorrections.examMarkId, mark.id), eq(examMarkCorrections.status, "pending")))
-    .limit(1);
-  if (pending.length) return { error: "A correction request is already awaiting review for this mark." };
-  await db.insert(examMarkCorrections).values({
-    publicId: randomUUID(),
-    schoolId: context.schoolId,
-    examMarkId: mark.id,
-    previousMarks: mark.marks,
-    requestedMarks: parsed.data.requestedMarks.toFixed(2),
-    reason: parsed.data.reason,
-    requestedBy: context.user.id,
-  });
-  revalidatePath(`/admin/examinations/${mark.examId}`);
-  return { success: true };
-}
-
 export async function reviewMarkCorrection(
   _previousState: ExaminationActionState,
   formData: FormData,

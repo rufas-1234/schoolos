@@ -12,7 +12,6 @@ import {
   createGradingScale,
   deleteExamination,
   publishExamination,
-  requestMarkCorrection,
   reopenApprovedExamSubject,
   reviewExamSubject,
   reviewMarkCorrection,
@@ -769,7 +768,7 @@ export function PublishExaminationForm({ examinationId }: { examinationId: numbe
     <form action={action} className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
       <input type="hidden" name="examinationId" value={examinationId} />
       <h2 className="font-bold text-emerald-950">Publish results</h2>
-      <p className="my-2 text-sm text-emerald-900">Publication locks marks. Every assessment must have complete, approved marks. Further changes require a reviewed correction request.</p>
+      <p className="my-2 text-sm text-emerald-900">Publication locks marks. Every assessment must have complete, approved marks. Any corrections must be reviewed before results are published.</p>
       <SubmitButton pending={pending}>Publish all results</SubmitButton>
       <Feedback state={state} />
     </form>
@@ -814,32 +813,6 @@ export function PrincipalRemarkForm({
         <textarea name="remark" maxLength={1000} rows={3} defaultValue={remark ?? ""} className="mt-2 w-full max-w-2xl rounded-lg border border-slate-200 p-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
       </label>
       <SubmitButton pending={pending}>Save principal remark</SubmitButton>
-      <Feedback state={state} />
-    </form>
-  );
-}
-
-export function CorrectionRequestForm({
-  examMarkId,
-  previousMarks,
-  maxMarks,
-}: {
-  examMarkId: number;
-  previousMarks: string;
-  maxMarks: string;
-}) {
-  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(requestMarkCorrection, {});
-  return (
-    <form action={action} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 print:hidden">
-      <input type="hidden" name="examMarkId" value={examMarkId} />
-      <p className="text-xs font-semibold text-amber-900">Published mark: {previousMarks}. Request changes with a reason; the published value remains until approved.</p>
-      <label className="block text-xs font-medium">Requested marks
-        <input required type="number" min="0" max={maxMarks} step="0.01" name="requestedMarks" defaultValue={previousMarks} className="mt-1 h-9 w-full max-w-40 rounded-lg border border-slate-200 bg-white px-3 text-sm tabular-nums outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
-      </label>
-      <label className="block text-xs font-medium">Reason
-        <textarea required name="reason" maxLength={1000} rows={2} className="mt-1 w-full max-w-md rounded-lg border border-slate-200 bg-white p-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
-      </label>
-      <SubmitButton pending={pending}>Request correction</SubmitButton>
       <Feedback state={state} />
     </form>
   );
