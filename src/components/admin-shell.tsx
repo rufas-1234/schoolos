@@ -17,7 +17,6 @@ import {
   PackageOpen,
   School,
   Settings,
-  ShieldCheck,
   Users,
   X,
   type LucideIcon,
@@ -535,14 +534,12 @@ export function AdminShell({
         })}
       </nav>
 
-      <div className="mt-auto flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/70 p-2.5 xl:block xl:rounded-2xl xl:p-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-violet-700 shadow-sm xl:mb-3 xl:h-9 xl:w-9 xl:rounded-xl">
-          <ShieldCheck size={18} />
-        </div>
-        <p className="text-xs font-semibold text-slate-800 xl:text-sm">School administration</p>
-        <p className="mt-1 hidden text-xs leading-5 text-slate-500 xl:block">
-          Manage academics, people, and school settings from one workspace.
-        </p>
+      <div className="mt-auto flex justify-center border-t border-slate-100 pt-4">
+        <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-violet-50 text-xs font-bold text-violet-800" title={schoolName}>
+          {schoolLogo
+            ? <Image src={schoolLogo} unoptimized width={36} height={36} alt={`${schoolName} logo`} className="h-full w-full object-contain" />
+            : schoolMonogram}
+        </span>
       </div>
     </aside>
   );
