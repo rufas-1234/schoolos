@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { AdminDeleteButton } from "@/components/admin-data-table";
+import { AdminConfirmSubmitButton, AdminDeleteButton } from "@/components/admin-data-table";
 import {
   assignSchoolRoles,
   createSchoolRole,
@@ -168,22 +168,16 @@ export function SchoolAccountAccessForm({
     <form action={action} className="space-y-2">
       <input type="hidden" name="membershipId" value={membershipId} />
       <input type="hidden" name="status" value={enabled ? "inactive" : "active"} />
-      <button
-        type="submit"
+      <AdminConfirmSubmitButton
+        label={enabled ? `Disable ${userName}'s school access` : `Enable ${userName}'s school access`}
+        buttonText={pending ? "Saving..." : enabled ? "Disable school access" : "Enable school access"}
+        confirmationTitle={enabled ? "Confirm access deactivation" : "Confirm access activation"}
+        confirmationMessage={enabled
+          ? `Disable ${userName}'s access to this school? They will no longer be able to sign in to this school workspace.`
+          : `Enable ${userName}'s access to this school?`}
         disabled={pending}
-        onClick={(event) => {
-          if (enabled && !window.confirm(`Disable ${userName}'s access to this school?`)) {
-            event.preventDefault();
-          }
-        }}
-        className={`rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${
-          enabled
-            ? "border-rose-200 text-rose-700 hover:bg-rose-50"
-            : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-        }`}
-      >
-        {pending ? "Saving..." : enabled ? "Disable school access" : "Enable school access"}
-      </button>
+        variant={enabled ? "danger" : "primary"}
+      />
       <ActionFeedback state={state} />
     </form>
   );

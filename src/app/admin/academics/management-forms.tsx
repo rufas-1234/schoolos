@@ -4,6 +4,7 @@ import { useActionState, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   AdminActionDialog,
+  AdminConfirmSubmitButton,
   AdminDeleteButton,
   AdminDataTable,
   AdminRecordDialog,
@@ -59,6 +60,12 @@ export function ClassLevelStatusForm({
       title={status === "active" ? "Archive class" : "Restore class"}
       action={setClassLevelStatus}
       submitLabel={status === "active" ? "Archive class" : "Restore class"}
+      confirmation={{
+        title: status === "active" ? "Confirm class archive" : "Confirm class restoration",
+        message: status === "active"
+          ? "Archive this class? It will be unavailable for new placements and fee setup, while existing student history and invoices remain available."
+          : "Restore this class so it is available for new placements and fee setup?",
+      }}
     >
       <input type="hidden" name="classLevelId" value={classLevelId} />
       <input type="hidden" name="status" value={status === "active" ? "archived" : "active"} />
@@ -77,6 +84,10 @@ export function AcademicYearStatusForm({ years }: { years: Option[] }) {
       title="Activate or archive an academic year"
       action={setAcademicYearStatus}
       submitLabel="Save year status"
+      confirmation={{
+        title: "Confirm academic year status change",
+        message: "Apply the selected status to the chosen academic year? This may change its availability for school operations.",
+      }}
     >
       <SelectField label="Academic year" name="academicYearId" options={years} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
@@ -341,9 +352,15 @@ export function SchoolBranchList({
                 name="status"
                 value={branch.status === "active" ? "inactive" : "active"}
               />
-              <button type="submit" className="text-xs font-semibold text-violet-700 hover:text-violet-900">
-                {branch.status === "active" ? "Deactivate" : "Activate"}
-              </button>
+              <AdminConfirmSubmitButton
+                label={`${branch.status === "active" ? "Deactivate" : "Activate"} ${branch.name}`}
+                buttonText={branch.status === "active" ? "Deactivate" : "Activate"}
+                confirmationTitle={branch.status === "active" ? "Confirm branch deactivation" : "Confirm branch activation"}
+                confirmationMessage={branch.status === "active"
+                  ? `Deactivate ${branch.name}? It will no longer be available for new school records.`
+                  : `Reactivate ${branch.name}?`}
+                variant={branch.status === "active" ? "danger" : "primary"}
+              />
             </form>
           </div>,
       }))}

@@ -1,6 +1,7 @@
 import { and, asc, count, eq } from "drizzle-orm";
 import { BriefcaseBusiness } from "lucide-react";
 import {
+  AdminConfirmSubmitButton,
   AdminActionDialog,
   AdminDataTable,
   AdminRecordDialog,
@@ -25,7 +26,6 @@ import {
 } from "@/lib/staff-settings";
 import { transitionStaffStatus } from "./actions";
 import { StaffForm } from "./staff-form";
-
 const employmentTypeLabels: Record<string, string> = {
   full_time: "Full-time",
   part_time: "Part-time",
@@ -249,12 +249,15 @@ export default async function StaffDirectoryPage() {
                     name="nextStatus"
                     value={record.status === "active" ? "inactive" : "active"}
                   />
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                  >
-                    {record.status === "active" ? "Deactivate" : "Reactivate"}
-                  </button>
+                  <AdminConfirmSubmitButton
+                    label={`${record.status === "active" ? "Deactivate" : "Reactivate"} ${record.firstName} ${record.lastName}`}
+                    buttonText={record.status === "active" ? "Deactivate" : "Reactivate"}
+                    confirmationTitle={record.status === "active" ? "Confirm staff deactivation" : "Confirm staff reactivation"}
+                    confirmationMessage={record.status === "active"
+                      ? `Deactivate ${record.firstName} ${record.lastName}? They will no longer be available for active school operations.`
+                      : `Reactivate ${record.firstName} ${record.lastName}?`}
+                    variant={record.status === "active" ? "danger" : "primary"}
+                  />
                 </form>
               </div>
             ),

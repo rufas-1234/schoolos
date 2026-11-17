@@ -623,44 +623,44 @@ export function AdminShell({
       )}
 
       <div className="admin-shell-content lg:pl-[260px]">
-        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-violet-100 bg-[#f7f1fb]/95 px-3 backdrop-blur sm:px-5 md:h-[76px] md:px-8">
+        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-violet-800 bg-[#7027b8] px-3 text-white shadow-sm shadow-violet-950/10 sm:px-5 md:h-[76px] md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
               ref={navigationTriggerRef}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 lg:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-white hover:bg-white/10 lg:hidden"
               onClick={() => setOpen(true)}
               aria-label="Open navigation"
             >
               <Menu size={20} />
             </button>
-            <div className="hidden items-center gap-2 text-sm text-slate-400 sm:flex">
+            <div className="hidden items-center gap-2 text-sm text-violet-100 sm:flex">
               <BookOpen size={16} />
               <span>Administration</span>
               <span>/</span>
-              <span className="font-semibold text-slate-700">{pageLabel}</span>
+              <span className="font-semibold text-white">{pageLabel}</span>
             </div>
-            <span className="text-sm font-semibold text-slate-800 sm:hidden">SchoolOS</span>
+            <span className="text-sm font-semibold text-white sm:hidden">SchoolOS</span>
           </div>
 
           <WorkspaceQuickSearch />
 
           <div className="flex items-center gap-2">
-            <div className="mx-1 hidden h-8 w-px bg-slate-100 sm:block" />
+            <div className="mx-1 hidden h-8 w-px bg-white/25 sm:block" />
             <div className="relative">
               <button
-                className="flex items-center gap-2 rounded-xl p-1.5 pr-2 hover:bg-slate-50"
+                className="flex items-center gap-2 rounded-xl p-1.5 pr-2 hover:bg-white/10"
                 onClick={() => setMenuOpen((value) => !value)}
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-sm font-bold text-amber-800">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-sm font-bold text-white">
                   {userName.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="hidden max-w-36 text-left sm:block">
-                  <span className="block truncate text-sm font-semibold text-slate-800">{userName}</span>
-                  <span className="block truncate text-xs text-slate-400">{roleLabel}</span>
+                  <span className="block truncate text-sm font-semibold text-white">{userName}</span>
+                  <span className="block truncate text-xs text-violet-100">{roleLabel}</span>
                 </span>
-                <ChevronDown size={16} className="hidden text-slate-400 sm:block" />
+                <ChevronDown size={16} className="hidden text-violet-100 sm:block" />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl">

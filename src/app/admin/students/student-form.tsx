@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useActionState, useEffect, useId, useMemo, useRef, useState } from "react";
+import { AdminConfirmSubmitButton } from "@/components/admin-data-table";
 import { RequiredMark } from "@/components/required-mark";
 import { SearchableSelect } from "@/components/searchable-select";
 import type { StudentAdditionalDetails, StudentFieldSettings } from "@/db/schema";
@@ -149,16 +150,6 @@ export function StudentForm({
           snapshot.set(name, [...(snapshot.get(name) ?? []), value]);
         }
         submittedValues.current = snapshot;
-        if (!record) {
-          const studentName = [formData.get("firstName"), formData.get("lastName")]
-            .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-            .join(" ");
-          const label = studentName || "this student";
-          if (!window.confirm(`Are you sure you want to register ${label} and place them in the selected class?`)) {
-            submittedValues.current = null;
-            event.preventDefault();
-          }
-        }
       }}
       className="space-y-6"
     >
@@ -563,19 +554,18 @@ export function StudentForm({
         </p>
       )}
       <div className="flex justify-end">
-        <button
-          type="submit"
-          disabled={pending || hasPendingUploads}
-          className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {hasPendingUploads
-            ? "Uploading documents..."
-            : pending
-            ? "Saving..."
-            : record
-              ? "Save changes"
-              : "Submit admission and class placement"}
-        </button>
+        {record
+          ? <button type="submit" disabled={pending || hasPendingUploads} className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60">
+              {hasPendingUploads ? "Uploading documents..." : pending ? "Saving..." : "Save changes"}
+            </button>
+          : <AdminConfirmSubmitButton
+              label="Submit student admission and class placement"
+              buttonText={hasPendingUploads ? "Uploading documents..." : pending ? "Saving..." : "Submit admission and class placement"}
+              confirmationTitle="Confirm student admission"
+              confirmationMessage="Submit this student’s admission and class placement for review?"
+              disabled={pending || hasPendingUploads}
+              variant="primary"
+            />}
       </div>
     </form>
   );

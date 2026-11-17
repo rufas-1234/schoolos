@@ -155,26 +155,38 @@ export function AdminRecordDialog({
   );
 }
 
-export function AdminDeleteButton({
+export function AdminConfirmSubmitButton({
   label,
-  disabled = false,
-  showLabel = false,
-  buttonText,
+  buttonText = label,
+  confirmationTitle = "Confirm action",
   confirmationMessage,
+  disabled = false,
+  variant = "neutral",
+  showIcon = false,
+  showLabel = true,
 }: {
   label: string;
-  disabled?: boolean;
-  showLabel?: boolean;
   buttonText?: string;
-  confirmationMessage?: string;
+  confirmationTitle?: string;
+  confirmationMessage: string;
+  disabled?: boolean;
+  variant?: "danger" | "primary" | "neutral";
+  showIcon?: boolean;
+  showLabel?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const confirmationId = useId();
-  const isDelete = /^delete\b/i.test(label);
-  const action = isDelete ? "delete" : "remove";
-  const confirmationTitle = isDelete ? "Confirm deletion" : "Confirm removal";
-  const subject = label.replace(/^(delete|remove)\s+/i, "");
+  const buttonClass = variant === "danger"
+    ? "border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+    : variant === "primary"
+      ? "border-violet-700 bg-violet-700 text-white hover:bg-violet-800 hover:text-white"
+      : "border-slate-200 text-slate-700 hover:bg-slate-50";
+  const confirmClass = variant === "danger"
+    ? "bg-rose-700 hover:bg-rose-800 focus-visible:ring-rose-500"
+    : variant === "primary"
+      ? "bg-violet-700 hover:bg-violet-800 focus-visible:ring-violet-500"
+      : "bg-slate-700 hover:bg-slate-800 focus-visible:ring-slate-500";
 
   return (
     <>
@@ -188,10 +200,10 @@ export function AdminDeleteButton({
           formRef.current = event.currentTarget.form;
           dialogRef.current?.showModal();
         }}
-        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white text-xs font-semibold text-rose-700 transition hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50 ${showLabel ? "px-3" : "w-9"}`}
+        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border bg-white text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${buttonClass} ${showIcon ? "w-9" : "px-3"}`}
       >
-        <Trash2 size={16} aria-hidden="true" />
-        {showLabel && <span>{buttonText ?? (isDelete ? "Delete" : "Remove")}</span>}
+        {showIcon && <Trash2 size={16} aria-hidden="true" />}
+        {showLabel && buttonText}
       </button>
       <dialog
         ref={dialogRef}
@@ -202,7 +214,7 @@ export function AdminDeleteButton({
         <div className="p-5 sm:p-6">
           <h2 id={`${confirmationId}-title`} className="text-lg font-semibold">{confirmationTitle}</h2>
           <p id={`${confirmationId}-description`} className="mt-2 text-sm leading-6 text-slate-600">
-            {confirmationMessage ?? `Are you sure you want to ${action} “${subject}”? This action cannot be undone.`}
+            {confirmationMessage}
           </p>
           <div className="mt-6 flex justify-end gap-2">
             <button
@@ -219,14 +231,45 @@ export function AdminDeleteButton({
                 dialogRef.current?.close();
                 form?.requestSubmit();
               }}
-              className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 ${confirmClass}`}
             >
-              {buttonText ?? (isDelete ? "Delete" : "Remove")}
+              {buttonText}
             </button>
           </div>
         </div>
       </dialog>
     </>
+  );
+}
+
+export function AdminDeleteButton({
+  label,
+  disabled = false,
+  showLabel = false,
+  buttonText,
+  confirmationMessage,
+}: {
+  label: string;
+  disabled?: boolean;
+  showLabel?: boolean;
+  buttonText?: string;
+  confirmationMessage?: string;
+}) {
+  const isDelete = /^(delete|permanently delete)\b/i.test(label);
+  const action = isDelete ? "delete" : "remove";
+  const subject = label.replace(/^(delete|remove|permanently delete)\s+/i, "");
+  return (
+    <AdminConfirmSubmitButton
+      label={label}
+      buttonText={buttonText ?? (isDelete ? "Delete" : "Remove")}
+      confirmationTitle={isDelete ? "Confirm deletion" : "Confirm removal"}
+      confirmationMessage={confirmationMessage ??
+        `Are you sure you want to ${action} “${subject}”? This action cannot be undone.`}
+      disabled={disabled}
+      variant="danger"
+      showIcon={!showLabel}
+      showLabel={showLabel}
+    />
   );
 }
 

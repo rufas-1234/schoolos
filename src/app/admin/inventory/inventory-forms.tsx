@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
-import { AdminDeleteButton, AdminRecordDialog } from "@/components/admin-data-table";
+import { useActionState, useState, type ReactNode } from "react";
+import { AdminConfirmSubmitButton, AdminDeleteButton, AdminRecordDialog } from "@/components/admin-data-table";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 import {
   createInventoryAsset,
@@ -69,11 +69,13 @@ function ActionForm({
   title,
   children,
   submitLabel = "Save",
+  confirmation,
 }: {
   action: (state: InventoryActionState, formData: FormData) => Promise<InventoryActionState>;
   title: string;
   children: ReactNode;
   submitLabel?: string;
+  confirmation?: { title: string; message: string };
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   return (
@@ -82,9 +84,18 @@ function ActionForm({
       {children}
       {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
       {state.success && <p role="status" className="text-sm text-emerald-700">{state.message ?? "Saved successfully."}</p>}
-      <button disabled={pending} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
-        {pending ? "Saving..." : submitLabel}
-      </button>
+      {confirmation
+        ? <AdminConfirmSubmitButton
+            label={submitLabel}
+            buttonText={pending ? "Saving..." : submitLabel}
+            confirmationTitle={confirmation.title}
+            confirmationMessage={confirmation.message}
+            disabled={pending}
+            variant="primary"
+          />
+        : <button disabled={pending} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {pending ? "Saving..." : submitLabel}
+          </button>}
     </form>
   );
 }
@@ -393,9 +404,20 @@ export function InventoryItemEditor({
   suppliers: InventoryOption[];
   locations: InventoryOption[];
 }) {
+  const [status, setStatus] = useState(item.status);
   return (
     <AdminRecordDialog title={`Edit inventory item: ${item.name}`} showLabel>
-      <ActionForm action={updateInventoryItem} title="Edit inventory item" submitLabel="Save changes">
+      <ActionForm
+        action={updateInventoryItem}
+        title="Edit inventory item"
+        submitLabel="Save changes"
+        confirmation={status !== item.status ? {
+          title: status === "inactive" ? "Confirm inventory item deactivation" : "Confirm inventory item reactivation",
+          message: status === "inactive"
+            ? `Deactivate “${item.name}”? It will no longer be available for active inventory operations.`
+            : `Reactivate “${item.name}” for active inventory operations?`,
+        } : undefined}
+      >
         <input type="hidden" name="itemId" value={item.id} />
         <TextField label="SKU / item code" name="sku" defaultValue={item.sku} />
         <TextField label="Item name" name="name" defaultValue={item.name} />
@@ -407,7 +429,7 @@ export function InventoryItemEditor({
         <DescriptionField defaultValue={item.description} />
         <label className="block text-sm text-slate-700">
           <span className="mb-1 block font-medium">Status</span>
-          <select name="status" defaultValue={item.status} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+          <select name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
             <option value="active">Active</option><option value="inactive">Inactive</option>
           </select>
         </label>
@@ -425,9 +447,20 @@ export function InventoryAssetEditor({
   items: InventoryOption[];
   locations: InventoryOption[];
 }) {
+  const [status, setStatus] = useState(asset.status);
   return (
     <AdminRecordDialog title={`Edit asset: ${asset.name}`} showLabel>
-      <ActionForm action={updateInventoryAsset} title="Edit school asset" submitLabel="Save changes">
+      <ActionForm
+        action={updateInventoryAsset}
+        title="Edit school asset"
+        submitLabel="Save changes"
+        confirmation={status !== asset.status ? {
+          title: status === "retired" ? "Confirm asset retirement" : "Confirm asset status change",
+          message: status === "retired"
+            ? `Retire “${asset.name}”? It will no longer be treated as an active school asset.`
+            : `Change “${asset.name}” to ${status === "maintenance" ? "under maintenance" : "active"} status?`,
+        } : undefined}
+      >
         <input type="hidden" name="assetId" value={asset.id} />
         <TextField label="Asset tag" name="assetTag" defaultValue={asset.assetTag} />
         <TextField label="Asset name" name="name" defaultValue={asset.name} />
@@ -438,7 +471,7 @@ export function InventoryAssetEditor({
         <DescriptionField defaultValue={asset.description} />
         <label className="block text-sm text-slate-700">
           <span className="mb-1 block font-medium">Status</span>
-          <select name="status" defaultValue={asset.status} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+          <select name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
             <option value="active">Active</option><option value="maintenance">Under maintenance</option><option value="retired">Retired</option>
           </select>
         </label>

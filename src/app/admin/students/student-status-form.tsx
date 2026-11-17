@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminConfirmSubmitButton } from "@/components/admin-data-table";
 import { transitionStudentStatus } from "./actions";
 
 export function StudentStatusForm({
@@ -14,7 +15,7 @@ export function StudentStatusForm({
   nextStatus: string;
 }) {
   const action = nextStatus === "active"
-    ? currentStatus === "inactive" || currentStatus === "disabled" ? "activate" : "enroll"
+    ? currentStatus === "inactive" || currentStatus === "disabled" ? "reactivate" : "enroll"
     : nextStatus === "disabled"
       ? "disable"
       : nextStatus === "inactive"
@@ -40,21 +41,13 @@ export function StudentStatusForm({
     <form action={transitionStudentStatus}>
       <input type="hidden" name="publicId" value={publicId} />
       <input type="hidden" name="nextStatus" value={nextStatus} />
-      <button
-        type="submit"
-        onClick={(event) => {
-          if (!window.confirm(`Are you sure you want to ${action} ${studentName}?`)) {
-            event.preventDefault();
-          }
-        }}
-        className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-          nextStatus === "rejected" || nextStatus === "inactive" || nextStatus === "disabled"
-            ? "border border-slate-200 text-slate-600 hover:bg-slate-100"
-            : "bg-violet-700 text-white hover:bg-violet-800"
-        }`}
-      >
-        {label}
-      </button>
+      <AdminConfirmSubmitButton
+        label={`${label} ${studentName}`}
+        buttonText={label}
+        confirmationTitle={`Confirm ${label.toLowerCase()}`}
+        confirmationMessage={`Are you sure you want to ${action} ${studentName}?`}
+        variant={nextStatus === "rejected" || nextStatus === "inactive" || nextStatus === "disabled" ? "danger" : "primary"}
+      />
     </form>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useActionState, useState, type ReactNode } from "react";
 import { RequiredMark } from "@/components/required-mark";
-import { AdminDeleteButton } from "@/components/admin-data-table";
+import { AdminConfirmSubmitButton, AdminDeleteButton } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   deleteAcademicTerm,
@@ -403,6 +403,7 @@ export function ActionForm({
   submitLabel,
   recordId,
   children,
+  confirmation,
 }: {
   title: string;
   action: (
@@ -412,6 +413,7 @@ export function ActionForm({
   submitLabel: string;
   recordId?: number;
   children: ReactNode;
+  confirmation?: { title: string; message: string };
 }) {
   const [state, formAction, pending] = useActionState<AcademicActionState, FormData>(action, {});
 
@@ -425,13 +427,18 @@ export function ActionForm({
       {children}
       {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
       {state.success && <p role="status" className="text-sm text-emerald-700">Saved successfully.</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400"
-      >
-        {pending ? "Saving..." : submitLabel}
-      </button>
+      {confirmation
+        ? <AdminConfirmSubmitButton
+            label={submitLabel}
+            buttonText={pending ? "Saving..." : submitLabel}
+            confirmationTitle={confirmation.title}
+            confirmationMessage={confirmation.message}
+            disabled={pending}
+            variant="primary"
+          />
+        : <button type="submit" disabled={pending} className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400">
+            {pending ? "Saving..." : submitLabel}
+          </button>}
     </form>
   );
 }

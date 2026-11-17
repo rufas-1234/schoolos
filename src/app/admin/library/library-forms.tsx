@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { AdminActionDialog } from "@/components/admin-data-table";
+import { AdminActionDialog, AdminConfirmSubmitButton } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   checkoutLibraryBook,
@@ -58,6 +58,7 @@ function BookForm({
   branches: LibraryBranchOption[];
 }) {
   const [state, formAction, pending] = useActionState(saveLibraryBook, {});
+  const [status, setStatus] = useState(book?.status ?? "active");
   return <form action={formAction} className="space-y-3">
     {book && <input type="hidden" name="bookId" value={book.id} />}
     <label className="block text-sm">Title<input name="title" required maxLength={200} defaultValue={book?.title} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
@@ -74,9 +75,20 @@ function BookForm({
       <label className="block text-sm">Total copies<input name="totalCopies" type="number" min={1} max={10000} required defaultValue={book?.totalCopies ?? 1} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
     </div>
     <label className="block text-sm">Description<textarea name="description" maxLength={1000} defaultValue={book?.description ?? ""} rows={3} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
-    {book && <label className="block text-sm">Catalog status<select name="status" defaultValue={book.status} className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="active">Active</option><option value="archived">Archived</option></select></label>}
+    {book && <label className="block text-sm">Catalog status<select name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="active">Active</option><option value="archived">Archived</option></select></label>}
     <ActionFeedback state={state} />
-    <button disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : book ? "Save changes" : "Add book"}</button>
+    {book && status !== book.status
+      ? <AdminConfirmSubmitButton
+          label={status === "archived" ? `Archive ${book.title}` : `Restore ${book.title}`}
+          buttonText={pending ? "Saving..." : "Save changes"}
+          confirmationTitle={status === "archived" ? "Confirm book archive" : "Confirm book restoration"}
+          confirmationMessage={status === "archived"
+            ? `Archive “${book.title}”? It will no longer be available for new loans.`
+            : `Restore “${book.title}” to the active catalog?`}
+          disabled={pending}
+          variant="primary"
+        />
+      : <button disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : book ? "Save changes" : "Add book"}</button>}
   </form>;
 }
 
@@ -172,6 +184,7 @@ export function LibraryTermDialog({
   term?: EditableLibraryTerm;
 }) {
   const [state, formAction, pending] = useActionState(saveLibraryTerm, {});
+  const [status, setStatus] = useState(term?.status ?? "active");
   const label = type === "category" ? "Category" : "Subject";
   return <AdminActionDialog label={term ? "Edit" : `Add ${label.toLowerCase()}`} title={`${term ? "Edit" : "Add a book"} ${label.toLowerCase()}`}>
     <form action={formAction} className="space-y-3">
@@ -179,9 +192,20 @@ export function LibraryTermDialog({
       {term && <input type="hidden" name="termId" value={term.id} />}
       <label className="block text-sm">{label} name<input name="name" required maxLength={120} defaultValue={term?.name} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
       {branches.length > 0 && <label className="block text-sm">Branch<select name="branchId" defaultValue={term?.branchId ? String(term.branchId) : ""} className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select></label>}
-      {term && <label className="block text-sm">Status<select name="status" defaultValue={term.status} className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="active">Active</option><option value="archived">Archived</option></select></label>}
+      {term && <label className="block text-sm">Status<select name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="active">Active</option><option value="archived">Archived</option></select></label>}
       <ActionFeedback state={state} />
-      <button disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : term ? "Save changes" : `Add ${label.toLowerCase()}`}</button>
+      {term && status !== term.status
+        ? <AdminConfirmSubmitButton
+            label={`${status === "archived" ? "Archive" : "Restore"} ${label.toLowerCase()} ${term.name}`}
+            buttonText={pending ? "Saving..." : "Save changes"}
+            confirmationTitle={status === "archived" ? `Confirm ${label.toLowerCase()} archive` : `Confirm ${label.toLowerCase()} restoration`}
+            confirmationMessage={status === "archived"
+              ? `Archive ${label.toLowerCase()} “${term.name}”?`
+              : `Restore ${label.toLowerCase()} “${term.name}” to active status?`}
+            disabled={pending}
+            variant="primary"
+          />
+        : <button disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving..." : term ? "Save changes" : `Add ${label.toLowerCase()}`}</button>}
     </form>
   </AdminActionDialog>;
 }
@@ -223,7 +247,16 @@ export function LibraryMemberStatusButton({ memberId, active }: { memberId: numb
   return <form action={formAction} className="flex items-center gap-2">
     <input type="hidden" name="memberId" value={memberId} />
     <input type="hidden" name="status" value={active ? "inactive" : "active"} />
-    <button disabled={pending} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">{pending ? "Saving..." : active ? "Deactivate" : "Activate"}</button>
+    <AdminConfirmSubmitButton
+      label={`${active ? "Deactivate" : "Activate"} library membership`}
+      buttonText={pending ? "Saving..." : active ? "Deactivate" : "Activate"}
+      confirmationTitle={active ? "Confirm membership deactivation" : "Confirm membership activation"}
+      confirmationMessage={active
+        ? "Deactivate this library membership? The member will no longer be able to borrow books until it is reactivated."
+        : "Reactivate this library membership to allow book borrowing again?"}
+      disabled={pending}
+      variant={active ? "danger" : "primary"}
+    />
     <ActionFeedback state={state} />
   </form>;
 }

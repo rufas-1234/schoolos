@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import { AdminDataTable, type AdminTableFilter } from "@/components/admin-data-table";
+import { AdminConfirmSubmitButton, AdminDataTable, type AdminTableFilter } from "@/components/admin-data-table";
 import { db } from "@/db";
 import {
   academicYears,
@@ -202,12 +202,13 @@ export default async function DisabledStudentsPage() {
             <form action={transitionStudentStatus}>
               <input type="hidden" name="publicId" value={record.publicId} />
               <input type="hidden" name="nextStatus" value="active" />
-              <button
-                type="submit"
-                className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"
-              >
-                Restore
-              </button>
+              <AdminConfirmSubmitButton
+                label={`Restore ${record.firstName} ${record.lastName}`}
+                buttonText="Restore"
+                confirmationTitle="Confirm student restoration"
+                confirmationMessage={`Restore ${record.firstName} ${record.lastName} to active status?`}
+                variant="primary"
+              />
             </form>
           ) : null,
         }))}

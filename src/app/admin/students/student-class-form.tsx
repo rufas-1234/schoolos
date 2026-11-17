@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { AdminConfirmSubmitButton } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   addStudentClass,
@@ -43,13 +44,6 @@ export function StudentClassForm({
   return (
     <form
       action={formAction}
-      onSubmit={(event) => {
-        if (!record && !window.confirm(
-          `Are you sure you want to add ${studentLabel || "this student"} to the selected class and section?`,
-        )) {
-          event.preventDefault();
-        }
-      }}
       className="space-y-5"
     >
       {record ? (
@@ -83,13 +77,16 @@ export function StudentClassForm({
       {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
       {state.success && <p role="status" className="text-sm text-emerald-700">Class assignment saved.</p>}
       <div className="flex justify-end">
-        <button
-          type="submit"
-          disabled={pending}
-          className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pending ? "Saving..." : record ? "Save changes" : "Add class"}
-        </button>
+        {record
+          ? <button type="submit" disabled={pending} className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Saving..." : "Save changes"}</button>
+          : <AdminConfirmSubmitButton
+              label={`Add ${studentLabel || "student"} to class`}
+              buttonText={pending ? "Saving..." : "Add class"}
+              confirmationTitle="Confirm class placement"
+              confirmationMessage={`Add ${studentLabel || "this student"} to the selected class and section?`}
+              disabled={pending}
+              variant="primary"
+            />}
       </div>
     </form>
   );
