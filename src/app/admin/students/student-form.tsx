@@ -67,6 +67,18 @@ const studentEditTabs: { id: StudentEditTab; label: string; emptyMessage?: strin
 const initialState = { success: false, error: undefined };
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white";
+const religionOptions = [
+  "Christian",
+  "Muslim",
+  "Hindu",
+  "Buddhist",
+  "Sikh",
+  "Jewish",
+  "African Traditional Religion",
+  "No religion",
+  "Prefer not to say",
+  "Other",
+];
 
 export function StudentForm({
   branches,
@@ -338,7 +350,23 @@ export function StudentForm({
           visible={fieldConfig("dateOfBirth").enabled}
             defaultValue={record?.dateOfBirth ?? ""}
           />
-          <Field label="Religion" name="religion" required={fieldConfig("religion").required} visible={fieldConfig("religion").enabled} defaultValue={record?.religion ?? ""} />
+          <label hidden={!fieldConfig("religion").enabled} className="space-y-1.5 text-sm font-medium text-slate-700">
+            Religion {fieldConfig("religion").required && <RequiredMark />}
+            <select
+              name="religion"
+              required={fieldConfig("religion").required}
+              defaultValue={record?.religion ?? ""}
+              className={inputClass}
+            >
+              <option value="">Select religion</option>
+              {record?.religion && !religionOptions.includes(record.religion) && (
+                <option value={record.religion}>{record.religion}</option>
+              )}
+              {religionOptions.map((religion) => (
+                <option key={religion} value={religion}>{religion}</option>
+              ))}
+            </select>
+          </label>
           <Field
             label="Caste"
             name="caste"
