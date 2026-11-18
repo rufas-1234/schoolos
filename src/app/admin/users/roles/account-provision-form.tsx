@@ -22,17 +22,21 @@ export function AccountProvisionForm({
   students,
   parents,
   roles,
+  suggestedRoleId,
 }: {
   staff: ProfileOption[];
   students: ProfileOption[];
   parents: ProfileOption[];
   roles: RoleOption[];
+  suggestedRoleId?: number;
 }) {
   const [state, action, pending] = useActionState<RoleActionState, FormData>(createSchoolAccount, {});
   const [personType, setPersonType] = useState<"staff" | "student" | "parent">("staff");
   const [recordId, setRecordId] = useState("");
   const [parentLogin, setParentLogin] = useState<"email" | "phone">("email");
-  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>(
+    suggestedRoleId ? [suggestedRoleId] : [],
+  );
   const studentRoleId = getStudentRoleId(roles);
   const profiles = personType === "staff" ? staff : personType === "student" ? students : parents;
   const selectedParent = useMemo(
@@ -136,6 +140,11 @@ export function AccountProvisionForm({
       )}
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-slate-700">Assign school roles</legend>
+        {suggestedRoleId && roles.find((role) => role.id === suggestedRoleId) && (
+          <p className="text-xs text-violet-800">
+            {roles.find((role) => role.id === suggestedRoleId)?.name} is preselected for this caretaker account.
+          </p>
+        )}
         {personType === "student" && studentRoleId !== null && (
           <p className="text-xs text-slate-500">
             {selectedRoleIds.includes(studentRoleId)

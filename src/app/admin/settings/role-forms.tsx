@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from "react";
 import { AdminConfirmSubmitButton, AdminDeleteButton } from "@/components/admin-data-table";
 import {
   assignSchoolRoles,
+  createCaretakerRoles,
   createSchoolRole,
   deleteSchoolRole,
   setSchoolAccountAccess,
@@ -34,6 +35,7 @@ const permissionCategoryLabels: Record<string, string> = {
   accounts: "Accounts",
   academics: "Academics",
   dashboard: "Dashboard",
+  dormitories: "Dormitories",
   examinations: "Examinations",
   fees: "Fees",
   inventory: "Inventory",
@@ -91,6 +93,22 @@ export function CreateRoleForm({ permissions }: { permissions: PermissionOption[
       <ActionFeedback state={state} />
       <button disabled={pending} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">
         {pending ? "Creating..." : "Create role"}
+      </button>
+    </form>
+  );
+}
+
+export function CaretakerRolesSetupForm() {
+  const [state, action, pending] = useActionState(createCaretakerRoles, {});
+  return (
+    <form action={action} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+      <p className="text-sm text-slate-600">
+        Create module-specific roles for existing staff profiles. Roles already present are left unchanged.
+      </p>
+      {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
+      {state.success && <p role="status" className="text-sm text-emerald-700">{state.message}</p>}
+      <button disabled={pending} className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+        {pending ? "Setting up..." : "Set up caretaker roles"}
       </button>
     </form>
   );

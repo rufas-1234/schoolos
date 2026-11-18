@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { hasDormitoryCapacity, isDormitoryGenderCompatible } from "./dormitory-policy";
+import {
+  hasDormitoryBatchCapacity,
+  hasDormitoryCapacity,
+  isDormitoryGenderCompatible,
+} from "./dormitory-policy";
 
 describe("dormitory assignment policy", () => {
   it("only assigns students to a gender-compatible dormitory", () => {
@@ -13,5 +17,11 @@ describe("dormitory assignment policy", () => {
     expect(hasDormitoryCapacity(4, 3)).toBe(true);
     expect(hasDormitoryCapacity(4, 4)).toBe(false);
     expect(hasDormitoryCapacity(0, 0)).toBe(false);
+  });
+
+  it("only allows a bulk assignment when every selected student has a bed", () => {
+    expect(hasDormitoryBatchCapacity(5, 2, 3)).toBe(true);
+    expect(hasDormitoryBatchCapacity(5, 2, 4)).toBe(false);
+    expect(hasDormitoryBatchCapacity(5, 2, 0)).toBe(false);
   });
 });

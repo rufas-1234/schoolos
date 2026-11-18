@@ -26,7 +26,7 @@ import { schoolAccountInputSchema } from "@/lib/account-provisioning-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { normalizePhoneIdentifier } from "@/lib/login-identifier-policy";
 
-export type RoleActionState = { error?: string; success?: boolean };
+export type RoleActionState = { error?: string; success?: boolean; message?: string };
 
 function value(formData: FormData, key: string): string {
   const field = formData.get(key);
@@ -349,6 +349,107 @@ export async function createSchoolRole(
   revalidatePath("/admin/users");
   revalidatePath("/admin/users/roles");
   return { success: true };
+}
+
+export async function createCaretakerRoles(
+  _previousState: RoleActionState,
+  _formData: FormData,
+): Promise<RoleActionState> {
+  void _previousState;
+  void _formData;
+  const context = await requireSchoolPermission("roles.manage");
+  const templates = [
+    {
+      name: "Dormitory Caretaker",
+      description: "Manage dormitories, rooms, and student room assignments.",
+      permissionKey: "dormitories.manage",
+    },
+    {
+      name: "Library Caretaker",
+      description: "Manage library books, memberships, and book lending.",
+      permissionKey: "library.manage",
+    },
+  ] as const;
+  const created: string[] = [];
+  const updated: string[] = [];
+  const alreadyPresent: string[] = [];
+
+  try {
+    await db.transaction(async (tx) => {
+      for (const template of templates) {
+        const [permission] = await tx.select({ id: permissions.id }).from(permissions)
+          .where(eq(permissions.key, template.permissionKey)).limit(1);
+        if (!permission) {
+          throw new Error(`The required permission ${template.permissionKey} is not available.`);
+        }
+        const [existingRole] = await tx.select({ id: roles.id }).from(roles).where(and(
+          eq(roles.schoolId, context.schoolId),
+          eq(roles.name, template.name),
+        )).limit(1);
+        if (existingRole) {
+          const [existingPermission] = await tx.select({ roleId: rolePermissions.roleId })
+            .from(rolePermissions).where(and(
+              eq(rolePermissions.roleId, existingRole.id),
+              eq(rolePermissions.permissionId, permission.id),
+            )).limit(1);
+          if (existingPermission) {
+            alreadyPresent.push(template.name);
+            continue;
+          }
+          await tx.insert(rolePermissions).values({
+            roleId: existingRole.id,
+            permissionId: permission.id,
+          });
+          await tx.insert(auditLogs).values({
+            schoolId: context.schoolId,
+            actorUserId: context.user.id,
+            action: "roles.updated",
+            resourceType: "role",
+            resourcePublicId: String(existingRole.id),
+            changedFields: ["permissions"],
+          });
+          updated.push(template.name);
+          continue;
+        }
+        await tx.insert(roles).values({
+          schoolId: context.schoolId,
+          name: template.name,
+          description: template.description,
+          isSystem: false,
+        });
+        const [role] = await tx.select({ id: roles.id }).from(roles).where(and(
+          eq(roles.schoolId, context.schoolId),
+          eq(roles.name, template.name),
+        )).limit(1);
+        if (!role) throw new Error(`The ${template.name} role could not be loaded.`);
+        await tx.insert(rolePermissions).values({ roleId: role.id, permissionId: permission.id });
+        await tx.insert(auditLogs).values({
+          schoolId: context.schoolId,
+          actorUserId: context.user.id,
+          action: "roles.created",
+          resourceType: "role",
+          resourcePublicId: String(role.id),
+          changedFields: ["name", "description", "permissions"],
+        });
+        created.push(template.name);
+      }
+    });
+  } catch (error) {
+    if (isDuplicateEntryError(error)) {
+      return { error: "A caretaker role was created at the same time. Refresh the page and check the role list." };
+    }
+    throw error;
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
+  const changes = [
+    created.length ? `Created: ${created.join(", ")}.` : "",
+    updated.length ? `Added the required module access to: ${updated.join(", ")}.` : "",
+    alreadyPresent.length ? `Already configured: ${alreadyPresent.join(", ")}.` : "",
+  ].filter(Boolean);
+  const message = changes.join(" ") || "Caretaker roles are ready.";
+  return { success: true, message };
 }
 
 export async function updateSchoolRole(

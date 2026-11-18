@@ -117,6 +117,7 @@ const navigation: NavigationItem[] = [
       { id: "dormitories", label: "Dormitories", href: "/admin/dormitories?section=dormitories", matchQuery: { key: "section", value: "dormitories" } },
       { id: "rooms", label: "Rooms & beds", href: "/admin/dormitories?section=rooms", matchQuery: { key: "section", value: "rooms" } },
       { id: "residents", label: "Room assignments", href: "/admin/dormitories?section=residents", matchQuery: { key: "section", value: "residents" } },
+      { id: "reports", label: "Reports", href: "/admin/dormitories/reports", matchPath: "/admin/dormitories/reports" },
     ],
   },
   {
@@ -193,6 +194,7 @@ const navigation: NavigationItem[] = [
       { id: "user-list", label: "User list", href: "/admin/users" },
       { id: "create-role", label: "Create role", href: "/admin/users/roles?section=create-role", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-role" } },
       { id: "school-roles", label: "School roles", href: "/admin/users/roles?section=school-roles", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "school-roles" } },
+      { id: "caretaker-roles", label: "Caretaker roles & accounts", href: "/admin/users/roles?section=caretaker-roles", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "caretaker-roles" } },
       { id: "create-account", label: "Create account", href: "/admin/users/roles?section=create-account", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-account" } },
       { id: "individual-access", label: "Individual access", href: "/admin/users/roles?section=individual-access", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "individual-access" } },
     ],
@@ -276,6 +278,10 @@ export function AdminShell({
         ? "/admin/examinations"
       : permissions.includes("staff.manage")
         ? "/admin/hr"
+      : permissions.includes("dormitories.manage")
+        ? "/admin/dormitories?section=overview"
+      : permissions.includes("library.manage")
+        ? "/admin/library?section=books"
       : permissions.includes("inventory.manage")
         ? "/admin/inventory"
       : permissions.includes("accounts.manage")

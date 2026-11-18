@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminRecordDialog } from "@/components/admin-data-table";
 import { db } from "@/db";
@@ -16,6 +17,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import {
   AccountRoleDirectory,
+  CaretakerRolesSetupForm,
   CreateRoleForm,
   DeleteRoleForm,
   EditRoleForm,
@@ -31,6 +33,7 @@ const permissionCategoryLabels: Record<string, string> = {
   fees: "Fees",
   inventory: "Inventory",
   library: "Library",
+  dormitories: "Dormitories",
   payments: "Payments",
   results: "Results",
   roles: "Users & access",
@@ -48,11 +51,11 @@ function getRoleCategories(permissionKeys: string[]) {
 export default async function UserRolesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ section?: string }>;
+  searchParams: Promise<{ section?: string; roleId?: string }>;
 }) {
   const context = await requireSchoolPermission("roles.manage");
-  const { section } = await searchParams;
-  const validSections = ["create-role", "school-roles", "create-account", "individual-access"];
+  const { section, roleId: requestedRoleId } = await searchParams;
+  const validSections = ["create-role", "school-roles", "caretaker-roles", "create-account", "individual-access"];
   if (!section || !validSections.includes(section)) {
     redirect("/admin/users/roles?section=create-role");
   }
@@ -212,6 +215,15 @@ export default async function UserRolesPage({
     currentRoleIds: roleIdsByMembership.get(account.membershipId) ?? [],
     loginIdentifiers: identifiersByUser.get(account.userId) ?? [],
   }));
+  const suggestedRoleId = /^\d+$/.test(requestedRoleId ?? "")
+    ? schoolRoles.find((role) => role.id === Number(requestedRoleId))?.id
+    : undefined;
+  const dormitoryCaretakerRole = schoolRoles.find((role) =>
+    role.name === "Dormitory Caretaker" && permissionsByRole.get(role.id)?.includes("dormitories.manage"),
+  );
+  const libraryCaretakerRole = schoolRoles.find((role) =>
+    role.name === "Library Caretaker" && permissionsByRole.get(role.id)?.includes("library.manage"),
+  );
 
   return (
     <div className="space-y-7">
@@ -316,6 +328,41 @@ export default async function UserRolesPage({
           ),
         },
         {
+          id: "caretaker-roles",
+          label: "Caretaker roles & accounts",
+          description: "Set up limited-access dormitory and library roles, then provision accounts for existing staff profiles.",
+          content: (
+            <div className="space-y-4">
+              <CaretakerRolesSetupForm />
+              <div className="grid gap-3 md:grid-cols-2">
+                <section className="rounded-xl border border-slate-200 bg-white p-4">
+                  <h3 className="font-semibold text-slate-900">Dormitory caretaker</h3>
+                  <p className="mt-1 text-sm text-slate-500">Access to dormitory setup, room assignments, and reports.</p>
+                  {dormitoryCaretakerRole ? (
+                    <Link href={`/admin/users/roles?section=create-account&roleId=${dormitoryCaretakerRole.id}`}
+                      className="mt-3 inline-flex rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">
+                      Create caretaker account
+                    </Link>
+                  ) : <p className="mt-3 text-xs text-amber-700">Set up caretaker roles to continue.</p>}
+                </section>
+                <section className="rounded-xl border border-slate-200 bg-white p-4">
+                  <h3 className="font-semibold text-slate-900">Library caretaker</h3>
+                  <p className="mt-1 text-sm text-slate-500">Access to books, members, circulation, and library reports.</p>
+                  {libraryCaretakerRole ? (
+                    <Link href={`/admin/users/roles?section=create-account&roleId=${libraryCaretakerRole.id}`}
+                      className="mt-3 inline-flex rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">
+                      Create caretaker account
+                    </Link>
+                  ) : <p className="mt-3 text-xs text-amber-700">Set up caretaker roles to continue.</p>}
+                </section>
+              </div>
+              <p className="text-sm text-slate-500">
+                Caretaker logins are created from active staff profiles with an email address. Add the person to the staff directory first if needed.
+              </p>
+            </div>
+          ),
+        },
+        {
           id: "create-account",
           label: "Create a login account",
           description: "Set up login access for an existing staff, student, or parent profile.",
@@ -330,6 +377,7 @@ export default async function UserRolesPage({
               students={studentAccountOptions}
               parents={parentAccountOptions}
               roles={schoolRoles.map(({ id, name }) => ({ id, name }))}
+              suggestedRoleId={suggestedRoleId}
             />
           ),
         },

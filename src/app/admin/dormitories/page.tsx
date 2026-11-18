@@ -2,6 +2,8 @@ import { and, asc, count, eq, inArray, like, or } from "drizzle-orm";
 import { TablePagination } from "@/components/table-pagination";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { parsePageSize } from "@/components/pagination-utils";
+import { SearchableSelect } from "@/components/searchable-select";
+import { PrintButton } from "@/components/print-button";
 import type { AdminTableColumn, AdminTableRow } from "@/components/admin-data-table";
 import { db } from "@/db";
 import {
@@ -16,6 +18,7 @@ import {
   DormitoryForm,
   DormitoryRoomForm,
   EndRoomAssignmentButton,
+  BulkStudentRoomAssignmentForm,
   StudentRoomAssignmentForm,
 } from "./dormitory-forms";
 
@@ -377,7 +380,7 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
       <FilterForm section={section} search={search} branchId={branchId} dormitoryId={dormitoryId}
         genderPolicy={genderPolicy} occupancy={occupancy} pageSize={pageSize}
         branchRows={branchRows} dormitoryOptions={dormitoryOptions} />
-      <RecordsTable title="Dormitories" columns={columns.dormitories} rows={visibleRows}
+      <RecordsTable id="dormitory-register" title="Dormitories" columns={columns.dormitories} rows={visibleRows}
         emptyMessage={search || branchId || genderPolicy ? "No dormitories match these filters." : "No dormitories have been created."} />
     </>}
 
@@ -390,7 +393,7 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
       <FilterForm section={section} search={search} branchId={branchId} dormitoryId={dormitoryId}
         genderPolicy={genderPolicy} occupancy={occupancy} pageSize={pageSize}
         branchRows={branchRows} dormitoryOptions={dormitoryOptions} />
-      <RecordsTable title="Rooms & bed capacity" columns={columns.rooms} rows={visibleRows}
+      <RecordsTable id="dormitory-room-register" title="Rooms & bed capacity" columns={columns.rooms} rows={visibleRows}
         emptyMessage={search || dormitoryId || occupancy ? "No rooms match these filters." : "Add a room to start tracking occupancy."} />
     </>}
 
@@ -406,10 +409,17 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
           </p>
         )}
       </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+        <h2 className="font-semibold text-slate-950">Bulk room assignment</h2>
+        <p className="mb-4 mt-1 text-sm text-slate-500">
+          Select up to 100 students for one room. The batch is all-or-nothing and checks eligibility, resident policy, branch, and remaining beds before saving.
+        </p>
+        <BulkStudentRoomAssignmentForm students={eligibleStudents} rooms={roomOptions} today={today} />
+      </section>
       <FilterForm section={section} search={search} branchId={branchId} dormitoryId={dormitoryId}
         genderPolicy={genderPolicy} occupancy={occupancy} pageSize={pageSize}
         branchRows={branchRows} dormitoryOptions={dormitoryOptions} />
-      <RecordsTable title="Current residents" columns={columns.residents} rows={visibleRows}
+      <RecordsTable id="current-resident-register" title="Current residents" columns={columns.residents} rows={visibleRows}
         emptyMessage={search || dormitoryId ? "No residents match these filters." : "No students are currently assigned to a room."} />
     </>}
 
@@ -454,27 +464,32 @@ function FilterForm({
         className="mt-1 h-11 w-full max-w-sm min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
     </label>
     {section === "dormitories" && <>
-      <label className="block min-w-0 text-sm font-medium text-slate-700">Branch
-        <select name="branchId" defaultValue={branchId} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
-          <option value="">All branches</option>{branchRows.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-        </select>
-      </label>
-      <label className="block min-w-0 text-sm font-medium text-slate-700">Resident policy
-        <select name="genderPolicy" defaultValue={genderPolicy} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
-          <option value="">All policies</option><option value="male">Male</option><option value="female">Female</option><option value="mixed">Mixed</option>
-        </select>
-      </label>
+      <div className="max-w-xs"><SearchableSelect label="Branch" name="branchId"
+        defaultValue={branchId}
+        options={[{ value: "", label: "All branches" }, ...branchRows.map((branch) => ({ value: String(branch.id), label: branch.name }))]}
+        placeholder="Search branches..." /></div>
+      <div className="max-w-xs"><SearchableSelect label="Resident policy" name="genderPolicy"
+        defaultValue={genderPolicy}
+        options={[
+          { value: "", label: "All policies" },
+          { value: "male", label: "Male" },
+          { value: "female", label: "Female" },
+          { value: "mixed", label: "Mixed" },
+        ]} placeholder="Search policies..." /></div>
     </>}
-    {(section === "rooms" || section === "residents") && <label className="block min-w-0 text-sm font-medium text-slate-700">Dormitory
-      <select name="dormitoryId" defaultValue={dormitoryId} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
-        <option value="">All dormitories</option>{dormitoryOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-      </select>
-    </label>}
-    {section === "rooms" && <label className="block min-w-0 text-sm font-medium text-slate-700">Bed availability
-      <select name="occupancy" defaultValue={occupancy} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
-        <option value="">All rooms</option><option value="available">Available beds</option><option value="full">Full rooms</option>
-      </select>
-    </label>}
+    {(section === "rooms" || section === "residents") && <div className="max-w-xs">
+      <SearchableSelect label="Dormitory" name="dormitoryId" defaultValue={dormitoryId}
+        options={[{ value: "", label: "All dormitories" }, ...dormitoryOptions.map((item) => ({ value: String(item.id), label: item.label }))]}
+        placeholder="Search dormitories..." />
+    </div>}
+    {section === "rooms" && <div className="max-w-xs">
+      <SearchableSelect label="Bed availability" name="occupancy" defaultValue={occupancy}
+        options={[
+          { value: "", label: "All rooms" },
+          { value: "available", label: "Available beds" },
+          { value: "full", label: "Full rooms" },
+        ]} placeholder="Search availability..." />
+    </div>}
     <div className="flex items-end gap-3">
       <button type="submit" className="h-11 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Apply filters</button>
       <a href={`/admin/dormitories?section=${section}`} className="text-sm font-medium text-violet-700">Clear</a>
@@ -483,38 +498,41 @@ function FilterForm({
 }
 
 function RecordsTable({
+  id,
   title,
   columns,
   rows,
   emptyMessage,
 }: {
+  id: string;
   title: string;
   columns: AdminTableColumn[];
   rows: AdminTableRow[];
   emptyMessage: string;
 }) {
-  return <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-    <div className="border-b border-slate-100 p-4">
+  return <section id={id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white print-report-content">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 p-4">
       <h2 className="font-semibold text-slate-950">{title}</h2>
+      <PrintButton targetId={id} />
       <p className="mt-1 text-sm text-slate-500">{rows.length} records on this page</p>
     </div>
     {rows.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{emptyMessage}</p> : <>
-      <div className="hidden overflow-x-auto sm:block">
+      <div className="hidden overflow-x-auto sm:block print:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>{columns.map((column) => <th key={column.key} className="px-4 py-3">{column.label}</th>)}
-              {rows.some((row) => row.actions) && <th className="px-4 py-3">Actions</th>}
+              {rows.some((row) => row.actions) && <th className="px-4 py-3 print:hidden">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row) => <tr key={row.id} className="align-top">
               {columns.map((column) => <td key={column.key} className="px-4 py-3 text-slate-700">{row.values[column.key] || "—"}</td>)}
-              {rows.some((item) => item.actions) && <td className="px-4 py-3">{row.actions}</td>}
+              {rows.some((item) => item.actions) && <td className="px-4 py-3 print:hidden">{row.actions}</td>}
             </tr>)}
           </tbody>
         </table>
       </div>
-      <div className="space-y-3 p-3 sm:hidden">
+      <div className="space-y-3 p-3 sm:hidden print:hidden">
         {rows.map((row) => <article key={row.id} className="rounded-xl border border-slate-200 p-3">
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
             {columns.map((column, index) => <div key={column.key} className={index === 0 ? "col-span-2" : "min-w-0"}>

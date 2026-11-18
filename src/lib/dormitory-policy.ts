@@ -12,3 +12,14 @@ export function hasDormitoryCapacity(capacity: number, occupiedBeds: number): bo
   return Number.isInteger(capacity) && capacity > 0 &&
     Number.isInteger(occupiedBeds) && occupiedBeds >= 0 && occupiedBeds < capacity;
 }
+
+export function hasDormitoryBatchCapacity(
+  capacity: number,
+  occupiedBeds: number,
+  requestedBeds: number,
+): boolean {
+  return Number.isInteger(capacity) && capacity > 0 &&
+    Number.isInteger(occupiedBeds) && occupiedBeds >= 0 &&
+    Number.isInteger(requestedBeds) && requestedBeds > 0 &&
+    occupiedBeds + requestedBeds <= capacity;
+}

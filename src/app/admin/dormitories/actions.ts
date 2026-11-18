@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -16,7 +16,11 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
-import { hasDormitoryCapacity, isDormitoryGenderCompatible } from "@/lib/dormitory-policy";
+import {
+  hasDormitoryBatchCapacity,
+  hasDormitoryCapacity,
+  isDormitoryGenderCompatible,
+} from "@/lib/dormitory-policy";
 
 export type DormitoryActionState = { error?: string; success?: boolean; message?: string };
 
@@ -242,6 +246,126 @@ export async function assignStudentToRoom(
   });
 
   revalidateDormitories();
+  return result;
+}
+
+export async function bulkAssignStudentsToRoom(
+  _state: DormitoryActionState,
+  formData: FormData,
+): Promise<DormitoryActionState> {
+  const context = await requireSchoolPermission("dormitories.manage");
+  const studentIds = formData.getAll("studentIds")
+    .filter((entry): entry is string => typeof entry === "string");
+  const parsed = z.object({
+    studentIds: z.array(idField).min(1).max(100)
+      .refine((ids) => new Set(ids).size === ids.length),
+    roomId: idField,
+    assignedAt: z.string().refine(
+      (date) => isCalendarDate(date) && date <= today(),
+      "Enter a valid assignment date that is not in the future.",
+    ),
+  }).safeParse({
+    studentIds,
+    roomId: value(formData, "roomId"),
+    assignedAt: value(formData, "assignedAt"),
+  });
+  if (!parsed.success) {
+    return { error: "Select 1–100 unique students, an active room, and a valid assignment date." };
+  }
+
+  const result = await db.transaction(async (tx): Promise<DormitoryActionState> => {
+    const orderedStudentIds = [...parsed.data.studentIds].sort((a, b) => a - b);
+    const selectedStudents = await tx.select({
+      id: students.id,
+      branchId: students.branchId,
+      gender: students.gender,
+      status: students.status,
+    }).from(students).where(and(
+      eq(students.schoolId, context.schoolId),
+      inArray(students.id, orderedStudentIds),
+    )).orderBy(asc(students.id)).for("update");
+    if (selectedStudents.length !== orderedStudentIds.length) {
+      return { error: "One or more selected students do not belong to this school." };
+    }
+
+    const [room] = await tx.select({
+      id: dormitoryRooms.id,
+      capacity: dormitoryRooms.capacity,
+      roomNumber: dormitoryRooms.roomNumber,
+      publicId: dormitoryRooms.publicId,
+      dormitoryId: dormitories.id,
+      dormitoryName: dormitories.name,
+      branchId: dormitories.branchId,
+      genderPolicy: dormitories.genderPolicy,
+    }).from(dormitoryRooms).innerJoin(dormitories, and(
+      eq(dormitories.id, dormitoryRooms.dormitoryId),
+      eq(dormitories.schoolId, context.schoolId),
+    )).where(and(
+      eq(dormitoryRooms.id, parsed.data.roomId),
+      eq(dormitoryRooms.schoolId, context.schoolId),
+      eq(dormitoryRooms.status, "active"),
+      eq(dormitories.status, "active"),
+    )).for("update").limit(1);
+    if (!room) return { error: "Choose an active room in a dormitory belonging to this school." };
+
+    const activeAssignments = await tx.select({
+      studentId: studentDormitoryAssignments.studentId,
+    }).from(studentDormitoryAssignments).where(and(
+      eq(studentDormitoryAssignments.schoolId, context.schoolId),
+      eq(studentDormitoryAssignments.status, "active"),
+      inArray(studentDormitoryAssignments.studentId, orderedStudentIds),
+    ));
+    if (activeAssignments.length) {
+      return { error: "At least one selected student already has an active room assignment. Refresh and review the selection." };
+    }
+    if (selectedStudents.some((student) => !["active", "admitted"].includes(student.status))) {
+      return { error: "Only active or admitted students can be assigned a bed." };
+    }
+    if (selectedStudents.some((student) => room.branchId && room.branchId !== student.branchId)) {
+      return { error: "Every selected student must belong to the dormitory's branch." };
+    }
+    if (room.genderPolicy !== "male" && room.genderPolicy !== "female" && room.genderPolicy !== "mixed") {
+      return { error: "This dormitory has an invalid resident policy. Update it before assigning students." };
+    }
+    const genderPolicy = room.genderPolicy;
+    if (selectedStudents.some((student) => !isDormitoryGenderCompatible(genderPolicy, student.gender))) {
+      return { error: "Every selected student must match the dormitory's resident policy." };
+    }
+
+    const [occupancy] = await tx.select({ value: count() }).from(studentDormitoryAssignments).where(and(
+      eq(studentDormitoryAssignments.schoolId, context.schoolId),
+      eq(studentDormitoryAssignments.roomId, room.id),
+      eq(studentDormitoryAssignments.status, "active"),
+    ));
+    const occupied = Number(occupancy?.value ?? 0);
+    if (!hasDormitoryBatchCapacity(room.capacity, occupied, selectedStudents.length)) {
+      return { error: `This room has only ${Math.max(0, room.capacity - occupied)} available bed(s); select fewer students or another room.` };
+    }
+
+    const assignments = selectedStudents.map((student) => ({
+      publicId: randomUUID(),
+      schoolId: context.schoolId,
+      studentId: student.id,
+      roomId: room.id,
+      assignedAt: parsed.data.assignedAt,
+      assignedBy: context.user.id,
+    }));
+    await tx.insert(studentDormitoryAssignments).values(assignments);
+    await tx.insert(auditLogs).values(assignments.map((assignment) => ({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "student.dormitory.assigned",
+      resourceType: "student_dormitory_assignment",
+      resourcePublicId: assignment.publicId,
+      changedFields: ["studentId", "roomId", "assignedAt", "bulkAssignment"],
+    })));
+    return {
+      success: true,
+      message: `${assignments.length} students assigned to ${room.dormitoryName}, room ${room.roomNumber}.`,
+    };
+  });
+
+  if (result.success) revalidateDormitories();
   return result;
 }
 
