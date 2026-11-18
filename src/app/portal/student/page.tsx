@@ -918,17 +918,25 @@ export default async function StudentPortalPage({
                               <p className="mt-1 text-sm text-slate-600">{progress.yearName}</p>
                             </div>
                           </header>
-                          <section className="exam-report-student-details grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                          <section className="exam-report-student-details grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm min-[400px]:grid-cols-2">
                             <p><span className="font-semibold text-slate-500">Student</span><br />{student ? `${student.firstName} ${student.lastName}` : "—"}</p>
                             <p><span className="font-semibold text-slate-500">Admission number</span><br />{student?.admissionNumber ?? "—"}</p>
                             <p><span className="font-semibold text-slate-500">Class / section</span><br />{latestExam?.className} · {latestExam?.sectionName}</p>
                             <p><span className="font-semibold text-slate-500">Annual average</span><br />{progress.annualAverage === null ? "—" : `${progress.annualAverage.toFixed(2)}%`}</p>
                           </section>
-                          <section className="print-report-panel overflow-x-auto rounded-xl border border-slate-200">
+                          <section className="print-report-panel overflow-hidden rounded-xl border border-slate-200 print:overflow-visible">
+                            <p className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:hidden print:hidden">
+                              Swipe horizontally to compare results across exams.
+                            </p>
+                            <div
+                              className="overflow-x-auto overscroll-x-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-600"
+                              tabIndex={0}
+                              aria-label="Annual results table. Swipe horizontally to view every exam."
+                            >
                             <table className="print-report-table w-full min-w-[640px] border-collapse text-left text-sm">
                               <thead className="bg-slate-50 text-xs uppercase text-slate-600">
                                 <tr>
-                                  <th className="p-3">Subject</th>
+                                  <th className="sticky left-0 z-10 bg-slate-50 p-3">Subject</th>
                                   {progress.exams.map((exam) => (
                                     <th key={exam.examId} className="p-3">{exam.examName}<span className="block font-normal normal-case">{exam.termName ?? progress.yearName}</span></th>
                                   ))}
@@ -938,7 +946,7 @@ export default async function StudentPortalPage({
                               <tbody>
                                 {progress.subjects.map((subject) => (
                                   <tr key={subject.name} className="border-t border-slate-200">
-                                    <td className="p-3 font-medium">{subject.name} {subject.code && <span className="text-xs text-slate-500">{subject.code}</span>}</td>
+                                    <td className="sticky left-0 z-10 bg-white p-3 font-medium">{subject.name} {subject.code && <span className="text-xs text-slate-500">{subject.code}</span>}</td>
                                     {progress.exams.map((exam) => {
                                       const percentage = subject.examPercentages.get(exam.examId);
                                       return <td key={exam.examId} className="p-3">{percentage === undefined || percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td>;
@@ -947,12 +955,13 @@ export default async function StudentPortalPage({
                                   </tr>
                                 ))}
                                 <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
-                                  <td className="p-3">Overall average</td>
+                                  <td className="sticky left-0 z-10 bg-slate-50 p-3">Overall average</td>
                                   {progress.exams.map((exam) => <td key={exam.examId} className="p-3">{exam.score.percentage.toFixed(2)}%</td>)}
                                   <td className="p-3">{progress.annualAverage === null ? "—" : `${progress.annualAverage.toFixed(2)}%`}</td>
                                 </tr>
                               </tbody>
                             </table>
+                            </div>
                           </section>
                           <section className="grid gap-3 sm:grid-cols-2">
                             <article className="rounded-xl border border-violet-200 bg-violet-50 p-4">
@@ -1004,7 +1013,7 @@ export default async function StudentPortalPage({
                             <p className="mt-1 text-sm text-slate-600">{report.examName} · {report.termName ?? report.yearName}</p>
                           </div>
                         </header>
-                        <section className="exam-report-student-details grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                        <section className="exam-report-student-details grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm min-[400px]:grid-cols-2">
                           <p><span className="font-semibold text-slate-500">Student</span><br />{student ? `${student.firstName} ${student.lastName}` : "—"}</p>
                           <p><span className="font-semibold text-slate-500">Admission number</span><br />{report.admissionNumber ?? "—"}</p>
                           <p><span className="font-semibold text-slate-500">Class / section</span><br />{report.className} · {report.sectionName}</p>
@@ -1019,7 +1028,34 @@ export default async function StudentPortalPage({
                             <p className="mt-1 text-sm text-slate-600">{report.score.totalMarks.toFixed(2)} of {report.score.maxMarks.toFixed(2)} · Grade {report.grade?.grade ?? "—"}{report.grade?.description ? ` · ${report.grade.description}` : ""}</p>
                           </article>
                         </section>
-                        <section className="print-report-panel overflow-x-auto rounded-xl border border-slate-200">
+                        <section className="print-report-panel overflow-hidden rounded-xl border border-slate-200 print:overflow-visible">
+                          <div className="space-y-2 p-3 sm:hidden print:hidden">
+                            {report.rows.map((row, index) => (
+                              <article key={`${row.subjectName}-${row.examDate}-${index}`} className="rounded-xl border border-slate-200 bg-white p-3">
+                                <header className="flex items-start justify-between gap-3">
+                                  <h3 className="min-w-0 font-semibold text-slate-900">
+                                    {row.subjectName}
+                                    {row.subjectCode && <span className="ml-1 text-xs font-normal text-slate-500">{row.subjectCode}</span>}
+                                  </h3>
+                                  <span className="shrink-0 rounded-full bg-violet-50 px-2.5 py-1 text-sm font-bold text-violet-800">
+                                    {row.grade?.grade ?? "—"}
+                                  </span>
+                                </header>
+                                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                                  <div><dt className="text-xs text-slate-500">Marks</dt><dd className="mt-0.5 font-medium">{row.marks} / {row.maxMarks}</dd></div>
+                                  <div><dt className="text-xs text-slate-500">Percentage</dt><dd className="mt-0.5 font-medium">{row.percentage.toFixed(2)}%</dd></div>
+                                  <div className="col-span-2"><dt className="text-xs text-slate-500">Teacher remark</dt><dd className="mt-0.5 break-words">{row.teacherRemark || row.grade?.performanceRemark || "—"}</dd></div>
+                                </dl>
+                              </article>
+                            ))}
+                            <article className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3">
+                              <h3 className="font-bold text-slate-900">Overall result</h3>
+                              <p className="mt-1 text-lg font-bold">{report.score.totalMarks.toFixed(2)} / {report.score.maxMarks.toFixed(2)} · {report.score.percentage.toFixed(2)}%</p>
+                              <p className="mt-1 text-sm text-slate-700">Grade {report.grade?.grade ?? "—"} {report.grade?.description}</p>
+                              {report.grade?.performanceRemark && <p className="mt-1 text-sm text-slate-600">{report.grade.performanceRemark}</p>}
+                            </article>
+                          </div>
+                          <div className="hidden overflow-x-auto sm:block print:block">
                           <table className="print-report-table w-full min-w-[640px] border-collapse text-left text-sm">
                             <thead className="bg-slate-50 text-xs uppercase text-slate-600">
                               <tr><th className="p-3">Subject</th><th className="p-3">Marks</th><th className="p-3">Percentage</th><th className="p-3">Grade</th><th className="p-3">Teacher remark</th></tr>
@@ -1037,12 +1073,13 @@ export default async function StudentPortalPage({
                               <tr><td className="p-3">Overall</td><td className="p-3">{report.score.totalMarks.toFixed(2)} / {report.score.maxMarks.toFixed(2)}</td><td className="p-3">{report.score.percentage.toFixed(2)}%</td><td className="p-3">{report.grade?.grade ?? "—"} {report.grade?.description}</td><td className="p-3">{report.grade?.performanceRemark ?? ""}</td></tr>
                             </tfoot>
                           </table>
+                          </div>
                         </section>
                         <section className="grid gap-4 sm:grid-cols-2">
                           <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{report.classTeacherRemark || report.grade?.performanceRemark || "—"}</p></div>
                           <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{report.principalRemark || "—"}</p></div>
                         </section>
-                        <section className="grid grid-cols-3 gap-3 pt-4 text-center text-xs">
+                        <section className="grid grid-cols-1 gap-3 pt-4 text-center text-xs min-[400px]:grid-cols-3 print:grid-cols-3">
                           {(["Headteacher", "Class teacher", "Subject teacher"] as const).map((label) => (
                             <div key={label} className="flex min-h-16 flex-col justify-end pt-1">
                               <div className="border-t border-slate-500 pt-1">{label} signature</div>
@@ -1078,47 +1115,49 @@ export default async function StudentPortalPage({
                     <article
                       key={invoice.id}
                       id={`student-invoice-${invoice.id}`}
-                      className="fee-invoice-page fee-invoice-card mx-auto w-full max-w-[210mm] space-y-5 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm sm:p-6"
+                      className="fee-invoice-page fee-invoice-card mx-auto w-full min-w-0 max-w-[210mm] space-y-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 text-slate-900 shadow-sm min-[400px]:p-4 sm:space-y-5 sm:p-6 print:overflow-visible"
                     >
-                      <header className="fee-invoice-title-row flex flex-wrap items-start justify-between gap-5">
-                        <div>
+                      <header className="fee-invoice-title-row flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row sm:gap-5">
+                        <div className="min-w-0">
                           <h2 className="fee-invoice-title">INVOICE</h2>
-                          <p className="mt-2 text-base font-bold text-slate-900">{schoolDetails[0]?.name ?? context.schoolName}</p>
+                          <p className="mt-2 break-words text-base font-bold text-slate-900">{schoolDetails[0]?.name ?? context.schoolName}</p>
                           {[schoolDetails[0]?.address, schoolDetails[0]?.email, schoolDetails[0]?.phone].filter(Boolean).map((detail, index) => (
-                            <p key={`${index}-${detail}`} className="mt-1 text-sm text-slate-600">{detail}</p>
+                            <p key={`${index}-${detail}`} className="mt-1 break-words text-sm text-slate-600">{detail}</p>
                           ))}
                         </div>
-                        <div className="flex flex-col items-start gap-3 sm:items-end">
-                          <div className="fee-invoice-number-block">
+                        <div className="flex w-full min-w-0 flex-col items-start gap-3 sm:w-auto sm:items-end">
+                          <div className="fee-invoice-number-block min-w-0 max-w-full sm:min-w-40">
                             <span>Invoice #</span>
-                            <strong>{invoice.invoiceNumber}</strong>
+                            <strong className="break-all">{invoice.invoiceNumber}</strong>
                           </div>
-                          <PrintButton targetId={`student-invoice-${invoice.id}`} label="Print invoice" />
+                          <div className="w-full sm:w-auto [&>button]:w-full sm:[&>button]:w-auto">
+                            <PrintButton targetId={`student-invoice-${invoice.id}`} label="Print invoice" />
+                          </div>
                         </div>
                       </header>
-                      <section className="fee-invoice-parties grid gap-5 sm:grid-cols-2">
-                        <div>
+                      <section className="fee-invoice-parties grid min-w-0 gap-4 sm:grid-cols-2 sm:gap-5">
+                        <div className="min-w-0 break-words">
                           <h3>BILL TO</h3>
                           <p className="font-semibold">{invoice.guardianName || invoice.fatherName || `${invoice.studentFirstName} ${invoice.studentLastName}`}</p>
                           {invoice.guardianAddress && <p>{invoice.guardianAddress}</p>}
                           {(invoice.guardianPhone || invoice.fatherPhone) && <p>{invoice.guardianPhone || invoice.fatherPhone}</p>}
                           {invoice.guardianName && <p>Parent / guardian of {invoice.studentFirstName} {invoice.studentLastName}</p>}
                         </div>
-                        <div>
+                        <div className="min-w-0 break-words">
                           <h3>STUDENT</h3>
                           <p className="font-semibold">{invoice.studentFirstName} {invoice.studentLastName}</p>
                           <p>Admission No. {invoice.admissionNumber || "—"} · Roll {invoice.rollNumber || "—"}</p>
                           <p>{invoice.branchName} · {invoice.className} ({invoice.sectionName})</p>
                         </div>
                       </section>
-                      <dl className="fee-invoice-meta grid grid-cols-2 gap-x-5 gap-y-2 sm:grid-cols-4">
+                      <dl className="fee-invoice-meta grid grid-cols-1 gap-x-5 gap-y-3 break-words min-[400px]:grid-cols-2 sm:grid-cols-4">
                         <div><dt>Invoice date</dt><dd>{invoice.createdAt.toISOString().slice(0, 10)}</dd></div>
                         <div><dt>Academic year</dt><dd>{invoice.yearName}</dd></div>
                         <div><dt>Term</dt><dd>{invoice.termName || "—"}</dd></div>
                         <div><dt>Due date</dt><dd>{invoice.dueDate}</dd></div>
                       </dl>
                       <div className="fee-invoice-divider" aria-hidden="true">★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★</div>
-                      <div className="overflow-x-auto">
+                      <div className="hidden overflow-x-auto sm:block print:block">
                         <table className="fee-invoice-items w-full min-w-[34rem] border-collapse text-left text-sm">
                           <thead>
                             <tr><th>Qty</th><th>Description</th><th className="text-right">Unit price</th><th className="text-right">Amount</th></tr>
@@ -1135,7 +1174,30 @@ export default async function StudentPortalPage({
                           </tbody>
                         </table>
                       </div>
-                      <div className="fee-invoice-totals ml-auto grid max-w-sm grid-cols-2 gap-x-6 gap-y-2 text-right text-sm">
+                      <div className="space-y-2 sm:hidden print:hidden">
+                        <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Invoice items</h3>
+                        <div className="rounded-xl border border-slate-200 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900">{feeDisplayName(invoice.typeName)}</p>
+                              {invoice.groupName && <p className="mt-0.5 text-xs text-slate-500">{invoice.groupName}</p>}
+                              <p className="mt-1 text-xs text-slate-500">Qty 1 · Unit price {context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</p>
+                            </div>
+                            <strong className="max-w-[45%] shrink-0 break-words text-right text-sm text-slate-900">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</strong>
+                          </div>
+                          {invoice.discountMinor > 0 && (
+                            <div className="mt-3 flex justify-between gap-3 border-t border-slate-100 pt-2 text-sm">
+                              <span>Discount</span><strong className="shrink-0">− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</strong>
+                            </div>
+                          )}
+                          {invoice.fineMinor > 0 && (
+                            <div className="mt-2 flex justify-between gap-3 text-sm">
+                              <span>Late fine</span><strong className="shrink-0">{context.schoolCurrency} {(invoice.fineMinor / 100).toFixed(2)}</strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="fee-invoice-totals ml-auto grid w-full max-w-sm grid-cols-2 gap-x-4 gap-y-2 break-words text-right text-sm sm:gap-x-6">
                         <span>Subtotal</span><strong>{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</strong>
                         {invoice.discountMinor > 0 && <><span>Discount</span><strong>− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</strong></>}
                         {invoice.fineMinor > 0 && <><span>Late fine</span><strong>{context.schoolCurrency} {(invoice.fineMinor / 100).toFixed(2)}</strong></>}
@@ -1144,12 +1206,12 @@ export default async function StudentPortalPage({
                         <span className="font-semibold">Amount due</span><strong className="fee-invoice-balance">{context.schoolCurrency} {(invoice.balanceMinor / 100).toFixed(2)}</strong>
                         <span>Payment status</span><strong className="fee-invoice-status capitalize">{feeInvoiceStatus(invoice.amountMinor - invoice.discountMinor + invoice.fineMinor, invoice.paidMinor) ?? "unpaid"}</strong>
                       </div>
-                      <footer className="fee-invoice-footer grid gap-5 border-t border-slate-200 pt-5 sm:grid-cols-[1fr_auto] sm:items-end">
-                        <div>
+                      <footer className="fee-invoice-footer grid min-w-0 gap-4 border-t border-slate-200 pt-4 sm:grid-cols-[1fr_auto] sm:items-end sm:gap-5 sm:pt-5">
+                        <div className="min-w-0">
                           <p className="fee-invoice-thank-you">Thank you</p>
                           <p className="mt-1 text-sm text-slate-600">We appreciate your timely payment.</p>
                         </div>
-                        <div className="sm:text-right">
+                        <div className="min-w-0 break-words sm:text-right">
                           <h3>PAYMENT INFORMATION</h3>
                           <p>Use invoice number <strong>{invoice.invoiceNumber}</strong> as your payment reference.</p>
                           <p>Please keep this invoice for your records.</p>
