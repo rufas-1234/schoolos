@@ -5,6 +5,41 @@ import { useRouter } from "next/navigation";
 import { LoaderCircle, Search } from "lucide-react";
 import { searchWorkspace, type WorkspaceSearchResult } from "@/app/admin/workspace-search-actions";
 
+const teachingSuggestions: WorkspaceSearchResult[] = [
+  {
+    id: "teaching-classes",
+    title: "My classes",
+    description: "Open classes, subjects, sections, and current-year assignments.",
+    href: "/portal/teacher?section=classes",
+    category: "Academics",
+    searchTerms: ["class", "subject", "section", "assignment"],
+  },
+  {
+    id: "teaching-register",
+    title: "Class register & attendance",
+    description: "Find your class registers and take attendance.",
+    href: "/portal/teacher?section=register",
+    category: "Academics",
+    searchTerms: ["register", "attendance", "student", "roll"],
+  },
+  {
+    id: "teaching-assessments",
+    title: "Examination work",
+    description: "Open assessments and enter marks for assigned subjects.",
+    href: "/portal/teacher?section=assessments",
+    category: "Examinations",
+    searchTerms: ["exam", "assessment", "marks", "results"],
+  },
+  {
+    id: "teaching-timetable",
+    title: "My timetable",
+    description: "View your assigned lessons and teaching schedule.",
+    href: "/portal/teacher?section=timetable",
+    category: "Academics",
+    searchTerms: ["timetable", "schedule", "lesson"],
+  },
+];
+
 export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspace" | "teaching" }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -42,7 +77,17 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
 
   const normalizedQuery = query.trim();
   const results = resultState.query === normalizedQuery ? resultState.results : [];
-  const showResults = focused && normalizedQuery.length >= 2;
+  const suggestions = scope === "teaching"
+    ? teachingSuggestions.filter((suggestion) =>
+      !normalizedQuery ||
+      `${suggestion.title} ${suggestion.description} ${suggestion.searchTerms?.join(" ") ?? ""}`
+        .toLocaleLowerCase()
+        .includes(normalizedQuery.toLocaleLowerCase()),
+    )
+    : [];
+  const navigationOptions = normalizedQuery.length >= 2 ? results : suggestions;
+  const showResults = focused &&
+    (normalizedQuery.length >= 2 || (scope === "teaching" && normalizedQuery.length < 2));
 
   function openResult(result: WorkspaceSearchResult) {
     setFocused(false);
@@ -52,19 +97,19 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const selectedResult = results[activeIndex] ?? results[0];
+    const selectedResult = navigationOptions[activeIndex] ?? navigationOptions[0];
     if (selectedResult) openResult(selectedResult);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") setFocused(false);
-    if (event.key === "ArrowDown" && results.length > 0) {
+    if (event.key === "ArrowDown" && navigationOptions.length > 0) {
       event.preventDefault();
-      setActiveIndex((index) => (index + 1) % results.length);
+      setActiveIndex((index) => (index + 1) % navigationOptions.length);
     }
-    if (event.key === "ArrowUp" && results.length > 0) {
+    if (event.key === "ArrowUp" && navigationOptions.length > 0) {
       event.preventDefault();
-      setActiveIndex((index) => (index <= 0 ? results.length - 1 : index - 1));
+      setActiveIndex((index) => (index <= 0 ? navigationOptions.length - 1 : index - 1));
     }
   }
 
@@ -104,8 +149,8 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
         aria-expanded={showResults}
         aria-haspopup="listbox"
         aria-activedescendant={
-          activeIndex >= 0 && results[activeIndex]
-            ? `workspace-result-${results[activeIndex].id}`
+          activeIndex >= 0 && navigationOptions[activeIndex]
+            ? `workspace-result-${navigationOptions[activeIndex].id}`
             : undefined
         }
         placeholder={scope === "teaching"
@@ -127,7 +172,36 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
           aria-label="Workspace search results"
           className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(70vh,32rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
         >
-          {status === "error" ? (
+          {normalizedQuery.length < 2 && suggestions.length > 0 ? (
+            <>
+              <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                {normalizedQuery ? "Suggested destinations" : "Quick access"}
+              </p>
+              {suggestions.map((suggestion, index) => (
+                <button
+                  type="button"
+                  role="option"
+                  id={`workspace-result-${suggestion.id}`}
+                  aria-selected={activeIndex === index}
+                  key={suggestion.id}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => openResult(suggestion)}
+                  className={`flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition ${
+                    activeIndex === index ? "bg-violet-50" : "hover:bg-violet-50"
+                  } focus-visible:bg-violet-50 focus-visible:outline-none`}
+                >
+                  <span className="flex w-full items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-slate-800">{suggestion.title}</span>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                      {suggestion.category}
+                    </span>
+                  </span>
+                  <span className="text-xs text-slate-500">{suggestion.description}</span>
+                </button>
+              ))}
+            </>
+          ) : status === "error" ? (
             <p role="alert" className="px-3 py-3 text-sm text-rose-700">
               Search is temporarily unavailable. Please try again.
             </p>
@@ -164,7 +238,7 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
                 : "No matching students, staff, library records, or workspace pages."}
             </p>
           )}
-          {results.length > 0 && (
+          {navigationOptions.length > 0 && (
             <p className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
               Use ↑/↓ to select and Enter to open.
             </p>

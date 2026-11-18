@@ -1,21 +1,29 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import {
   auditLogs,
+  account as authAccount,
   permissions,
   rolePermissions,
   roles,
   schoolMemberships,
   schools,
+  staffMembers,
+  students,
   user,
+  userLoginIdentifiers,
   userRoles,
+  userStudentLinks,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { normalizePhoneIdentifier } from "@/lib/login-identifier-policy";
 
 export type RoleActionState = { error?: string; success?: boolean };
 
@@ -30,6 +38,264 @@ function permissionIds(formData: FormData) {
 
 function roleIds(formData: FormData) {
   return formData.getAll("roleIds").filter((entry): entry is string => typeof entry === "string");
+}
+
+function generatedAccountEmail(kind: "student" | "parent", schoolId: number, recordId: number) {
+  return `${kind}-${schoolId}-${recordId}@accounts.schoolos.invalid`;
+}
+
+export async function createSchoolAccount(
+  _previousState: RoleActionState,
+  formData: FormData,
+): Promise<RoleActionState> {
+  const context = await requireSchoolPermission("roles.manage");
+  const parsed = z.object({
+    personType: z.enum(["staff", "student", "parent"]),
+    recordId: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()),
+    parentLogin: z.enum(["email", "phone"]).optional(),
+    password: z.string().min(12).max(128),
+    passwordConfirmation: z.string().max(128),
+    roleIds: z.array(z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()))
+      .min(1)
+      .refine((ids) => new Set(ids).size === ids.length),
+  }).refine((data) => data.password === data.passwordConfirmation, {
+    path: ["passwordConfirmation"],
+    message: "Passwords do not match.",
+  }).safeParse({
+    personType: value(formData, "personType"),
+    recordId: value(formData, "recordId"),
+    parentLogin: value(formData, "parentLogin"),
+    password: value(formData, "password"),
+    passwordConfirmation: value(formData, "passwordConfirmation"),
+    roleIds: roleIds(formData),
+  });
+  if (!parsed.success) {
+    return { error: "Choose a profile and at least one role, then enter matching passwords of at least 12 characters." };
+  }
+
+  const selectedRoles = await db.select({ id: roles.id })
+    .from(roles)
+    .where(and(
+      eq(roles.schoolId, context.schoolId),
+      inArray(roles.id, parsed.data.roleIds),
+    ));
+  if (selectedRoles.length !== parsed.data.roleIds.length) {
+    return { error: "One or more selected roles are unavailable for this school." };
+  }
+
+  const passwordHash = await hashPassword(parsed.data.password);
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      let name = "";
+      let email = "";
+      let identifier: string | null = null;
+      let identifierKind = "";
+      let linkedStaffId: number | null = null;
+      let linkedStudentIds: number[] = [];
+
+      if (parsed.data.personType === "staff") {
+        const [staff] = await tx.select({
+          id: staffMembers.id,
+          firstName: staffMembers.firstName,
+          lastName: staffMembers.lastName,
+          email: staffMembers.email,
+          phone: staffMembers.phone,
+          linkedUserId: staffMembers.linkedUserId,
+        }).from(staffMembers)
+          .where(and(
+            eq(staffMembers.id, parsed.data.recordId),
+            eq(staffMembers.schoolId, context.schoolId),
+            eq(staffMembers.status, "active"),
+          ))
+          .for("update")
+          .limit(1);
+        if (!staff) return "profile-not-found";
+        if (staff.linkedUserId) return "profile-linked";
+        if (!staff.email?.trim()) return "email-required";
+        name = `${staff.firstName} ${staff.lastName}`;
+        email = staff.email.trim().toLowerCase();
+        linkedStaffId = staff.id;
+        if (staff.phone?.trim()) {
+          identifier = normalizePhoneIdentifier(staff.phone);
+          if (!identifier) return "invalid-phone";
+          identifierKind = "staff_phone";
+        }
+      } else if (parsed.data.personType === "student") {
+        const [student] = await tx.select({
+          id: students.id,
+          firstName: students.firstName,
+          lastName: students.lastName,
+          admissionNumber: students.admissionNumber,
+        }).from(students)
+          .where(and(
+            eq(students.id, parsed.data.recordId),
+            eq(students.schoolId, context.schoolId),
+            inArray(students.status, ["admitted", "active"]),
+          ))
+          .for("update")
+          .limit(1);
+        if (!student) return "profile-not-found";
+        if (!student.admissionNumber?.trim()) return "admission-required";
+        name = `${student.firstName} ${student.lastName}`;
+        email = generatedAccountEmail("student", context.schoolId, student.id);
+        identifier = student.admissionNumber.trim().toLocaleUpperCase();
+        identifierKind = "student_admission";
+        linkedStudentIds = [student.id];
+      } else {
+        const [student] = await tx.select({
+          id: students.id,
+          firstName: students.firstName,
+          lastName: students.lastName,
+          guardianName: students.guardianName,
+          guardianEmail: students.guardianEmail,
+          guardianPhone: students.guardianPhone,
+        }).from(students)
+          .where(and(
+            eq(students.id, parsed.data.recordId),
+            eq(students.schoolId, context.schoolId),
+            inArray(students.status, ["admitted", "active"]),
+          ))
+          .for("update")
+          .limit(1);
+        if (!student) return "profile-not-found";
+        const loginType = parsed.data.parentLogin;
+        if (loginType === "email" && student.guardianEmail?.trim()) {
+          email = student.guardianEmail.trim().toLowerCase();
+          identifier = email;
+          identifierKind = "parent_email";
+        } else if (loginType === "phone" && student.guardianPhone?.trim()) {
+          identifier = normalizePhoneIdentifier(student.guardianPhone);
+          if (!identifier) return "invalid-phone";
+          email = generatedAccountEmail("parent", context.schoolId, student.id);
+          identifierKind = "parent_phone";
+        } else {
+          return "parent-contact-required";
+        }
+        name = student.guardianName?.trim() || `Parent of ${student.firstName} ${student.lastName}`;
+        const matchingStudents = await tx.select({ id: students.id })
+          .from(students)
+          .where(and(
+            eq(students.schoolId, context.schoolId),
+            inArray(students.status, ["admitted", "active"]),
+            loginType === "email"
+              ? eq(students.guardianEmail, student.guardianEmail!)
+              : eq(students.guardianPhone, student.guardianPhone!),
+          ));
+        linkedStudentIds = [...new Set([student.id, ...matchingStudents.map(({ id }) => id)])];
+      }
+
+      if (identifier) {
+        const [existingIdentifier] = await tx.select({ id: userLoginIdentifiers.id })
+          .from(userLoginIdentifiers)
+          .where(and(
+            eq(userLoginIdentifiers.schoolId, context.schoolId),
+            eq(userLoginIdentifiers.identifier, identifier),
+          ))
+          .limit(1);
+        if (existingIdentifier) return "identifier-in-use";
+      }
+      const [existingEmail] = await tx.select({ id: user.id })
+        .from(user)
+        .where(eq(user.email, email))
+        .limit(1);
+      if (existingEmail) return "email-in-use";
+
+      const userId = randomUUID();
+      await tx.insert(user).values({
+        id: userId,
+        name,
+        email,
+        emailVerified: false,
+        isActive: true,
+      });
+      await tx.insert(authAccount).values({
+        id: randomUUID(),
+        accountId: userId,
+        providerId: "credential",
+        userId,
+        password: passwordHash,
+      });
+      await tx.insert(schoolMemberships).values({
+        schoolId: context.schoolId,
+        userId,
+        status: "active",
+      });
+      const [membership] = await tx.select({ id: schoolMemberships.id })
+        .from(schoolMemberships)
+        .where(and(
+          eq(schoolMemberships.schoolId, context.schoolId),
+          eq(schoolMemberships.userId, userId),
+        ))
+        .limit(1);
+      if (!membership) throw new Error("The new school account membership could not be loaded.");
+      await tx.insert(userRoles).values(selectedRoles.map((role) => ({
+        membershipId: membership.id,
+        roleId: role.id,
+      })));
+      if (identifier) {
+        await tx.insert(userLoginIdentifiers).values({
+          schoolId: context.schoolId,
+          userId,
+          kind: identifierKind,
+          identifier,
+        });
+      }
+      if (linkedStaffId !== null) {
+        await tx.update(staffMembers)
+          .set({ linkedUserId: userId })
+          .where(and(
+            eq(staffMembers.id, linkedStaffId),
+            eq(staffMembers.schoolId, context.schoolId),
+          ));
+      }
+      if (linkedStudentIds.length) {
+        await tx.insert(userStudentLinks).values(linkedStudentIds.map((studentId) => ({
+          schoolId: context.schoolId,
+          userId,
+          studentId,
+          accessType: parsed.data.personType,
+        })));
+      }
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: "school_account.created",
+        resourceType: "user",
+        resourcePublicId: userId,
+        changedFields: [
+          "user",
+          "credential.password",
+          "schoolMembership",
+          "roles",
+          ...(identifier ? ["loginIdentifier"] : []),
+          ...(linkedStaffId !== null ? ["staffMember.linkedUserId"] : []),
+          ...(linkedStudentIds.length ? ["studentLinks"] : []),
+        ],
+      });
+      return "created";
+    });
+
+    if (outcome === "profile-not-found") return { error: "That active profile was not found in this school." };
+    if (outcome === "profile-linked") return { error: "That staff profile is already linked to a login account." };
+    if (outcome === "email-required") return { error: "Add an email address to the staff profile before creating its login." };
+    if (outcome === "admission-required") return { error: "Add an admission number to the student profile before creating its login." };
+    if (outcome === "parent-contact-required") return { error: "The selected parent login method is not available on this student profile." };
+    if (outcome === "invalid-phone") return { error: "The profile phone number must include 7–15 digits to be used for login." };
+    if (outcome === "identifier-in-use") return { error: "That login identifier is already assigned to an account in this school." };
+    if (outcome === "email-in-use") return { error: "An account already uses this email. Assign roles from the existing account instead." };
+  } catch (error) {
+    if (isDuplicateEntryError(error)) {
+      return { error: "An account or login identifier already exists for that profile. Refresh the page and check the account directory." };
+    }
+    throw error;
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/users/roles");
+  revalidatePath("/admin/staff");
+  revalidatePath("/portal/student");
+  revalidatePath("/portal/parent");
+  return { success: true };
 }
 
 export async function createSchoolRole(

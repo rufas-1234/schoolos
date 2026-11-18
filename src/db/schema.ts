@@ -121,6 +121,26 @@ export const schoolMemberships = mysqlTable(
   ],
 );
 
+export const userLoginIdentifiers = mysqlTable(
+  "user_login_identifiers",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    userId: varchar("userId", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 32 }).notNull(),
+    identifier: varchar("identifier", { length: 320 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("user_login_identifiers_school_identifier_uq").on(table.schoolId, table.identifier),
+    index("user_login_identifiers_user_idx").on(table.userId, table.schoolId),
+  ],
+);
+
 export const roles = mysqlTable(
   "roles",
   {
@@ -297,6 +317,28 @@ export const students = mysqlTable(
     index("students_school_status_idx").on(table.schoolId, table.status),
     index("students_school_created_idx").on(table.schoolId, table.createdAt),
     index("students_school_category_idx").on(table.schoolId, table.categoryId),
+  ],
+);
+
+export const userStudentLinks = mysqlTable(
+  "user_student_links",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    userId: varchar("userId", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    studentId: bigint("studentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    accessType: varchar("accessType", { length: 20 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("user_student_links_user_student_type_uq").on(table.userId, table.studentId, table.accessType),
+    index("user_student_links_school_user_type_idx").on(table.schoolId, table.userId, table.accessType),
   ],
 );
 

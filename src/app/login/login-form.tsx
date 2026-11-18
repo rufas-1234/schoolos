@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LockKeyhole, Mail } from "lucide-react";
-import { authClient } from "@/lib/auth-client";
+import { KeyRound, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSignedInWorkspacePath } from "./actions";
 
@@ -18,11 +17,15 @@ export function LoginForm() {
     setError("");
 
     try {
-      const result = await authClient.signIn.email({
-        email: String(formData.get("email") ?? ""),
-        password: String(formData.get("password") ?? ""),
+      const response = await fetch("/api/auth/identifier/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: String(formData.get("identifier") ?? ""),
+          password: String(formData.get("password") ?? ""),
+        }),
       });
-      if (result.error) {
+      if (!response.ok) {
         setError("Sign-in failed. Check your credentials or contact your administrator.");
         return;
       }
@@ -60,16 +63,16 @@ export function LoginForm() {
         </p>
       )}
       <label className="block">
-        <span className="mb-2 block text-sm font-medium text-slate-700">Email address</span>
+        <span className="mb-2 block text-sm font-medium text-slate-700">Email, phone number, or admission number</span>
         <span className="relative block">
-          <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <KeyRound size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            autoComplete="email"
+            autoComplete="username"
             className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
-            name="email"
-            placeholder="you@school.edu"
+            name="identifier"
+            placeholder="Email, phone, or admission number"
             required
-            type="email"
+            type="text"
           />
         </span>
       </label>

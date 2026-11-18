@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import {
   BookOpenCheck,
   CalendarDays,
@@ -20,6 +20,7 @@ import {
   studentEnrollments,
   students,
   subjects,
+  userStudentLinks,
 } from "@/db/schema";
 import { requireSchoolMember } from "@/lib/access-control";
 import { PortalShell } from "@/components/portal-shell";
@@ -28,6 +29,14 @@ export const dynamic = "force-dynamic";
 
 export default async function StudentPortalPage() {
   const context = await requireSchoolMember();
+  const linkedStudentRecords = await db.select({ studentId: userStudentLinks.studentId })
+    .from(userStudentLinks)
+    .where(and(
+      eq(userStudentLinks.schoolId, context.schoolId),
+      eq(userStudentLinks.userId, context.user.id),
+      eq(userStudentLinks.accessType, "student"),
+    ));
+  const linkedStudentIds = linkedStudentRecords.map(({ studentId }) => studentId);
   const linkedStudents = await db.select({
     id: students.id,
     firstName: students.firstName,
@@ -38,8 +47,10 @@ export default async function StudentPortalPage() {
   }).from(students)
     .where(and(
       eq(students.schoolId, context.schoolId),
-      eq(students.email, context.user.email),
       inArray(students.status, ["admitted", "active"]),
+      linkedStudentIds.length
+        ? or(eq(students.email, context.user.email), inArray(students.id, linkedStudentIds))
+        : eq(students.email, context.user.email),
     ));
   const studentIds = linkedStudents.map((student) => student.id);
   const [enrollments, attendance, results] = studentIds.length

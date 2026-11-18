@@ -20,6 +20,7 @@ type SchoolAccount = {
   email: string;
   membershipStatus: string;
   currentRoleIds: number[];
+  loginIdentifiers: string[];
 };
 type EditableRole = {
   id: number;
@@ -225,7 +226,8 @@ export function AccountRoleDirectory({
   const visibleAccounts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return accounts.filter((account) =>
-      (!normalizedQuery || `${account.name} ${account.email}`.toLocaleLowerCase().includes(normalizedQuery)) &&
+      (!normalizedQuery || `${account.name} ${account.email} ${account.loginIdentifiers.join(" ")}`
+        .toLocaleLowerCase().includes(normalizedQuery)) &&
       (!roleFilter || account.currentRoleIds.includes(Number(roleFilter))) &&
       (!accessFilter || account.membershipStatus === accessFilter),
     );
@@ -240,7 +242,7 @@ export function AccountRoleDirectory({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Name or email"
+            placeholder="Name, email, phone, or admission number"
             className={fieldClass}
           />
         </label>
@@ -269,7 +271,14 @@ export function AccountRoleDirectory({
             <li key={account.membershipId} className="grid gap-4 p-5 lg:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)]">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-slate-800">{account.name}</p>
-                <p className="truncate text-sm text-slate-500">{account.email}</p>
+                {!account.email.endsWith("@accounts.schoolos.invalid") && (
+                  <p className="truncate text-sm text-slate-500">{account.email}</p>
+                )}
+                {account.loginIdentifiers.length > 0 && (
+                  <p className="truncate text-sm text-slate-500">
+                    Login: {account.loginIdentifiers.join(" · ")}
+                  </p>
+                )}
                 <p className={`mt-1 text-xs font-semibold ${account.membershipStatus === "active" ? "text-emerald-700" : "text-rose-700"}`}>
                   {account.membershipStatus === "active" ? "School access enabled" : "School access disabled"}
                 </p>

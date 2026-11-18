@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { AdminRecordDialog } from "@/components/admin-data-table";
 import { db } from "@/db";
 import {
@@ -6,7 +6,10 @@ import {
   rolePermissions,
   roles,
   schoolMemberships,
+  staffMembers,
+  students,
   user,
+  userLoginIdentifiers,
   userRoles,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -16,6 +19,7 @@ import {
   DeleteRoleForm,
   EditRoleForm,
 } from "../../settings/role-forms";
+import { AccountProvisionForm } from "./account-provision-form";
 
 const permissionCategoryLabels: Record<string, string> = {
   accounts: "Accounts",
@@ -41,7 +45,7 @@ function getRoleCategories(permissionKeys: string[]) {
 
 export default async function UserRolesPage() {
   const context = await requireSchoolPermission("roles.manage");
-  const [schoolRoles, availablePermissions, accounts] = await Promise.all([
+  const [schoolRoles, availablePermissions, accounts, staffProfiles, studentProfiles, parentProfiles, loginIdentifiers] = await Promise.all([
     db.select({
       id: roles.id,
       name: roles.name,
@@ -68,7 +72,76 @@ export default async function UserRolesPage() {
         eq(user.isActive, true),
       ))
       .orderBy(asc(user.name)),
+    db.select({
+      id: staffMembers.id,
+      firstName: staffMembers.firstName,
+      lastName: staffMembers.lastName,
+      email: staffMembers.email,
+      phone: staffMembers.phone,
+    }).from(staffMembers)
+      .where(and(
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.status, "active"),
+        isNull(staffMembers.linkedUserId),
+      ))
+      .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
+    db.select({
+      id: students.id,
+      firstName: students.firstName,
+      lastName: students.lastName,
+      admissionNumber: students.admissionNumber,
+      status: students.status,
+    }).from(students)
+      .where(and(
+        eq(students.schoolId, context.schoolId),
+        inArray(students.status, ["admitted", "active"]),
+      ))
+      .orderBy(asc(students.lastName), asc(students.firstName)),
+    db.select({
+      id: students.id,
+      firstName: students.firstName,
+      lastName: students.lastName,
+      guardianName: students.guardianName,
+      guardianEmail: students.guardianEmail,
+      guardianPhone: students.guardianPhone,
+    }).from(students)
+      .where(and(
+        eq(students.schoolId, context.schoolId),
+        inArray(students.status, ["admitted", "active"]),
+      ))
+      .orderBy(asc(students.lastName), asc(students.firstName)),
+    db.select({
+      userId: userLoginIdentifiers.userId,
+      identifier: userLoginIdentifiers.identifier,
+      kind: userLoginIdentifiers.kind,
+    }).from(userLoginIdentifiers)
+      .where(eq(userLoginIdentifiers.schoolId, context.schoolId)),
   ]);
+  const existingStudentIdentifiers = new Set(loginIdentifiers
+    .filter((item) => item.kind === "student_admission")
+    .map((item) => item.identifier));
+  const identifiersByUser = new Map<string, string[]>();
+  for (const item of loginIdentifiers) {
+    const identifiers = identifiersByUser.get(item.userId) ?? [];
+    identifiers.push(item.identifier);
+    identifiersByUser.set(item.userId, identifiers);
+  }
+  const studentAccountOptions = studentProfiles
+    .filter((student) => student.admissionNumber && !existingStudentIdentifiers.has(student.admissionNumber.trim().toLocaleUpperCase()))
+    .map((student) => ({
+      id: student.id,
+      name: `${student.firstName} ${student.lastName}`,
+      admissionNumber: student.admissionNumber,
+    }));
+  const parentAccountOptions = parentProfiles
+    .filter((student) => student.guardianEmail?.trim() || student.guardianPhone?.trim())
+    .map((student) => ({
+      id: student.id,
+      name: student.guardianName?.trim() || "Parent or guardian",
+      childName: `${student.firstName} ${student.lastName}`,
+      email: student.guardianEmail,
+      phone: student.guardianPhone,
+    }));
   const assignedRoles = schoolRoles.length
     ? await db.select({
       membershipId: userRoles.membershipId,
@@ -126,6 +199,7 @@ export default async function UserRolesPage() {
   const accountsWithRoles = accounts.map((account) => ({
     ...account,
     currentRoleIds: roleIdsByMembership.get(account.membershipId) ?? [],
+    loginIdentifiers: identifiersByUser.get(account.userId) ?? [],
   }));
 
   return (
@@ -223,6 +297,18 @@ export default async function UserRolesPage() {
           </ul>
         </section>
       </div>
+
+      <AccountProvisionForm
+        staff={staffProfiles.map((staff) => ({
+          id: staff.id,
+          name: `${staff.firstName} ${staff.lastName}`,
+          email: staff.email,
+          phone: staff.phone,
+        }))}
+        students={studentAccountOptions}
+        parents={parentAccountOptions}
+        roles={schoolRoles.map(({ id, name }) => ({ id, name }))}
+      />
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">

@@ -20,11 +20,13 @@ import {
   teachers,
   uploadedFiles,
   user,
+  userLoginIdentifiers,
 } from "@/db/schema";
 import type { StaffDocuments } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { normalizePhoneIdentifier } from "@/lib/login-identifier-policy";
 import {
   defaultRequiredStaffFields,
   getStaffRequiredFieldError,
@@ -483,6 +485,45 @@ async function applyStaffLoginAccess(
     await tx.update(schoolMemberships)
       .set({ status: "active" })
       .where(eq(schoolMemberships.id, membership.id));
+  }
+
+  const phoneIdentifier = staff.phone.trim()
+    ? normalizePhoneIdentifier(staff.phone)
+    : "";
+  if (staff.phone.trim() && !phoneIdentifier) {
+    throw new StaffLoginError("The staff phone number must include 7-15 digits to be used for login.");
+  }
+  if (phoneIdentifier) {
+    const [identifierOwner] = await tx.select({
+      userId: userLoginIdentifiers.userId,
+    }).from(userLoginIdentifiers)
+      .where(and(
+        eq(userLoginIdentifiers.schoolId, schoolId),
+        eq(userLoginIdentifiers.identifier, phoneIdentifier),
+      ))
+      .limit(1);
+    if (identifierOwner && identifierOwner.userId !== userId) {
+      throw new StaffLoginError("That phone number is already assigned as a login identifier in this school.");
+    }
+    await tx.delete(userLoginIdentifiers).where(and(
+      eq(userLoginIdentifiers.schoolId, schoolId),
+      eq(userLoginIdentifiers.userId, userId),
+      eq(userLoginIdentifiers.kind, "staff_phone"),
+    ));
+    if (!identifierOwner) {
+      await tx.insert(userLoginIdentifiers).values({
+        schoolId,
+        userId,
+        kind: "staff_phone",
+        identifier: phoneIdentifier,
+      });
+    }
+  } else {
+    await tx.delete(userLoginIdentifiers).where(and(
+      eq(userLoginIdentifiers.schoolId, schoolId),
+      eq(userLoginIdentifiers.userId, userId),
+      eq(userLoginIdentifiers.kind, "staff_phone"),
+    ));
   }
 
   return {

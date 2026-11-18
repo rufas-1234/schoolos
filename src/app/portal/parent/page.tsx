@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import {
   BookOpenCheck,
   CalendarDays,
@@ -21,6 +21,7 @@ import {
   studentFeeInvoices,
   students,
   subjects,
+  userStudentLinks,
 } from "@/db/schema";
 import { requireSchoolMember } from "@/lib/access-control";
 import { PortalShell } from "@/components/portal-shell";
@@ -29,6 +30,14 @@ export const dynamic = "force-dynamic";
 
 export default async function ParentPortalPage() {
   const context = await requireSchoolMember();
+  const linkedStudentRecords = await db.select({ studentId: userStudentLinks.studentId })
+    .from(userStudentLinks)
+    .where(and(
+      eq(userStudentLinks.schoolId, context.schoolId),
+      eq(userStudentLinks.userId, context.user.id),
+      eq(userStudentLinks.accessType, "parent"),
+    ));
+  const linkedStudentIds = linkedStudentRecords.map(({ studentId }) => studentId);
   const children = await db.select({
     id: students.id,
     firstName: students.firstName,
@@ -37,8 +46,10 @@ export default async function ParentPortalPage() {
   }).from(students)
     .where(and(
       eq(students.schoolId, context.schoolId),
-      eq(students.guardianEmail, context.user.email),
       inArray(students.status, ["admitted", "active"]),
+      linkedStudentIds.length
+        ? or(eq(students.guardianEmail, context.user.email), inArray(students.id, linkedStudentIds))
+        : eq(students.guardianEmail, context.user.email),
     ))
     .orderBy(students.lastName, students.firstName);
   const childIds = children.map((child) => child.id);
