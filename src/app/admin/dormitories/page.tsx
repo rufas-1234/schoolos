@@ -451,27 +451,27 @@ function FilterForm({
     <label className="block min-w-0 text-sm font-medium text-slate-700">Search
       <input type="search" name="search" defaultValue={search}
         placeholder={section === "residents" ? "Student, admission no., room..." : "Dormitory or room..."}
-        className="mt-1 h-11 w-full min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
+        className="mt-1 h-11 w-full max-w-sm min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
     </label>
     {section === "dormitories" && <>
       <label className="block min-w-0 text-sm font-medium text-slate-700">Branch
-        <select name="branchId" defaultValue={branchId} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
+        <select name="branchId" defaultValue={branchId} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
           <option value="">All branches</option>{branchRows.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
         </select>
       </label>
       <label className="block min-w-0 text-sm font-medium text-slate-700">Resident policy
-        <select name="genderPolicy" defaultValue={genderPolicy} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
+        <select name="genderPolicy" defaultValue={genderPolicy} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
           <option value="">All policies</option><option value="male">Male</option><option value="female">Female</option><option value="mixed">Mixed</option>
         </select>
       </label>
     </>}
     {(section === "rooms" || section === "residents") && <label className="block min-w-0 text-sm font-medium text-slate-700">Dormitory
-      <select name="dormitoryId" defaultValue={dormitoryId} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
+      <select name="dormitoryId" defaultValue={dormitoryId} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
         <option value="">All dormitories</option>{dormitoryOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
       </select>
     </label>}
     {section === "rooms" && <label className="block min-w-0 text-sm font-medium text-slate-700">Bed availability
-      <select name="occupancy" defaultValue={occupancy} className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
+      <select name="occupancy" defaultValue={occupancy} className="mt-1 h-11 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-sm">
         <option value="">All rooms</option><option value="available">Available beds</option><option value="full">Full rooms</option>
       </select>
     </label>}
