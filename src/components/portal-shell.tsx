@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { GraduationCap, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -32,6 +32,7 @@ export function PortalShell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const [activeAnchor, setActiveAnchor] = useState("");
@@ -59,7 +60,11 @@ export function PortalShell({
   function renderNavigation(mobile = false) {
     return navigation.map(({ href, label, icon: Icon }) => {
       const target = navHref(href);
-      const active = href.startsWith("#") ? activeAnchor === href : pathname === href;
+      const [targetPath, targetQuery] = href.split("?");
+      const targetSection = new URLSearchParams(targetQuery ?? "").get("section");
+      const active = href.startsWith("#")
+        ? activeAnchor === href
+        : pathname === targetPath && searchParams.get("section") === targetSection;
       return (
         <Link
           key={href}

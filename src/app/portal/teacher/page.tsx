@@ -37,13 +37,36 @@ const weekdays = new Map([
   [5, "Friday"],
 ]);
 
+const sectionTitles: Record<string, string> = {
+  classes: "My classes",
+  register: "Class register & attendance",
+  assessments: "Examination work",
+  timetable: "My timetable",
+};
+
 export default async function TeacherPortalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ classSectionId?: string | string[]; attendanceDate?: string | string[] }>;
+  searchParams: Promise<{
+    section?: string | string[];
+    q?: string | string[];
+    status?: string | string[];
+    classSectionId?: string | string[];
+    attendanceDate?: string | string[];
+  }>;
 }) {
   const context = await requireSchoolPermission("results.enter");
   const params = await searchParams;
+  const sectionParam = typeof params.section === "string" ? params.section : "overview";
+  const activeSection = ["overview", "classes", "register", "assessments", "timetable"].includes(sectionParam)
+    ? sectionParam
+    : "overview";
+  const showOverview = activeSection === "overview";
+  const search = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
+  const normalizedSearch = search.toLocaleLowerCase();
+  const assessmentStatusFilter = ["open", "published"].includes(typeof params.status === "string" ? params.status : "")
+    ? params.status as "open" | "published"
+    : "";
   const requestedSectionId = typeof params.classSectionId === "string" && /^\d+$/.test(params.classSectionId)
     ? Number(params.classSectionId)
     : null;
@@ -72,7 +95,7 @@ export default async function TeacherPortalPage({
 
   const [assignments, routines, assessments, classTeacherSections] = teacherIds.length
     ? await Promise.all([
-      db.select({
+      showOverview || activeSection === "classes" ? db.select({
         className: classLevels.name,
         sectionName: classSections.name,
         yearName: academicYears.name,
@@ -117,8 +140,8 @@ export default async function TeacherPortalPage({
           eq(classSubjects.schoolId, context.schoolId),
           inArray(classSubjects.teacherId, teacherIds),
         ))
-        .orderBy(asc(classLevels.name), asc(classSections.name), asc(subjects.name)),
-      db.select({
+        .orderBy(asc(classLevels.name), asc(classSections.name), asc(subjects.name)) : Promise.resolve([]),
+      showOverview || activeSection === "timetable" ? db.select({
         dayOfWeek: classRoutines.dayOfWeek,
         startsAt: classRoutines.startsAt,
         endsAt: classRoutines.endsAt,
@@ -168,8 +191,8 @@ export default async function TeacherPortalPage({
           eq(classRoutines.schoolId, context.schoolId),
           inArray(classSubjects.teacherId, teacherIds),
         ))
-        .orderBy(asc(classRoutines.dayOfWeek), asc(classRoutines.startsAt)),
-      db.select({
+        .orderBy(asc(classRoutines.dayOfWeek), asc(classRoutines.startsAt)) : Promise.resolve([]),
+      showOverview || activeSection === "assessments" ? db.select({
         examId: examinations.id,
         assessmentId: examSubjects.id,
         examName: examinations.name,
@@ -222,8 +245,8 @@ export default async function TeacherPortalPage({
           eq(examSubjects.schoolId, context.schoolId),
           inArray(classSubjects.teacherId, teacherIds),
         ))
-        .orderBy(asc(examSubjects.examDate), asc(classLevels.name), asc(subjects.name)),
-      db.select({
+        .orderBy(asc(examSubjects.examDate), asc(classLevels.name), asc(subjects.name)) : Promise.resolve([]),
+      showOverview || activeSection === "register" ? db.select({
         id: classSections.id,
         academicYearId: classSections.academicYearId,
         classLevelId: classSections.classLevelId,
@@ -251,7 +274,7 @@ export default async function TeacherPortalPage({
           eq(classSections.schoolId, context.schoolId),
           inArray(classSections.classTeacherId, teacherIds),
         ))
-        .orderBy(asc(academicYears.startDate), asc(classLevels.name), asc(classSections.name)),
+        .orderBy(asc(academicYears.startDate), asc(classLevels.name), asc(classSections.name)) : Promise.resolve([]),
     ])
     : [[], [], [], []];
 
@@ -260,7 +283,9 @@ export default async function TeacherPortalPage({
     assignment,
   ])).values()];
   const hasTeacherProfile = teacherRecords.length > 0;
-  const selectedClassSection = classTeacherSections.find((section) => section.id === requestedSectionId);
+  const selectedClassSection = activeSection === "register"
+    ? classTeacherSections.find((section) => section.id === requestedSectionId)
+    : undefined;
   const roster = selectedClassSection
     ? await db.select({
       id: students.id,
@@ -393,6 +418,37 @@ export default async function TeacherPortalPage({
     label: `${section.branchName} · ${section.yearName} · ${section.className} · ${section.sectionName}`,
   }));
   const selectedAttendanceSectionId = selectedClassSection ? String(selectedClassSection.id) : "";
+  const filteredAssignments = uniqueAssignments.filter((assignment) =>
+    `${assignment.branchName} ${assignment.yearName} ${assignment.className} ${assignment.sectionName} ${assignment.subjectName} ${assignment.subjectCode}`
+      .toLocaleLowerCase().includes(normalizedSearch),
+  );
+  const filteredAssessments = assessments.filter((assessment) =>
+    (!assessmentStatusFilter || assessment.examStatus === assessmentStatusFilter) &&
+    `${assessment.examName} ${assessment.yearName} ${assessment.className} ${assessment.subjectName} ${assessment.assessmentStatus}`
+      .toLocaleLowerCase().includes(normalizedSearch),
+  );
+  const filteredRoutines = routines.filter((routine) =>
+    `${weekdays.get(routine.dayOfWeek) ?? "Other"} ${routine.startsAt} ${routine.endsAt} ${routine.className} ${routine.sectionName} ${routine.subjectName} ${routine.roomNumber ?? ""}`
+      .toLocaleLowerCase().includes(normalizedSearch),
+  );
+  const grantedPermissions = new Set(context.grantedPermissions);
+  const capabilities = [
+    ...(grantedPermissions.has("results.enter") ? ["Enter and submit marks for assigned subjects"] : []),
+    ...(classTeacherSections.length ? ["View appointed class registers and record daily attendance"] : []),
+    ...(classTeacherSections.length ? ["View complete published report cards for appointed classes"] : []),
+    ...(grantedPermissions.has("students.view") ? ["View student records (subject to assignment scope)"] : []),
+    ...(grantedPermissions.has("students.update") ? ["Update student records and attendance (subject to school authorization)"] : []),
+    ...(grantedPermissions.has("academics.manage") ? ["Manage academic setup"] : []),
+    ...(grantedPermissions.has("examinations.create") ? ["Configure examinations"] : []),
+    ...(grantedPermissions.has("results.publish") ? ["Review and publish results"] : []),
+    ...(grantedPermissions.has("fees.balance.view") ? ["View student fee balances"] : []),
+  ];
+  const restrictions = [
+    ...(!grantedPermissions.has("academics.delete") ? ["Cannot delete academic records"] : []),
+    ...(!grantedPermissions.has("students.delete") ? ["Cannot delete student records"] : []),
+    ...(!grantedPermissions.has("results.publish") ? ["Cannot approve or publish examination results"] : []),
+    ...(!grantedPermissions.has("fees.manage") && !grantedPermissions.has("payments.record") ? ["No finance-management access"] : []),
+  ];
 
   return (
     <TeacherPortalShell
@@ -402,10 +458,16 @@ export default async function TeacherPortalPage({
     >
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
         <header className="rounded-3xl bg-gradient-to-br from-violet-800 to-indigo-900 p-7 text-white shadow-lg sm:p-9">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Your teaching workspace</p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Welcome, {teacherName}</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">
+            {activeSection === "overview" ? "Teacher dashboard" : "Teacher workspace"}
+          </p>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
+            {activeSection === "overview" ? `Welcome, ${teacherName}` : sectionTitles[activeSection]}
+          </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-violet-100">
-            Your assigned classes, weekly timetable, and examination work are collected here.
+            {activeSection === "overview"
+              ? "Your responsibilities, permissions, and teaching activity at a glance."
+              : "Only information within your active teaching assignments and class appointments is shown."}
           </p>
         </header>
 
@@ -418,24 +480,59 @@ export default async function TeacherPortalPage({
           </section>
         ) : (
           <>
-            <section aria-label="Teaching summary" className="grid gap-4 sm:grid-cols-3">
-              <SummaryCard icon={UsersRound} label="Class and subject assignments" value={uniqueAssignments.length} />
-              <SummaryCard icon={CalendarDays} label="Scheduled lessons this week" value={routines.length} />
-              <SummaryCard icon={ClipboardCheck} label="Active exam assessments" value={assessments.length} />
-            </section>
+            {activeSection === "overview" && (
+              <>
+                <section aria-label="Teaching summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <SummaryCard icon={UsersRound} label="Subject assignments" value={uniqueAssignments.length} />
+                  <SummaryCard icon={UsersRound} label="Appointed classes" value={classTeacherSections.length} />
+                  <SummaryCard icon={CalendarDays} label="Scheduled lessons" value={routines.length} />
+                  <SummaryCard icon={ClipboardCheck} label="Active exam assessments" value={assessments.length} />
+                </section>
 
-            <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
-              <h2 className="font-semibold text-slate-950">Your school access</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                Access is limited to your active teaching assignments and appointed classes. You can enter marks only for assigned subjects and record daily attendance only for a class you are appointed to lead. Student-record changes, examination approval and publication, finance, and school administration remain restricted to authorized staff.
-              </p>
-            </section>
+                <section className="grid gap-4 lg:grid-cols-2">
+                  <article className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
+                    <h2 className="font-semibold text-slate-950">Your responsibilities</h2>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      {capabilities.map((capability) => (
+                        <li key={capability} className="flex gap-2">
+                          <span className="font-bold text-emerald-700" aria-hidden="true">✓</span>{capability}
+                        </li>
+                      ))}
+                      {!classTeacherSections.length && (
+                        <li className="text-slate-500">You are not currently appointed as a class teacher.</li>
+                      )}
+                    </ul>
+                  </article>
+                  <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 className="font-semibold text-slate-950">Permission boundaries</h2>
+                    <p className="mt-1 text-sm text-slate-500">Actions are checked against your role and active assignments.</p>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      {restrictions.map((restriction) => (
+                        <li key={restriction} className="flex gap-2">
+                          <span className="font-bold text-slate-400" aria-hidden="true">•</span>{restriction}
+                        </li>
+                      ))}
+                      <li>Marks and student results are limited to assigned subjects or appointed classes.</li>
+                    </ul>
+                  </article>
+                </section>
 
-            <section id="classes" className="space-y-4">
-              <SectionHeading title="My classes" description="Assignments are shown by the actual class section." />
-              {uniqueAssignments.length ? (
+                <section aria-label="Portal sections" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <QuickLink href="/portal/teacher?section=classes" label="My classes" detail={`${uniqueAssignments.length} assigned subject sections`} icon={UsersRound} />
+                  <QuickLink href="/portal/teacher?section=register" label="Class register" detail={`${classTeacherSections.length} appointed classes`} icon={UsersRound} />
+                  <QuickLink href="/portal/teacher?section=assessments" label="Examination work" detail={`${assessments.length} available assessments`} icon={ClipboardCheck} />
+                  <QuickLink href="/portal/teacher?section=timetable" label="My timetable" detail={`${routines.length} scheduled lessons`} icon={CalendarDays} />
+                </section>
+              </>
+            )}
+
+            {activeSection === "classes" && (
+              <section id="classes" className="space-y-4">
+                <SectionHeading title="My classes" description="Your active class and subject assignments. Search by class, section, year, subject, or code." />
+                <SectionFilter section="classes" search={search} />
+                {filteredAssignments.length ? (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {uniqueAssignments.map((assignment) => (
+                  {filteredAssignments.map((assignment) => (
                     <article
                       key={`${assignment.yearName}-${assignment.className}-${assignment.sectionName}-${assignment.subjectName}`}
                       className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -452,11 +549,12 @@ export default async function TeacherPortalPage({
                   ))}
                 </div>
               ) : (
-                <EmptyState>There are no subject assignments in an active academic year yet.</EmptyState>
+                <EmptyState>{search ? "No assignments match your search." : "There are no subject assignments in an active academic year yet."}</EmptyState>
               )}
-            </section>
+              </section>
+            )}
 
-            <section id="register" className="space-y-4">
+            {activeSection === "register" && <section id="register" className="space-y-4">
               <SectionHeading title="Class register and attendance" description="View enrolled students and record daily attendance for classes where you are the appointed class teacher. Recent absences are highlighted for follow-up." />
               <TeacherClassAttendance
                 key={`${selectedAttendanceSectionId}:${requestedDate}`}
@@ -465,11 +563,12 @@ export default async function TeacherPortalPage({
                 attendanceDate={requestedDate}
                 students={attendanceRoster}
               />
-            </section>
+            </section>}
 
-            <section id="assessments" className="space-y-4">
-              <SectionHeading title="Examination work" description="Open only the assessments assigned to your teacher account." />
-              {assessments.length ? (
+            {activeSection === "assessments" && <section id="assessments" className="space-y-4">
+              <SectionHeading title="Examination work" description="Assessments are limited to your assigned subjects. Search the exam, class, subject, or status." />
+              <SectionFilter section="assessments" search={search} status={assessmentStatusFilter} showStatus />
+              {filteredAssessments.length ? (
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[46rem] text-left text-sm">
@@ -484,7 +583,7 @@ export default async function TeacherPortalPage({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {assessments.map((assessment) => (
+                        {filteredAssessments.map((assessment) => (
                           <tr key={assessment.assessmentId}>
                             <td className="px-4 py-3 font-medium text-slate-900">
                               {assessment.examName}<span className="mt-1 block text-xs font-normal text-slate-500">{assessment.yearName}</span>
@@ -510,13 +609,14 @@ export default async function TeacherPortalPage({
                   </div>
                 </div>
               ) : (
-                <EmptyState>No open or published examination assessments are assigned to you for the active academic year.</EmptyState>
+                <EmptyState>{search || assessmentStatusFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
               )}
-            </section>
+            </section>}
 
-            <section id="timetable" className="space-y-4">
-              <SectionHeading title="My weekly timetable" description="Scheduled lessons for your assigned subjects and active-year sections." />
-              {routines.length ? (
+            {activeSection === "timetable" && <section id="timetable" className="space-y-4">
+              <SectionHeading title="My weekly timetable" description="Scheduled lessons for your assigned subjects and active-year sections. Search by day, subject, section, or room." />
+              <SectionFilter section="timetable" search={search} />
+              {filteredRoutines.length ? (
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[40rem] text-left text-sm">
@@ -530,7 +630,7 @@ export default async function TeacherPortalPage({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {routines.map((routine, index) => (
+                        {filteredRoutines.map((routine, index) => (
                           <tr key={`${routine.dayOfWeek}-${routine.startsAt}-${routine.className}-${routine.sectionName}-${routine.subjectName}-${index}`}>
                             <td className="px-4 py-3 font-medium text-slate-900">{weekdays.get(routine.dayOfWeek) ?? "Other"}</td>
                             <td className="px-4 py-3 text-slate-700">{routine.startsAt}–{routine.endsAt}</td>
@@ -544,9 +644,9 @@ export default async function TeacherPortalPage({
                   </div>
                 </div>
               ) : (
-                <EmptyState>No timetable periods have been scheduled for your active-year assignments.</EmptyState>
+                <EmptyState>{search ? "No timetable lessons match your search." : "No timetable periods have been scheduled for your active-year assignments."}</EmptyState>
               )}
-            </section>
+            </section>}
           </>
         )}
       </main>
@@ -590,5 +690,79 @@ function EmptyState({ children }: { children: string }) {
     <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
       {children}
     </p>
+  );
+}
+
+function SectionFilter({
+  section,
+  search,
+  status = "",
+  showStatus = false,
+}: {
+  section: string;
+  search: string;
+  status?: string;
+  showStatus?: boolean;
+}) {
+  return (
+    <form method="get" action="/portal/teacher" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+      <input type="hidden" name="section" value={section} />
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Search
+        <input
+          type="search"
+          name="q"
+          defaultValue={search}
+          placeholder="Type to find a record..."
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
+        />
+      </label>
+      {showStatus && (
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Examination status
+          <select
+            name="status"
+            defaultValue={status}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
+          >
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="published">Published</option>
+          </select>
+        </label>
+      )}
+      <div className="flex gap-2">
+        <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">
+          Search
+        </button>
+        {(search || status) && (
+          <Link href={`/portal/teacher?section=${section}`} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            Clear
+          </Link>
+        )}
+      </div>
+    </form>
+  );
+}
+
+function QuickLink({
+  href,
+  label,
+  detail,
+  icon: Icon,
+}: {
+  href: string;
+  label: string;
+  detail: string;
+  icon: typeof UsersRound;
+}) {
+  return (
+    <Link href={href} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-violet-200 hover:shadow-md">
+      <span className="inline-flex rounded-xl bg-violet-50 p-3 text-violet-700">
+        <Icon size={20} aria-hidden="true" />
+      </span>
+      <h2 className="mt-3 font-semibold text-slate-950 group-hover:text-violet-800">{label}</h2>
+      <p className="mt-1 text-sm text-slate-500">{detail}</p>
+    </Link>
   );
 }

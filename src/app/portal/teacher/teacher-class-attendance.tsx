@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { CheckCheck, Save } from "lucide-react";
+import { CheckCheck, Search, Save } from "lucide-react";
 import { attendanceStatuses, type AttendanceStatus } from "@/lib/attendance-policy";
 import { saveTeacherClassAttendance } from "./teacher-actions";
 
@@ -50,6 +50,11 @@ export function TeacherClassAttendance({
     { error?: string; success?: boolean },
     FormData
   >(saveTeacherClassAttendance, {});
+  const [studentSearch, setStudentSearch] = useState("");
+  const filteredStudents = students.filter((student) =>
+    `${student.firstName} ${student.lastName} ${student.admissionNumber ?? ""} ${student.rollNumber ?? ""}`
+      .toLocaleLowerCase().includes(studentSearch.trim().toLocaleLowerCase()),
+  );
 
   function setAll(status: AttendanceStatus) {
     setStatuses(Object.fromEntries(students.map((student) => [student.id, status])) as Record<number, AttendanceStatus>);
@@ -58,6 +63,7 @@ export function TeacherClassAttendance({
   return (
     <div className="space-y-4">
       <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end">
+        <input type="hidden" name="section" value="register" />
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Appointed class
           <select
@@ -100,7 +106,9 @@ export function TeacherClassAttendance({
           <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-semibold text-slate-950">Class register · {attendanceDate}</h3>
-              <p className="mt-1 text-sm text-slate-500">{students.length} currently enrolled students</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {studentSearch ? `Showing ${filteredStudents.length} of ` : ""}{students.length} currently enrolled students
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setAll("present")} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
@@ -111,8 +119,19 @@ export function TeacherClassAttendance({
               </button>
             </div>
           </div>
+          <label className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-500">
+            <Search size={16} aria-hidden="true" />
+            <span className="sr-only">Search students</span>
+            <input
+              type="search"
+              value={studentSearch}
+              onChange={(event) => setStudentSearch(event.target.value)}
+              placeholder="Search by student name, admission number, or roll number"
+              className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none focus:ring-0"
+            />
+          </label>
           <div className="divide-y divide-slate-100">
-            {students.map((student, index) => (
+            {filteredStudents.length ? filteredStudents.map((student, index) => (
               <article key={student.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_10rem_minmax(10rem,1fr)] sm:items-end">
                 <div>
                   <p className="text-xs font-medium text-slate-400">Student {index + 1}{student.rollNumber ? ` · Roll ${student.rollNumber}` : ""}</p>
@@ -162,7 +181,9 @@ export function TeacherClassAttendance({
                   />
                 </label>
               </article>
-            ))}
+            )) : (
+              <p className="p-5 text-sm text-slate-500">No students match your search.</p>
+            )}
           </div>
           <div className="flex flex-col gap-3 border-t border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p aria-live="polite" className={state.error ? "text-sm text-rose-700" : "text-sm text-emerald-700"}>
