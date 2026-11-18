@@ -210,6 +210,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("inventory-suppliers", "Inventory suppliers", "Manage inventory suppliers", "/admin/inventory?section=inventory", ["supplier", "vendor"]);
   }
   if (canManageLibrary) {
+    addPage("library-portal", "Library portal", "Library overview, lending activity, and caretaker shortcuts", "/portal/library", ["librarian", "library workspace", "library caretaker"]);
     addPage("library", "Library", "Book catalog, student loans, returns, and overdue books", "/admin/library", ["books", "book loans", "lending", "borrowed", "overdue"]);
     addPage("library-add-book", "Add book", "Add a new title to the library catalog", "/admin/library?section=add-book", ["new book", "catalog"]);
     addPage("library-members", "Library members", "Register student and staff borrowers", "/admin/library?section=members", ["student members", "staff members", "library card", "member register"]);
@@ -219,6 +220,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("library-subjects", "Library subjects", "Organize library books by subject", "/admin/library?section=subjects", ["book subjects"]);
   }
   if (canManageDormitories) {
+    addPage("dormitory-portal", "Dormitory portal", "Dormitory overview, room assignments, and caretaker shortcuts", "/portal/dormitories", ["dormitory caretaker", "boarding", "hostel portal"]);
     addPage("dormitories", "Dormitory management", "Manage school dormitories, rooms, occupancy, and student assignments", "/admin/dormitories", ["hostel", "boarding", "residents", "room assignments"]);
   }
   if (permissions.has("roles.manage")) {

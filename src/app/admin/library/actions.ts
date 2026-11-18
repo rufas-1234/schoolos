@@ -38,6 +38,7 @@ function today(): string {
 
 function revalidateLibrary() {
   revalidatePath("/admin/library");
+  revalidatePath("/portal/library");
   revalidatePath("/admin");
 }
 

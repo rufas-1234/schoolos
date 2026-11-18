@@ -279,9 +279,9 @@ export function AdminShell({
       : permissions.includes("staff.manage")
         ? "/admin/hr"
       : permissions.includes("dormitories.manage")
-        ? "/admin/dormitories?section=overview"
+        ? "/portal/dormitories"
       : permissions.includes("library.manage")
-        ? "/admin/library?section=books"
+        ? "/portal/library"
       : permissions.includes("inventory.manage")
         ? "/admin/inventory"
       : permissions.includes("accounts.manage")

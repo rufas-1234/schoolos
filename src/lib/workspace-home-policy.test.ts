@@ -23,6 +23,13 @@ describe("workspace home policy", () => {
     expect(getWorkspaceHomePath([])).toBe("/unauthorized");
   });
 
+  it("routes library and dormitory caretakers to their dedicated portals", () => {
+    expect(getWorkspaceHomePath(["library.manage"])).toBe("/portal/library");
+    expect(getWorkspaceHomePath(["dormitories.manage"])).toBe("/portal/dormitories");
+    expect(getWorkspaceHomePath(["library.manage", "dormitories.manage"])).toBe("/portal/dormitories");
+    expect(getWorkspaceHomePath(["library.manage", "fees.manage"])).toBe("/admin/fees/collection");
+  });
+
   it("routes linked students and parents to their own portals", () => {
     expect(getWorkspaceHomePath([], { student: true })).toBe("/portal/student");
     expect(getWorkspaceHomePath([], { parent: true })).toBe("/portal/parent");

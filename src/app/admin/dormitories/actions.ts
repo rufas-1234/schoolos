@@ -38,6 +38,7 @@ function today(): string {
 
 function revalidateDormitories() {
   revalidatePath("/admin/dormitories");
+  revalidatePath("/portal/dormitories");
   revalidatePath("/admin/students");
   revalidatePath("/admin");
 }
