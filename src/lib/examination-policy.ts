@@ -183,6 +183,29 @@ export function calculateAnnualProgress(
   };
 }
 
+export function buildExamProgressPeriods(
+  exams: Array<{
+    examId: number;
+    examName: string;
+    termName: string | null;
+    startDate: string;
+  }>,
+): Array<{ key: string; label: string; order: string }> {
+  const uniqueExams = new Map<number, { key: string; label: string; order: string }>();
+  for (const exam of exams) {
+    if (!uniqueExams.has(exam.examId)) {
+      uniqueExams.set(exam.examId, {
+        key: `exam:${exam.examId}`,
+        label: exam.termName ? `${exam.examName} · ${exam.termName}` : exam.examName,
+        order: exam.startDate,
+      });
+    }
+  }
+  return [...uniqueExams.values()].sort((first, second) =>
+    first.order.localeCompare(second.order) || first.key.localeCompare(second.key),
+  );
+}
+
 export function rankScores(scores: Array<{ id: number; score: number }>): Map<number, number> {
   const ordered = [...scores].sort((a, b) => b.score - a.score || a.id - b.id);
   const ranks = new Map<number, number>();

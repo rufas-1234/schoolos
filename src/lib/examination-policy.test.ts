@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canPreviewDraftTestReport,
+  buildExamProgressPeriods,
   calculateComponentTotal,
   calculateAnnualProgress,
   calculateWeightedAverage,
@@ -51,9 +52,23 @@ describe("examination policy", () => {
 
   it("calculates annual averages from available periods and compares the first and last results", () => {
     expect(calculateAnnualProgress([80, null, 90])).toEqual({ average: 85, change: 10 });
+    expect(calculateAnnualProgress([70, 80, 90])).toEqual({ average: 80, change: 20 });
     expect(calculateAnnualProgress([null, 75, null])).toEqual({ average: 75, change: null });
     expect(calculateAnnualProgress([null, null])).toEqual({ average: null, change: null });
     expect(calculateAnnualProgress([80, 105])).toEqual({ average: null, change: null });
+  });
+
+  it("keeps every exam as a separate progress period even when exams share a term", () => {
+    expect(buildExamProgressPeriods([
+      { examId: 1, examName: "Opening Exam", termName: "Term 1", startDate: "2026-01-10" },
+      { examId: 2, examName: "Midterm Exam", termName: "Term 1", startDate: "2026-02-10" },
+      { examId: 3, examName: "End-Term Exam", termName: "Term 1", startDate: "2026-03-10" },
+      { examId: 2, examName: "Midterm Exam", termName: "Term 1", startDate: "2026-02-10" },
+    ])).toEqual([
+      { key: "exam:1", label: "Opening Exam · Term 1", order: "2026-01-10" },
+      { key: "exam:2", label: "Midterm Exam · Term 1", order: "2026-02-10" },
+      { key: "exam:3", label: "End-Term Exam · Term 1", order: "2026-03-10" },
+    ]);
   });
 
   it("validates single and multi-exam mark distributions and sums complete component marks", () => {

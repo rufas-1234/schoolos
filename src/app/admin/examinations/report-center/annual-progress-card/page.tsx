@@ -23,7 +23,11 @@ import {
   subjects,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { calculateAnnualProgress, calculateWeightedAverage } from "@/lib/examination-policy";
+import {
+  buildExamProgressPeriods,
+  calculateAnnualProgress,
+  calculateWeightedAverage,
+} from "@/lib/examination-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 
@@ -37,7 +41,7 @@ function validId(value: string | undefined): number | null {
   return value && /^\d+$/.test(value) ? Number(value) : null;
 }
 
-type ProgressTerm = {
+type ProgressExam = {
   key: string;
   label: string;
   order: string;
@@ -46,7 +50,7 @@ type ProgressTerm = {
 type SubjectProgress = {
   subjectId: number;
   subjectName: string;
-  termScores: Map<string, { totalMarks: number; maxMarks: number; percentage: number } | null>;
+  examScores: Map<string, { totalMarks: number; maxMarks: number; percentage: number } | null>;
   annualPercentage: number | null;
 };
 
@@ -57,7 +61,7 @@ type StudentProgress = {
   sectionName: string;
   rollNumber: string | null;
   subjects: SubjectProgress[];
-  termAverages: Map<string, number | null>;
+  examAverages: Map<string, number | null>;
   annualAverage: number | null;
   change: number | null;
 };
@@ -80,12 +84,12 @@ function buildProgressRows(input: {
     sectionName: string;
     rollNumber: string | null;
   }>;
-  terms: ProgressTerm[];
+  exams: ProgressExam[];
   assessments: Array<{
     id: number;
     subjectId: number;
     subjectName: string;
-    termKey: string;
+    examKey: string;
     maxMarks: string;
     weight: string;
   }>;
@@ -100,15 +104,15 @@ function buildProgressRows(input: {
     const studentId = input.studentByEnrollment.get(mark.enrollmentId);
     if (!assessment || studentId === undefined) continue;
     const studentScores = scores.get(studentId) ?? new Map();
-    const termScores = studentScores.get(assessment.termKey) ?? new Map();
-    const subjectScores = termScores.get(assessment.subjectId) ?? [];
+    const examScores = studentScores.get(assessment.examKey) ?? new Map();
+    const subjectScores = examScores.get(assessment.subjectId) ?? [];
     subjectScores.push({
       marks: Number(mark.marks),
       maxMarks: Number(assessment.maxMarks),
       weight: Number(assessment.weight),
     });
-    termScores.set(assessment.subjectId, subjectScores);
-    studentScores.set(assessment.termKey, termScores);
+    examScores.set(assessment.subjectId, subjectScores);
+    studentScores.set(assessment.examKey, examScores);
     scores.set(studentId, studentScores);
   }
 
@@ -119,35 +123,35 @@ function buildProgressRows(input: {
 
   return input.roster.map((student) => {
     const studentScores = scores.get(student.studentId) ?? new Map();
-    const termAverages = new Map<string, number | null>();
-    for (const term of input.terms) {
-      const termSubjectScores = studentScores.get(term.key);
-      const allScores = termSubjectScores ? [...termSubjectScores.values()].flat() : [];
-      termAverages.set(
-        term.key,
+    const examAverages = new Map<string, number | null>();
+    for (const exam of input.exams) {
+      const examSubjectScores = studentScores.get(exam.key);
+      const allScores = examSubjectScores ? [...examSubjectScores.values()].flat() : [];
+      examAverages.set(
+        exam.key,
         calculateWeightedAverage(allScores)?.percentage ?? null,
       );
     }
 
     const subjectRows = subjects.map((subject) => {
-      const termScores = new Map<string, { totalMarks: number; maxMarks: number; percentage: number } | null>();
-      for (const term of input.terms) {
-        const subjectScores = studentScores.get(term.key)?.get(subject.subjectId) ?? [];
-        termScores.set(
-          term.key,
+      const examScores = new Map<string, { totalMarks: number; maxMarks: number; percentage: number } | null>();
+      for (const exam of input.exams) {
+        const subjectScores = studentScores.get(exam.key)?.get(subject.subjectId) ?? [];
+        examScores.set(
+          exam.key,
           calculateWeightedAverage(subjectScores),
         );
       }
       return {
         ...subject,
-        termScores,
+        examScores,
         annualPercentage: calculateAnnualProgress(
-          input.terms.map((term) => termScores.get(term.key)?.percentage ?? null),
+          input.exams.map((exam) => examScores.get(exam.key)?.percentage ?? null),
         ).average,
       };
     });
     const annualProgress = calculateAnnualProgress(
-      input.terms.map((term) => termAverages.get(term.key) ?? null),
+      input.exams.map((exam) => examAverages.get(exam.key) ?? null),
     );
 
     return {
@@ -157,7 +161,7 @@ function buildProgressRows(input: {
       sectionName: student.sectionName,
       rollNumber: student.rollNumber,
       subjects: subjectRows,
-      termAverages,
+      examAverages,
       annualAverage: annualProgress.average,
       change: annualProgress.change,
     };
@@ -166,7 +170,7 @@ function buildProgressRows(input: {
 
 function StudentProgressCard({
   student,
-  terms,
+  exams,
   schoolName,
   schoolLogoUrl,
   schoolAddress,
@@ -178,7 +182,7 @@ function StudentProgressCard({
   last,
 }: {
   student: StudentProgress;
-  terms: ProgressTerm[];
+  exams: ProgressExam[];
   schoolName: string;
   schoolLogoUrl: string | null;
   schoolAddress: string | null;
@@ -214,7 +218,7 @@ function StudentProgressCard({
           <thead>
             <tr>
               <th>Subject</th>
-              {terms.map((term) => <th key={term.key}>{term.label}</th>)}
+              {exams.map((exam) => <th key={exam.key}>{exam.label}</th>)}
               <th>Annual average</th>
             </tr>
           </thead>
@@ -222,10 +226,10 @@ function StudentProgressCard({
             {student.subjects.map((subject) => (
               <tr key={subject.subjectId}>
                 <td>{subject.subjectName}</td>
-                {terms.map((term) => {
-                  const score = subject.termScores.get(term.key);
+                {exams.map((exam) => {
+                  const score = subject.examScores.get(exam.key);
                   return (
-                    <td key={term.key}>
+                    <td key={exam.key}>
                       {score
                         ? `${score.totalMarks.toFixed(1)} / ${score.maxMarks.toFixed(1)} · ${percentageLabel(score.percentage)}`
                         : "—"}
@@ -237,8 +241,8 @@ function StudentProgressCard({
             ))}
             <tr className="font-bold">
               <td>Overall average</td>
-              {terms.map((term) => (
-                <td key={term.key}>{percentageLabel(student.termAverages.get(term.key) ?? null)}</td>
+              {exams.map((exam) => (
+                <td key={exam.key}>{percentageLabel(student.examAverages.get(exam.key) ?? null)}</td>
               ))}
               <td>{percentageLabel(student.annualAverage)}</td>
             </tr>
@@ -246,16 +250,16 @@ function StudentProgressCard({
         </table>
       </div>
       <section className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-        {terms.map((term) => (
-          <div key={term.key} className="rounded-lg border border-slate-200 p-3">
-            <h3 className="font-bold">{term.label}</h3>
-            <p className="mt-1 text-lg font-bold">{percentageLabel(student.termAverages.get(term.key) ?? null)}</p>
+        {exams.map((exam) => (
+          <div key={exam.key} className="rounded-lg border border-slate-200 p-3">
+            <h3 className="font-bold">{exam.label}</h3>
+            <p className="mt-1 text-lg font-bold">{percentageLabel(student.examAverages.get(exam.key) ?? null)}</p>
           </div>
         ))}
         <div className="rounded-lg border border-violet-200 bg-violet-50 p-3">
           <h3 className="font-bold">Progress change</h3>
           <p className="mt-1 text-lg font-bold">{changeLabel(student.change)}</p>
-          <p>First to last term with a published result</p>
+          <p>First to last published exam</p>
         </div>
       </section>
       <ReportSignatureStrip signatures={signatures} />
@@ -310,9 +314,7 @@ export default async function AnnualProgressCardPage({
       examId: examinations.id,
       examName: examinations.name,
       examStartDate: examinations.startDate,
-      academicTermId: academicTerms.id,
       academicTermName: academicTerms.name,
-      termStartDate: academicTerms.startDate,
       examClassId: examClasses.id,
       classLevelId: classLevels.id,
       className: classLevels.name,
@@ -373,28 +375,30 @@ export default async function AnnualProgressCardPage({
       ))
       .orderBy(asc(examSubjects.examDate), asc(subjects.name))
     : [];
-  const termMap = new Map<string, ProgressTerm>();
+  const examPeriods = buildExamProgressPeriods(subjectAssessments.flatMap((assessment) => {
+    const examClass = examClassById.get(assessment.examClassId);
+    return examClass
+      ? [{
+        examId: examClass.examId,
+        examName: examClass.examName,
+        termName: examClass.academicTermName,
+        startDate: examClass.examStartDate,
+      }]
+      : [];
+  }));
+  const examPeriodById = new Map(
+    selectedClassRows.map((row) => [row.examId, `exam:${row.examId}`]),
+  );
   const assessments = subjectAssessments.flatMap((assessment) => {
     const examClass = examClassById.get(assessment.examClassId);
     if (!examClass) return [];
-    const termKey = examClass.academicTermId === null
-      ? `exam:${examClass.examId}`
-      : `term:${examClass.academicTermId}`;
-    if (!termMap.has(termKey)) {
-      termMap.set(termKey, {
-        key: termKey,
-        label: examClass.academicTermName ?? examClass.examName,
-        order: examClass.termStartDate ?? examClass.examStartDate,
-      });
-    }
     return [{
       ...assessment,
-      termKey,
+      examKey: examPeriodById.get(examClass.examId) ?? `exam:${examClass.examId}`,
       maxMarks: String(assessment.maxMarks),
       weight: String(assessment.weight),
     }];
   });
-  const terms = [...termMap.values()].sort((a, b) => a.order.localeCompare(b.order));
   const rawRoster = selectedYear && selectedClass
     ? await db.select({
       enrollmentId: studentEnrollments.id,
@@ -443,7 +447,7 @@ export default async function AnnualProgressCardPage({
     : [];
   const studentProgress = buildProgressRows({
     roster,
-    terms,
+    exams: examPeriods,
     assessments,
     marks: markRows,
     studentByEnrollment,
@@ -464,7 +468,7 @@ export default async function AnnualProgressCardPage({
           <Link href="/admin/examinations" className="text-sm font-semibold text-violet-700">← Examinations</Link>
           <p className="mt-4 text-sm font-semibold text-violet-700">{context.schoolName} · Examination reports</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">Annual Progress Card Report</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">Compare published subject results across all terms in an academic year, with annual averages and progress from the first to the latest term.</p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">Compare published subject results across every examination in an academic year, with annual averages and progress from the first to the latest exam.</p>
         </div>
         {selectedYear && selectedClass && visibleProgress.length > 0 && (
           <PrintButton label={selectedStudentId ? "Print progress card / Save PDF" : "Print class progress cards / Save PDF"} targetId="annual-progress-output" pageOrientation="landscape" pageSize="A4" />
@@ -505,13 +509,13 @@ export default async function AnnualProgressCardPage({
           <Link href="/admin/examinations/report-center/annual-progress-card" className="rounded-lg border px-4 py-2.5 text-sm font-semibold text-slate-700">Reset</Link>
         </div>
       </SmartFilterForm>
-      {selectedYear && selectedClass && terms.length > 0 && visibleProgress.length > 0 && hasPublishedMarks ? (
+      {selectedYear && selectedClass && examPeriods.length > 0 && visibleProgress.length > 0 && hasPublishedMarks ? (
         <section id="annual-progress-output" className="print-report-content space-y-5">
           {visibleProgress.map((student, index) => (
             <StudentProgressCard
               key={student.studentId}
               student={student}
-              terms={terms}
+              exams={examPeriods}
               schoolName={school?.name ?? context.schoolName}
               schoolLogoUrl={school?.logoUrl ?? null}
               schoolAddress={school?.address ?? null}
@@ -532,7 +536,7 @@ export default async function AnnualProgressCardPage({
               ? "Create an academic year first."
               : !selectedClass
                 ? "There are no classes with published examination results for this academic year."
-                : terms.length === 0 || !hasPublishedMarks
+                : examPeriods.length === 0 || !hasPublishedMarks
                   ? "No published subject results were found for this class."
                   : "No enrolled students were found for this class and academic year."}
           </p>
