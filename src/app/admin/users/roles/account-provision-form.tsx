@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { createSchoolAccount, type RoleActionState } from "../../settings/role-actions";
+import { getStudentRoleId } from "@/lib/account-provisioning-policy";
 
 type ProfileOption = {
   id: number;
@@ -31,6 +32,8 @@ export function AccountProvisionForm({
   const [personType, setPersonType] = useState<"staff" | "student" | "parent">("staff");
   const [recordId, setRecordId] = useState("");
   const [parentLogin, setParentLogin] = useState<"email" | "phone">("email");
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const studentRoleId = getStudentRoleId(roles);
   const profiles = personType === "staff" ? staff : personType === "student" ? students : parents;
   const selectedParent = useMemo(
     () => parents.find((profile) => String(profile.id) === recordId),
@@ -56,6 +59,11 @@ export function AccountProvisionForm({
             const nextType = event.target.value as "staff" | "student" | "parent";
             setPersonType(nextType);
             setRecordId("");
+            if (nextType === "student" && studentRoleId !== null) {
+              setSelectedRoleIds((current) => current.includes(studentRoleId) ? current : [...current, studentRoleId]);
+            } else if (personType === "student" && studentRoleId !== null) {
+              setSelectedRoleIds((current) => current.filter((id) => id !== studentRoleId));
+            }
           }}
           className={fieldClass}
         >
@@ -128,10 +136,30 @@ export function AccountProvisionForm({
       )}
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-slate-700">Assign school roles</legend>
+        {personType === "student" && studentRoleId !== null && (
+          <p className="text-xs text-slate-500">
+            {selectedRoleIds.includes(studentRoleId)
+              ? "The Student role is selected. Add any other roles this account needs."
+              : "Select the Student role to enable student access. Add any other roles this account needs."}
+          </p>
+        )}
         <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
           {roles.map((role) => (
             <label key={role.id} className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" name="roleIds" value={role.id} className="accent-violet-700" />
+              <input
+                type="checkbox"
+                name="roleIds"
+                value={role.id}
+                checked={selectedRoleIds.includes(role.id)}
+                onChange={(event) => {
+                  setSelectedRoleIds((current) =>
+                    event.target.checked
+                      ? [...current, role.id]
+                      : current.filter((id) => id !== role.id),
+                  );
+                }}
+                className="accent-violet-700"
+              />
               {role.name}
             </label>
           ))}

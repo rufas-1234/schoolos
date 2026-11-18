@@ -70,7 +70,7 @@ export async function createSchoolAccount(
     roleIds: roleIds(formData),
   });
   if (!parsed.success) {
-    return { error: "Choose a profile and at least one role, then enter matching passwords of at least 12 characters." };
+    return { error: "Choose a profile, select at least one school role, and enter matching passwords of at least 12 characters." };
   }
 
   const selectedRoles = await db.select({ id: roles.id })
