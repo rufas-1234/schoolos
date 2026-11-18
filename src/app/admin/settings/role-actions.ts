@@ -22,6 +22,7 @@ import {
   userStudentLinks,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { schoolAccountInputSchema } from "@/lib/account-provisioning-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { normalizePhoneIdentifier } from "@/lib/login-identifier-policy";
 
@@ -49,19 +50,7 @@ export async function createSchoolAccount(
   formData: FormData,
 ): Promise<RoleActionState> {
   const context = await requireSchoolPermission("roles.manage");
-  const parsed = z.object({
-    personType: z.enum(["staff", "student", "parent"]),
-    recordId: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()),
-    parentLogin: z.enum(["email", "phone"]).optional(),
-    password: z.string().min(12).max(128),
-    passwordConfirmation: z.string().max(128),
-    roleIds: z.array(z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()))
-      .min(1)
-      .refine((ids) => new Set(ids).size === ids.length),
-  }).refine((data) => data.password === data.passwordConfirmation, {
-    path: ["passwordConfirmation"],
-    message: "Passwords do not match.",
-  }).safeParse({
+  const parsed = schoolAccountInputSchema.safeParse({
     personType: value(formData, "personType"),
     recordId: value(formData, "recordId"),
     parentLogin: value(formData, "parentLogin"),
