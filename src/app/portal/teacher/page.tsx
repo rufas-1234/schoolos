@@ -52,7 +52,7 @@ export default async function TeacherPortalPage({
     section?: string | string[];
     q?: string | string[];
     status?: string | string[];
-    examType?: string | string[];
+    examTitle?: string | string[];
     classSectionId?: string | string[];
     attendanceDate?: string | string[];
   }>;
@@ -69,10 +69,8 @@ export default async function TeacherPortalPage({
   const assessmentStatusFilter = ["open", "published"].includes(typeof params.status === "string" ? params.status : "")
     ? params.status as "open" | "published"
     : "";
-  const requestedExamType = typeof params.examType === "string" ? params.examType : "";
-  const assessmentTypeFilter = requestedExamType === "none" || /^\d+$/.test(requestedExamType)
-    ? requestedExamType
-    : "";
+  const requestedExamTitle = typeof params.examTitle === "string" ? params.examTitle : "";
+  const assessmentTitleFilter = /^\d+$/.test(requestedExamTitle) ? requestedExamTitle : "";
   const requestedSectionId = typeof params.classSectionId === "string" && /^\d+$/.test(params.classSectionId)
     ? Number(params.classSectionId)
     : null;
@@ -436,17 +434,19 @@ export default async function TeacherPortalPage({
   );
   const filteredAssessments = assessments.filter((assessment) =>
     (!assessmentStatusFilter || assessment.examStatus === assessmentStatusFilter) &&
-    (!assessmentTypeFilter ||
-      (assessmentTypeFilter === "none" ? assessment.examTypeId === null : String(assessment.examTypeId) === assessmentTypeFilter)) &&
+    (!assessmentTitleFilter || String(assessment.examId) === assessmentTitleFilter) &&
     `${assessment.examName} ${assessment.examTypeName ?? ""} ${assessment.yearName} ${assessment.className} ${assessment.subjectName} ${assessment.assessmentStatus}`
       .toLocaleLowerCase().includes(normalizedSearch),
+  ).sort((a, b) =>
+    a.examName.localeCompare(b.examName) ||
+    a.examDate.localeCompare(b.examDate) ||
+    a.className.localeCompare(b.className) ||
+    a.subjectName.localeCompare(b.subjectName),
   );
-  const assessmentTypes = [...new Map(
+  const assessmentTitles = [...new Map(
     assessments
-      .filter((assessment) => assessment.examTypeId !== null)
-      .map((assessment) => [assessment.examTypeId!, assessment.examTypeName!]),
+      .map((assessment) => [assessment.examId, assessment.examName]),
   )].sort((a, b) => a[1].localeCompare(b[1]));
-  const hasUntypedAssessments = assessments.some((assessment) => assessment.examTypeId === null);
   const filteredRoutines = routines.filter((routine) =>
     `${weekdays.get(routine.dayOfWeek) ?? "Other"} ${routine.startsAt} ${routine.endsAt} ${routine.className} ${routine.sectionName} ${routine.subjectName} ${routine.roomNumber ?? ""}`
       .toLocaleLowerCase().includes(normalizedSearch),
@@ -592,9 +592,8 @@ export default async function TeacherPortalPage({
                 search={search}
                 status={assessmentStatusFilter}
                 showStatus
-                examType={assessmentTypeFilter}
-                examTypes={assessmentTypes}
-                hasUntypedExams={hasUntypedAssessments}
+                examTitle={assessmentTitleFilter}
+                examTitles={assessmentTitles}
               />
               {filteredAssessments.length ? (
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -639,7 +638,7 @@ export default async function TeacherPortalPage({
                   </div>
                 </div>
               ) : (
-                <EmptyState>{search || assessmentStatusFilter || assessmentTypeFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
+                <EmptyState>{search || assessmentStatusFilter || assessmentTitleFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
               )}
             </section>}
 
@@ -728,20 +727,18 @@ function SectionFilter({
   search,
   status = "",
   showStatus = false,
-  examType = "",
-  examTypes = [],
-  hasUntypedExams = false,
+  examTitle = "",
+  examTitles = [],
 }: {
   section: string;
   search: string;
   status?: string;
   showStatus?: boolean;
-  examType?: string;
-  examTypes?: [number, string][];
-  hasUntypedExams?: boolean;
+  examTitle?: string;
+  examTitles?: [number, string][];
 }) {
   return (
-    <form method="get" action="/portal/teacher" className={`grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTypes.length + Number(hasUntypedExams) > 0 ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
+    <form method="get" action="/portal/teacher" className={`grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTitles.length ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
       <input type="hidden" name="section" value={section} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Search
@@ -753,17 +750,16 @@ function SectionFilter({
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
         />
       </label>
-      {(examTypes.length > 0 || hasUntypedExams) && (
+      {examTitles.length > 0 && (
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Exam type
+          Exam title
           <select
-            name="examType"
-            defaultValue={examType}
+            name="examTitle"
+            defaultValue={examTitle}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
           >
-            <option value="">All exam types</option>
-            {examTypes.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-            {hasUntypedExams && <option value="none">Not set</option>}
+            <option value="">All exam titles</option>
+            {examTitles.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>
         </label>
       )}
@@ -785,7 +781,7 @@ function SectionFilter({
         <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">
           Search
         </button>
-        {(search || status || examType) && (
+        {(search || status || examTitle) && (
           <Link href={`/portal/teacher?section=${section}`} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Clear
           </Link>
