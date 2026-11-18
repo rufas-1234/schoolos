@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { getDefaultLoanDueDate } from "@/lib/library-policy";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
   CheckoutDialog,
   LibraryIssueForm,
@@ -447,9 +448,9 @@ export default async function LibraryPage({
         {addAction}
       </header>
 
-      <nav aria-label="Library sections" className="flex gap-2 overflow-x-auto pb-1">
+      <nav aria-label="Library sections" className="grid grid-cols-2 gap-2 pb-1 sm:flex sm:flex-wrap">
         {sections.map((item) => <Link key={item} href={sectionHref(item)}
-          className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${section === item ? "bg-violet-100 text-violet-800" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+          className={`min-w-0 rounded-lg px-3 py-2 text-center text-sm font-medium sm:text-left ${section === item ? "bg-violet-100 text-violet-800" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
           {sectionTitle(item)}
         </Link>)}
       </nav>
@@ -472,7 +473,7 @@ export default async function LibraryPage({
               sortDirection={sortDirection}
             />
           </div>
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr><th className="px-4 py-3">Book</th><th className="px-4 py-3">Category / subject</th><th className="px-4 py-3">Branch / shelf</th><th className="px-4 py-3">Availability</th><th className="px-4 py-3">Actions</th></tr>
@@ -495,6 +496,25 @@ export default async function LibraryPage({
               </tbody>
             </table>
           </div>
+          <div className="space-y-3 p-3 sm:hidden">
+            {books.map((book) => (
+              <article key={book.id} className="min-w-0 rounded-xl border border-slate-200 p-3">
+                <h3 className="break-words font-semibold text-slate-900">{book.title}</h3>
+                <p className="mt-1 break-words text-sm text-slate-600">{book.author}{book.isbn ? ` · ISBN ${book.isbn}` : ""}</p>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div className="min-w-0"><dt className="text-xs text-slate-500">Category</dt><dd className="break-words text-slate-800">{book.categoryId ? categoryNames.get(book.categoryId) : book.category || "Uncategorized"}</dd></div>
+                  <div className="min-w-0"><dt className="text-xs text-slate-500">Subject</dt><dd className="break-words text-slate-800">{book.subjectId ? subjectNames.get(book.subjectId) ?? "Unassigned" : "None"}</dd></div>
+                  <div className="min-w-0"><dt className="text-xs text-slate-500">Branch / shelf</dt><dd className="break-words text-slate-800">{book.branchId ? branchNames.get(book.branchId) ?? "Branch" : "All branches"} · {book.shelfLocation || "No shelf"}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Available</dt><dd className="font-medium text-slate-800">{book.availableCopies} / {book.totalCopies}</dd></div>
+                </dl>
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                  <LibraryBookDialog book={book} categories={categories} subjects={subjects} branches={branches} />
+                  {book.status === "active" && book.availableCopies > 0 && <CheckoutDialog book={{ id: book.id, label: book.title }} members={activeMembers} dueDate={dueDate} minDate={today} />}
+                </div>
+              </article>
+            ))}
+            {books.length === 0 && <p className="py-8 text-center text-sm text-slate-500">{query ? "No books match your search." : "No books in the catalog yet. Add the first title to get started."}</p>}
+          </div>
           <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
         </section>
       </>}
@@ -508,12 +528,23 @@ export default async function LibraryPage({
         const rows = isCategory ? categoryRows : subjectRows;
         return         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-4"><h2 className="font-semibold text-slate-950">{sectionTitle(section)}</h2><p className="mt-1 text-sm text-slate-500">Organize titles by {isCategory ? "category" : "subject"} across school branches.</p></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm">
+          <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[520px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr></thead>
             <tbody className="divide-y divide-slate-100">{rows.map((row) => <tr key={row.id}><td className="px-4 py-4 font-medium text-slate-900">{row.name}</td><td className="px-4 py-4 text-slate-600">{row.branchId ? branchNames.get(row.branchId) ?? "Branch" : "All branches"}</td><td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{row.status}</span></td><td className="px-4 py-4"><LibraryTermDialog type={isCategory ? "category" : "subject"} branches={branches} term={row} /></td></tr>)}
               {rows.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-slate-500">No {isCategory ? "categories" : "subjects"} have been added.</td></tr>}
             </tbody>
           </table></div>
+          <div className="space-y-3 p-3 sm:hidden">
+            {rows.map((row) => <article key={row.id} className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-slate-200 p-3">
+              <div className="min-w-0">
+                <h3 className="break-words font-semibold text-slate-900">{row.name}</h3>
+                <p className="mt-1 text-sm text-slate-600">{row.branchId ? branchNames.get(row.branchId) ?? "Branch" : "All branches"}</p>
+                <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{row.status}</span>
+              </div>
+              <LibraryTermDialog type={isCategory ? "category" : "subject"} branches={branches} term={row} />
+            </article>)}
+            {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No {isCategory ? "categories" : "subjects"} have been added.</p>}
+          </div>
           <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
         </section>;
       })()}
@@ -523,7 +554,7 @@ export default async function LibraryPage({
           <div><h2 className="font-semibold text-slate-950">Library members</h2><p className="mt-1 text-sm text-slate-500">{totalRows} members registered</p></div>
           <SearchForm section={section} query={query} placeholder="Search name, member ID, or contact..." />
         </div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm">
+        <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Member</th><th className="px-4 py-3">Member ID</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{memberRows.filter((member) => !query || `${member.firstName} ${member.lastName} ${member.memberNumber} ${member.admissionNumber ?? ""} ${member.employeeCode ?? ""} ${member.memberPhone ?? ""} ${member.memberEmail ?? ""}`.toLowerCase().includes(query.toLowerCase())).map((member) => <tr key={member.id}>
             <td className="px-4 py-4 font-medium text-slate-900">{member.firstName} {member.lastName}<span className="block text-xs font-normal text-slate-400">{member.memberType === "staff" ? member.employeeCode ? `Employee ${member.employeeCode}` : "Staff member" : member.memberType === "other" ? [member.memberPhone, member.memberEmail].filter(Boolean).join(" · ") || "Community member" : member.admissionNumber ?? "Student"}</span></td>
@@ -535,6 +566,20 @@ export default async function LibraryPage({
             {memberRows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">Register a student, staff member, or another person to enable book lending.</td></tr>}
           </tbody>
         </table></div>
+        <div className="space-y-3 p-3 sm:hidden">
+          {memberRows.filter((member) => !query || `${member.firstName} ${member.lastName} ${member.memberNumber} ${member.admissionNumber ?? ""} ${member.employeeCode ?? ""} ${member.memberPhone ?? ""} ${member.memberEmail ?? ""}`.toLowerCase().includes(query.toLowerCase())).map((member) => (
+            <article key={member.id} className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-slate-200 p-3">
+              <div className="min-w-0">
+                <h3 className="break-words font-semibold text-slate-900">{member.firstName} {member.lastName}</h3>
+                <p className="mt-1 break-words text-sm text-slate-600">{member.memberType === "staff" ? "Staff" : member.memberType === "other" ? "Other member" : "Student"} · {member.memberNumber}</p>
+                <p className="mt-1 break-words text-xs text-slate-500">{member.memberType === "other" ? [member.memberPhone, member.memberEmail].filter(Boolean).join(" · ") || "Community member" : member.admissionNumber ?? member.employeeCode ?? "No reference number"}</p>
+                <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${member.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{member.status}</span>
+              </div>
+              <LibraryMemberStatusButton memberId={member.id} active={member.status === "active"} />
+            </article>
+          ))}
+          {memberRows.length === 0 && <p className="py-8 text-center text-sm text-slate-500">Register a student, staff member, or another person to enable book lending.</p>}
+        </div>
         <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
       </section>}
 
@@ -550,14 +595,14 @@ export default async function LibraryPage({
       {section === "issued" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="space-y-4 border-b border-slate-100 p-4">
           <div><h2 className="font-semibold text-slate-950">Issued book register</h2><p className="mt-1 text-sm text-slate-500">Search and filter current and returned loans.</p></div>
-          <form action="/admin/library" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <SmartFilterForm action="/admin/library" method="get" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-5">
             <input type="hidden" name="section" value="issued" />
             <input name="q" defaultValue={query} placeholder="Member, book, or ID" className="h-11 min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
             <select name="branchId" defaultValue={branchId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All branches</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select>
             <select name="bookId" defaultValue={bookId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All books</option>{books.map((book) => <option key={book.id} value={book.id}>{book.title}</option>)}</select>
             <select name="subjectId" defaultValue={subjectId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="">All subjects</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.label}</option>)}</select>
             <div className="grid gap-2 sm:flex"><select name="status" defaultValue={selectedStatus} className="h-11 min-w-0 w-full flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="all">All statuses</option><option value="active">Active</option><option value="returned">Returned</option></select><button className="h-11 w-full rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white sm:w-auto">Filter</button></div>
-          </form>
+          </SmartFilterForm>
         </div>
         <LoanHistoryTable loans={activeLoans} today={today} dueDate={dueDate} />
         <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
@@ -596,12 +641,12 @@ function PaginationControls({
 }
 
 function SearchForm({ section, query, placeholder }: { section: LibrarySection; query: string; placeholder: string }) {
-  return <form action="/admin/library" className="flex min-w-0 w-full gap-2">
+  return <SmartFilterForm action="/admin/library" method="get" className="flex min-w-0 w-full gap-2">
     <input type="hidden" name="section" value={section} />
-    <input name="q" defaultValue={query} placeholder={placeholder} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm sm:w-72" />
+    <input type="search" name="q" defaultValue={query} placeholder={placeholder} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm sm:w-72" />
     <button className="h-11 shrink-0 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700">Search</button>
     {query && <Link href={sectionHref(section)} className="self-center text-sm text-violet-700">Clear</Link>}
-  </form>;
+  </SmartFilterForm>;
 }
 
 function BookSearchForm({
@@ -617,9 +662,9 @@ function BookSearchForm({
   sortBy: BookSortField;
   sortDirection: "asc" | "desc";
 }) {
-  return <form action="/admin/library" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+  return <SmartFilterForm action="/admin/library" method="get" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
     <input type="hidden" name="section" value="books" />
-    <input name="q" defaultValue={query} placeholder="Search title, author, ISBN, or subject..." className="h-11 min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
+    <input type="search" name="q" defaultValue={query} placeholder="Search title, author, ISBN, or subject..." className="h-11 min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
     <select name="subjectId" defaultValue={subjectId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm">
       <option value="">All subjects</option>
       {subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.label}</option>)}
@@ -636,7 +681,7 @@ function BookSearchForm({
       <button className="h-11 shrink-0 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Apply</button>
       {(query || subjectId) && <Link href="/admin/library?section=books" className="self-center text-sm text-violet-700">Clear</Link>}
     </div>
-  </form>;
+  </SmartFilterForm>;
 }
 
 type LoanRow = {
@@ -680,7 +725,8 @@ function LoanHistoryTable({
   dueDate: string;
   activeOnly?: boolean;
 }) {
-  return <div className="overflow-x-auto">
+  return <>
+    <div className="hidden overflow-x-auto sm:block">
     <table className="w-full min-w-[900px] text-left text-sm">
       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
         <tr><th className="px-4 py-3">Book</th><th className="px-4 py-3">Member</th><th className="px-4 py-3">Issued</th><th className="px-4 py-3">Due / returned</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr>
@@ -700,7 +746,31 @@ function LoanHistoryTable({
         {loans.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">{activeOnly ? "There are no active loans." : "No loans match these filters."}</td></tr>}
       </tbody>
     </table>
-  </div>;
+    </div>
+    <div className="space-y-3 p-3 sm:hidden">
+      {loans.map((loan) => {
+        const overdue = loan.status === "active" && loan.dueDate < today;
+        return <article key={loan.id} className="min-w-0 rounded-xl border border-slate-200 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="break-words font-semibold text-slate-900">{loan.title}</h3>
+              <p className="mt-1 break-words text-sm text-slate-600">{loan.studentName ?? "Unknown member"}</p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${overdue ? "bg-rose-50 text-rose-700" : loan.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{overdue ? "Overdue" : loan.status}</span>
+          </div>
+          <p className="mt-2 break-words text-xs text-slate-500">{loan.memberNumber ? `Member ${loan.memberNumber}` : loan.admissionNumber ?? loan.employeeCode ?? "No member number"}{loan.bookNumber ? ` · Book ${loan.bookNumber}` : ""}</p>
+          {(loan.memberPhone || loan.memberEmail) && <p className="mt-1 break-words text-xs text-slate-500">{[loan.memberPhone, loan.memberEmail].filter(Boolean).join(" · ")}</p>}
+          <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-sm">
+            <div><dt className="text-xs text-slate-500">Issued</dt><dd className="text-slate-800">{loan.issuedAt}</dd></div>
+            <div><dt className="text-xs text-slate-500">Due</dt><dd className={overdue ? "font-medium text-rose-700" : "text-slate-800"}>{loan.dueDate}</dd></div>
+          </dl>
+          {loan.returnedAt && <p className="mt-2 text-xs text-slate-500">Returned {loan.returnedAt}</p>}
+          {loan.status === "active" && <div className="mt-3 border-t border-slate-100 pt-3"><LoanActions loanId={loan.id} currentDueDate={loan.dueDate} dueDate={getDefaultLoanDueDate(loan.dueDate) ?? dueDate} /></div>}
+        </article>;
+      })}
+      {loans.length === 0 && <p className="py-8 text-center text-sm text-slate-500">{activeOnly ? "There are no active loans." : "No loans match these filters."}</p>}
+    </div>
+  </>;
 }
 
 function SummaryCard({ label, value, alert = false }: {

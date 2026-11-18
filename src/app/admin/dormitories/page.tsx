@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { and, asc, count, eq, inArray, like, or } from "drizzle-orm";
 import { TablePagination } from "@/components/table-pagination";
 import { SmartFilterForm } from "@/components/smart-filter-form";
@@ -364,12 +365,26 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
       <p className="mt-1 max-w-3xl text-sm text-slate-600">Manage dormitories, rooms, bed capacity, student assignments, and checkouts.</p>
     </header>
 
-    {section === "overview" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard label="Dormitories" value={dormitoryRows.length} />
-      <SummaryCard label="Rooms" value={rooms.length} />
-      <SummaryCard label="Occupied beds" value={occupiedBedCount} />
-      <SummaryCard label="Available beds" value={rooms.reduce((total, room) => total + room.available, 0)} />
-    </section>}
+    {section === "overview" && <>
+      <section aria-label="Dormitory summary" className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
+        <SummaryCard label="Dormitories" value={dormitoryRows.length} />
+        <SummaryCard label="Rooms" value={rooms.length} />
+        <SummaryCard label="Occupied beds" value={occupiedBedCount} />
+        <SummaryCard label="Available beds" value={rooms.reduce((total, room) => total + room.available, 0)} />
+      </section>
+      <section aria-label="Dormitory management shortcuts" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { href: "/admin/dormitories?section=dormitories", title: "Dormitories", description: "Manage buildings, branches, and resident policies." },
+          { href: "/admin/dormitories?section=rooms", title: "Rooms & beds", description: "Track room capacity and available beds." },
+          { href: "/admin/dormitories?section=residents", title: "Room assignments", description: "Assign students individually or in bulk." },
+          { href: "/admin/dormitories/reports", title: "Reports", description: "Print occupancy and assignment registers." },
+        ].map((item) => <Link key={item.href} href={item.href}
+          className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-violet-300 hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-700">
+          <h2 className="break-words font-semibold text-slate-950">{item.title}</h2>
+          <p className="mt-1 break-words text-sm text-slate-600">{item.description}</p>
+        </Link>)}
+      </section>
+    </>}
 
     {section === "dormitories" && <>
       <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">

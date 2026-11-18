@@ -39,6 +39,7 @@ import {
   userStudentLinks,
 } from "@/db/schema";
 import { PrintButton } from "@/components/print-button";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { requireSchoolMember } from "@/lib/access-control";
 import {
   calculateAnnualProgress,
@@ -1471,7 +1472,7 @@ function FilterForm({
   selectOptions?: Array<{ value: string; label: string }>;
 }) {
   return (
-    <form method="get" action="/portal/student" className="flex flex-col gap-2 sm:flex-row sm:items-center">
+    <SmartFilterForm method="get" action="/portal/student" className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <input type="hidden" name="section" value={name === "fees" ? "fees" : name} />
       {selectOptions ? (
         <select
@@ -1496,7 +1497,7 @@ function FilterForm({
       <button type="submit" className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
         Apply filter
       </button>
-    </form>
+    </SmartFilterForm>
   );
 }
 

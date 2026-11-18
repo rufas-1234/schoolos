@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, type FormHTMLAttributes, type ReactNode, type ChangeEvent } from "react";
+import { useEffect, useRef, type FormHTMLAttributes, type ReactNode, type ChangeEvent, type SubmitEvent } from "react";
 
 export function SmartFilterForm({
   children,
   onChange,
+  onSubmit,
   ...props
 }: FormHTMLAttributes<HTMLFormElement> & { children: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -22,12 +23,17 @@ export function SmartFilterForm({
     if (target.type === "hidden" || target.type === "submit" || target.type === "button") return;
 
     if (timer.current !== null) window.clearTimeout(timer.current);
-    const delay = target instanceof HTMLInputElement && ["search", "text"].includes(target.type) ? 200 : 0;
+    const delay = target instanceof HTMLInputElement && ["search", "text"].includes(target.type) ? 350 : 0;
     timer.current = window.setTimeout(() => formRef.current?.requestSubmit(), delay);
   }
 
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    onSubmit?.(event);
+  }
+
   return (
-    <form {...props} ref={formRef} data-smart-filter="" onChange={handleChange}>
+    <form {...props} ref={formRef} data-smart-filter="" onChange={handleChange} onSubmit={handleSubmit}>
       {children}
     </form>
   );

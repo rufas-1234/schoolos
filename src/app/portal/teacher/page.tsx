@@ -26,6 +26,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isAttendanceStatus } from "@/lib/attendance-policy";
 import { PrintButton } from "@/components/print-button";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { TeacherPortalShell } from "./teacher-portal-shell";
 import { TeacherClassAttendance } from "./teacher-class-attendance";
 
@@ -797,7 +798,7 @@ function SectionFilter({
   examTitles?: [number, string][];
 }) {
   return (
-    <form method="get" action="/portal/teacher" className={`print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTitles.length ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
+    <SmartFilterForm method="get" action="/portal/teacher" className={`print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTitles.length ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
       <input type="hidden" name="section" value={section} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Search
@@ -846,7 +847,7 @@ function SectionFilter({
           </Link>
         )}
       </div>
-    </form>
+    </SmartFilterForm>
   );
 }
 

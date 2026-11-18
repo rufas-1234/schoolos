@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { CheckCheck, Search, Save } from "lucide-react";
 import { attendanceStatuses, type AttendanceStatus } from "@/lib/attendance-policy";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { saveTeacherClassAttendance } from "./teacher-actions";
 
 export type TeacherClassSectionOption = {
@@ -63,7 +64,7 @@ export function TeacherClassAttendance({
 
   return (
     <div className="space-y-4">
-      <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end">
+      <SmartFilterForm method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end">
         <input type="hidden" name="section" value="register" />
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Appointed class
@@ -90,7 +91,7 @@ export function TeacherClassAttendance({
         <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">
           Load class
         </button>
-      </form>
+      </SmartFilterForm>
 
       {!sections.length ? (
         <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
