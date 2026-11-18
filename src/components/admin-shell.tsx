@@ -59,7 +59,10 @@ const navigation: NavigationItem[] = [
     permission: "roles.manage",
     children: [
       { id: "user-list", label: "User list", href: "/admin/users" },
-      { id: "user-roles", label: "User roles", href: "/admin/users/roles" },
+      { id: "create-role", label: "Create role", href: "/admin/users/roles?section=create-role", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-role" } },
+      { id: "school-roles", label: "School roles", href: "/admin/users/roles?section=school-roles", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "school-roles" } },
+      { id: "create-account", label: "Create account", href: "/admin/users/roles?section=create-account", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-account" } },
+      { id: "individual-access", label: "Individual access", href: "/admin/users/roles?section=individual-access", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "individual-access" } },
     ],
   },
   {
@@ -290,7 +293,12 @@ export function AdminShell({
     ?.children?.find((section) => section.href === pathname);
   const activeUserSection = navigation
     .find((item) => item.href === "/admin/users")
-    ?.children?.find((section) => section.href === pathname);
+    ?.children?.find((section) => {
+      const sectionPath = section.matchPath ?? section.href?.split("?")[0];
+      return sectionPath === pathname &&
+        (!section.matchQuery ||
+          searchParams.get(section.matchQuery.key) === section.matchQuery.value);
+    });
   const activeInventorySection = navigation
     .find((item) => item.label === "Inventory")
     ?.children?.find((section) => {

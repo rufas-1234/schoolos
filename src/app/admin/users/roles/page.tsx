@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { AdminRecordDialog } from "@/components/admin-data-table";
 import { db } from "@/db";
 import {
@@ -44,8 +45,17 @@ function getRoleCategories(permissionKeys: string[]) {
   ))].sort((a, b) => a.localeCompare(b));
 }
 
-export default async function UserRolesPage() {
+export default async function UserRolesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ section?: string }>;
+}) {
   const context = await requireSchoolPermission("roles.manage");
+  const { section } = await searchParams;
+  const validSections = ["create-role", "school-roles", "create-account", "individual-access"];
+  if (!section || !validSections.includes(section)) {
+    redirect("/admin/users/roles?section=create-role");
+  }
   const [schoolRoles, availablePermissions, accounts, staffProfiles, studentProfiles, parentProfiles, loginIdentifiers] = await Promise.all([
     db.select({
       id: roles.id,
@@ -209,10 +219,7 @@ export default async function UserRolesPage() {
         <p className="text-sm font-medium text-violet-700">Administration</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">User roles</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
-          Create categorized roles, grant only the needed permissions, and combine a base role with account-specific roles.
-        </p>
-        <p className="mt-3 max-w-3xl rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
-          To enable a teacher, assign the Teacher role and link the account to an active teacher profile. The default role allows marks entry only for assigned subjects; class attendance is available only in the teacher&apos;s appointed classes. Grant additional permissions separately when needed.
+          Set up school roles, create login accounts, and manage individual access.
         </p>
       </header>
 
@@ -340,7 +347,7 @@ export default async function UserRolesPage() {
             </section>
           ),
         },
-      ]} />
+      ]} activeSectionId={section} />
     </div>
   );
 }
