@@ -207,7 +207,7 @@ function StudentProgressCard({
           <p className="mt-1 text-sm text-slate-600">{yearName} · {className}</p>
         </div>
       </header>
-      <section className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs sm:grid-cols-4">
+      <section className="annual-progress-card-info grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs sm:grid-cols-4">
         <p><b>Student</b><br />{student.name}</p>
         <p><b>Admission no.</b><br />{student.admissionNumber ?? "—"}</p>
         <p><b>Section / roll no.</b><br />{student.sectionName} · {student.rollNumber ?? "—"}</p>
@@ -249,7 +249,7 @@ function StudentProgressCard({
           </tbody>
         </table>
       </div>
-      <section className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+      <section className="annual-progress-card-summary grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
         {exams.map((exam) => (
           <div key={exam.key} className="rounded-lg border border-slate-200 p-3">
             <h3 className="font-bold">{exam.label}</h3>

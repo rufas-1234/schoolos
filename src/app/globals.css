@@ -696,6 +696,26 @@ h6 {
     -webkit-print-color-adjust: exact;
   }
 
+  .exam-report-document {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .exam-report-document .a4-report-card .exam-report-student-details {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .exam-report-document .annual-progress-card-info {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .exam-report-document .annual-progress-card-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
   .attendance-print-only {
     display: block !important;
   }

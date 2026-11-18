@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, count, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   libraryBooks,
@@ -66,6 +66,12 @@ function sectionHref(section: LibrarySection, query = ""): string {
   return `/admin/library?${params}`;
 }
 
+type BookSortField = "title" | "author" | "subject";
+
+function validBookSort(value: string | undefined): BookSortField {
+  return value === "author" || value === "subject" ? value : "title";
+}
+
 export default async function LibraryPage({
   searchParams,
 }: {
@@ -78,6 +84,8 @@ export default async function LibraryPage({
     bookId?: string;
     subjectId?: string;
     page?: string;
+    sortBy?: string;
+    sortDirection?: string;
   }>;
 }) {
   const context = await requireSchoolPermission("library.manage");
@@ -92,6 +100,8 @@ export default async function LibraryPage({
   const branchId = validId(queryParams.branchId);
   const bookId = validId(queryParams.bookId);
   const subjectId = validId(queryParams.subjectId);
+  const sortBy = validBookSort(queryParams.sortBy);
+  const sortDirection = queryParams.sortDirection === "desc" ? "desc" : "asc";
   const requestedPage = validPage(queryParams.page);
   const schoolId = context.schoolId;
   const today = dateToday();
@@ -103,8 +113,34 @@ export default async function LibraryPage({
       like(libraryBooks.isbn, `%${query}%`),
       like(libraryBooks.bookNumber, `%${query}%`),
       like(libraryBooks.category, `%${query}%`),
+      sql`exists (
+        select 1 from ${librarySubjects}
+        where ${librarySubjects.id} = ${libraryBooks.subjectId}
+          and ${librarySubjects.schoolId} = ${schoolId}
+          and ${librarySubjects.name} like ${`%${query}%`}
+      )`,
     )
     : undefined;
+  const bookConditions = and(
+    eq(libraryBooks.schoolId, schoolId),
+    searchBook,
+    subjectId ? eq(libraryBooks.subjectId, subjectId) : undefined,
+  );
+  const subjectSort = sql<string>`coalesce((
+    select ${librarySubjects.name}
+    from ${librarySubjects}
+    where ${librarySubjects.id} = ${libraryBooks.subjectId}
+      and ${librarySubjects.schoolId} = ${schoolId}
+    limit 1
+  ), '')`;
+  const sortExpression = sortBy === "author"
+    ? libraryBooks.author
+    : sortBy === "subject"
+      ? subjectSort
+      : libraryBooks.title;
+  const bookOrder = sortDirection === "desc"
+    ? [desc(sortExpression), asc(libraryBooks.title)]
+    : [asc(sortExpression), asc(libraryBooks.title)];
   const memberSearch = query
     ? or(
       like(libraryMembers.memberNumber, `%${query}%`),
@@ -141,10 +177,7 @@ export default async function LibraryPage({
     ) : undefined,
   ];
   const [pageTotal] = section === "books"
-    ? await db.select({ value: count() }).from(libraryBooks).where(and(
-      eq(libraryBooks.schoolId, schoolId),
-      searchBook,
-    ))
+    ? await db.select({ value: count() }).from(libraryBooks).where(bookConditions)
     : section === "categories"
       ? await db.select({ value: count() }).from(libraryCategories).where(eq(libraryCategories.schoolId, schoolId))
       : section === "subjects"
@@ -168,7 +201,7 @@ export default async function LibraryPage({
   const offset = (page - 1) * PAGE_SIZE;
   const pageHref = (nextPage: number) => {
     const params = new URLSearchParams({ section });
-    for (const key of ["q", "status", "branchId", "memberType", "bookId", "subjectId"] as const) {
+    for (const key of ["q", "status", "branchId", "memberType", "bookId", "subjectId", "sortBy", "sortDirection"] as const) {
       const value = queryParams[key];
       if (value) params.set(key, value);
     }
@@ -190,10 +223,7 @@ export default async function LibraryPage({
     [overdueCount],
     [catalogStats],
   ] = await Promise.all([
-    db.select().from(libraryBooks).where(and(
-      eq(libraryBooks.schoolId, schoolId),
-      searchBook,
-    )).orderBy(asc(libraryBooks.title))
+    db.select().from(libraryBooks).where(bookConditions).orderBy(...bookOrder)
       .limit(section === "books" ? PAGE_SIZE : 500)
       .offset(section === "books" ? offset : 0),
     db.select().from(libraryCategories).where(eq(libraryCategories.schoolId, schoolId))
@@ -432,9 +462,15 @@ export default async function LibraryPage({
           <SummaryCard label="Overdue loans" value={String(overdueCount?.value ?? 0)} alert={Number(overdueCount?.value ?? 0) > 0} />
         </section>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4">
             <div><h2 className="font-semibold text-slate-950">Book catalog</h2><p className="mt-1 text-sm text-slate-500">{totalRows} matching titles</p></div>
-            <SearchForm section={section} query={query} placeholder="Search title, author, ISBN..." />
+            <BookSearchForm
+              query={query}
+              subjectId={subjectId}
+              subjects={subjects}
+              sortBy={sortBy}
+              sortDirection={sortDirection}
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
@@ -565,6 +601,41 @@ function SearchForm({ section, query, placeholder }: { section: LibrarySection; 
     <input name="q" defaultValue={query} placeholder={placeholder} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm sm:w-72" />
     <button className="h-11 shrink-0 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700">Search</button>
     {query && <Link href={sectionHref(section)} className="self-center text-sm text-violet-700">Clear</Link>}
+  </form>;
+}
+
+function BookSearchForm({
+  query,
+  subjectId,
+  subjects,
+  sortBy,
+  sortDirection,
+}: {
+  query: string;
+  subjectId?: number;
+  subjects: LibraryTermOption[];
+  sortBy: BookSortField;
+  sortDirection: "asc" | "desc";
+}) {
+  return <form action="/admin/library" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <input type="hidden" name="section" value="books" />
+    <input name="q" defaultValue={query} placeholder="Search title, author, ISBN, or subject..." className="h-11 min-w-0 rounded-lg border border-slate-200 px-3 text-sm" />
+    <select name="subjectId" defaultValue={subjectId ?? ""} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm">
+      <option value="">All subjects</option>
+      {subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.label}</option>)}
+    </select>
+    <select name="sortBy" defaultValue={sortBy} className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm" aria-label="Sort books by">
+      <option value="title">Sort by title</option>
+      <option value="author">Sort by author</option>
+      <option value="subject">Sort by subject</option>
+    </select>
+    <div className="flex gap-2">
+      <select name="sortDirection" defaultValue={sortDirection} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm" aria-label="Sort direction">
+        <option value="asc">Ascending</option><option value="desc">Descending</option>
+      </select>
+      <button className="h-11 shrink-0 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">Apply</button>
+      {(query || subjectId) && <Link href="/admin/library?section=books" className="self-center text-sm text-violet-700">Clear</Link>}
+    </div>
   </form>;
 }
 
