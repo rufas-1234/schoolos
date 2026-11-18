@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { GraduationCap, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function PortalShell({
   userName,
   portalLabel,
   navigation,
+  showWorkspaceSearch = false,
 }: {
   children: ReactNode;
   schoolName: string;
@@ -29,6 +31,7 @@ export function PortalShell({
   userName: string;
   portalLabel: string;
   navigation: PortalNavigationItem[];
+  showWorkspaceSearch?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -122,7 +125,7 @@ export function PortalShell({
       </aside>
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur print:hidden">
+        <header className="sticky top-0 z-30 border-b border-violet-900/15 bg-[#eadcf4] text-violet-950 print:hidden">
           <div className="flex min-h-[4.5rem] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button
@@ -139,6 +142,11 @@ export function PortalShell({
                 <p className="hidden truncate text-xs text-slate-500 sm:block">{schoolName}</p>
               </div>
             </div>
+            {showWorkspaceSearch && (
+              <div className="hidden min-w-0 max-w-xl flex-1 sm:block">
+                <WorkspaceQuickSearch scope="teaching" />
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <span className="hidden max-w-56 truncate text-sm font-medium text-slate-700 sm:inline">
                 {userName}
@@ -153,6 +161,11 @@ export function PortalShell({
               </button>
             </div>
           </div>
+          {showWorkspaceSearch && (
+            <div className="px-4 pb-3 sm:hidden">
+              <WorkspaceQuickSearch scope="teaching" />
+            </div>
+          )}
           {mobileMenuOpen && (
             <div className="border-t border-slate-100 bg-[#eadcf4] px-4 py-4 md:hidden">
               <nav aria-label={`${portalLabel} navigation`} className="space-y-1">
@@ -170,6 +183,12 @@ export function PortalShell({
           )}
           {signOutError && <p role="alert" className="px-6 pb-3 text-sm text-rose-700">{signOutError}</p>}
         </header>
+        <div className="admin-print-header" aria-label={`${schoolName} letterhead`}>
+          <div className="admin-print-identity">
+            <p className="admin-print-eyebrow">{portalLabel}</p>
+            <h1>{schoolName}</h1>
+          </div>
+        </div>
         {children}
       </div>
     </div>

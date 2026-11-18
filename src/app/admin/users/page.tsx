@@ -27,6 +27,7 @@ export default async function UsersPage({
   const assignments = memberships.length
     ? await db.select({
       membershipId: userRoles.membershipId,
+      roleId: userRoles.roleId,
       roleName: roles.name,
     }).from(userRoles)
       .innerJoin(roles, and(
@@ -36,11 +37,20 @@ export default async function UsersPage({
       .where(inArray(userRoles.membershipId, memberships.map((membership) => membership.membershipId)))
     : [];
   const roleNamesByMembership = new Map<number, string[]>();
+  const roleIdsByMembership = new Map<number, number[]>();
   for (const assignment of assignments) {
     const names = roleNamesByMembership.get(assignment.membershipId) ?? [];
     names.push(assignment.roleName);
     roleNamesByMembership.set(assignment.membershipId, names);
+    const roleIds = roleIdsByMembership.get(assignment.membershipId) ?? [];
+    roleIds.push(assignment.roleId);
+    roleIdsByMembership.set(assignment.membershipId, roleIds);
   }
+  const roleFilterOptions = [...new Map(assignments.map((assignment) => [
+    assignment.roleId,
+    assignment.roleName,
+  ]))].sort((a, b) => a[1].localeCompare(b[1]))
+    .map(([roleId, roleName]) => ({ value: String(roleId), label: roleName }));
 
   return (
     <div className="space-y-7">
@@ -62,11 +72,6 @@ export default async function UsersPage({
         </Link>
       </header>
 
-      <section className="rounded-2xl border border-violet-100 bg-violet-50 p-4 text-sm leading-6 text-violet-950">
-        User accounts are created through the school’s account onboarding flow. This directory shows each account’s
-        current school access; use Manage roles to assign permissions or enable and disable access.
-      </section>
-
       <AdminDataTable
         key={typeof search === "string" ? search : ""}
         title="School users"
@@ -77,6 +82,25 @@ export default async function UsersPage({
           { key: "status", label: "School access" },
           { key: "accountStatus", label: "Account" },
         ]}
+        filters={[
+          { key: "roleFilter", label: "Role", options: roleFilterOptions },
+          {
+            key: "schoolAccessFilter",
+            label: "School access",
+            options: [
+              { value: "Enabled", label: "Enabled" },
+              { value: "Disabled", label: "Disabled" },
+            ],
+          },
+          {
+            key: "accountStatusFilter",
+            label: "Account status",
+            options: [
+              { value: "Active", label: "Active" },
+              { value: "Inactive", label: "Inactive" },
+            ],
+          },
+        ]}
         rows={memberships.map((membership) => ({
           id: membership.membershipId,
           values: {
@@ -85,6 +109,9 @@ export default async function UsersPage({
             roles: (roleNamesByMembership.get(membership.membershipId) ?? []).join(", ") || "No roles assigned",
             status: membership.membershipStatus === "active" ? "Enabled" : "Disabled",
             accountStatus: membership.accountActive ? "Active" : "Inactive",
+            roleFilter: roleIdsByMembership.get(membership.membershipId)?.join("|") ?? "",
+            schoolAccessFilter: membership.membershipStatus === "active" ? "Enabled" : "Disabled",
+            accountStatusFilter: membership.accountActive ? "Active" : "Inactive",
             createdAt: new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(membership.createdAt),
           },
         }))}

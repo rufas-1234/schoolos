@@ -11,12 +11,33 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import {
-  AccountRolesForm,
+  AccountRoleDirectory,
   CreateRoleForm,
   DeleteRoleForm,
   EditRoleForm,
-  SchoolAccountAccessForm,
 } from "../../settings/role-forms";
+
+const permissionCategoryLabels: Record<string, string> = {
+  accounts: "Accounts",
+  academics: "Academics",
+  dashboard: "Dashboard",
+  examinations: "Examinations",
+  fees: "Fees",
+  inventory: "Inventory",
+  library: "Library",
+  payments: "Payments",
+  results: "Results",
+  roles: "Users & access",
+  school: "School settings",
+  staff: "Human resources",
+  students: "Students",
+};
+
+function getRoleCategories(permissionKeys: string[]) {
+  return [...new Set(permissionKeys.map((key) =>
+    permissionCategoryLabels[key.split(".")[0]] ?? "Other permissions",
+  ))].sort((a, b) => a.localeCompare(b));
+}
 
 export default async function UserRolesPage() {
   const context = await requireSchoolPermission("roles.manage");
@@ -97,6 +118,15 @@ export default async function UserRolesPage() {
       (assignedCountByRole.get(assignment.roleId) ?? 0) + 1,
     );
   }
+  const roleOptions = schoolRoles.map((role) => ({
+    id: role.id,
+    name: role.name,
+    categories: getRoleCategories(permissionsByRole.get(role.id) ?? []),
+  }));
+  const accountsWithRoles = accounts.map((account) => ({
+    ...account,
+    currentRoleIds: roleIdsByMembership.get(account.membershipId) ?? [],
+  }));
 
   return (
     <div className="space-y-7">
@@ -104,7 +134,7 @@ export default async function UserRolesPage() {
         <p className="text-sm font-medium text-violet-700">Administration</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">User roles</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
-          Create school-specific roles, grant the least required permissions, and assign those roles to active school accounts.
+          Create categorized roles, grant only the needed permissions, and combine a base role with account-specific roles.
         </p>
         <p className="mt-3 max-w-3xl rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
           To enable a teacher, assign the Teacher role and link the account to an active teacher profile. The default role allows marks entry only for assigned subjects; class attendance is available only in the teacher&apos;s appointed classes. Grant additional permissions separately when needed.
@@ -116,7 +146,7 @@ export default async function UserRolesPage() {
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="font-semibold text-slate-900">Roles in {context.schoolName}</h2>
-            <p className="mt-1 text-sm text-slate-500">System and custom role permissions can be changed at any time. Roles must be unassigned before deletion.</p>
+              <p className="mt-1 text-sm text-slate-500">Each role is labeled with its permission areas. Multiple roles can be assigned to one account; their permissions combine.</p>
           </div>
           <ul className="divide-y divide-slate-100">
             {schoolRoles.map((role) => (
@@ -129,6 +159,13 @@ export default async function UserRolesPage() {
                     </span>
                   </div>
                   {role.description && <p className="mt-1 text-sm text-slate-500">{role.description}</p>}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(getRoleCategories(permissionsByRole.get(role.id) ?? [])).map((category) => (
+                      <span key={category} className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-800">
+                        {category}
+                      </span>
+                    ))}
+                  </div>
                   <p className="mt-2 text-xs leading-5 text-slate-500">
                     {(permissionsByRole.get(role.id) ?? []).join(" · ") || "No permissions assigned"}
                   </p>
@@ -189,41 +226,13 @@ export default async function UserRolesPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">School login access and role assignments</h2>
-          <p className="mt-1 text-sm text-slate-500">Select the role names this account should have, then choose Save role assignments. For a teacher, select Teacher. Disabling access blocks this account from entering this school but does not delete the user.</p>
+          <h2 className="font-semibold text-slate-900">Individual account access and roles</h2>
+          <p className="mt-1 text-sm text-slate-500">Assign each person a base role plus any additional role they need. For example, assign Teacher and an examination-specific role to the same teacher. Disabling access blocks school entry but does not delete the account.</p>
         </div>
         {accounts.length === 0 ? (
           <p className="p-7 text-center text-sm text-slate-500">No active school accounts are available.</p>
         ) : (
-          <ul className="divide-y divide-slate-100">
-            {accounts.map((account) => (
-              <li key={account.membershipId} className="grid gap-4 p-5 lg:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)]">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-800">{account.name}</p>
-                  <p className="truncate text-sm text-slate-500">{account.email}</p>
-                  <p className={`mt-1 text-xs font-semibold ${account.membershipStatus === "active" ? "text-emerald-700" : "text-rose-700"}`}>
-                    {account.membershipStatus === "active" ? "School access enabled" : "School access disabled"}
-                  </p>
-                  <div className="mt-3">
-                    <SchoolAccountAccessForm
-                      membershipId={account.membershipId}
-                      enabled={account.membershipStatus === "active"}
-                      userName={account.name}
-                    />
-                  </div>
-                </div>
-                {account.membershipStatus === "active" ? (
-                  <AccountRolesForm
-                    userId={account.userId}
-                    currentRoleIds={roleIdsByMembership.get(account.membershipId) ?? []}
-                    roles={schoolRoles.map(({ id, name }) => ({ id, name }))}
-                  />
-                ) : (
-                  <p className="self-center text-sm text-slate-500">Enable school access before assigning roles.</p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <AccountRoleDirectory accounts={accountsWithRoles} roles={roleOptions} />
         )}
       </section>
     </div>

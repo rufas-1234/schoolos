@@ -24,7 +24,8 @@ export type TeacherClassStudent = {
   publishedReports: { examId: number; examName: string }[];
 };
 
-const statusLabels: Record<AttendanceStatus, string> = {
+const statusLabels: Record<AttendanceStatus | "", string> = {
+  "": "Not marked",
   present: "Present",
   absent: "Absent",
   late: "Late",
@@ -62,7 +63,7 @@ export function TeacherClassAttendance({
 
   return (
     <div className="space-y-4">
-      <form method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end">
+      <form method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end">
         <input type="hidden" name="section" value="register" />
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Appointed class
@@ -110,7 +111,7 @@ export function TeacherClassAttendance({
                 {studentSearch ? `Showing ${filteredStudents.length} of ` : ""}{students.length} currently enrolled students
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="print:hidden flex flex-wrap gap-2">
               <button type="button" onClick={() => setAll("present")} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
                 <CheckCheck size={14} aria-hidden="true" /> All present
               </button>
@@ -119,7 +120,7 @@ export function TeacherClassAttendance({
               </button>
             </div>
           </div>
-          <label className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-500">
+          <label className="print:hidden flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-500">
             <Search size={16} aria-hidden="true" />
             <span className="sr-only">Search students</span>
             <input
@@ -158,6 +159,9 @@ export function TeacherClassAttendance({
                 </div>
                 <label className="block space-y-1 text-xs font-semibold text-slate-600">
                   Attendance
+                  <span className="hidden print:block pt-1 text-sm font-normal text-slate-800">
+                    {statusLabels[statuses[student.id] ?? ""]}
+                  </span>
                   <select
                     name={`status_${student.id}`}
                     value={statuses[student.id] ?? ""}
@@ -165,7 +169,7 @@ export function TeacherClassAttendance({
                       ...current,
                       [student.id]: event.target.value as AttendanceStatus | "",
                     }))}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-800"
+                    className="print:hidden w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-800"
                   >
                     <option value="">Not marked</option>
                     {attendanceStatuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
@@ -173,11 +177,14 @@ export function TeacherClassAttendance({
                 </label>
                 <label className="block space-y-1 text-xs font-semibold text-slate-600">
                   Note (optional)
+                  <span className="hidden print:block pt-1 text-sm font-normal text-slate-800">
+                    {student.note || "—"}
+                  </span>
                   <input
                     name={`note_${student.id}`}
                     defaultValue={student.note ?? ""}
                     maxLength={500}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
+                    className="print:hidden w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
                   />
                 </label>
               </article>
@@ -185,7 +192,7 @@ export function TeacherClassAttendance({
               <p className="p-5 text-sm text-slate-500">No students match your search.</p>
             )}
           </div>
-          <div className="flex flex-col gap-3 border-t border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="print:hidden flex flex-col gap-3 border-t border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p aria-live="polite" className={state.error ? "text-sm text-rose-700" : "text-sm text-emerald-700"}>
               {state.error ?? (state.success ? "Attendance saved." : "")}
             </p>

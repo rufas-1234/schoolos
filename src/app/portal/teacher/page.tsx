@@ -25,6 +25,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isAttendanceStatus } from "@/lib/attendance-policy";
+import { PrintButton } from "@/components/print-button";
 import { TeacherPortalShell } from "./teacher-portal-shell";
 import { TeacherClassAttendance } from "./teacher-class-attendance";
 
@@ -476,19 +477,22 @@ export default async function TeacherPortalPage({
       schoolLogoUrl={context.schoolLogoUrl}
       teacherName={teacherName}
     >
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
-        <header className="rounded-3xl bg-gradient-to-br from-violet-800 to-indigo-900 p-7 text-white shadow-lg sm:p-9">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">
-            {activeSection === "overview" ? "Teacher dashboard" : "Teacher workspace"}
-          </p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
-            {activeSection === "overview" ? `Welcome, ${teacherName}` : sectionTitles[activeSection]}
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-violet-100">
-            {activeSection === "overview"
-              ? "Your responsibilities, permissions, and teaching activity at a glance."
-              : "Only information within your active teaching assignments and class appointments is shown."}
-          </p>
+      <main id="teacher-portal-print" className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
+        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-violet-700">
+              {activeSection === "overview" ? "Teacher dashboard" : "Teacher workspace"}
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              {activeSection === "overview" ? `Welcome, ${teacherName}` : sectionTitles[activeSection]}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-500">
+              {activeSection === "overview"
+                ? "Your responsibilities, permissions, and teaching activity at a glance."
+                : "Only information within your active teaching assignments and class appointments is shown."}
+            </p>
+          </div>
+          <PrintButton targetId="teacher-portal-print" />
         </header>
 
         {!hasTeacherProfile ? (
@@ -537,7 +541,7 @@ export default async function TeacherPortalPage({
                   </article>
                 </section>
 
-                <section aria-label="Portal sections" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <section aria-label="Portal sections" className="print:hidden grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <QuickLink href="/portal/teacher?section=classes" label="My classes" detail={`${uniqueAssignments.length} assigned subject sections`} icon={UsersRound} />
                   <QuickLink href="/portal/teacher?section=register" label="Class register" detail={`${classTeacherSections.length} appointed classes`} icon={UsersRound} />
                   <QuickLink href="/portal/teacher?section=assessments" label="Examination work" detail={`${assessments.length} available assessments`} icon={ClipboardCheck} />
@@ -738,7 +742,7 @@ function SectionFilter({
   examTitles?: [number, string][];
 }) {
   return (
-    <form method="get" action="/portal/teacher" className={`grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTitles.length ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
+    <form method="get" action="/portal/teacher" className={`print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTitles.length ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
       <input type="hidden" name="section" value={section} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Search
