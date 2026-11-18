@@ -80,8 +80,8 @@ export function PortalShell({
           className={cn(
             "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
             active
-              ? "bg-white/85 text-violet-950 shadow-sm"
-              : "text-violet-950/85 hover:bg-white/50 hover:text-violet-950",
+              ? "bg-white text-violet-800 shadow-sm"
+              : "text-slate-700 hover:bg-white/80 hover:text-slate-950",
           )}
         >
           <Icon size={18} aria-hidden="true" />
@@ -93,30 +93,30 @@ export function PortalShell({
 
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 md:grid md:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="hidden h-dvh flex-col border-r border-violet-900/15 bg-[#eadcf4] px-5 py-6 md:sticky md:top-0 md:flex">
+      <aside className="hidden h-dvh flex-col border-r border-slate-200 bg-slate-100 px-5 py-6 md:sticky md:top-0 md:flex">
         <Link href={navHref(navigation[0]?.href ?? "/")} className="mb-9 flex items-center gap-3 px-1">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/75 text-violet-900 shadow-sm">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-violet-800 shadow-sm">
             {logo
               ? <Image src={logo} unoptimized width={44} height={44} alt={`${schoolName} logo`} className="h-full w-full object-contain" />
               : <GraduationCap size={24} aria-hidden="true" />}
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-bold text-violet-950">{schoolName}</span>
-            <span className="mt-0.5 block text-xs text-violet-900/75">{portalLabel}</span>
+            <span className="block truncate text-sm font-bold text-slate-950">{schoolName}</span>
+            <span className="mt-0.5 block text-xs text-slate-600">{portalLabel}</span>
           </span>
         </Link>
-        <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-900/75">
+        <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
           Workspace
         </p>
         <nav aria-label={`${portalLabel} navigation`} className="min-h-0 flex-1 space-y-1 overflow-y-auto">
           {renderNavigation()}
         </nav>
-        <div className="mt-5 border-t border-violet-900/15 pt-4">
-          <p className="truncate px-3 text-sm font-semibold text-violet-950">{userName}</p>
+        <div className="mt-5 border-t border-slate-200 pt-4">
+          <p className="truncate px-3 text-sm font-semibold text-slate-900">{userName}</p>
           <button
             type="button"
             onClick={signOut}
-            className="mt-3 inline-flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-violet-950/85 transition hover:bg-white/50"
+            className="mt-3 inline-flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white/80"
           >
             <LogOut size={18} aria-hidden="true" />
             Sign out
@@ -125,7 +125,7 @@ export function PortalShell({
       </aside>
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-30 border-b border-violet-900/15 bg-[#eadcf4] text-violet-950 print:hidden">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white text-slate-950 print:hidden">
           <div className="flex min-h-[4.5rem] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button
@@ -167,14 +167,14 @@ export function PortalShell({
             </div>
           )}
           {mobileMenuOpen && (
-            <div className="border-t border-slate-100 bg-[#eadcf4] px-4 py-4 md:hidden">
+            <div className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-slate-200 bg-white px-4 py-4 md:hidden">
               <nav aria-label={`${portalLabel} navigation`} className="space-y-1">
                 {renderNavigation(true)}
               </nav>
               <button
                 type="button"
                 onClick={signOut}
-                className="mt-3 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-violet-950/85 hover:bg-white/50"
+                className="mt-3 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 <LogOut size={18} aria-hidden="true" />
                 Sign out

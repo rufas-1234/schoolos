@@ -600,7 +600,34 @@ export default async function TeacherPortalPage({
                 examTitles={assessmentTitles}
               />
               {filteredAssessments.length ? (
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <>
+                  <div className="grid gap-3 sm:hidden print:hidden">
+                    {filteredAssessments.map((assessment) => (
+                      <article key={assessment.assessmentId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="break-words font-bold text-slate-950">{assessment.examName}</h3>
+                            <p className="mt-1 text-xs text-slate-500">{assessment.yearName} · {assessment.examDate}</p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                            {assessment.examStatus === "published" ? "Published" : assessment.assessmentStatus.replaceAll("_", " ")}
+                          </span>
+                        </div>
+                        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                          <InfoItem label="Class" value={assessment.className} />
+                          <InfoItem label="Subject" value={assessment.subjectName} />
+                          <InfoItem label="Type" value={assessment.examTypeName ?? "Not set"} />
+                        </dl>
+                        <Link
+                          href={`/admin/examinations/${assessment.examId}/subjects/${assessment.assessmentId}`}
+                          className="mt-4 inline-flex min-h-10 items-center gap-1 font-semibold text-violet-700 hover:text-violet-900"
+                        >
+                          {assessment.examStatus === "published" ? "View results" : "Open marks"} <BookOpenCheck size={15} aria-hidden="true" />
+                        </Link>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block print:block">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[46rem] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -640,17 +667,35 @@ export default async function TeacherPortalPage({
                       </tbody>
                     </table>
                   </div>
-                </div>
+                  </div>
+                </>
               ) : (
                 <EmptyState>{search || assessmentStatusFilter || assessmentTitleFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
               )}
             </section>}
 
             {activeSection === "timetable" && <section id="timetable" className="space-y-4">
-              <SectionHeading title="My weekly timetable" description="Scheduled lessons for your assigned subjects and active-year sections. Search by day, subject, section, or room." />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <SectionHeading title="My weekly timetable" description="Scheduled lessons for your assigned subjects and active-year sections. Search by day, subject, section, or room." />
+                {filteredRoutines.length > 0 && <PrintButton targetId="teacher-timetable-print" label="Print timetable" pageOrientation="landscape" />}
+              </div>
               <SectionFilter section="timetable" search={search} />
               {filteredRoutines.length ? (
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div id="teacher-timetable-print" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="grid gap-3 p-3 sm:hidden print:hidden">
+                    {filteredRoutines.map((routine, index) => (
+                      <article key={`${routine.dayOfWeek}-${routine.startsAt}-${routine.className}-${routine.sectionName}-${routine.subjectName}-${index}`} className="rounded-xl border border-slate-200 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-bold text-slate-950">{routine.subjectName}</h3>
+                          <span className="shrink-0 text-xs font-semibold text-violet-700">{weekdays.get(routine.dayOfWeek) ?? "Other"}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-700">{routine.startsAt}–{routine.endsAt}</p>
+                        <p className="mt-1 text-sm text-slate-600">{routine.className} · {routine.sectionName}</p>
+                        <p className="mt-1 text-xs text-slate-500">Room {routine.roomNumber ?? "not assigned"}</p>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="hidden sm:block print:block">
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[40rem] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -674,6 +719,7 @@ export default async function TeacherPortalPage({
                         ))}
                       </tbody>
                     </table>
+                  </div>
                   </div>
                 </div>
               ) : (
@@ -715,6 +761,15 @@ function SectionHeading({ title, description }: { title: string; description: st
       <h2 className="text-xl font-bold text-slate-950">{title}</h2>
       <p className="mt-1 text-sm text-slate-500">{description}</p>
     </header>
+  );
+}
+
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs font-medium text-slate-500">{label}</dt>
+      <dd className="mt-0.5 break-words text-sm text-slate-900">{value}</dd>
+    </div>
   );
 }
 

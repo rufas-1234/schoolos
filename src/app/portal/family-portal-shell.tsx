@@ -15,6 +15,9 @@ const studentNavigation = [
   { href: "#learning", label: "My learning", icon: GraduationCap },
   { href: "#timetable", label: "Class timetable", icon: CalendarDays },
   { href: "#results", label: "Exam results", icon: BookOpenCheck },
+  { href: "#fees", label: "Fees and receipts", icon: CreditCard },
+  { href: "#profile", label: "My profile", icon: UsersRound },
+  { href: "#library", label: "Library", icon: BookOpenCheck },
   { href: "#attendance", label: "Attendance", icon: CalendarDays },
 ];
 

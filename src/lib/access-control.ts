@@ -36,6 +36,8 @@ export async function requireSchoolMember() {
       schoolEmail: schools.email,
       schoolPhone: schools.phone,
       schoolAddress: schools.address,
+      schoolCurrency: schools.currency,
+      schoolTimezone: schools.timezone,
     })
     .from(schoolMemberships)
     .innerJoin(schools, eq(schoolMemberships.schoolId, schools.id))
@@ -57,6 +59,8 @@ export async function requireSchoolMember() {
     schoolEmail: membership.schoolEmail,
     schoolPhone: membership.schoolPhone,
     schoolAddress: membership.schoolAddress,
+    schoolCurrency: membership.schoolCurrency,
+    schoolTimezone: membership.schoolTimezone,
     membershipId: membership.membershipId,
   };
 }

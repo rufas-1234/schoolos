@@ -825,6 +825,12 @@ h6 {
     visibility: visible !important;
   }
 
+  body.print-target-active [data-print-target].overflow-hidden,
+  body.print-target-active [data-print-target] .overflow-hidden,
+  body.print-target-active [data-print-target] .overflow-x-auto {
+    overflow: visible !important;
+  }
+
   body.print-target-active [data-print-target] * {
     visibility: visible !important;
   }
