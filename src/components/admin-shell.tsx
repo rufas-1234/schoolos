@@ -131,7 +131,11 @@ const navigation: NavigationItem[] = [
     permission: "fees.manage",
     permissionAlternatives: ["payments.record"],
     children: [
-      { id: "fee-setup", label: "Fee setup", href: "/admin/fees", permission: "fees.manage" },
+      { id: "fee-setup", label: "Fee setup", href: "/admin/fees", matchQuery: { key: "section", value: null }, permission: "fees.manage" },
+      { id: "fee-discounts", label: "Scholarships & discounts", href: "/admin/fees?section=discounts", matchPath: "/admin/fees", matchQuery: { key: "section", value: "discounts" }, permission: "fees.manage" },
+      { id: "fee-structure-create", label: "Set up fee structure", href: "/admin/fees?section=structure", matchPath: "/admin/fees", matchQuery: { key: "section", value: "structure" }, permission: "fees.manage" },
+      { id: "fee-structures", label: "Created fee structures", href: "/admin/fees?section=structures", matchPath: "/admin/fees", matchQuery: { key: "section", value: "structures" }, permission: "fees.manage" },
+      { id: "fee-invoices", label: "Generate student invoices", href: "/admin/fees?section=invoices", matchPath: "/admin/fees", matchQuery: { key: "section", value: "invoices" }, permission: "fees.manage" },
       {
         id: "fee-collection",
         label: "Fee collection",
@@ -317,7 +321,12 @@ export function AdminShell({
     });
   const activeFeesSection = navigation
     .find((item) => item.label === "Fees")
-    ?.children?.find((section) => (section.matchPath ?? section.href?.split("?")[0]) === pathname);
+    ?.children?.find((section) => {
+      const sectionPath = section.matchPath ?? section.href?.split("?")[0];
+      return sectionPath === pathname &&
+        (!section.matchQuery ||
+          searchParams.get(section.matchQuery.key) === section.matchQuery.value);
+    });
   const activeLibrarySection = navigation
     .find((item) => item.label === "Library")
     ?.children?.find((section) => section.matchQuery && searchParams.get(section.matchQuery.key) === section.matchQuery.value);
