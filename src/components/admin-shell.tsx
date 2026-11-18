@@ -88,7 +88,6 @@ const navigation: NavigationItem[] = [
       { id: "marks-grade", label: "Marks Grade", href: "/admin/examinations?section=grades", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "grades" } },
       { id: "send-marks-sms", label: "Send Marks By SMS", href: "/admin/examinations?section=sms", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "sms" } },
       { id: "exam-reports", label: "Exams Reports", href: "/admin/examinations/report-center/exam-routine" },
-      { id: "annual-progress-report", label: "Annual Progress Cards", href: "/admin/examinations/report-center/annual-progress-card", permission: "examinations.create", permissionAlternatives: ["results.publish"] },
       { id: "exam-analytics", label: "Exam Analytics", href: "/admin/exam-analytics", matchPath: "/admin/exam-analytics", permission: "examinations.create", permissionAlternatives: ["results.publish"] },
     ],
   },

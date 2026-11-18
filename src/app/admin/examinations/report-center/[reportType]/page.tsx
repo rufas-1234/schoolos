@@ -759,7 +759,7 @@ export default async function ExaminationReportPage({
           </Link>
         ))}
         <Link href="/admin/examinations/report-center/annual-progress-card" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-          Annual Progress Card · All terms
+          Annual Progress Card Report
         </Link>
       </nav>
 
