@@ -67,7 +67,8 @@ export function PortalShell({
       const targetSection = new URLSearchParams(targetQuery ?? "").get("section");
       const active = href.startsWith("#")
         ? activeAnchor === href
-        : pathname === targetPath && searchParams.get("section") === targetSection;
+        : pathname === targetPath &&
+          (searchParams.get("section") ?? "overview") === (targetSection ?? "overview");
       return (
         <Link
           key={href}
