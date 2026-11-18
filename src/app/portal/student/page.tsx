@@ -1,10 +1,8 @@
 import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import {
-  BookOpenCheck,
   CalendarDays,
   ClipboardCheck,
   GraduationCap,
-  LayoutDashboard,
 } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -25,7 +23,7 @@ import {
   userStudentLinks,
 } from "@/db/schema";
 import { requireSchoolMember } from "@/lib/access-control";
-import { PortalShell } from "@/components/portal-shell";
+import { FamilyPortalShell } from "../family-portal-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -181,18 +179,11 @@ export default async function StudentPortalPage() {
   ]);
 
   return (
-    <PortalShell
+    <FamilyPortalShell
       schoolName={context.schoolName}
       schoolLogoUrl={context.schoolLogoUrl}
       userName={context.user.name}
-      portalLabel="Student Portal"
-      navigation={[
-        { href: "/portal/student", label: "Overview", icon: LayoutDashboard },
-        { href: "#learning", label: "My learning", icon: GraduationCap },
-        { href: "#timetable", label: "Class timetable", icon: CalendarDays },
-        { href: "#results", label: "Exam results", icon: BookOpenCheck },
-        { href: "#attendance", label: "Attendance", icon: CalendarDays },
-      ]}
+      portalType="student"
     >
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
         <header className="rounded-3xl bg-gradient-to-br from-violet-800 to-indigo-900 p-6 text-white shadow-lg sm:p-9">
@@ -348,7 +339,7 @@ export default async function StudentPortalPage() {
           </>
         )}
       </main>
-    </PortalShell>
+    </FamilyPortalShell>
   );
 }
 

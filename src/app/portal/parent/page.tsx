@@ -1,11 +1,5 @@
 import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
-import {
-  BookOpenCheck,
-  CalendarDays,
-  CreditCard,
-  LayoutDashboard,
-  UsersRound,
-} from "lucide-react";
+import { BookOpenCheck, CreditCard, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import {
   academicYears,
@@ -24,7 +18,7 @@ import {
   userStudentLinks,
 } from "@/db/schema";
 import { requireSchoolMember } from "@/lib/access-control";
-import { PortalShell } from "@/components/portal-shell";
+import { FamilyPortalShell } from "../family-portal-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -159,18 +153,11 @@ export default async function ParentPortalPage() {
   );
 
   return (
-    <PortalShell
+    <FamilyPortalShell
       schoolName={context.schoolName}
       schoolLogoUrl={context.schoolLogoUrl}
       userName={context.user.name}
-      portalLabel="Parent Portal"
-      navigation={[
-        { href: "/portal/parent", label: "Overview", icon: LayoutDashboard },
-        { href: "#children", label: "My children", icon: UsersRound },
-        { href: "#progress", label: "Academic progress", icon: BookOpenCheck },
-        { href: "#fees", label: "Fee invoices", icon: CreditCard },
-        { href: "#attendance", label: "Attendance", icon: CalendarDays },
-      ]}
+      portalType="parent"
     >
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
         <header className="rounded-3xl bg-gradient-to-br from-violet-800 to-indigo-900 p-6 text-white shadow-lg sm:p-9">
@@ -318,7 +305,7 @@ export default async function ParentPortalPage() {
           </>
         )}
       </main>
-    </PortalShell>
+    </FamilyPortalShell>
   );
 }
 
