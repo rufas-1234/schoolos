@@ -12,6 +12,7 @@ import {
   examClasses,
   examMarks,
   examSubjects,
+  examTypes,
   examinations,
   schoolBranches,
   studentAttendance,
@@ -51,6 +52,7 @@ export default async function TeacherPortalPage({
     section?: string | string[];
     q?: string | string[];
     status?: string | string[];
+    examType?: string | string[];
     classSectionId?: string | string[];
     attendanceDate?: string | string[];
   }>;
@@ -66,6 +68,10 @@ export default async function TeacherPortalPage({
   const normalizedSearch = search.toLocaleLowerCase();
   const assessmentStatusFilter = ["open", "published"].includes(typeof params.status === "string" ? params.status : "")
     ? params.status as "open" | "published"
+    : "";
+  const requestedExamType = typeof params.examType === "string" ? params.examType : "";
+  const assessmentTypeFilter = requestedExamType === "none" || /^\d+$/.test(requestedExamType)
+    ? requestedExamType
     : "";
   const requestedSectionId = typeof params.classSectionId === "string" && /^\d+$/.test(params.classSectionId)
     ? Number(params.classSectionId)
@@ -196,6 +202,8 @@ export default async function TeacherPortalPage({
         examId: examinations.id,
         assessmentId: examSubjects.id,
         examName: examinations.name,
+        examTypeId: examTypes.id,
+        examTypeName: examTypes.name,
         examStatus: examinations.status,
         assessmentStatus: examSubjects.status,
         examDate: examSubjects.examDate,
@@ -226,6 +234,10 @@ export default async function TeacherPortalPage({
           eq(examinations.id, examClasses.examinationId),
           eq(examinations.schoolId, context.schoolId),
           inArray(examinations.status, ["open", "published"]),
+        ))
+        .leftJoin(examTypes, and(
+          eq(examTypes.id, examinations.examTypeId!),
+          eq(examTypes.schoolId, context.schoolId),
         ))
         .innerJoin(academicYears, and(
           eq(academicYears.id, examinations.academicYearId),
@@ -424,9 +436,17 @@ export default async function TeacherPortalPage({
   );
   const filteredAssessments = assessments.filter((assessment) =>
     (!assessmentStatusFilter || assessment.examStatus === assessmentStatusFilter) &&
-    `${assessment.examName} ${assessment.yearName} ${assessment.className} ${assessment.subjectName} ${assessment.assessmentStatus}`
+    (!assessmentTypeFilter ||
+      (assessmentTypeFilter === "none" ? assessment.examTypeId === null : String(assessment.examTypeId) === assessmentTypeFilter)) &&
+    `${assessment.examName} ${assessment.examTypeName ?? ""} ${assessment.yearName} ${assessment.className} ${assessment.subjectName} ${assessment.assessmentStatus}`
       .toLocaleLowerCase().includes(normalizedSearch),
   );
+  const assessmentTypes = [...new Map(
+    assessments
+      .filter((assessment) => assessment.examTypeId !== null)
+      .map((assessment) => [assessment.examTypeId!, assessment.examTypeName!]),
+  )].sort((a, b) => a[1].localeCompare(b[1]));
+  const hasUntypedAssessments = assessments.some((assessment) => assessment.examTypeId === null);
   const filteredRoutines = routines.filter((routine) =>
     `${weekdays.get(routine.dayOfWeek) ?? "Other"} ${routine.startsAt} ${routine.endsAt} ${routine.className} ${routine.sectionName} ${routine.subjectName} ${routine.roomNumber ?? ""}`
       .toLocaleLowerCase().includes(normalizedSearch),
@@ -567,7 +587,15 @@ export default async function TeacherPortalPage({
 
             {activeSection === "assessments" && <section id="assessments" className="space-y-4">
               <SectionHeading title="Examination work" description="Assessments are limited to your assigned subjects. Search the exam, class, subject, or status." />
-              <SectionFilter section="assessments" search={search} status={assessmentStatusFilter} showStatus />
+              <SectionFilter
+                section="assessments"
+                search={search}
+                status={assessmentStatusFilter}
+                showStatus
+                examType={assessmentTypeFilter}
+                examTypes={assessmentTypes}
+                hasUntypedExams={hasUntypedAssessments}
+              />
               {filteredAssessments.length ? (
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <div className="overflow-x-auto">
@@ -575,6 +603,7 @@ export default async function TeacherPortalPage({
                       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                         <tr>
                           <th className="px-4 py-3 font-semibold">Examination</th>
+                          <th className="px-4 py-3 font-semibold">Exam type</th>
                           <th className="px-4 py-3 font-semibold">Class</th>
                           <th className="px-4 py-3 font-semibold">Subject</th>
                           <th className="px-4 py-3 font-semibold">Assessment date</th>
@@ -588,6 +617,7 @@ export default async function TeacherPortalPage({
                             <td className="px-4 py-3 font-medium text-slate-900">
                               {assessment.examName}<span className="mt-1 block text-xs font-normal text-slate-500">{assessment.yearName}</span>
                             </td>
+                            <td className="px-4 py-3 text-slate-700">{assessment.examTypeName ?? "Not set"}</td>
                             <td className="px-4 py-3 text-slate-700">{assessment.className}</td>
                             <td className="px-4 py-3 text-slate-700">{assessment.subjectName}</td>
                             <td className="px-4 py-3 text-slate-700">{assessment.examDate}</td>
@@ -609,7 +639,7 @@ export default async function TeacherPortalPage({
                   </div>
                 </div>
               ) : (
-                <EmptyState>{search || assessmentStatusFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
+                <EmptyState>{search || assessmentStatusFilter || assessmentTypeFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
               )}
             </section>}
 
@@ -698,14 +728,20 @@ function SectionFilter({
   search,
   status = "",
   showStatus = false,
+  examType = "",
+  examTypes = [],
+  hasUntypedExams = false,
 }: {
   section: string;
   search: string;
   status?: string;
   showStatus?: boolean;
+  examType?: string;
+  examTypes?: [number, string][];
+  hasUntypedExams?: boolean;
 }) {
   return (
-    <form method="get" action="/portal/teacher" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+    <form method="get" action="/portal/teacher" className={`grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTypes.length + Number(hasUntypedExams) > 0 ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
       <input type="hidden" name="section" value={section} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Search
@@ -717,6 +753,20 @@ function SectionFilter({
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
         />
       </label>
+      {(examTypes.length > 0 || hasUntypedExams) && (
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Exam type
+          <select
+            name="examType"
+            defaultValue={examType}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
+          >
+            <option value="">All exam types</option>
+            {examTypes.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            {hasUntypedExams && <option value="none">Not set</option>}
+          </select>
+        </label>
+      )}
       {showStatus && (
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Examination status
@@ -735,7 +785,7 @@ function SectionFilter({
         <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">
           Search
         </button>
-        {(search || status) && (
+        {(search || status || examType) && (
           <Link href={`/portal/teacher?section=${section}`} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Clear
           </Link>
