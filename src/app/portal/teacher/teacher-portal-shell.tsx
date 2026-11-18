@@ -29,7 +29,7 @@ export function TeacherPortalShell({
       userName={teacherName}
       portalLabel="Teacher Portal"
       navigation={teacherNavigation}
-      showWorkspaceSearch
+      searchScope="teaching"
     >
       {children}
     </PortalShell>

@@ -23,7 +23,7 @@ export function PortalShell({
   userName,
   portalLabel,
   navigation,
-  showWorkspaceSearch = false,
+  searchScope,
 }: {
   children: ReactNode;
   schoolName: string;
@@ -31,7 +31,7 @@ export function PortalShell({
   userName: string;
   portalLabel: string;
   navigation: PortalNavigationItem[];
-  showWorkspaceSearch?: boolean;
+  searchScope?: "teaching" | "student";
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -138,14 +138,19 @@ export function PortalShell({
               >
                 {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
               </button>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white text-violet-800 md:hidden">
+                {logo
+                  ? <Image src={logo} unoptimized width={36} height={36} alt={`${schoolName} logo`} className="h-full w-full object-contain" />
+                  : <GraduationCap size={20} aria-hidden="true" />}
+              </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-violet-800">{portalLabel}</p>
                 <p className="hidden truncate text-xs text-slate-500 sm:block">{schoolName}</p>
               </div>
             </div>
-            {showWorkspaceSearch && (
+            {searchScope && (
               <div className="hidden min-w-0 max-w-xl flex-1 sm:block">
-                <WorkspaceQuickSearch scope="teaching" />
+                <WorkspaceQuickSearch scope={searchScope} instanceId="portal-search-desktop" />
               </div>
             )}
             <div className="flex items-center gap-3">
@@ -162,9 +167,9 @@ export function PortalShell({
               </button>
             </div>
           </div>
-          {showWorkspaceSearch && (
+          {searchScope && (
             <div className="px-4 pb-3 sm:hidden">
-              <WorkspaceQuickSearch scope="teaching" />
+              <WorkspaceQuickSearch scope={searchScope} instanceId="portal-search-mobile" />
             </div>
           )}
           {mobileMenuOpen && (

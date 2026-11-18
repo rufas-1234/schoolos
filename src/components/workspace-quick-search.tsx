@@ -40,7 +40,88 @@ const teachingSuggestions: WorkspaceSearchResult[] = [
   },
 ];
 
-export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspace" | "teaching" }) {
+const studentSuggestions: WorkspaceSearchResult[] = [
+  {
+    id: "student-overview",
+    title: "Overview",
+    description: "See your class placement, learning summary, and fee balance.",
+    href: "/portal/student?section=overview",
+    category: "Pages",
+    searchTerms: ["home", "dashboard", "summary"],
+  },
+  {
+    id: "student-learning",
+    title: "My learning",
+    description: "View your current class placement.",
+    href: "/portal/student?section=learning",
+    category: "Academics",
+    searchTerms: ["class", "learning", "placement"],
+  },
+  {
+    id: "student-timetable",
+    title: "Class timetable",
+    description: "Open your weekly lesson schedule.",
+    href: "/portal/student?section=timetable",
+    category: "Academics",
+    searchTerms: ["schedule", "lessons", "subjects"],
+  },
+  {
+    id: "student-results",
+    title: "Exam results",
+    description: "View and print your published report cards.",
+    href: "/portal/student?section=results",
+    category: "Examinations",
+    searchTerms: ["exam", "marks", "reports", "grades"],
+  },
+  {
+    id: "student-fees",
+    title: "Invoices and fees",
+    description: "Review fee invoices, balances, and payment status.",
+    href: "/portal/student?section=fees",
+    category: "Fees",
+    searchTerms: ["invoice", "balance", "payment", "finance"],
+  },
+  {
+    id: "student-receipts",
+    title: "Payment receipts",
+    description: "View and print payment receipts.",
+    href: "/portal/student?section=receipts",
+    category: "Fees",
+    searchTerms: ["receipt", "paid", "transaction"],
+  },
+  {
+    id: "student-profile",
+    title: "My profile",
+    description: "View your read-only student details.",
+    href: "/portal/student?section=profile",
+    category: "Pages",
+    searchTerms: ["personal", "details", "student"],
+  },
+  {
+    id: "student-library",
+    title: "Library",
+    description: "Search the catalogue and check your loans.",
+    href: "/portal/student?section=library",
+    category: "Library",
+    searchTerms: ["books", "loans", "borrowed"],
+  },
+  {
+    id: "student-attendance",
+    title: "Attendance",
+    description: "Review attendance recorded by your school.",
+    href: "/portal/student?section=attendance",
+    category: "Pages",
+    searchTerms: ["present", "absent", "register"],
+  },
+];
+
+export function WorkspaceQuickSearch({
+  scope = "workspace",
+  instanceId = "workspace-quick-search",
+}: {
+  scope?: "workspace" | "teaching" | "student";
+  instanceId?: string;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [resultState, setResultState] = useState<{
@@ -53,6 +134,7 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
   const requestId = useRef(0);
 
   useEffect(() => {
+    if (scope === "student") return;
     const normalizedQuery = query.trim();
     const currentRequestId = ++requestId.current;
     if (normalizedQuery.length < 2) return;
@@ -73,21 +155,30 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
     }, 180);
 
     return () => window.clearTimeout(timer);
-  }, [query]);
+  }, [query, scope]);
 
   const normalizedQuery = query.trim();
   const results = resultState.query === normalizedQuery ? resultState.results : [];
-  const suggestions = scope === "teaching"
-    ? teachingSuggestions.filter((suggestion) =>
+  const suggestions = scope === "student"
+    ? studentSuggestions.filter((suggestion) =>
       !normalizedQuery ||
       `${suggestion.title} ${suggestion.description} ${suggestion.searchTerms?.join(" ") ?? ""}`
         .toLocaleLowerCase()
         .includes(normalizedQuery.toLocaleLowerCase()),
     )
-    : [];
-  const navigationOptions = normalizedQuery.length >= 2 ? results : suggestions;
+    : scope === "teaching"
+      ? teachingSuggestions.filter((suggestion) =>
+      !normalizedQuery ||
+      `${suggestion.title} ${suggestion.description} ${suggestion.searchTerms?.join(" ") ?? ""}`
+        .toLocaleLowerCase()
+        .includes(normalizedQuery.toLocaleLowerCase()),
+    )
+      : [];
+  const navigationOptions = scope === "student"
+    ? suggestions
+    : normalizedQuery.length >= 2 ? results : suggestions;
   const showResults = focused &&
-    (normalizedQuery.length >= 2 || (scope === "teaching" && normalizedQuery.length < 2));
+    (normalizedQuery.length >= 2 || (scope !== "workspace" && normalizedQuery.length < 2));
 
   function openResult(result: WorkspaceSearchResult) {
     setFocused(false);
@@ -119,8 +210,10 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
       onSubmit={submitSearch}
       className="relative mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xl"
     >
-      <label className="sr-only" htmlFor="workspace-quick-search">
-        {scope === "teaching"
+      <label className="sr-only" htmlFor={instanceId}>
+        {scope === "student"
+          ? "Search student portal pages and services"
+          : scope === "teaching"
           ? "Search your classes, exam titles, subjects, and teaching pages"
           : "Search students, staff, classes, exams, library books and members, inventory, fees, accounts, and reports"}
       </label>
@@ -130,7 +223,7 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
         className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
       />
       <input
-        id="workspace-quick-search"
+        id={instanceId}
         role="combobox"
         type="search"
         autoComplete="off"
@@ -139,23 +232,25 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
           requestId.current += 1;
           setActiveIndex(-1);
           setQuery(event.target.value);
-          setStatus(event.target.value.trim().length >= 2 ? "searching" : "idle");
+          setStatus(scope !== "student" && event.target.value.trim().length >= 2 ? "searching" : "idle");
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => window.setTimeout(() => setFocused(false), 120)}
         onKeyDown={handleKeyDown}
         aria-autocomplete="list"
-        aria-controls={showResults ? "workspace-quick-search-results" : undefined}
+        aria-controls={showResults ? `${instanceId}-results` : undefined}
         aria-expanded={showResults}
         aria-haspopup="listbox"
         aria-activedescendant={
           activeIndex >= 0 && navigationOptions[activeIndex]
-            ? `workspace-result-${navigationOptions[activeIndex].id}`
+            ? `${instanceId}-result-${navigationOptions[activeIndex].id}`
             : undefined
         }
-        placeholder={scope === "teaching"
-          ? "Search your classes, exams, subjects..."
-          : "Search students, staff, library, inventory, fees..."}
+        placeholder={scope === "student"
+          ? "Search your portal..."
+          : scope === "teaching"
+            ? "Search your classes, exams, subjects..."
+            : "Search students, staff, library, inventory, fees..."}
         className="admin-quick-search-input h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
       />
       {status === "searching" && normalizedQuery.length >= 2 && (
@@ -167,12 +262,12 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
       )}
       {showResults && (
         <div
-          id="workspace-quick-search-results"
+          id={`${instanceId}-results`}
           role="listbox"
           aria-label="Workspace search results"
           className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(70vh,32rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
         >
-          {normalizedQuery.length < 2 && suggestions.length > 0 ? (
+          {(scope === "student" || normalizedQuery.length < 2) && suggestions.length > 0 ? (
             <>
               <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 {normalizedQuery ? "Suggested destinations" : "Quick access"}
@@ -181,7 +276,7 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
                 <button
                   type="button"
                   role="option"
-                  id={`workspace-result-${suggestion.id}`}
+                  id={`${instanceId}-result-${suggestion.id}`}
                   aria-selected={activeIndex === index}
                   key={suggestion.id}
                   onPointerDown={(event) => event.preventDefault()}
@@ -212,7 +307,7 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
               <button
                 type="button"
                 role="option"
-                id={`workspace-result-${result.id}`}
+                id={`${instanceId}-result-${result.id}`}
                 aria-selected={activeIndex === index}
                 key={result.id}
                 onPointerDown={(event) => event.preventDefault()}
@@ -233,9 +328,11 @@ export function WorkspaceQuickSearch({ scope = "workspace" }: { scope?: "workspa
             ))
           ) : (
             <p role="status" className="px-3 py-3 text-sm text-slate-500">
-              {scope === "teaching"
-                ? "No matching teaching records or pages."
-                : "No matching students, staff, library records, or workspace pages."}
+              {scope === "student"
+                ? "No matching student portal pages or services."
+                : scope === "teaching"
+                  ? "No matching teaching records or pages."
+                  : "No matching students, staff, library records, or workspace pages."}
             </p>
           )}
           {navigationOptions.length > 0 && (

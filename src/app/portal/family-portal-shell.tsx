@@ -53,6 +53,7 @@ export function FamilyPortalShell({
       userName={userName}
       portalLabel={isStudent ? "Student Portal" : "Parent Portal"}
       navigation={isStudent ? studentNavigation : parentNavigation}
+      searchScope={isStudent ? "student" : undefined}
     >
       {children}
     </PortalShell>

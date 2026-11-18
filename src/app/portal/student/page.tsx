@@ -664,7 +664,7 @@ export default async function StudentPortalPage({
           </section>
         ) : (
           <>
-            <section aria-label="Student summary" className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-4 ${activeSection !== "overview" ? "hidden" : ""}`}>
+            <section aria-label="Student summary" className={`grid grid-cols-2 gap-3 xl:grid-cols-4 ${activeSection !== "overview" ? "hidden" : ""}`}>
               <SummaryCard icon={GraduationCap} label="Student profiles" value={linkedStudents.length} />
               <SummaryCard icon={CalendarDays} label="Weekly lessons" value={timetable.length} />
               <SummaryCard icon={ClipboardCheck} label="Published reports" value={reports.length} />
@@ -941,21 +941,23 @@ export default async function StudentPortalPage({
                         <div><dt>Due date</dt><dd>{invoice.dueDate}</dd></div>
                       </dl>
                       <div className="fee-invoice-divider" aria-hidden="true">★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★</div>
-                      <table className="fee-invoice-items w-full border-collapse text-left text-sm">
-                        <thead>
-                          <tr><th>Qty</th><th>Description</th><th className="text-right">Unit price</th><th className="text-right">Amount</th></tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>1</td>
-                            <td>{feeDisplayName(invoice.typeName)}{invoice.groupName ? ` · ${invoice.groupName}` : ""}</td>
-                            <td className="text-right">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</td>
-                            <td className="text-right">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</td>
-                          </tr>
-                          {invoice.discountMinor > 0 && <tr><td></td><td>Discount</td><td></td><td className="text-right">− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</td></tr>}
-                          {invoice.fineMinor > 0 && <tr><td></td><td>Late fine</td><td></td><td className="text-right">{context.schoolCurrency} {(invoice.fineMinor / 100).toFixed(2)}</td></tr>}
-                        </tbody>
-                      </table>
+                      <div className="overflow-x-auto">
+                        <table className="fee-invoice-items w-full min-w-[34rem] border-collapse text-left text-sm">
+                          <thead>
+                            <tr><th>Qty</th><th>Description</th><th className="text-right">Unit price</th><th className="text-right">Amount</th></tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>1</td>
+                              <td>{feeDisplayName(invoice.typeName)}{invoice.groupName ? ` · ${invoice.groupName}` : ""}</td>
+                              <td className="text-right">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</td>
+                              <td className="text-right">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</td>
+                            </tr>
+                            {invoice.discountMinor > 0 && <tr><td></td><td>Discount</td><td></td><td className="text-right">− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</td></tr>}
+                            {invoice.fineMinor > 0 && <tr><td></td><td>Late fine</td><td></td><td className="text-right">{context.schoolCurrency} {(invoice.fineMinor / 100).toFixed(2)}</td></tr>}
+                          </tbody>
+                        </table>
+                      </div>
                       <div className="fee-invoice-totals ml-auto grid max-w-sm grid-cols-2 gap-x-6 gap-y-2 text-right text-sm">
                         <span>Subtotal</span><strong>{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</strong>
                         {invoice.discountMinor > 0 && <><span>Discount</span><strong>− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</strong></>}

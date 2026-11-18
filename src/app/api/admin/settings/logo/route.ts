@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, schools, uploadedFiles } from "@/db/schema";
-import { requireSchoolPermission } from "@/lib/access-control";
+import { requireSchoolMember, requireSchoolPermission } from "@/lib/access-control";
 import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -24,26 +24,8 @@ function isValidImageSignature(contentType: string, bytes: Uint8Array): boolean 
     String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
 }
 
-const logoPermissions = [
-  "school.settings.manage",
-  "dashboard.view",
-  "academics.manage",
-  "academics.delete",
-  "staff.manage",
-  "roles.manage",
-  "fees.manage",
-  "payments.record",
-  "examinations.create",
-  "examinations.delete",
-  "results.enter",
-  "results.publish",
-  "students.view",
-  "students.create",
-  "students.update",
-] as const;
-
 export async function GET() {
-  const context = await requireSchoolPermission(logoPermissions);
+  const context = await requireSchoolMember();
   const [school] = await db.select({ logoUrl: schools.logoUrl })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   const objectKey = school?.logoUrl;
