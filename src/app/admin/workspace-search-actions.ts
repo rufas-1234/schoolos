@@ -10,6 +10,8 @@ import {
   classLevels,
   classSections,
   classSubjects,
+  dormitories,
+  dormitoryRooms,
   examClasses,
   examSubjects,
   examinations,
@@ -26,6 +28,7 @@ import {
   librarySubjects,
   staffMembers,
   studentFeeInvoices,
+  studentDormitoryAssignments,
   students,
   subjects,
   teachers,
@@ -54,6 +57,7 @@ const workspacePermissions = [
   "accounts.manage",
   "inventory.manage",
   "library.manage",
+  "dormitories.manage",
   "dashboard.view",
   "roles.manage",
 ] as const;
@@ -63,7 +67,7 @@ export type WorkspaceSearchResult = {
   title: string;
   description: string;
   href: string;
-  category: "Pages" | "Users" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Library" | "Fees" | "Accounts";
+  category: "Pages" | "Users" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Library" | "Dormitories" | "Fees" | "Accounts";
   searchTerms?: string[];
 };
 
@@ -101,6 +105,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const canManageAccounts = permissions.has("accounts.manage");
   const canManageInventory = permissions.has("inventory.manage");
   const canManageLibrary = permissions.has("library.manage");
+  const canManageDormitories = permissions.has("dormitories.manage");
   const canManageStudents = permissions.has("students.view");
   const canManageStudentSettings = permissions.has("school.settings.manage") || permissions.has("students.update");
   const results: WorkspaceSearchResult[] = [];
@@ -212,6 +217,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("library-issued", "Issued books", "Review active, overdue, and returned book loans", "/admin/library?section=issued&status=all", ["loan register", "overdue books", "returned books"]);
     addPage("library-categories", "Library categories", "Organize library books by category", "/admin/library?section=categories", ["book categories"]);
     addPage("library-subjects", "Library subjects", "Organize library books by subject", "/admin/library?section=subjects", ["book subjects"]);
+  }
+  if (canManageDormitories) {
+    addPage("dormitories", "Dormitory management", "Manage school dormitories, rooms, occupancy, and student assignments", "/admin/dormitories", ["hostel", "boarding", "residents", "room assignments"]);
   }
   if (permissions.has("roles.manage")) {
     addPage("users", "Users", "School user accounts and access", "/admin/users", ["user list", "accounts"]);
@@ -652,6 +660,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           eq(libraryMembers.schoolId, context.schoolId),
           or(
             tokenMatch(libraryMembers.memberNumber),
+            tokenMatch(libraryMembers.memberName),
+            like(sql`lower(${libraryMembers.memberPhone})`, pattern),
+            like(sql`lower(${libraryMembers.memberEmail})`, pattern),
             tokenMatch(students.firstName),
             tokenMatch(students.lastName),
             tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
@@ -660,18 +671,15 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(staffMembers.lastName),
             tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
             like(sql`lower(${staffMembers.employeeCode})`, pattern),
-            tokenMatch(libraryMembers.memberName),
-            like(sql`lower(${libraryMembers.memberPhone})`, pattern),
-            like(sql`lower(${libraryMembers.memberEmail})`, pattern),
             fuzzyTextMatch(queryTokens,
               libraryMembers.memberNumber,
+              libraryMembers.memberName,
+              libraryMembers.memberPhone,
+              libraryMembers.memberEmail,
               students.firstName,
               students.lastName,
               staffMembers.firstName,
               staffMembers.lastName,
-              libraryMembers.memberName,
-              libraryMembers.memberPhone,
-              libraryMembers.memberEmail,
             ),
           ),
         ))
@@ -712,6 +720,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(libraryBooks.author),
             tokenMatch(libraryBooks.bookNumber),
             tokenMatch(libraryMembers.memberNumber),
+            tokenMatch(libraryMembers.memberName),
+            like(sql`lower(${libraryMembers.memberPhone})`, pattern),
+            like(sql`lower(${libraryMembers.memberEmail})`, pattern),
             tokenMatch(students.firstName),
             tokenMatch(students.lastName),
             tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
@@ -720,15 +731,63 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
             like(sql`lower(${students.admissionNumber})`, pattern),
             like(sql`lower(${staffMembers.employeeCode})`, pattern),
-            tokenMatch(libraryMembers.memberName),
-            like(sql`lower(${libraryMembers.memberPhone})`, pattern),
-            like(sql`lower(${libraryMembers.memberEmail})`, pattern),
           ),
         ))
         .orderBy(asc(libraryLoans.dueDate))
         .limit(20)
       : Promise.resolve([]),
   ]);
+
+  const [dormitorySearchRows, residentSearchRows] = canManageDormitories
+    ? await Promise.all([
+      db.select({
+        id: dormitories.id,
+        name: dormitories.name,
+        genderPolicy: dormitories.genderPolicy,
+      }).from(dormitories).where(and(
+        eq(dormitories.schoolId, context.schoolId),
+        eq(dormitories.status, "active"),
+        or(
+          tokenMatch(dormitories.name),
+          tokenMatch(dormitories.description),
+          fuzzyTextMatch(queryTokens, dormitories.name, dormitories.description),
+        ),
+      )).orderBy(asc(dormitories.name)).limit(20),
+      db.select({
+        id: studentDormitoryAssignments.id,
+        studentName: students.firstName,
+        studentLastName: students.lastName,
+        admissionNumber: students.admissionNumber,
+        dormitoryName: dormitories.name,
+        roomNumber: dormitoryRooms.roomNumber,
+      }).from(studentDormitoryAssignments)
+        .innerJoin(students, and(
+          eq(students.id, studentDormitoryAssignments.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .innerJoin(dormitoryRooms, and(
+          eq(dormitoryRooms.id, studentDormitoryAssignments.roomId),
+          eq(dormitoryRooms.schoolId, context.schoolId),
+        ))
+        .innerJoin(dormitories, and(
+          eq(dormitories.id, dormitoryRooms.dormitoryId),
+          eq(dormitories.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(studentDormitoryAssignments.schoolId, context.schoolId),
+          eq(studentDormitoryAssignments.status, "active"),
+          or(
+            tokenMatch(students.firstName),
+            tokenMatch(students.lastName),
+            tokenMatch(sql`concat(${students.firstName}, ' ', ${students.lastName})`),
+            tokenMatch(students.admissionNumber),
+            tokenMatch(dormitories.name),
+            tokenMatch(dormitoryRooms.roomNumber),
+            fuzzyTextMatch(queryTokens, students.firstName, students.lastName, sql`concat(${students.firstName}, ' ', ${students.lastName})`, students.admissionNumber, dormitories.name, dormitoryRooms.roomNumber),
+          ),
+        )).orderBy(asc(students.lastName), asc(students.firstName)).limit(20),
+    ])
+    : [[], []] as const;
 
   const teacherAssignmentRows = permissions.has("results.enter")
     ? await db.select({
@@ -963,6 +1022,29 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       description: `${loan.status === "active" ? "Book loan" : "Returned book"} · ${loan.borrowerName} · Due ${loan.dueDate}`,
       href: `/admin/library?section=issued&status=all&q=${encodeURIComponent(query)}`,
       category: "Library",
+    });
+  }
+  for (const dormitory of dormitorySearchRows) {
+    results.push({
+      id: `dormitory-${dormitory.id}`,
+      title: dormitory.name,
+      description: `Dormitory · ${dormitory.genderPolicy} residents`,
+      href: "/admin/dormitories",
+      category: "Dormitories",
+    });
+  }
+  for (const resident of residentSearchRows) {
+    results.push({
+      id: `dormitory-resident-${resident.id}`,
+      title: `${resident.studentName} ${resident.studentLastName}`,
+      description: [
+        "Dormitory resident",
+        resident.admissionNumber,
+        resident.dormitoryName,
+        `Room ${resident.roomNumber}`,
+      ].filter(Boolean).join(" · "),
+      href: "/admin/dormitories",
+      category: "Dormitories",
     });
   }
 

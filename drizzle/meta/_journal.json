@@ -302,6 +302,13 @@
       "when": 1795034502866,
       "tag": "0042_first_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1795035576188,
+      "tag": "0043_tiresome_lucky_pierre",
+      "breakpoints": true
     }
   ]
 }

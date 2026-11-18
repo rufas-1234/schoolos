@@ -128,7 +128,7 @@ export function CheckoutForm({
   const [state, formAction, pending] = useActionState(checkoutLibraryBook, {});
   return <form action={formAction} className="space-y-3">
     <input type="hidden" name="bookId" value={book.id} />
-    <SearchableSelect label="Library member" name="personRef" required
+    <SearchableSelect label="Borrower" name="personRef" required
       options={members.map((member) => ({ value: String(member.id), label: member.label }))}
       placeholder={members.length ? "Search students, staff, and other members..." : "No active library members"} />
     <label className="block text-sm">Due date<input name="dueDate" type="date" required min={minDate} defaultValue={dueDate} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
@@ -155,7 +155,7 @@ export function LibraryIssueForm({
     <SearchableSelect label="Book" name="bookId" required
       options={books.map((book) => ({ value: String(book.id), label: book.label }))}
       placeholder={books.length ? "Search available books..." : "No available books"} />
-    <SearchableSelect label="Library member" name="personRef" required
+    <SearchableSelect label="Borrower" name="personRef" required
       options={members.map((member) => ({ value: String(member.id), label: member.label }))}
       placeholder={members.length ? "Search students, staff, and other members..." : "No active library members"} />
     <label className="block text-sm">Due date<input name="dueDate" type="date" required min={minDate} defaultValue={dueDate} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
@@ -235,22 +235,24 @@ export function LibraryMemberDialog({
   return <AdminActionDialog className="admin-library-dialog" label="Add member" title="Register a library member">
     <form action={formAction} className="space-y-3">
       <label className="block text-sm">Member type<select name="memberType" value={memberType}
-        onChange={(event) => setMemberType(event.target.value === "staff" || event.target.value === "other" ? event.target.value : "student")}
+        onChange={(event) => setMemberType(
+          event.target.value === "staff" || event.target.value === "other" ? event.target.value : "student",
+        )}
         className="mt-1 h-10 w-full rounded-lg border bg-white px-3">
         <option value="student">Student</option>
         <option value="staff">Staff</option>
         <option value="other">Other person</option>
       </select></label>
-      {memberType === "other" ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm sm:col-span-2">Member name<input name="memberName" required maxLength={200} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
-          <label className="block text-sm">Phone (optional)<input name="memberPhone" type="tel" maxLength={40} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
-          <label className="block text-sm">Email (optional)<input name="memberEmail" type="email" maxLength={320} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
-        </div>
-      ) : <SearchableSelect key={memberType} label={memberType === "student" ? "Student" : "Staff member"}
-        name="personId" required
-        options={people.map((person) => ({ value: String(person.id), label: person.label }))}
-        placeholder={people.length ? `Search ${memberType === "student" ? "students" : "staff"}...` : `No unregistered ${memberType === "student" ? "students" : "staff"}`} />}
+      {memberType === "other"
+        ? <>
+          <label className="block text-sm">Full name<input name="memberName" required maxLength={200} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
+          <label className="block text-sm">Phone<input name="memberPhone" maxLength={40} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
+          <label className="block text-sm">Email<input name="memberEmail" type="email" maxLength={320} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
+        </>
+        : <SearchableSelect key={memberType} label={memberType === "student" ? "Student" : "Staff member"}
+          name="personId" required
+          options={people.map((person) => ({ value: String(person.id), label: person.label }))}
+          placeholder={people.length ? `Search ${memberType === "student" ? "students" : "staff"}...` : `No unregistered ${memberType === "student" ? "students" : "staff"}`} />}
       <label className="block text-sm">Member ID<input name="memberNumber" required maxLength={40} className="mt-1 h-10 w-full rounded-lg border px-3" /></label>
       {branches.length > 0 && <label className="block text-sm">Branch<select name="branchId" className="mt-1 h-10 w-full rounded-lg border bg-white px-3"><option value="">{memberType === "other" ? "All branches" : `Use ${memberType} branch`}</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.label}</option>)}</select></label>}
       <ActionFeedback state={state} />

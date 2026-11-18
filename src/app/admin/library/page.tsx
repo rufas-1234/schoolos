@@ -32,6 +32,7 @@ export const dynamic = "force-dynamic";
 
 const sections = ["add-book", "books", "categories", "members", "issue", "issued", "subjects"] as const;
 type LibrarySection = (typeof sections)[number];
+const PAGE_SIZE = 25;
 
 function dateToday(): string {
   return new Date().toISOString().slice(0, 10);
@@ -39,6 +40,12 @@ function dateToday(): string {
 
 function validId(value: string | undefined): number | undefined {
   return value && /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : undefined;
+}
+
+function validPage(value: string | undefined): number {
+  return value && /^\d+$/.test(value) && Number(value) > 0
+    ? Math.min(Number(value), 100000)
+    : 1;
 }
 
 function sectionTitle(section: LibrarySection): string {
@@ -70,6 +77,7 @@ export default async function LibraryPage({
     memberType?: string;
     bookId?: string;
     subjectId?: string;
+    page?: string;
   }>;
 }) {
   const context = await requireSchoolPermission("library.manage");
@@ -84,6 +92,7 @@ export default async function LibraryPage({
   const branchId = validId(queryParams.branchId);
   const bookId = validId(queryParams.bookId);
   const subjectId = validId(queryParams.subjectId);
+  const requestedPage = validPage(queryParams.page);
   const schoolId = context.schoolId;
   const today = dateToday();
   const dueDate = getDefaultLoanDueDate(today) ?? today;
@@ -96,6 +105,76 @@ export default async function LibraryPage({
       like(libraryBooks.category, `%${query}%`),
     )
     : undefined;
+  const memberSearch = query
+    ? or(
+      like(libraryMembers.memberNumber, `%${query}%`),
+      like(libraryMembers.memberName, `%${query}%`),
+      like(libraryMembers.memberPhone, `%${query}%`),
+      like(libraryMembers.memberEmail, `%${query}%`),
+      like(students.admissionNumber, `%${query}%`),
+      like(staffMembers.employeeCode, `%${query}%`),
+      sql`concat(${students.firstName}, ' ', ${students.lastName}) like ${`%${query}%`}`,
+      sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}) like ${`%${query}%`}`,
+    )
+    : undefined;
+  const loanConditions = [
+    eq(libraryLoans.schoolId, schoolId),
+    section === "issued" && selectedStatus !== "all"
+      ? eq(libraryLoans.status, selectedStatus)
+      : section !== "issued"
+        ? eq(libraryLoans.status, "active")
+        : undefined,
+    branchId ? eq(libraryBooks.branchId, branchId) : undefined,
+    bookId ? eq(libraryBooks.id, bookId) : undefined,
+    subjectId ? eq(libraryBooks.subjectId, subjectId) : undefined,
+    query ? or(
+      like(libraryBooks.title, `%${query}%`),
+      like(libraryBooks.bookNumber, `%${query}%`),
+      like(libraryMembers.memberNumber, `%${query}%`),
+      like(libraryMembers.memberName, `%${query}%`),
+      like(libraryMembers.memberPhone, `%${query}%`),
+      like(libraryMembers.memberEmail, `%${query}%`),
+      sql`concat(${students.firstName}, ' ', ${students.lastName}) like ${`%${query}%`}`,
+      sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}) like ${`%${query}%`}`,
+      like(students.admissionNumber, `%${query}%`),
+      like(staffMembers.employeeCode, `%${query}%`),
+    ) : undefined,
+  ];
+  const [pageTotal] = section === "books"
+    ? await db.select({ value: count() }).from(libraryBooks).where(and(
+      eq(libraryBooks.schoolId, schoolId),
+      searchBook,
+    ))
+    : section === "categories"
+      ? await db.select({ value: count() }).from(libraryCategories).where(eq(libraryCategories.schoolId, schoolId))
+      : section === "subjects"
+        ? await db.select({ value: count() }).from(librarySubjects).where(eq(librarySubjects.schoolId, schoolId))
+        : section === "members"
+          ? await db.select({ value: count() }).from(libraryMembers)
+            .leftJoin(students, and(eq(students.id, libraryMembers.studentId), eq(students.schoolId, schoolId)))
+            .leftJoin(staffMembers, and(eq(staffMembers.id, libraryMembers.staffMemberId), eq(staffMembers.schoolId, schoolId)))
+            .where(and(eq(libraryMembers.schoolId, schoolId), memberSearch))
+          : section === "issue" || section === "issued"
+            ? await db.select({ value: count() }).from(libraryLoans)
+              .innerJoin(libraryBooks, and(eq(libraryBooks.id, libraryLoans.bookId), eq(libraryBooks.schoolId, schoolId)))
+              .leftJoin(students, and(eq(students.id, libraryLoans.studentId), eq(students.schoolId, schoolId)))
+              .leftJoin(libraryMembers, and(eq(libraryMembers.id, libraryLoans.memberId), eq(libraryMembers.schoolId, schoolId)))
+              .leftJoin(staffMembers, and(eq(staffMembers.id, libraryMembers.staffMemberId), eq(staffMembers.schoolId, schoolId)))
+              .where(and(...loanConditions))
+            : [{ value: 0 }];
+  const totalRows = Number(pageTotal?.value ?? 0);
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * PAGE_SIZE;
+  const pageHref = (nextPage: number) => {
+    const params = new URLSearchParams({ section });
+    for (const key of ["q", "status", "branchId", "memberType", "bookId", "subjectId"] as const) {
+      const value = queryParams[key];
+      if (value) params.set(key, value);
+    }
+    params.set("page", String(nextPage));
+    return `/admin/library?${params}`;
+  };
 
   const [
     bookRows,
@@ -105,6 +184,7 @@ export default async function LibraryPage({
     studentRows,
     staffRows,
     memberRows,
+    membershipReferenceRows,
     loanRows,
     [loanCount],
     [overdueCount],
@@ -113,11 +193,17 @@ export default async function LibraryPage({
     db.select().from(libraryBooks).where(and(
       eq(libraryBooks.schoolId, schoolId),
       searchBook,
-    )).orderBy(asc(libraryBooks.title)).limit(500),
+    )).orderBy(asc(libraryBooks.title))
+      .limit(section === "books" ? PAGE_SIZE : 500)
+      .offset(section === "books" ? offset : 0),
     db.select().from(libraryCategories).where(eq(libraryCategories.schoolId, schoolId))
-      .orderBy(asc(libraryCategories.name)).limit(500),
+      .orderBy(asc(libraryCategories.name))
+      .limit(section === "categories" ? PAGE_SIZE : 500)
+      .offset(section === "categories" ? offset : 0),
     db.select().from(librarySubjects).where(eq(librarySubjects.schoolId, schoolId))
-      .orderBy(asc(librarySubjects.name)).limit(500),
+      .orderBy(asc(librarySubjects.name))
+      .limit(section === "subjects" ? PAGE_SIZE : 500)
+      .offset(section === "subjects" ? offset : 0),
     db.select({ id: schoolBranches.id, name: schoolBranches.name }).from(schoolBranches)
       .where(and(eq(schoolBranches.schoolId, schoolId), eq(schoolBranches.status, "active")))
       .orderBy(asc(schoolBranches.name)).limit(200),
@@ -145,14 +231,14 @@ export default async function LibraryPage({
     db.select({
       id: libraryMembers.id,
       memberNumber: libraryMembers.memberNumber,
+      memberName: libraryMembers.memberName,
+      memberPhone: libraryMembers.memberPhone,
+      memberEmail: libraryMembers.memberEmail,
       memberType: libraryMembers.memberType,
       status: libraryMembers.status,
       branchId: libraryMembers.branchId,
       studentId: libraryMembers.studentId,
       staffMemberId: libraryMembers.staffMemberId,
-      memberName: libraryMembers.memberName,
-      memberPhone: libraryMembers.memberPhone,
-      memberEmail: libraryMembers.memberEmail,
       firstName: sql<string>`coalesce(${students.firstName}, ${staffMembers.firstName}, ${libraryMembers.memberName}, '')`,
       lastName: sql<string>`coalesce(${students.lastName}, ${staffMembers.lastName}, '')`,
       admissionNumber: students.admissionNumber,
@@ -166,8 +252,21 @@ export default async function LibraryPage({
         eq(staffMembers.id, libraryMembers.staffMemberId),
         eq(staffMembers.schoolId, schoolId),
       ))
-      .where(eq(libraryMembers.schoolId, schoolId))
-      .orderBy(asc(libraryMembers.memberNumber)),
+      .where(and(eq(libraryMembers.schoolId, schoolId), memberSearch))
+      .orderBy(asc(libraryMembers.memberNumber))
+      .limit(section === "members" ? PAGE_SIZE : 10000)
+      .offset(section === "members" ? offset : 0),
+    db.select({
+      id: libraryMembers.id,
+      studentId: libraryMembers.studentId,
+      staffMemberId: libraryMembers.staffMemberId,
+      memberType: libraryMembers.memberType,
+      memberNumber: libraryMembers.memberNumber,
+      memberName: libraryMembers.memberName,
+      memberPhone: libraryMembers.memberPhone,
+      memberEmail: libraryMembers.memberEmail,
+      status: libraryMembers.status,
+    }).from(libraryMembers).where(eq(libraryMembers.schoolId, schoolId)),
     db.select({
       id: libraryLoans.id,
       bookId: libraryBooks.id,
@@ -178,12 +277,12 @@ export default async function LibraryPage({
       memberId: libraryMembers.id,
       memberType: libraryMembers.memberType,
       memberNumber: libraryMembers.memberNumber,
+      memberPhone: libraryMembers.memberPhone,
+      memberEmail: libraryMembers.memberEmail,
       studentId: students.id,
       studentName: sql<string>`coalesce(concat(${students.firstName}, ' ', ${students.lastName}), concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}), ${libraryMembers.memberName})`,
       admissionNumber: students.admissionNumber,
       employeeCode: staffMembers.employeeCode,
-      memberPhone: libraryMembers.memberPhone,
-      memberEmail: libraryMembers.memberEmail,
       issuedAt: libraryLoans.issuedAt,
       dueDate: libraryLoans.dueDate,
       returnedAt: libraryLoans.returnedAt,
@@ -205,30 +304,10 @@ export default async function LibraryPage({
         eq(staffMembers.id, libraryMembers.staffMemberId),
         eq(staffMembers.schoolId, schoolId),
       ))
-      .where(and(
-        eq(libraryLoans.schoolId, schoolId),
-        section === "issued" && selectedStatus !== "all"
-          ? eq(libraryLoans.status, selectedStatus)
-          : section !== "issued"
-            ? eq(libraryLoans.status, "active")
-            : undefined,
-        branchId ? eq(libraryBooks.branchId, branchId) : undefined,
-        bookId ? eq(libraryBooks.id, bookId) : undefined,
-        subjectId ? eq(libraryBooks.subjectId, subjectId) : undefined,
-        query ? or(
-          like(libraryBooks.title, `%${query}%`),
-          like(libraryBooks.bookNumber, `%${query}%`),
-          like(libraryMembers.memberNumber, `%${query}%`),
-          sql`concat(${students.firstName}, ' ', ${students.lastName}) like ${`%${query}%`}`,
-          sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}) like ${`%${query}%`}`,
-          like(students.admissionNumber, `%${query}%`),
-          like(staffMembers.employeeCode, `%${query}%`),
-          like(libraryMembers.memberName, `%${query}%`),
-          like(libraryMembers.memberPhone, `%${query}%`),
-          like(libraryMembers.memberEmail, `%${query}%`),
-        ) : undefined,
-      ))
-      .orderBy(asc(libraryLoans.dueDate)).limit(500),
+      .where(and(...loanConditions))
+      .orderBy(asc(libraryLoans.dueDate))
+      .limit(section === "issue" || section === "issued" ? PAGE_SIZE : 500)
+      .offset(section === "issue" || section === "issued" ? offset : 0),
     db.select({ value: count() }).from(libraryLoans)
       .where(and(eq(libraryLoans.schoolId, schoolId), eq(libraryLoans.status, "active"))),
     db.select({ value: count() }).from(libraryLoans)
@@ -254,9 +333,9 @@ export default async function LibraryPage({
   const branchNames = new Map(branches.map((branch) => [branch.id, branch.label]));
   const categoryNames = new Map(categoryRows.map((category) => [category.id, category.name]));
   const subjectNames = new Map(subjectRows.map((subject) => [subject.id, subject.name]));
-  const registeredStudentIds = new Set(memberRows.filter((member) => member.memberType === "student")
+  const registeredStudentIds = new Set(membershipReferenceRows.filter((member) => member.memberType === "student")
     .map((member) => member.studentId).filter((id): id is number => id !== null));
-  const registeredStaffIds = new Set(memberRows.filter((member) => member.memberType === "staff")
+  const registeredStaffIds = new Set(membershipReferenceRows.filter((member) => member.memberType === "staff")
     .map((member) => member.staffMemberId).filter((id): id is number => id !== null));
   const unregisteredStudents: LibraryStudentOption[] = studentRows
     .filter((student) => !registeredStudentIds.has(student.id))
@@ -270,14 +349,14 @@ export default async function LibraryPage({
       id: staff.id,
       label: `${staff.firstName} ${staff.lastName}${staff.employeeCode ? ` (${staff.employeeCode})` : ""}`,
     }));
-  const studentMemberships = new Map(memberRows
+  const studentMemberships = new Map(membershipReferenceRows
     .filter((member) => member.studentId !== null)
     .map((member) => [member.studentId!, member]));
-  const staffMemberships = new Map(memberRows
+  const staffMemberships = new Map(membershipReferenceRows
     .filter((member) => member.staffMemberId !== null)
     .map((member) => [member.staffMemberId!, member]));
   const activeMembers: LibraryMemberOption[] = [
-    ...studentRows.filter((student) => studentMemberships.get(student.id)?.status !== "inactive").map((student) => {
+    ...studentRows.map((student) => {
       const membership = studentMemberships.get(student.id);
       return {
         id: `student:${student.id}`,
@@ -286,10 +365,11 @@ export default async function LibraryPage({
           "Student",
           student.admissionNumber,
           membership?.memberNumber,
+          membership?.status === "inactive" ? "Library access inactive" : null,
         ].filter(Boolean).join(" · "),
       };
     }),
-    ...staffRows.filter((staff) => staffMemberships.get(staff.id)?.status !== "inactive").map((staff) => {
+    ...staffRows.map((staff) => {
       const membership = staffMemberships.get(staff.id);
       return {
         id: `staff:${staff.id}`,
@@ -298,10 +378,12 @@ export default async function LibraryPage({
           "Staff",
           staff.employeeCode,
           membership?.memberNumber,
+          membership?.status === "inactive" ? "Library access inactive" : null,
         ].filter(Boolean).join(" · "),
       };
     }),
-    ...memberRows.filter((member) => member.memberType === "other" && member.status === "active")
+    ...membershipReferenceRows
+      .filter((member) => member.memberType === "other" && member.status === "active")
       .map((member) => ({
         id: `other:${member.id}`,
         label: [
@@ -351,7 +433,7 @@ export default async function LibraryPage({
         </section>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><h2 className="font-semibold text-slate-950">Book catalog</h2><p className="mt-1 text-sm text-slate-500">{bookRows.length} matching titles shown</p></div>
+            <div><h2 className="font-semibold text-slate-950">Book catalog</h2><p className="mt-1 text-sm text-slate-500">{totalRows} matching titles</p></div>
             <SearchForm section={section} query={query} placeholder="Search title, author, ISBN..." />
           </div>
           <div className="overflow-x-auto">
@@ -377,6 +459,7 @@ export default async function LibraryPage({
               </tbody>
             </table>
           </div>
+          <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
         </section>
       </>}
 
@@ -387,7 +470,7 @@ export default async function LibraryPage({
       {(section === "categories" || section === "subjects") && (() => {
         const isCategory = section === "categories";
         const rows = isCategory ? categoryRows : subjectRows;
-        return <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        return         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-4"><h2 className="font-semibold text-slate-950">{sectionTitle(section)}</h2><p className="mt-1 text-sm text-slate-500">Organize titles by {isCategory ? "category" : "subject"} across school branches.</p></div>
           <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr></thead>
@@ -395,12 +478,13 @@ export default async function LibraryPage({
               {rows.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-slate-500">No {isCategory ? "categories" : "subjects"} have been added.</td></tr>}
             </tbody>
           </table></div>
+          <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
         </section>;
       })()}
 
       {section === "members" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><h2 className="font-semibold text-slate-950">Library members</h2><p className="mt-1 text-sm text-slate-500">{memberRows.length} members registered</p></div>
+          <div><h2 className="font-semibold text-slate-950">Library members</h2><p className="mt-1 text-sm text-slate-500">{totalRows} members registered</p></div>
           <SearchForm section={section} query={query} placeholder="Search name, member ID, or contact..." />
         </div>
         <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm">
@@ -415,6 +499,7 @@ export default async function LibraryPage({
             {memberRows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">Register a student, staff member, or another person to enable book lending.</td></tr>}
           </tbody>
         </table></div>
+        <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
       </section>}
 
       {section === "issue" && <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -423,6 +508,7 @@ export default async function LibraryPage({
           <div className="mt-4"><LibraryIssueForm books={books.filter((book) => book.status === "active" && book.availableCopies > 0).map((book) => ({ id: book.id, label: book.title }))} members={activeMembers} dueDate={dueDate} minDate={today} /></div>
         </div>
         <LoanTable loans={activeLoans} today={today} dueDate={dueDate} />
+        <div className="lg:col-span-2"><PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} /></div>
       </section>}
 
       {section === "issued" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -438,9 +524,39 @@ export default async function LibraryPage({
           </form>
         </div>
         <LoanHistoryTable loans={activeLoans} today={today} dueDate={dueDate} />
+        <PaginationControls page={page} totalPages={totalPages} totalRows={totalRows} pageSize={PAGE_SIZE} hrefForPage={pageHref} />
       </section>}
     </main>
   );
+}
+
+function PaginationControls({
+  page,
+  totalPages,
+  totalRows,
+  pageSize,
+  hrefForPage,
+}: {
+  page: number;
+  totalPages: number;
+  totalRows: number;
+  pageSize: number;
+  hrefForPage: (page: number) => string;
+}) {
+  const first = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, totalRows);
+  return <nav aria-label="Pagination" className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+    <span>Showing {first}–{last} of {totalRows}</span>
+    <div className="flex items-center gap-2">
+      {page > 1
+        ? <Link href={hrefForPage(page - 1)} className="rounded-lg border border-slate-200 px-3 py-2 font-medium hover:bg-slate-50">Previous</Link>
+        : <span aria-disabled="true" className="rounded-lg border border-slate-100 px-3 py-2 text-slate-400">Previous</span>}
+      <span className="px-2">Page {page} of {totalPages}</span>
+      {page < totalPages
+        ? <Link href={hrefForPage(page + 1)} className="rounded-lg border border-slate-200 px-3 py-2 font-medium hover:bg-slate-50">Next</Link>
+        : <span aria-disabled="true" className="rounded-lg border border-slate-100 px-3 py-2 text-slate-400">Next</span>}
+    </div>
+  </nav>;
 }
 
 function SearchForm({ section, query, placeholder }: { section: LibrarySection; query: string; placeholder: string }) {
@@ -461,13 +577,13 @@ type LoanRow = {
   branchId: number | null;
   memberId: number | null;
   memberNumber: string | null;
+  memberPhone: string | null;
+  memberEmail: string | null;
   memberType: string | null;
   studentId: number | null;
   studentName: string | null;
   admissionNumber: string | null;
   employeeCode: string | null;
-  memberPhone: string | null;
-  memberEmail: string | null;
   issuedAt: string;
   dueDate: string;
   returnedAt: string | null;
@@ -503,7 +619,7 @@ function LoanHistoryTable({
           const overdue = loan.status === "active" && loan.dueDate < today;
           return <tr key={loan.id} className="align-top">
             <td className="px-4 py-4 font-medium text-slate-900">{loan.title}<span className="block text-xs font-normal text-slate-400">{loan.bookNumber ? `Book ID ${loan.bookNumber}` : "No book number"}</span></td>
-            <td className="px-4 py-4 text-slate-700">{loan.studentName ?? "Unknown member"}<span className="block text-xs text-slate-400">{loan.memberNumber ? `Member ${loan.memberNumber} · ${loan.memberType === "staff" ? "Staff" : loan.memberType === "other" ? "Other" : "Student"}` : loan.admissionNumber ?? loan.employeeCode ?? "No member number"}</span></td>
+            <td className="px-4 py-4 text-slate-700">{loan.studentName ?? "Unknown member"}<span className="block text-xs text-slate-400">{loan.memberNumber ? `Member ${loan.memberNumber} · ${loan.memberType === "staff" ? "Staff" : loan.memberType === "other" ? "Other" : "Student"}` : loan.admissionNumber ?? loan.employeeCode ?? "No member number"}{(loan.memberPhone || loan.memberEmail) ? ` · ${[loan.memberPhone, loan.memberEmail].filter(Boolean).join(" · ")}` : ""}</span></td>
             <td className="px-4 py-4 text-slate-600">{loan.issuedAt}</td>
             <td className={`px-4 py-4 font-medium ${overdue ? "text-rose-700" : "text-slate-600"}`}>{loan.dueDate}{overdue && <span className="ml-2 text-xs font-semibold">Overdue</span>}{loan.returnedAt && <span className="block text-xs text-slate-400">Returned {loan.returnedAt}</span>}</td>
             <td className="px-4 py-4 text-slate-600">{loan.status}</td>

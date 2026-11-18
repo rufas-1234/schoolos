@@ -320,6 +320,66 @@ export const students = mysqlTable(
   ],
 );
 
+export const dormitories = mysqlTable(
+  "dormitories",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(() => schoolBranches.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    genderPolicy: varchar("genderPolicy", { length: 20 }).notNull().default("mixed"),
+    description: varchar("description", { length: 1000 }),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("dormitories_school_name_uq").on(table.schoolId, table.name),
+    index("dormitories_school_branch_status_idx").on(table.schoolId, table.branchId, table.status),
+  ],
+);
+
+export const dormitoryRooms = mysqlTable(
+  "dormitory_rooms",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    dormitoryId: bigint("dormitoryId", { mode: "number", unsigned: true }).notNull().references(() => dormitories.id),
+    roomNumber: varchar("roomNumber", { length: 40 }).notNull(),
+    capacity: int("capacity", { unsigned: true }).notNull().default(1),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("dormitory_rooms_dorm_room_uq").on(table.dormitoryId, table.roomNumber),
+    index("dormitory_rooms_school_dorm_status_idx").on(table.schoolId, table.dormitoryId, table.status),
+  ],
+);
+
+export const studentDormitoryAssignments = mysqlTable(
+  "student_dormitory_assignments",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true }).notNull().references(() => students.id),
+    roomId: bigint("roomId", { mode: "number", unsigned: true }).notNull().references(() => dormitoryRooms.id),
+    assignedAt: date("assignedAt", { mode: "string" }).notNull(),
+    leftAt: date("leftAt", { mode: "string" }),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    assignedBy: varchar("assignedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("student_dormitory_assignments_school_student_status_idx").on(table.schoolId, table.studentId, table.status),
+    index("student_dormitory_assignments_school_room_status_idx").on(table.schoolId, table.roomId, table.status),
+  ],
+);
+
 export const userStudentLinks = mysqlTable(
   "user_student_links",
   {

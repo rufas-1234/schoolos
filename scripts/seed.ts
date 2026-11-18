@@ -38,6 +38,7 @@ const permissionCatalog = [
   ["fees.manage", "Manage fee structures"],
   ["inventory.manage", "Manage school inventory and assets"],
   ["library.manage", "Manage library books and lending"],
+  ["dormitories.manage", "Manage dormitories, rooms, and student assignments"],
   ["accounts.manage", "Manage school accounts, income, expenses, and reports"],
   ["fees.balance.view", "View outstanding student fee balances"],
   ["payments.record", "Record school payments"],
@@ -242,6 +243,7 @@ async function seed() {
       "accounts.manage",
       "inventory.manage",
       "library.manage",
+      "dormitories.manage",
       "reports.export",
       "examinations.create",
       "examinations.delete",
@@ -292,6 +294,34 @@ async function seed() {
       await tx.insert(rolePermissions).values({
         roleId: hrRole.id,
         permissionId: staffPermission.id,
+      });
+    }
+
+    const [hostelRole] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.schoolId, school.id), eq(roles.name, "Hostel administrator")))
+      .limit(1);
+    const [dormitoryPermission] = await tx
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(eq(permissions.key, "dormitories.manage"))
+      .limit(1);
+    if (!hostelRole || !dormitoryPermission) {
+      throw new Error("The Hostel administrator role or dormitory permission could not be created.");
+    }
+    const [hostelRolePermission] = await tx
+      .select({ roleId: rolePermissions.roleId })
+      .from(rolePermissions)
+      .where(and(
+        eq(rolePermissions.roleId, hostelRole.id),
+        eq(rolePermissions.permissionId, dormitoryPermission.id),
+      ))
+      .limit(1);
+    if (!hostelRolePermission) {
+      await tx.insert(rolePermissions).values({
+        roleId: hostelRole.id,
+        permissionId: dormitoryPermission.id,
       });
     }
 

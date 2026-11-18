@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BookOpen,
   BookMarked,
+  BedDouble,
   BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
@@ -105,6 +106,12 @@ const navigation: NavigationItem[] = [
       { id: "issued", label: "All Issued Books", href: "/admin/library?section=issued", matchQuery: { key: "section", value: "issued" } },
       { id: "subjects", label: "Subject", href: "/admin/library?section=subjects", matchQuery: { key: "section", value: "subjects" } },
     ],
+  },
+  {
+    href: "/admin/dormitories",
+    label: "Dormitories",
+    icon: BedDouble,
+    permission: "dormitories.manage",
   },
   {
     href: "/admin/hr",
