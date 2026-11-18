@@ -28,14 +28,13 @@ import {
   type FeeOption,
 } from "./fee-forms";
 
-const feesSections = ["catalog", "discounts", "structure", "structures", "invoices"] as const;
+const feesSections = ["catalog", "discounts", "structure", "invoices"] as const;
 type FeesSection = (typeof feesSections)[number];
 
 const feesSectionLabels: Record<FeesSection, string> = {
   catalog: "Fee setup",
   discounts: "Scholarships & discounts",
   structure: "Set up fee structure",
-  structures: "Created fee structures",
   invoices: "Generate student invoices",
 };
 
@@ -48,7 +47,9 @@ export default async function FeesSetupPage({
     requireSchoolPermission("fees.manage"),
     searchParams,
   ]);
-  const section = feesSections.find((candidate) => candidate === query.section) ?? "catalog";
+  const section = query.section === "structures"
+    ? "structure"
+    : feesSections.find((candidate) => candidate === query.section) ?? "catalog";
   const [school, branches, years, terms, classes, groups, types, discounts, studentDiscountAssignments, eligibleStudents, structures] =
     await Promise.all([
       db.select({ currency: schools.currency }).from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
@@ -232,8 +233,7 @@ export default async function FeesSetupPage({
   const sectionDescriptions: Record<FeesSection, string> = {
     catalog: "Manage the fee groups and fee types used to organize your school’s charges.",
     discounts: "Create scholarships and discounts, then assign them to individual students and fee types.",
-    structure: "Set up a fee structure for a class or an individual student.",
-    structures: "Review and manage the fee structures already created for your school.",
+    structure: "Set up fee structures for a class or an individual student, then review and manage them here.",
     invoices: "Generate student invoices from an existing fee structure.",
   };
   return (
@@ -365,11 +365,7 @@ export default async function FeesSetupPage({
             groups={groupOptions}
             types={structureTypeOptions}
           />
-        </>
-      )}
-
-      {section === "structures" && (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5">
             <h2 className="font-semibold text-slate-900">Created fee structures</h2>
             <p className="mt-1 text-sm text-slate-500">Saved amounts and due dates by branch, class, and academic year.</p>
@@ -407,7 +403,8 @@ export default async function FeesSetupPage({
           ) : (
             <p className="p-5 text-sm text-slate-500">No fee structures have been created yet.</p>
           )}
-        </section>
+          </section>
+        </>
       )}
 
       {section === "invoices" && (

@@ -134,7 +134,6 @@ const navigation: NavigationItem[] = [
       { id: "fee-setup", label: "Fee setup", href: "/admin/fees", matchQuery: { key: "section", value: null }, permission: "fees.manage" },
       { id: "fee-discounts", label: "Scholarships & discounts", href: "/admin/fees?section=discounts", matchPath: "/admin/fees", matchQuery: { key: "section", value: "discounts" }, permission: "fees.manage" },
       { id: "fee-structure-create", label: "Set up fee structure", href: "/admin/fees?section=structure", matchPath: "/admin/fees", matchQuery: { key: "section", value: "structure" }, permission: "fees.manage" },
-      { id: "fee-structures", label: "Created fee structures", href: "/admin/fees?section=structures", matchPath: "/admin/fees", matchQuery: { key: "section", value: "structures" }, permission: "fees.manage" },
       { id: "fee-invoices", label: "Generate student invoices", href: "/admin/fees?section=invoices", matchPath: "/admin/fees", matchQuery: { key: "section", value: "invoices" }, permission: "fees.manage" },
       {
         id: "fee-collection",
@@ -324,7 +323,8 @@ export function AdminShell({
     ?.children?.find((section) => {
       const sectionPath = section.matchPath ?? section.href?.split("?")[0];
       return sectionPath === pathname &&
-        (!section.matchQuery ||
+        ((section.id === "fee-structure-create" && searchParams.get("section") === "structures") ||
+          !section.matchQuery ||
           searchParams.get(section.matchQuery.key) === section.matchQuery.value);
     });
   const activeLibrarySection = navigation
@@ -558,7 +558,10 @@ export function AdminShell({
                           </span>
                         );
                       }
-                      const sectionActive = activeChild?.id === section.id;
+                      const sectionActive = activeChild?.id === section.id ||
+                        (section.id === "fee-structure-create" &&
+                          pathname === "/admin/fees" &&
+                          searchParams.get("section") === "structures");
                       return (
                         <Link
                           key={section.id}
