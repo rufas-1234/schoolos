@@ -41,6 +41,7 @@ import {
 import { PrintButton } from "@/components/print-button";
 import { requireSchoolMember } from "@/lib/access-control";
 import {
+  calculateAnnualProgress,
   calculateWeightedAverage,
   gradeForPercentage,
   type GradeBand,
@@ -513,6 +514,80 @@ export default async function StudentPortalPage({
       }),
     };
   });
+  const annualProgressByStudentYear = new Map<string, {
+    studentId: number;
+    yearName: string;
+    exams: typeof reports;
+  }>();
+  for (const report of reports) {
+    const key = `${report.studentId}:${report.yearName}`;
+    const progress = annualProgressByStudentYear.get(key) ?? {
+      studentId: report.studentId,
+      yearName: report.yearName,
+      exams: [],
+    };
+    progress.exams.push(report);
+    annualProgressByStudentYear.set(key, progress);
+  }
+  const annualProgressReports = [...annualProgressByStudentYear.values()].map((progress) => {
+    const exams = [...progress.exams].sort((first, second) =>
+      (first.rows[0]?.examDate ?? "").localeCompare(second.rows[0]?.examDate ?? "") ||
+      first.examName.localeCompare(second.examName),
+    );
+    const subjectsByName = new Map<string, {
+      name: string;
+      code: string | null;
+      examPercentages: Map<number, number | null>;
+    }>();
+    for (const report of exams) {
+      const examSubjects = new Map<string, {
+        name: string;
+        code: string | null;
+        scores: Array<{ marks: number; maxMarks: number; weight: number }>;
+      }>();
+      for (const row of report.rows) {
+        const examSubject = examSubjects.get(row.subjectName) ?? {
+          name: row.subjectName,
+          code: row.subjectCode,
+          scores: [],
+        };
+        examSubject.scores.push({
+          marks: Number(row.marks),
+          maxMarks: Number(row.maxMarks),
+          weight: Number(row.weight),
+        });
+        examSubjects.set(row.subjectName, examSubject);
+      }
+      for (const [subjectName, examSubject] of examSubjects) {
+        const subject = subjectsByName.get(subjectName) ?? {
+          name: examSubject.name,
+          code: examSubject.code,
+          examPercentages: new Map<number, number | null>(),
+        };
+        subject.examPercentages.set(
+          report.examId,
+          calculateWeightedAverage(examSubject.scores)?.percentage ?? null,
+        );
+        subjectsByName.set(subjectName, subject);
+      }
+    }
+    const subjectRows = [...subjectsByName.values()]
+      .sort((first, second) => first.name.localeCompare(second.name))
+      .map((subject) => ({
+        ...subject,
+        annualPercentage: calculateAnnualProgress(
+          exams.map((exam) => subject.examPercentages.get(exam.examId) ?? null),
+        ).average,
+      }));
+    const annual = calculateAnnualProgress(exams.map((exam) => exam.score.percentage));
+    return {
+      ...progress,
+      exams,
+      subjects: subjectRows,
+      annualAverage: annual.average,
+      change: annual.change,
+    };
+  });
   const schoolDetails = await db.select({
     name: schools.name,
     address: schools.address,
@@ -616,6 +691,13 @@ export default async function StudentPortalPage({
     !resultSearch || `${report.examName} ${report.yearName} ${report.termName ?? ""} ${
       linkedStudents.find((student) => student.id === report.studentId)?.firstName ?? ""
     } ${linkedStudents.find((student) => student.id === report.studentId)?.lastName ?? ""}`.toLocaleLowerCase().includes(resultSearch),
+  );
+  const visibleAnnualProgressReports = annualProgressReports.filter((progress) =>
+    !resultSearch || `${progress.yearName} ${
+      linkedStudents.find((student) => student.id === progress.studentId)?.firstName ?? ""
+    } ${linkedStudents.find((student) => student.id === progress.studentId)?.lastName ?? ""
+    } ${progress.exams.map((exam) => `${exam.examName} ${exam.termName ?? ""}`).join(" ")
+    } ${progress.subjects.map((subject) => `${subject.name} ${subject.code ?? ""}`).join(" ")}`.toLocaleLowerCase().includes(resultSearch),
   );
   const visibleInvoices = invoiceRows.filter((invoice) => feeFilter !== "outstanding" || invoice.balanceMinor > 0);
   const visibleLoans = loans.filter((loan) =>
@@ -799,6 +881,101 @@ export default async function StudentPortalPage({
 
             <section id="results" className={`space-y-4 ${activeSection !== "results" ? "hidden" : ""}`}>
               <SectionHeading title="Published results" description="Printable report-style summaries are available after every subject result is published." />
+              <section className="space-y-4">
+                <SectionHeading
+                  title="Annual progress report cards"
+                  description="Review your published results across every exam in each academic year. Only your linked student records are shown."
+                />
+                {visibleAnnualProgressReports.length ? (
+                  <div className="space-y-5">
+                    {visibleAnnualProgressReports.map((progress) => {
+                      const student = linkedStudents.find((entry) => entry.id === progress.studentId);
+                      const printId = `student-annual-progress-${progress.studentId}-${progress.yearName.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+                      const latestExam = progress.exams[progress.exams.length - 1];
+                      return (
+                        <article
+                          key={`${progress.studentId}-${progress.yearName}`}
+                          id={printId}
+                          className="exam-report-document a4-report-card a4-report-card-last print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm sm:p-7"
+                        >
+                          <header className="print:hidden flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <h3 className="text-lg font-bold text-slate-950">Annual Progress Card · {progress.yearName}</h3>
+                              <p className="text-sm text-slate-600">{progress.exams.length} published {progress.exams.length === 1 ? "exam" : "exams"}</p>
+                            </div>
+                            <PrintButton targetId={printId} label="Print annual report card" pageSize="A4" pageOrientation="landscape" />
+                          </header>
+                          <header className="print-report-heading flex items-center gap-4">
+                            {schoolLogo && (
+                              <Image src={schoolLogo} unoptimized width={64} height={64} alt={`${context.schoolName} logo`} className="exam-report-school-logo h-16 w-16 rounded-lg object-contain" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="exam-report-school-name text-sm font-semibold uppercase tracking-wide text-violet-700">{schoolDetails[0]?.name ?? context.schoolName}</p>
+                              <p className="exam-report-school-contact mt-0.5 text-xs text-slate-600">
+                                {[schoolDetails[0]?.address, schoolDetails[0]?.phone, schoolDetails[0]?.email].filter(Boolean).join(" · ")}
+                              </p>
+                              <h2 className="mt-1 text-2xl font-bold">Annual Student Progress Card</h2>
+                              <p className="mt-1 text-sm text-slate-600">{progress.yearName}</p>
+                            </div>
+                          </header>
+                          <section className="exam-report-student-details grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+                            <p><span className="font-semibold text-slate-500">Student</span><br />{student ? `${student.firstName} ${student.lastName}` : "—"}</p>
+                            <p><span className="font-semibold text-slate-500">Admission number</span><br />{student?.admissionNumber ?? "—"}</p>
+                            <p><span className="font-semibold text-slate-500">Class / section</span><br />{latestExam?.className} · {latestExam?.sectionName}</p>
+                            <p><span className="font-semibold text-slate-500">Annual average</span><br />{progress.annualAverage === null ? "—" : `${progress.annualAverage.toFixed(2)}%`}</p>
+                          </section>
+                          <section className="print-report-panel overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="print-report-table w-full min-w-[640px] border-collapse text-left text-sm">
+                              <thead className="bg-slate-50 text-xs uppercase text-slate-600">
+                                <tr>
+                                  <th className="p-3">Subject</th>
+                                  {progress.exams.map((exam) => (
+                                    <th key={exam.examId} className="p-3">{exam.examName}<span className="block font-normal normal-case">{exam.termName ?? progress.yearName}</span></th>
+                                  ))}
+                                  <th className="p-3">Annual average</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {progress.subjects.map((subject) => (
+                                  <tr key={subject.name} className="border-t border-slate-200">
+                                    <td className="p-3 font-medium">{subject.name} {subject.code && <span className="text-xs text-slate-500">{subject.code}</span>}</td>
+                                    {progress.exams.map((exam) => {
+                                      const percentage = subject.examPercentages.get(exam.examId);
+                                      return <td key={exam.examId} className="p-3">{percentage === undefined || percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td>;
+                                    })}
+                                    <td className="p-3 font-semibold">{subject.annualPercentage === null ? "—" : `${subject.annualPercentage.toFixed(2)}%`}</td>
+                                  </tr>
+                                ))}
+                                <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                                  <td className="p-3">Overall average</td>
+                                  {progress.exams.map((exam) => <td key={exam.examId} className="p-3">{exam.score.percentage.toFixed(2)}%</td>)}
+                                  <td className="p-3">{progress.annualAverage === null ? "—" : `${progress.annualAverage.toFixed(2)}%`}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </section>
+                          <section className="grid gap-3 sm:grid-cols-2">
+                            <article className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">Progress change</p>
+                              <p className="mt-1 text-2xl font-bold text-slate-950">
+                                {progress.change === null ? "—" : `${progress.change > 0 ? "+" : ""}${progress.change.toFixed(2)} percentage points`}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-600">First to last published exam</p>
+                            </article>
+                            <article className="rounded-xl border border-slate-200 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Exams included</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-900">{progress.exams.map((exam) => `${exam.examName}${exam.termName ? ` · ${exam.termName}` : ""}`).join(" → ")}</p>
+                            </article>
+                          </section>
+                          <footer className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-slate-500">
+                            <span>{context.schoolName}</span><span>{progress.yearName} · Annual progress report</span>
+                          </footer>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : <EmptyState>No annual progress cards are available for the published results matching this search.</EmptyState>}
+              </section>
               <FilterForm name="results" value={query.results ?? ""} placeholder="Search reports by exam or student" />
               {visibleReports.length ? (
                 <div className="grid gap-4 xl:grid-cols-2">
