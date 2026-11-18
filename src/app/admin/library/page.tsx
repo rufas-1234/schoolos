@@ -150,8 +150,11 @@ export default async function LibraryPage({
       branchId: libraryMembers.branchId,
       studentId: libraryMembers.studentId,
       staffMemberId: libraryMembers.staffMemberId,
-      firstName: sql<string>`coalesce(${students.firstName}, ${staffMembers.firstName})`,
-      lastName: sql<string>`coalesce(${students.lastName}, ${staffMembers.lastName})`,
+      memberName: libraryMembers.memberName,
+      memberPhone: libraryMembers.memberPhone,
+      memberEmail: libraryMembers.memberEmail,
+      firstName: sql<string>`coalesce(${students.firstName}, ${staffMembers.firstName}, ${libraryMembers.memberName}, '')`,
+      lastName: sql<string>`coalesce(${students.lastName}, ${staffMembers.lastName}, '')`,
       admissionNumber: students.admissionNumber,
       employeeCode: staffMembers.employeeCode,
     }).from(libraryMembers)
@@ -176,9 +179,11 @@ export default async function LibraryPage({
       memberType: libraryMembers.memberType,
       memberNumber: libraryMembers.memberNumber,
       studentId: students.id,
-      studentName: sql<string>`coalesce(concat(${students.firstName}, ' ', ${students.lastName}), concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}))`,
+      studentName: sql<string>`coalesce(concat(${students.firstName}, ' ', ${students.lastName}), concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}), ${libraryMembers.memberName})`,
       admissionNumber: students.admissionNumber,
       employeeCode: staffMembers.employeeCode,
+      memberPhone: libraryMembers.memberPhone,
+      memberEmail: libraryMembers.memberEmail,
       issuedAt: libraryLoans.issuedAt,
       dueDate: libraryLoans.dueDate,
       returnedAt: libraryLoans.returnedAt,
@@ -218,6 +223,9 @@ export default async function LibraryPage({
           sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}) like ${`%${query}%`}`,
           like(students.admissionNumber, `%${query}%`),
           like(staffMembers.employeeCode, `%${query}%`),
+          like(libraryMembers.memberName, `%${query}%`),
+          like(libraryMembers.memberPhone, `%${query}%`),
+          like(libraryMembers.memberEmail, `%${query}%`),
         ) : undefined,
       ))
       .orderBy(asc(libraryLoans.dueDate)).limit(500),
@@ -269,7 +277,7 @@ export default async function LibraryPage({
     .filter((member) => member.staffMemberId !== null)
     .map((member) => [member.staffMemberId!, member]));
   const activeMembers: LibraryMemberOption[] = [
-    ...studentRows.map((student) => {
+    ...studentRows.filter((student) => studentMemberships.get(student.id)?.status !== "inactive").map((student) => {
       const membership = studentMemberships.get(student.id);
       return {
         id: `student:${student.id}`,
@@ -278,11 +286,10 @@ export default async function LibraryPage({
           "Student",
           student.admissionNumber,
           membership?.memberNumber,
-          membership?.status === "inactive" ? "Library access inactive" : null,
         ].filter(Boolean).join(" · "),
       };
     }),
-    ...staffRows.map((staff) => {
+    ...staffRows.filter((staff) => staffMemberships.get(staff.id)?.status !== "inactive").map((staff) => {
       const membership = staffMemberships.get(staff.id);
       return {
         id: `staff:${staff.id}`,
@@ -291,10 +298,20 @@ export default async function LibraryPage({
           "Staff",
           staff.employeeCode,
           membership?.memberNumber,
-          membership?.status === "inactive" ? "Library access inactive" : null,
         ].filter(Boolean).join(" · "),
       };
     }),
+    ...memberRows.filter((member) => member.memberType === "other" && member.status === "active")
+      .map((member) => ({
+        id: `other:${member.id}`,
+        label: [
+          member.memberName,
+          "Other member",
+          member.memberNumber,
+          member.memberPhone,
+          member.memberEmail,
+        ].filter(Boolean).join(" · "),
+      })),
   ].sort((a, b) => a.label.localeCompare(b.label));
   const activeLoans = loanRows.map((loan) => ({ ...loan, overdue: loan.dueDate < today }));
   const addAction = section === "books" || section === "add-book"
@@ -384,25 +401,25 @@ export default async function LibraryPage({
       {section === "members" && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><h2 className="font-semibold text-slate-950">Library members</h2><p className="mt-1 text-sm text-slate-500">{memberRows.length} members registered</p></div>
-          <SearchForm section={section} query={query} placeholder="Search member, ID, or admission no..." />
+          <SearchForm section={section} query={query} placeholder="Search name, member ID, or contact..." />
         </div>
         <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Member</th><th className="px-4 py-3">Member ID</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Branch</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{memberRows.filter((member) => !query || `${member.firstName} ${member.lastName} ${member.memberNumber} ${member.admissionNumber ?? ""} ${member.employeeCode ?? ""}`.toLowerCase().includes(query.toLowerCase())).map((member) => <tr key={member.id}>
-            <td className="px-4 py-4 font-medium text-slate-900">{member.firstName} {member.lastName}<span className="block text-xs font-normal text-slate-400">{member.memberType === "staff" ? member.employeeCode ? `Employee ${member.employeeCode}` : "Staff member" : member.admissionNumber ?? "Student"}</span></td>
-            <td className="px-4 py-4 text-slate-700">{member.memberNumber}</td><td className="px-4 py-4 text-slate-600">{member.memberType === "staff" ? "Staff" : "Student"}</td>
+          <tbody className="divide-y divide-slate-100">{memberRows.filter((member) => !query || `${member.firstName} ${member.lastName} ${member.memberNumber} ${member.admissionNumber ?? ""} ${member.employeeCode ?? ""} ${member.memberPhone ?? ""} ${member.memberEmail ?? ""}`.toLowerCase().includes(query.toLowerCase())).map((member) => <tr key={member.id}>
+            <td className="px-4 py-4 font-medium text-slate-900">{member.firstName} {member.lastName}<span className="block text-xs font-normal text-slate-400">{member.memberType === "staff" ? member.employeeCode ? `Employee ${member.employeeCode}` : "Staff member" : member.memberType === "other" ? [member.memberPhone, member.memberEmail].filter(Boolean).join(" · ") || "Community member" : member.admissionNumber ?? "Student"}</span></td>
+            <td className="px-4 py-4 text-slate-700">{member.memberNumber}</td><td className="px-4 py-4 text-slate-600">{member.memberType === "staff" ? "Staff" : member.memberType === "other" ? "Other" : "Student"}</td>
             <td className="px-4 py-4 text-slate-600">{member.branchId ? branchNames.get(member.branchId) ?? "Branch" : "—"}</td>
             <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${member.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{member.status}</span></td>
             <td className="px-4 py-4"><LibraryMemberStatusButton memberId={member.id} active={member.status === "active"} /></td>
           </tr>)}
-            {memberRows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">Register a student or staff member to enable book lending.</td></tr>}
+            {memberRows.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">Register a student, staff member, or another person to enable book lending.</td></tr>}
           </tbody>
         </table></div>
       </section>}
 
       {section === "issue" && <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
-          <h2 className="font-semibold text-slate-950">Issue a book</h2><p className="mt-1 text-sm text-slate-500">Search active students or staff. First-time borrowers are registered as library members automatically.</p>
+          <h2 className="font-semibold text-slate-950">Issue a book</h2><p className="mt-1 text-sm text-slate-500">Search active library members. Students and staff can be added automatically; other borrowers must be registered first.</p>
           <div className="mt-4"><LibraryIssueForm books={books.filter((book) => book.status === "active" && book.availableCopies > 0).map((book) => ({ id: book.id, label: book.title }))} members={activeMembers} dueDate={dueDate} minDate={today} /></div>
         </div>
         <LoanTable loans={activeLoans} today={today} dueDate={dueDate} />
@@ -449,6 +466,8 @@ type LoanRow = {
   studentName: string | null;
   admissionNumber: string | null;
   employeeCode: string | null;
+  memberPhone: string | null;
+  memberEmail: string | null;
   issuedAt: string;
   dueDate: string;
   returnedAt: string | null;
@@ -484,7 +503,7 @@ function LoanHistoryTable({
           const overdue = loan.status === "active" && loan.dueDate < today;
           return <tr key={loan.id} className="align-top">
             <td className="px-4 py-4 font-medium text-slate-900">{loan.title}<span className="block text-xs font-normal text-slate-400">{loan.bookNumber ? `Book ID ${loan.bookNumber}` : "No book number"}</span></td>
-            <td className="px-4 py-4 text-slate-700">{loan.studentName ?? "Unknown member"}<span className="block text-xs text-slate-400">{loan.memberNumber ? `Member ${loan.memberNumber} · ${loan.memberType === "staff" ? "Staff" : "Student"}` : loan.admissionNumber ?? loan.employeeCode ?? "No member number"}</span></td>
+            <td className="px-4 py-4 text-slate-700">{loan.studentName ?? "Unknown member"}<span className="block text-xs text-slate-400">{loan.memberNumber ? `Member ${loan.memberNumber} · ${loan.memberType === "staff" ? "Staff" : loan.memberType === "other" ? "Other" : "Student"}` : loan.admissionNumber ?? loan.employeeCode ?? "No member number"}</span></td>
             <td className="px-4 py-4 text-slate-600">{loan.issuedAt}</td>
             <td className={`px-4 py-4 font-medium ${overdue ? "text-rose-700" : "text-slate-600"}`}>{loan.dueDate}{overdue && <span className="ml-2 text-xs font-semibold">Overdue</span>}{loan.returnedAt && <span className="block text-xs text-slate-400">Returned {loan.returnedAt}</span>}</td>
             <td className="px-4 py-4 text-slate-600">{loan.status}</td>

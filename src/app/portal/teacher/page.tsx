@@ -477,22 +477,24 @@ export default async function TeacherPortalPage({
       schoolLogoUrl={context.schoolLogoUrl}
       teacherName={teacherName}
     >
-      <main id="teacher-portal-print" className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-violet-700">
+      <main id="teacher-portal-print" className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
+        <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:rounded-3xl sm:p-7">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
               {activeSection === "overview" ? "Teacher dashboard" : "Teacher workspace"}
             </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            <h1 className="mt-2 text-2xl font-bold capitalize tracking-tight text-slate-950 sm:text-3xl">
               {activeSection === "overview" ? `Welcome, ${teacherName}` : sectionTitles[activeSection]}
             </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-500">
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               {activeSection === "overview"
                 ? "Your responsibilities, permissions, and teaching activity at a glance."
                 : "Only information within your active teaching assignments and class appointments is shown."}
             </p>
           </div>
-          <PrintButton targetId="teacher-portal-print" />
+          <div className="w-full sm:w-auto [&>button]:w-full sm:[&>button]:w-auto">
+            <PrintButton targetId="teacher-portal-print" label="Print teacher workspace" />
+          </div>
         </header>
 
         {!hasTeacherProfile ? (
@@ -506,7 +508,7 @@ export default async function TeacherPortalPage({
           <>
             {activeSection === "overview" && (
               <>
-                <section aria-label="Teaching summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <section aria-label="Teaching summary" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                   <SummaryCard icon={UsersRound} label="Subject assignments" value={uniqueAssignments.length} />
                   <SummaryCard icon={UsersRound} label="Appointed classes" value={classTeacherSections.length} />
                   <SummaryCard icon={CalendarDays} label="Scheduled lessons" value={routines.length} />
@@ -743,13 +745,13 @@ function SummaryCard({
   value: number;
 }) {
   return (
-    <article className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <span className="rounded-xl bg-violet-50 p-3 text-violet-700">
+    <article className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5">
+      <span className="shrink-0 rounded-xl bg-violet-50 p-2.5 text-violet-700 sm:p-3">
         <Icon size={20} aria-hidden="true" />
       </span>
-      <span>
-        <span className="block text-2xl font-bold text-slate-950">{value}</span>
-        <span className="block text-sm text-slate-500">{label}</span>
+      <span className="min-w-0">
+        <span className="block text-xl font-bold text-slate-950 sm:text-2xl">{value}</span>
+        <span className="block break-words text-xs text-slate-500 sm:text-sm">{label}</span>
       </span>
     </article>
   );

@@ -295,6 +295,13 @@
       "when": 1794963610380,
       "tag": "0041_blue_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1795034502866,
+      "tag": "0042_first_supreme_intelligence",
+      "breakpoints": true
     }
   ]
 }

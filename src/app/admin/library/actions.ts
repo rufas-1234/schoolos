@@ -273,18 +273,33 @@ export async function saveLibraryMember(
 ): Promise<LibraryActionState> {
   const context = await requireSchoolPermission("library.manage");
   const parsed = z.object({
-    memberType: z.enum(["student", "staff"]),
-    personId: idField,
+    memberType: z.enum(["student", "staff", "other"]),
+    personId: optionalId,
+    memberName: z.string().trim().max(200),
+    memberPhone: z.string().trim().max(40),
+    memberEmail: z.string().trim().max(320).transform((entry) => entry || null),
     memberNumber: z.string().trim().min(1).max(40),
     branchId: optionalId,
   }).safeParse({
     memberType: value(formData, "memberType"),
     personId: value(formData, "personId"),
+    memberName: value(formData, "memberName"),
+    memberPhone: value(formData, "memberPhone"),
+    memberEmail: value(formData, "memberEmail"),
     memberNumber: value(formData, "memberNumber"),
     branchId: value(formData, "branchId"),
   });
-  if (!parsed.success) return { error: "Choose an active student or staff member and enter a member number." };
-  const [person] = parsed.data.memberType === "student"
+  if (!parsed.success) return { error: "Enter a valid member name, contact details, member number, and branch." };
+  if (parsed.data.memberType === "other" && !parsed.data.memberName) {
+    return { error: "Enter the library member's name." };
+  }
+  if (parsed.data.memberType !== "other" && parsed.data.personId === null) {
+    return { error: `Choose an active ${parsed.data.memberType} from this school.` };
+  }
+  if (parsed.data.memberEmail && !z.string().email().safeParse(parsed.data.memberEmail).success) {
+    return { error: "Enter a valid email address." };
+  }
+  const [person] = parsed.data.memberType === "student" && parsed.data.personId !== null
     ? await db.select({
       id: students.id,
       branchId: students.branchId,
@@ -293,16 +308,20 @@ export async function saveLibraryMember(
       eq(students.schoolId, context.schoolId),
       inArray(students.status, ["active", "admitted"]),
     )).limit(1)
-    : await db.select({
-      id: staffMembers.id,
-      branchId: staffMembers.branchId,
-    }).from(staffMembers).where(and(
-      eq(staffMembers.id, parsed.data.personId),
-      eq(staffMembers.schoolId, context.schoolId),
-      eq(staffMembers.status, "active"),
-    )).limit(1);
-  if (!person) return { error: `Choose an active ${parsed.data.memberType} from this school.` };
-  const branchId = parsed.data.branchId ?? person.branchId;
+    : parsed.data.memberType === "staff" && parsed.data.personId !== null
+      ? await db.select({
+        id: staffMembers.id,
+        branchId: staffMembers.branchId,
+      }).from(staffMembers).where(and(
+        eq(staffMembers.id, parsed.data.personId),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.status, "active"),
+      )).limit(1)
+      : [];
+  if (parsed.data.memberType !== "other" && !person) {
+    return { error: `Choose an active ${parsed.data.memberType} from this school.` };
+  }
+  const branchId = parsed.data.branchId ?? person?.branchId ?? null;
   if (parsed.data.branchId) {
     const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
       eq(schoolBranches.id, parsed.data.branchId),
@@ -311,7 +330,7 @@ export async function saveLibraryMember(
     )).limit(1);
     if (!branch) return { error: "Choose an active branch belonging to this school." };
   }
-  if (parsed.data.branchId && person.branchId && parsed.data.branchId !== person.branchId) {
+  if (parsed.data.branchId && person?.branchId && parsed.data.branchId !== person.branchId) {
     return { error: `Choose the ${parsed.data.memberType}'s assigned branch.` };
   }
   const publicId = randomUUID();
@@ -321,8 +340,11 @@ export async function saveLibraryMember(
       schoolId: context.schoolId,
       branchId,
       memberType: parsed.data.memberType,
-      studentId: parsed.data.memberType === "student" ? person.id : null,
-      staffMemberId: parsed.data.memberType === "staff" ? person.id : null,
+      studentId: parsed.data.memberType === "student" ? person?.id ?? null : null,
+      staffMemberId: parsed.data.memberType === "staff" ? person?.id ?? null : null,
+      memberName: parsed.data.memberType === "other" ? parsed.data.memberName : null,
+      memberPhone: parsed.data.memberType === "other" ? parsed.data.memberPhone || null : null,
+      memberEmail: parsed.data.memberType === "other" ? parsed.data.memberEmail : null,
       memberNumber: parsed.data.memberNumber,
     });
   } catch (error) {
@@ -335,7 +357,7 @@ export async function saveLibraryMember(
     action: "library_member.created",
     resourceType: "library_member",
     resourcePublicId: publicId,
-    changedFields: ["branchId", "memberType", "studentId", "staffMemberId", "memberNumber"],
+    changedFields: ["branchId", "memberType", "studentId", "staffMemberId", "memberName", "memberPhone", "memberEmail", "memberNumber"],
   });
   revalidateLibrary();
   return { success: true, message: "Library member added." };
@@ -396,7 +418,7 @@ export async function checkoutLibraryBook(
   const context = await requireSchoolPermission("library.manage");
   const parsed = z.object({
     bookId: idField,
-    personRef: z.string().regex(/^(student|staff):[1-9]\d*$/),
+    personRef: z.string().regex(/^(student|staff|other):[1-9]\d*$/),
     dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   }).safeParse({
     bookId: value(formData, "bookId"),
@@ -411,8 +433,8 @@ export async function checkoutLibraryBook(
   }
   const [memberType, personIdText] = parsed.data.personRef.split(":");
   const parsedPersonId = idField.safeParse(personIdText);
-  if (!parsedPersonId.success || (memberType !== "student" && memberType !== "staff")) {
-    return { error: "Choose an active student or staff member from this school." };
+  if (!parsedPersonId.success || !["student", "staff", "other"].includes(memberType)) {
+    return { error: "Choose an active library member from this school." };
   }
   const personId = parsedPersonId.data;
 
@@ -447,7 +469,7 @@ export async function checkoutLibraryBook(
       if (!student) return { error: "Choose an active student from this school." };
       studentId = student.id;
       branchId = student.branchId;
-    } else {
+    } else if (memberType === "staff") {
       const [staff] = await tx.select({
         id: staffMembers.id,
         branchId: staffMembers.branchId,
@@ -459,6 +481,19 @@ export async function checkoutLibraryBook(
       if (!staff) return { error: "Choose an active staff member from this school." };
       staffMemberId = staff.id;
       branchId = staff.branchId;
+    } else {
+      const [otherMember] = await tx.select({
+        branchId: libraryMembers.branchId,
+        status: libraryMembers.status,
+      }).from(libraryMembers).where(and(
+        eq(libraryMembers.id, personId),
+        eq(libraryMembers.schoolId, context.schoolId),
+        eq(libraryMembers.memberType, "other"),
+      )).for("update").limit(1);
+      if (!otherMember || otherMember.status !== "active") {
+        return { error: "Choose an active other-person library membership from this school." };
+      }
+      branchId = otherMember.branchId;
     }
 
     let [member] = await tx.select({
@@ -470,9 +505,11 @@ export async function checkoutLibraryBook(
       status: libraryMembers.status,
     }).from(libraryMembers).where(and(
       eq(libraryMembers.schoolId, context.schoolId),
-      memberType === "student"
-        ? eq(libraryMembers.studentId, personId)
-        : eq(libraryMembers.staffMemberId, personId),
+      memberType === "other"
+        ? eq(libraryMembers.id, personId)
+        : memberType === "student"
+          ? eq(libraryMembers.studentId, personId)
+          : eq(libraryMembers.staffMemberId, personId),
     )).for("update").limit(1);
     if (member?.status === "inactive") {
       return { error: "This person's library access is inactive. Reactivate their membership before issuing a book." };
@@ -480,7 +517,7 @@ export async function checkoutLibraryBook(
     if (book.branchId !== null && book.branchId !== (member?.branchId ?? branchId)) {
       return { error: "This book is assigned to a different branch." };
     }
-    if (!member) {
+    if (!member && memberType !== "other") {
       const memberPublicId = randomUUID();
       await tx.insert(libraryMembers).values({
         publicId: memberPublicId,
@@ -514,6 +551,7 @@ export async function checkoutLibraryBook(
       )).for("update").limit(1);
       if (!member) throw new Error("The new library membership could not be loaded.");
     }
+    if (!member) return { error: "The library membership could not be loaded." };
 
     await tx.update(libraryBooks).set({
       availableCopies: book.availableCopies - 1,

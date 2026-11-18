@@ -632,8 +632,11 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         memberNumber: libraryMembers.memberNumber,
         memberType: libraryMembers.memberType,
         status: libraryMembers.status,
-        firstName: sql<string | null>`coalesce(${students.firstName}, ${staffMembers.firstName})`,
+        firstName: sql<string | null>`coalesce(${students.firstName}, ${staffMembers.firstName}, ${libraryMembers.memberName})`,
         lastName: sql<string | null>`coalesce(${students.lastName}, ${staffMembers.lastName})`,
+        memberName: libraryMembers.memberName,
+        memberPhone: libraryMembers.memberPhone,
+        memberEmail: libraryMembers.memberEmail,
         admissionNumber: students.admissionNumber,
         employeeCode: staffMembers.employeeCode,
       }).from(libraryMembers)
@@ -657,12 +660,18 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(staffMembers.lastName),
             tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
             like(sql`lower(${staffMembers.employeeCode})`, pattern),
+            tokenMatch(libraryMembers.memberName),
+            like(sql`lower(${libraryMembers.memberPhone})`, pattern),
+            like(sql`lower(${libraryMembers.memberEmail})`, pattern),
             fuzzyTextMatch(queryTokens,
               libraryMembers.memberNumber,
               students.firstName,
               students.lastName,
               staffMembers.firstName,
               staffMembers.lastName,
+              libraryMembers.memberName,
+              libraryMembers.memberPhone,
+              libraryMembers.memberEmail,
             ),
           ),
         ))
@@ -676,7 +685,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         bookNumber: libraryBooks.bookNumber,
         memberNumber: libraryMembers.memberNumber,
         memberType: libraryMembers.memberType,
-        borrowerName: sql<string>`coalesce(concat(${students.firstName}, ' ', ${students.lastName}), concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}), 'Unknown member')`,
+        borrowerName: sql<string>`coalesce(concat(${students.firstName}, ' ', ${students.lastName}), concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName}), ${libraryMembers.memberName}, 'Unknown member')`,
         dueDate: libraryLoans.dueDate,
         status: libraryLoans.status,
       }).from(libraryLoans)
@@ -711,6 +720,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
             tokenMatch(sql`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`),
             like(sql`lower(${students.admissionNumber})`, pattern),
             like(sql`lower(${staffMembers.employeeCode})`, pattern),
+            tokenMatch(libraryMembers.memberName),
+            like(sql`lower(${libraryMembers.memberPhone})`, pattern),
+            like(sql`lower(${libraryMembers.memberEmail})`, pattern),
           ),
         ))
         .orderBy(asc(libraryLoans.dueDate))
@@ -930,12 +942,14 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       id: `library-member-${member.id}`,
       title: member.firstName && member.lastName
         ? `${member.firstName} ${member.lastName}`
-        : member.memberNumber,
+        : member.firstName ?? member.memberNumber,
       description: [
-        member.memberType === "staff" ? "Staff library member" : "Student library member",
+        member.memberType === "staff" ? "Staff library member" : member.memberType === "other" ? "Other library member" : "Student library member",
         `Member ${member.memberNumber}`,
         member.admissionNumber ? `Admission ${member.admissionNumber}` : null,
         member.employeeCode ? `Employee ${member.employeeCode}` : null,
+        member.memberPhone,
+        member.memberEmail,
         member.status,
       ].filter(Boolean).join(" · "),
       href: `/admin/library?section=members&q=${encodeURIComponent(query)}`,
