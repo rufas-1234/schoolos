@@ -901,7 +901,7 @@ export default async function StudentPortalPage({
                     <article
                       key={invoice.id}
                       id={`student-invoice-${invoice.id}`}
-                      className="fee-invoice-page fee-invoice-card space-y-5 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm sm:p-7"
+                      className="fee-invoice-page fee-invoice-card mx-auto w-full max-w-[210mm] space-y-5 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm sm:p-6"
                     >
                       <header className="fee-invoice-title-row flex flex-wrap items-start justify-between gap-5">
                         <div>
@@ -999,7 +999,7 @@ export default async function StudentPortalPage({
                     const net = amount - reversed;
                     const paymentReversals = reversalsByPayment.get(payment.id) ?? [];
                     return (
-                      <article key={payment.id} id={`student-receipt-${payment.id}`} className="fee-receipt-page mx-auto w-full max-w-2xl space-y-5 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm sm:p-6">
+                      <article key={payment.id} id={`student-receipt-${payment.id}`} className="fee-receipt-page mx-auto w-full max-w-[148mm] space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm sm:p-5">
                         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Official payment receipt</p>

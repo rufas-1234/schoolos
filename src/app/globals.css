@@ -558,7 +558,7 @@ h6 {
   margin: 0;
   color: #20294b;
   font-family: var(--font-display), Arial, sans-serif;
-  font-size: clamp(2.8rem, 8vw, 4.5rem);
+  font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 800;
   letter-spacing: -0.07em;
   line-height: 0.95;
@@ -1203,23 +1203,35 @@ h6 {
   }
 
   .fee-invoice-page {
-    position: absolute !important;
-    inset: 0 !important;
+    position: relative !important;
+    inset: auto !important;
     width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 5mm !important;
     color: #172033;
   }
 
   .fee-receipt-page {
-    position: absolute !important;
-    inset: 0 !important;
+    position: relative !important;
+    inset: auto !important;
     width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    max-width: 148mm !important;
+    margin: 0 auto !important;
+    padding: 5mm !important;
     color: #172033;
+  }
+
+  body.print-target-active [data-print-target].fee-invoice-page {
+    max-width: 210mm !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+  }
+
+  body.print-target-active [data-print-target].fee-receipt-page {
+    max-width: 148mm !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
   }
 
   body:has(.fee-receipt-page) * {
@@ -1278,7 +1290,7 @@ h6 {
   }
 
   .fee-invoice-title {
-    font-size: 42pt;
+    font-size: 30pt;
   }
 
   .fee-invoice-number-block {
@@ -1326,12 +1338,12 @@ h6 {
   }
 
   .fee-invoice-footer {
-    margin-top: 12mm;
+    margin-top: 6mm;
     break-inside: avoid;
   }
 
   .fee-invoice-thank-you {
-    font-size: 30pt;
+    font-size: 20pt;
     -webkit-print-color-adjust: exact;
   }
 
