@@ -57,14 +57,14 @@ export default async function FeesSetupPage() {
         id: classLevels.id,
         name: classLevels.name,
         branchName: schoolBranches.name,
+        status: classLevels.status,
+        branchStatus: schoolBranches.status,
       })
         .from(classLevels)
         .innerJoin(schoolBranches, eq(classLevels.branchId, schoolBranches.id))
         .where(and(
           eq(classLevels.schoolId, context.schoolId),
-          eq(classLevels.status, "active"),
           eq(schoolBranches.schoolId, context.schoolId),
-          eq(schoolBranches.status, "active"),
         ))
         .orderBy(asc(schoolBranches.name), asc(classLevels.name)),
       db.select({ id: feeGroups.id, name: feeGroups.name, description: feeGroups.description })
@@ -177,10 +177,22 @@ export default async function FeesSetupPage() {
     id: term.id,
     label: `${term.yearName} · ${term.name} (${term.startDate} – ${term.endDate})`,
   }));
-  const classOptions: FeeOption[] = classes.map((item) => ({
-    id: item.id,
-    label: `${item.branchName} · ${item.name}`,
-  }));
+  const classOptions: FeeOption[] = classes
+    .filter((item) => item.status === "active" && item.branchStatus === "active")
+    .map((item) => ({
+      id: item.id,
+      label: `${item.branchName} · ${item.name}`,
+    }));
+  const unavailableClasses = classes
+    .filter((item) => item.status !== "active" || item.branchStatus !== "active")
+    .map((item) => ({
+      id: item.id,
+      label: `${item.branchName} · ${item.name}`,
+      reason: [
+        item.status !== "active" ? `class ${item.status}` : null,
+        item.branchStatus !== "active" ? `branch ${item.branchStatus}` : null,
+      ].filter((reason): reason is string => reason !== null).join(", "),
+    }));
   const groupOptions: FeeOption[] = groups.map((group) => ({ id: group.id, label: feeDisplayName(group.name) }));
   const typeOptions: FeeOption[] = types.map((type) => ({
     id: type.id,
@@ -213,6 +225,20 @@ export default async function FeesSetupPage() {
         <FeeTypeForm groups={groupOptions} />
         <FeeDiscountForm />
       </section>
+
+      {unavailableClasses.length > 0 && (
+        <aside role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p>
+            Only active classes on active branches can receive new fee structures. These classes are currently excluded:
+          </p>
+          <ul className="mt-2 list-inside list-disc">
+            {unavailableClasses.map((classLevel) => (
+              <li key={classLevel.id}>{classLevel.label} ({classLevel.reason})</li>
+            ))}
+          </ul>
+          <p className="mt-2">Reactivate the class or its branch in Academics if it should be available here.</p>
+        </aside>
+      )}
 
       <section className="grid gap-4 xl:grid-cols-2">
         <StudentFeeDiscountForm
