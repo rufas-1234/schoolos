@@ -112,6 +112,12 @@ const navigation: NavigationItem[] = [
     label: "Dormitories",
     icon: BedDouble,
     permission: "dormitories.manage",
+    children: [
+      { id: "overview", label: "Dormitory overview", href: "/admin/dormitories?section=overview", matchQuery: { key: "section", value: "overview" } },
+      { id: "dormitories", label: "Dormitories", href: "/admin/dormitories?section=dormitories", matchQuery: { key: "section", value: "dormitories" } },
+      { id: "rooms", label: "Rooms & beds", href: "/admin/dormitories?section=rooms", matchQuery: { key: "section", value: "rooms" } },
+      { id: "residents", label: "Room assignments", href: "/admin/dormitories?section=residents", matchQuery: { key: "section", value: "residents" } },
+    ],
   },
   {
     href: "/admin/hr",
@@ -247,6 +253,7 @@ export function AdminShell({
     pathname.startsWith("/admin/examinations") || pathname === "/admin/exam-analytics",
   );
   const [libraryOpen, setLibraryOpen] = useState(() => pathname.startsWith("/admin/library"));
+  const [dormitoriesOpen, setDormitoriesOpen] = useState(() => pathname.startsWith("/admin/dormitories"));
   const router = useRouter();
   const visibleNavigation = navigation
     .filter((item) =>
@@ -337,6 +344,9 @@ export function AdminShell({
   const activeLibrarySection = navigation
     .find((item) => item.label === "Library")
     ?.children?.find((section) => section.matchQuery && searchParams.get(section.matchQuery.key) === section.matchQuery.value);
+  const activeDormitorySection = navigation
+    .find((item) => item.href === "/admin/dormitories")
+    ?.children?.find((section) => section.matchQuery && searchParams.get(section.matchQuery.key) === section.matchQuery.value);
   const pageLabel = pathname.startsWith("/admin/academics")
     ? activeSection?.label ?? "Academics"
     : pathname.startsWith("/admin/students")
@@ -353,6 +363,8 @@ export function AdminShell({
           ? activeFeesSection?.label ?? "Fees"
         : pathname.startsWith("/admin/library")
           ? activeLibrarySection?.label ?? "Library"
+        : pathname.startsWith("/admin/dormitories")
+          ? activeDormitorySection?.label ?? "Dormitories"
         : pathname === "/admin/exam-analytics"
           ? "Exam Analytics"
       : visibleNavigation.find(
@@ -475,6 +487,7 @@ export function AdminShell({
             const isHumanResources = href === "/admin/hr";
             const isInventory = label === "Inventory";
             const isLibrary = label === "Library";
+            const isDormitories = label === "Dormitories";
             const isFees = href === "/admin/fees/collection";
             const isExaminations = href === "/admin/examinations";
             const sectionOpen = isStudentInfo
@@ -487,6 +500,8 @@ export function AdminShell({
                   ? inventoryOpen
                 : isLibrary
                   ? libraryOpen
+                : isDormitories
+                  ? dormitoriesOpen
                 : isFees
                   ? feesOpen
                   : isExaminations
@@ -502,6 +517,8 @@ export function AdminShell({
                   ? setInventoryOpen
                 : isLibrary
                   ? setLibraryOpen
+                : isDormitories
+                  ? setDormitoriesOpen
                 : isFees
                   ? setFeesOpen
                   : isExaminations
