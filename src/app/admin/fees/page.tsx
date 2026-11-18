@@ -179,12 +179,16 @@ export default async function FeesSetupPage() {
   }));
   const classOptions: FeeOption[] = classes.map((item) => ({
     id: item.id,
-    label: item.name,
+    label: `${item.branchName} · ${item.name}`,
   }));
   const groupOptions: FeeOption[] = groups.map((group) => ({ id: group.id, label: feeDisplayName(group.name) }));
   const typeOptions: FeeOption[] = types.map((type) => ({
     id: type.id,
     label: feeDisplayName(type.name),
+  }));
+  const structureTypeOptions: FeeOption[] = types.map((type) => ({
+    id: type.id,
+    label: `${feeDisplayName(type.groupName)} · ${feeDisplayName(type.name)}`,
   }));
   const discountOptions: FeeOption[] = discounts.map((discount) => ({
     id: discount.id,
@@ -223,7 +227,7 @@ export default async function FeesSetupPage() {
           students={studentsForDiscounts}
           classes={classOptions}
           groups={groupOptions}
-          types={typeOptions}
+          types={structureTypeOptions}
         />
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -285,7 +289,7 @@ export default async function FeesSetupPage() {
                       ]} />
                     </AdminRecordDialog>
                     <AdminRecordDialog title={`Edit ${feeDisplayName(structure.typeName)} fee structure`} wide>
-                      <FeeStructureForm branches={branchOptions} years={yearOptions} terms={termOptions} students={studentsForDiscounts} classes={classOptions} groups={groupOptions} types={typeOptions} record={structure} />
+                      <FeeStructureForm branches={branchOptions} years={yearOptions} terms={termOptions} students={studentsForDiscounts} classes={classOptions} groups={groupOptions} types={structureTypeOptions} record={structure} />
                     </AdminRecordDialog>
                     <DeleteFeeRecordForm recordId={structure.id} recordType="structure" />
                   </div>

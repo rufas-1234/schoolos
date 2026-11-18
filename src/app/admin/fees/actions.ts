@@ -508,9 +508,12 @@ export async function createFeeStructure(
     .where(and(eq(feeGroups.id, result.data.feeGroupId), eq(feeGroups.schoolId, context.schoolId))).limit(1);
   const [type] = await db.select({ id: feeTypes.id, feeGroupId: feeTypes.feeGroupId }).from(feeTypes)
     .where(and(eq(feeTypes.id, result.data.feeTypeId), eq(feeTypes.schoolId, context.schoolId))).limit(1);
-  if (!branch || !year || !classLevel || !group || !type || type.feeGroupId !== group.id) {
-    return { error: "Select records belonging to this school and branch; the fee type must match its group." };
-  }
+  if (!branch) return { error: "The selected branch is unavailable for this school. Choose an active branch." };
+  if (!year) return { error: "The selected academic year does not belong to this school." };
+  if (!classLevel) return { error: "The selected class does not belong to the selected branch, or is inactive. Choose a class labeled with this branch." };
+  if (!group) return { error: "The selected fee group does not belong to this school." };
+  if (!type) return { error: "The selected fee type does not belong to this school." };
+  if (type.feeGroupId !== group.id) return { error: "The selected fee type belongs to a different fee group. Choose the group shown before the fee type name." };
   const [term] = result.data.academicTermId === null
     ? [null]
     : await db.select({
