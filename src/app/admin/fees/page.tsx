@@ -2,6 +2,8 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import type { ReactNode } from "react";
 import { db } from "@/db";
 import { AdminRecordDialog } from "@/components/admin-data-table";
+import { TablePagination } from "@/components/table-pagination";
+import { parsePageSize } from "@/components/pagination-utils";
 import {
   academicTerms,
   academicYears,
@@ -41,7 +43,15 @@ const feesSectionLabels: Record<FeesSection, string> = {
 export default async function FeesSetupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ section?: string }>;
+  searchParams: Promise<{
+    section?: string;
+    pageSize?: string | string[];
+    groupsPage?: string | string[];
+    typesPage?: string | string[];
+    discountsPage?: string | string[];
+    assignmentsPage?: string | string[];
+    structuresPage?: string | string[];
+  }>;
 }) {
   const [context, query] = await Promise.all([
     requireSchoolPermission("fees.manage"),
@@ -50,6 +60,11 @@ export default async function FeesSetupPage({
   const section = query.section === "structures"
     ? "structure"
     : feesSections.find((candidate) => candidate === query.section) ?? "catalog";
+  const pageSize = parsePageSize(query.pageSize);
+  const requestedPage = (value: string | string[] | undefined) => {
+    const parsed = Number(Array.isArray(value) ? value[0] : value);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
+  };
   const [school, branches, years, terms, classes, groups, types, discounts, studentDiscountAssignments, eligibleStudents, structures] =
     await Promise.all([
       db.select({ currency: schools.currency }).from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
@@ -187,6 +202,28 @@ export default async function FeesSetupPage({
         .orderBy(asc(academicYears.startDate), asc(classLevels.name)),
     ]);
 
+  const paginateRows = <T,>(rows: T[], requested: number) => {
+    const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+    const page = Math.min(requested, pageCount);
+    return {
+      page,
+      rows: rows.slice((page - 1) * pageSize, page * pageSize),
+    };
+  };
+  const groupPage = paginateRows(groups, requestedPage(query.groupsPage));
+  const typePage = paginateRows(types, requestedPage(query.typesPage));
+  const discountPage = paginateRows(discounts, requestedPage(query.discountsPage));
+  const assignmentPage = paginateRows(studentDiscountAssignments, requestedPage(query.assignmentsPage));
+  const structurePage = paginateRows(structures, requestedPage(query.structuresPage));
+  const paginationHref = (parameter: string, page: number) => {
+    const params = new URLSearchParams({
+      section,
+      pageSize: String(pageSize),
+      [parameter]: String(page),
+    });
+    return `/admin/fees?${params.toString()}`;
+  };
+
   const studentsForDiscounts: FeeOption[] = eligibleStudents.map((student) => ({
     id: student.id,
     label: `${student.name} ${student.lastName}${student.admissionNumber ? ` (${student.admissionNumber})` : ""}`,
@@ -250,8 +287,15 @@ export default async function FeesSetupPage({
         <section className="grid gap-4 xl:grid-cols-2">
           <FeeGroupForm />
           <FeeTypeForm groups={groupOptions} />
-          <CatalogCard title="Fee groups" empty="No fee groups yet." count={groups.length}>
-            {groups.map((group) => (
+          <CatalogCard
+            title="Fee groups"
+            empty="No fee groups yet."
+            count={groups.length}
+            pagination={groups.length > 0 ? (
+              <TablePagination ariaLabel="Fee groups" currentPage={groupPage.page} pageSize={pageSize} totalRows={groups.length} hrefForPage={(page) => paginationHref("groupsPage", page)} />
+            ) : undefined}
+          >
+            {groupPage.rows.map((group) => (
               <li key={group.id} className="flex items-center justify-between gap-2">
                 <span>{feeDisplayName(group.name)}</span>
                 <div className="flex items-center gap-2">
@@ -262,8 +306,15 @@ export default async function FeesSetupPage({
               </li>
             ))}
           </CatalogCard>
-          <CatalogCard title="Fee types" empty="No fee types yet." count={types.length}>
-            {types.map((type) => (
+          <CatalogCard
+            title="Fee types"
+            empty="No fee types yet."
+            count={types.length}
+            pagination={types.length > 0 ? (
+              <TablePagination ariaLabel="Fee types" currentPage={typePage.page} pageSize={pageSize} totalRows={types.length} hrefForPage={(page) => paginationHref("typesPage", page)} />
+            ) : undefined}
+          >
+            {typePage.rows.map((type) => (
               <li key={type.id} className="flex items-center justify-between gap-2">
                 <span>{feeDisplayName(type.name)}</span>
                 <div className="flex items-center gap-2">
@@ -287,8 +338,15 @@ export default async function FeesSetupPage({
               feeTypes={typeOptions}
             />
           </section>
-          <CatalogCard title="Scholarships and discounts" empty="No discounts or scholarships yet." count={discounts.length}>
-            {discounts.map((discount) => (
+          <CatalogCard
+            title="Scholarships and discounts"
+            empty="No discounts or scholarships yet."
+            count={discounts.length}
+            pagination={discounts.length > 0 ? (
+              <TablePagination ariaLabel="Scholarships and discounts" currentPage={discountPage.page} pageSize={pageSize} totalRows={discounts.length} hrefForPage={(page) => paginationHref("discountsPage", page)} />
+            ) : undefined}
+          >
+            {discountPage.rows.map((discount) => (
               <li key={discount.id} className="flex items-center justify-between gap-2">
                 <span>
                   {feeDisplayName(discount.name)} · {discount.discountType === "percentage" ? `${discount.value}%` : `${school?.currency ?? ""} ${discount.value}`}
@@ -313,7 +371,7 @@ export default async function FeesSetupPage({
             <h2 className="font-semibold text-slate-900">Student assignments</h2>
             {studentDiscountAssignments.length ? (
               <ul className="mt-3 divide-y divide-slate-100">
-                {studentDiscountAssignments.map((assignment) => (
+                {assignmentPage.rows.map((assignment) => (
                   <li key={assignment.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
                     <span>
                       {assignment.studentName} {assignment.studentLastName} · {feeDisplayName(assignment.feeTypeName)} · {feeDisplayName(assignment.discountName)}
@@ -337,6 +395,9 @@ export default async function FeesSetupPage({
                 ))}
               </ul>
             ) : <p className="mt-2 text-sm text-slate-500">No student-specific discounts or scholarships are assigned.</p>}
+            {studentDiscountAssignments.length > 0 && (
+              <TablePagination ariaLabel="Student discount assignments" currentPage={assignmentPage.page} pageSize={pageSize} totalRows={studentDiscountAssignments.length} hrefForPage={(page) => paginationHref("assignmentsPage", page)} />
+            )}
           </section>
         </>
       )}
@@ -372,7 +433,7 @@ export default async function FeesSetupPage({
           </div>
           {structures.length ? (
             <div className="divide-y divide-slate-100">
-              {structures.map((structure) => (
+              {structurePage.rows.map((structure) => (
                 <div key={structure.id} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                   <div>
                     <p className="font-medium text-slate-900">{structure.branchName} · {structure.className} · {structure.yearName}{structure.termName ? ` · ${structure.termName}` : ""}{structure.studentName ? ` · ${structure.studentName} ${structure.studentLastName}` : ""}</p>
@@ -403,6 +464,9 @@ export default async function FeesSetupPage({
           ) : (
             <p className="p-5 text-sm text-slate-500">No fee structures have been created yet.</p>
           )}
+          {structures.length > 0 && (
+            <TablePagination ariaLabel="Created fee structures" currentPage={structurePage.page} pageSize={pageSize} totalRows={structures.length} hrefForPage={(page) => paginationHref("structuresPage", page)} />
+          )}
           </section>
         </>
       )}
@@ -431,11 +495,13 @@ function CatalogCard({
   title,
   empty,
   count,
+  pagination,
   children,
 }: {
   title: string;
   empty: string;
   count: number;
+  pagination?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -444,6 +510,7 @@ function CatalogCard({
       <ul className="mt-3 space-y-2 text-sm text-slate-600">
         {count > 0 ? children : <li>{empty}</li>}
       </ul>
+      {pagination}
     </div>
   );
 }

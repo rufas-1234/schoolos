@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canPreviewDraftTestReport,
   calculateComponentTotal,
+  calculateAnnualProgress,
   calculateWeightedAverage,
   completeSubmittedMarkIds,
   gradeForPercentage,
@@ -46,6 +47,13 @@ describe("examination policy", () => {
       { marks: 20, maxMarks: 100, weight: 3 },
     ])).toEqual({ totalMarks: 60, maxMarks: 150, percentage: 35 });
     expect(calculateWeightedAverage([{ marks: 51, maxMarks: 50, weight: 1 }])).toBeNull();
+  });
+
+  it("calculates annual averages from available periods and compares the first and last results", () => {
+    expect(calculateAnnualProgress([80, null, 90])).toEqual({ average: 85, change: 10 });
+    expect(calculateAnnualProgress([null, 75, null])).toEqual({ average: 75, change: null });
+    expect(calculateAnnualProgress([null, null])).toEqual({ average: null, change: null });
+    expect(calculateAnnualProgress([80, 105])).toEqual({ average: null, change: null });
   });
 
   it("validates single and multi-exam mark distributions and sums complete component marks", () => {

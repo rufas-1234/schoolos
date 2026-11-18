@@ -167,6 +167,22 @@ export function calculateWeightedAverage(
   };
 }
 
+export function calculateAnnualProgress(
+  periodPercentages: Array<number | null>,
+): { average: number | null; change: number | null } {
+  const available = periodPercentages.filter((value): value is number => value !== null);
+  if (available.some((value) => !Number.isFinite(value) || value < 0 || value > 100)) {
+    return { average: null, change: null };
+  }
+  if (available.length === 0) return { average: null, change: null };
+  return {
+    average: Math.round(available.reduce((total, value) => total + value, 0) / available.length * 100) / 100,
+    change: available.length > 1
+      ? Math.round((available[available.length - 1] - available[0]) * 100) / 100
+      : null,
+  };
+}
+
 export function rankScores(scores: Array<{ id: number; score: number }>): Map<number, number> {
   const ordered = [...scores].sort((a, b) => b.score - a.score || a.id - b.id);
   const ranks = new Map<number, number>();
