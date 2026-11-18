@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { db } from "@/db";
 import {
+  classRooms,
+  classRoutines,
   academicYears,
   classLevels,
   classSections,
@@ -57,6 +59,7 @@ export default async function StudentPortalPage() {
     ? await Promise.all([
       db.select({
         studentId: studentEnrollments.studentId,
+        classSectionId: studentEnrollments.classSectionId,
         className: classLevels.name,
         sectionName: classSections.name,
         yearName: academicYears.name,
@@ -140,6 +143,42 @@ export default async function StudentPortalPage() {
       newestEnrollmentByStudent.set(enrollment.studentId, enrollment);
     }
   }
+  const currentEnrollments = [...newestEnrollmentByStudent.values()];
+  const currentSectionIds = [...new Set(currentEnrollments.map((enrollment) => enrollment.classSectionId))];
+  const timetable = currentSectionIds.length
+    ? await db.select({
+      classSectionId: classRoutines.classSectionId,
+      dayOfWeek: classRoutines.dayOfWeek,
+      startsAt: classRoutines.startsAt,
+      endsAt: classRoutines.endsAt,
+      subjectName: subjects.name,
+      roomNumber: classRooms.roomNumber,
+    }).from(classRoutines)
+      .innerJoin(classSubjects, and(
+        eq(classSubjects.id, classRoutines.classSubjectId),
+        eq(classSubjects.schoolId, context.schoolId),
+      ))
+      .innerJoin(subjects, and(
+        eq(subjects.id, classSubjects.subjectId),
+        eq(subjects.schoolId, context.schoolId),
+      ))
+      .leftJoin(classRooms, and(
+        eq(classRooms.id, classRoutines.classRoomId!),
+        eq(classRooms.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(classRoutines.schoolId, context.schoolId),
+        inArray(classRoutines.classSectionId, currentSectionIds),
+      ))
+      .orderBy(classRoutines.dayOfWeek, classRoutines.startsAt)
+    : [];
+  const weekdayNames = new Map([
+    [1, "Monday"],
+    [2, "Tuesday"],
+    [3, "Wednesday"],
+    [4, "Thursday"],
+    [5, "Friday"],
+  ]);
 
   return (
     <PortalShell
@@ -150,6 +189,7 @@ export default async function StudentPortalPage() {
       navigation={[
         { href: "/portal/student", label: "Overview", icon: LayoutDashboard },
         { href: "#learning", label: "My learning", icon: GraduationCap },
+        { href: "#timetable", label: "Class timetable", icon: CalendarDays },
         { href: "#results", label: "Exam results", icon: BookOpenCheck },
         { href: "#attendance", label: "Attendance", icon: CalendarDays },
       ]}
@@ -159,7 +199,7 @@ export default async function StudentPortalPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">Your learning workspace</p>
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Welcome, {context.user.name}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-violet-100">
-            View your current class, published exam results, and attendance recorded by your school.
+            View your current class, weekly timetable, published exam results, and attendance recorded by your school.
           </p>
         </header>
 
@@ -173,8 +213,9 @@ export default async function StudentPortalPage() {
           </section>
         ) : (
           <>
-            <section aria-label="Student summary" className="grid gap-4 sm:grid-cols-3">
+            <section aria-label="Student summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryCard icon={GraduationCap} label="Student profiles" value={linkedStudents.length} />
+              <SummaryCard icon={CalendarDays} label="Weekly lessons" value={timetable.length} />
               <SummaryCard icon={ClipboardCheck} label="Published subject results" value={results.length} />
               <SummaryCard icon={CalendarDays} label="Attendance records" value={attendance.length} />
             </section>
@@ -199,6 +240,52 @@ export default async function StudentPortalPage() {
                   );
                 })}
               </div>
+            </section>
+
+            <section id="timetable" className="space-y-4">
+              <SectionHeading title="Class timetable" description="Weekly lesson times for your current class section." />
+              {timetable.length ? (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[35rem] text-left text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Day</th>
+                          <th className="px-4 py-3 font-semibold">Time</th>
+                          <th className="px-4 py-3 font-semibold">Subject</th>
+                          <th className="px-4 py-3 font-semibold">Room</th>
+                          {linkedStudents.length > 1 && <th className="px-4 py-3 font-semibold">Student</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {timetable.map((lesson, index) => {
+                          const student = currentEnrollments.find(
+                            (enrollment) => enrollment.classSectionId === lesson.classSectionId,
+                          );
+                          const studentProfile = linkedStudents.find((item) => item.id === student?.studentId);
+                          return (
+                            <tr key={`${lesson.classSectionId}-${lesson.dayOfWeek}-${lesson.startsAt}-${lesson.subjectName}-${index}`}>
+                              <td className="px-4 py-3 font-medium text-slate-900">
+                                {weekdayNames.get(lesson.dayOfWeek) ?? `Day ${lesson.dayOfWeek}`}
+                              </td>
+                              <td className="px-4 py-3 text-slate-700">{lesson.startsAt}–{lesson.endsAt}</td>
+                              <td className="px-4 py-3 text-slate-700">{lesson.subjectName}</td>
+                              <td className="px-4 py-3 text-slate-700">{lesson.roomNumber ?? "Not assigned"}</td>
+                              {linkedStudents.length > 1 && (
+                                <td className="px-4 py-3 text-slate-700">
+                                  {studentProfile ? `${studentProfile.firstName} ${studentProfile.lastName}` : "—"}
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState>No timetable has been scheduled for your current class yet.</EmptyState>
+              )}
             </section>
 
             <section id="results" className="space-y-4">

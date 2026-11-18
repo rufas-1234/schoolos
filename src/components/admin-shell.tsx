@@ -53,19 +53,6 @@ const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
   { href: "/portal/teacher", label: "Teacher Portal", icon: GraduationCap, permission: "results.enter" },
   {
-    href: "/admin/users",
-    label: "Users",
-    icon: UserRoundCog,
-    permission: "roles.manage",
-    children: [
-      { id: "user-list", label: "User list", href: "/admin/users" },
-      { id: "create-role", label: "Create role", href: "/admin/users/roles?section=create-role", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-role" } },
-      { id: "school-roles", label: "School roles", href: "/admin/users/roles?section=school-roles", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "school-roles" } },
-      { id: "create-account", label: "Create account", href: "/admin/users/roles?section=create-account", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-account" } },
-      { id: "individual-access", label: "Individual access", href: "/admin/users/roles?section=individual-access", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "individual-access" } },
-    ],
-  },
-  {
     href: "/admin/academics",
     label: "Academics",
     icon: CalendarDays,
@@ -162,6 +149,12 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
+    href: "/admin/settings",
+    label: "School profile",
+    icon: School,
+    permission: "school.settings.manage",
+  },
+  {
     href: "/admin/inventory",
     label: "Inventory",
     icon: PackageOpen,
@@ -176,10 +169,17 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    href: "/admin/settings",
-    label: "School profile",
-    icon: School,
-    permission: "school.settings.manage",
+    href: "/admin/users",
+    label: "Users",
+    icon: UserRoundCog,
+    permission: "roles.manage",
+    children: [
+      { id: "user-list", label: "User list", href: "/admin/users" },
+      { id: "create-role", label: "Create role", href: "/admin/users/roles?section=create-role", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-role" } },
+      { id: "school-roles", label: "School roles", href: "/admin/users/roles?section=school-roles", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "school-roles" } },
+      { id: "create-account", label: "Create account", href: "/admin/users/roles?section=create-account", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-account" } },
+      { id: "individual-access", label: "Individual access", href: "/admin/users/roles?section=individual-access", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "individual-access" } },
+    ],
   },
 ];
 
