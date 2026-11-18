@@ -718,6 +718,69 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       : Promise.resolve([]),
   ]);
 
+  const teacherAssignmentRows = permissions.has("results.enter")
+    ? await db.select({
+      sectionId: classSections.id,
+      classSubjectId: classSubjects.id,
+      className: classLevels.name,
+      sectionName: classSections.name,
+      subjectName: subjects.name,
+      subjectCode: subjects.code,
+      yearName: academicYears.name,
+    }).from(classSubjects)
+      .innerJoin(teachers, and(
+        eq(teachers.id, classSubjects.teacherId!),
+        eq(teachers.schoolId, context.schoolId),
+        eq(teachers.status, "active"),
+      ))
+      .innerJoin(staffMembers, and(
+        eq(staffMembers.id, teachers.staffMemberId!),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.linkedUserId, context.user.id),
+        eq(staffMembers.status, "active"),
+      ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSubjects.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+        eq(classLevels.status, "active"),
+      ))
+      .innerJoin(subjects, and(
+        eq(subjects.id, classSubjects.subjectId),
+        eq(subjects.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSections, and(
+        eq(classSections.classLevelId, classLevels.id),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(academicYears, and(
+        eq(academicYears.id, classSections.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+        eq(academicYears.status, "active"),
+      ))
+      .where(and(
+        eq(classSubjects.schoolId, context.schoolId),
+        or(
+          tokenMatch(classLevels.name),
+          tokenMatch(classSections.name),
+          tokenMatch(subjects.name),
+          tokenMatch(subjects.code),
+          tokenMatch(academicYears.name),
+          fuzzyTextMatch(queryTokens, classLevels.name, classSections.name, subjects.name, subjects.code, academicYears.name),
+        ),
+      ))
+      .groupBy(
+        classSections.id,
+        classSubjects.id,
+        classLevels.name,
+        classSections.name,
+        subjects.name,
+        subjects.code,
+        academicYears.name,
+      )
+      .orderBy(asc(classLevels.name), asc(classSections.name), asc(subjects.name))
+      .limit(30)
+    : [];
+
   for (const account of userRows) {
     results.push({
       id: `user-${account.email}`,
@@ -816,6 +879,16 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       description: "Class section",
       href: `/admin/academics?section=sections&search=${encodeURIComponent(section.name)}`,
       category: "Academics",
+    });
+  }
+  for (const assignment of teacherAssignmentRows) {
+    results.push({
+      id: `teacher-assignment-${assignment.sectionId}-${assignment.classSubjectId}`,
+      title: `${assignment.className} · ${assignment.sectionName} · ${assignment.subjectName}`,
+      description: `Teaching assignment · ${assignment.yearName} · ${assignment.subjectCode}`,
+      href: `/portal/teacher?section=classes&q=${encodeURIComponent(query)}`,
+      category: "Academics",
+      searchTerms: [assignment.subjectCode, assignment.yearName],
     });
   }
   for (const subject of academicRows[2]) {
