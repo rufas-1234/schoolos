@@ -12,6 +12,7 @@ import {
   classLevels,
   classSections,
   feeDiscounts,
+  feeAdvanceTransactions,
   feeGroups,
   feePayments,
   feePaymentReversals,
@@ -86,6 +87,19 @@ const paymentSchema = z.object({
   reference: z.string().trim().max(120).transform((value) => value || null),
   notes: optionalText,
 });
+const advanceCreditSchema = z.object({
+  idempotencyKey: z.string().uuid(),
+  studentId: idField,
+  amount: amountField,
+  paymentMethod: z.enum(feePaymentMethods),
+  reference: z.string().trim().max(120).transform((value) => value || null),
+  notes: optionalText,
+});
+const applyAdvanceCreditSchema = z.object({
+  idempotencyKey: z.string().uuid(),
+  studentId: idField,
+  invoiceId: idField,
+});
 const bulkPaymentSchema = z.object({
   search: z.string().trim().max(100),
   status: z.enum(["", "unpaid", "partial", "paid"]),
@@ -140,6 +154,7 @@ async function writeAudit(
 function revalidateFees() {
   revalidatePath("/admin/fees");
   revalidatePath("/admin/fees/collection");
+  revalidatePath("/admin/fees/collection/carry-forward");
   revalidatePath("/admin/fees/reports");
 }
 
@@ -910,6 +925,257 @@ function todayInTimezone(timezone: string): string {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+export async function recordFeeAdvanceCredit(
+  _previousState: FeeActionState,
+  formData: FormData,
+): Promise<FeeActionState> {
+  const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
+  const result = advanceCreditSchema.safeParse({
+    idempotencyKey: value(formData, "idempotencyKey"),
+    studentId: value(formData, "studentId"),
+    amount: value(formData, "amount"),
+    paymentMethod: value(formData, "paymentMethod"),
+    reference: value(formData, "reference"),
+    notes: value(formData, "notes"),
+  });
+  const amountMinor = result.success ? parseMoneyToMinorUnits(result.data.amount) : null;
+  if (!result.success || amountMinor === null || amountMinor <= 0) {
+    return { error: "Enter a valid positive advance amount and payment method." };
+  }
+
+  const transactionPublicId = randomUUID();
+  const receiptNumber = `ADV-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+  const outcome = await db.transaction(async (tx) => {
+    const [student] = await tx.select({ id: students.id, status: students.status })
+      .from(students).where(and(
+        eq(students.id, result.data.studentId),
+        eq(students.schoolId, context.schoolId),
+      )).for("update").limit(1);
+    if (!student) return { state: "student-not-found" as const };
+
+    const [duplicate] = await tx.select({
+      publicId: feeAdvanceTransactions.publicId,
+      receiptNumber: feeAdvanceTransactions.receiptNumber,
+      transactionType: feeAdvanceTransactions.transactionType,
+      studentId: feeAdvanceTransactions.studentId,
+      amount: feeAdvanceTransactions.amount,
+      paymentMethod: feeAdvanceTransactions.paymentMethod,
+      reference: feeAdvanceTransactions.reference,
+      notes: feeAdvanceTransactions.notes,
+    }).from(feeAdvanceTransactions).where(and(
+      eq(feeAdvanceTransactions.schoolId, context.schoolId),
+      eq(feeAdvanceTransactions.idempotencyKey, result.data.idempotencyKey),
+    )).limit(1);
+    if (duplicate) {
+      if (duplicate.transactionType !== "received" || duplicate.studentId !== result.data.studentId ||
+        parseMoneyToMinorUnits(duplicate.amount) !== amountMinor ||
+        duplicate.paymentMethod !== result.data.paymentMethod ||
+        duplicate.reference !== result.data.reference || duplicate.notes !== result.data.notes ||
+        !duplicate.receiptNumber) return { state: "conflict" as const };
+      return { state: "saved" as const, publicId: duplicate.publicId, receiptNumber: duplicate.receiptNumber };
+    }
+    if (student.status !== "active") return { state: "student-not-found" as const };
+    const [activeEnrollment] = await tx.select({ id: studentEnrollments.id })
+      .from(studentEnrollments)
+      .innerJoin(academicYears, and(
+        eq(academicYears.id, studentEnrollments.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.studentId, student.id),
+        eq(studentEnrollments.status, "enrolled"),
+        eq(academicYears.status, "active"),
+      )).limit(1);
+    if (!activeEnrollment) return { state: "no-active-enrollment" as const };
+
+    await tx.insert(feeAdvanceTransactions).values({
+      publicId: transactionPublicId,
+      schoolId: context.schoolId,
+      studentId: student.id,
+      transactionType: "received",
+      amount: result.data.amount,
+      receiptNumber,
+      idempotencyKey: result.data.idempotencyKey,
+      paymentMethod: result.data.paymentMethod,
+      reference: result.data.reference,
+      notes: result.data.notes,
+      recordedBy: context.user.id,
+    });
+    await writeAudit(tx, context.schoolId, context.user.id, "fee_advance.received", "fee_advance_transaction", transactionPublicId,
+      ["studentId", "amount", "paymentMethod", "reference"]);
+    return { state: "saved" as const, publicId: transactionPublicId, receiptNumber };
+  });
+  if (outcome.state === "conflict") return { error: "This advance receipt request was already used with different details. Refresh and try again." };
+  if (outcome.state === "student-not-found") return { error: "Choose an active student in this school." };
+  if (outcome.state === "no-active-enrollment") return { error: "This student needs an active enrollment before an advance can be recorded." };
+  revalidateFees();
+  return {
+    success: true,
+    message: `Advance payment recorded. Receipt ${outcome.receiptNumber}.`,
+    receiptUrl: `/admin/fees/collection/carry-forward/receipt/${outcome.publicId}`,
+  };
+}
+
+export async function applyFeeAdvanceCredit(
+  _previousState: FeeActionState,
+  formData: FormData,
+): Promise<FeeActionState> {
+  const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
+  const result = applyAdvanceCreditSchema.safeParse({
+    idempotencyKey: value(formData, "idempotencyKey"),
+    studentId: value(formData, "studentId"),
+    invoiceId: value(formData, "invoiceId"),
+  });
+  if (!result.success) return { error: "Choose a valid student invoice to receive the advance credit." };
+
+  const paymentPublicId = randomUUID();
+  const outcome = await db.transaction(async (tx) => {
+    const [student] = await tx.select({ id: students.id }).from(students).where(and(
+      eq(students.id, result.data.studentId),
+      eq(students.schoolId, context.schoolId),
+    )).for("update").limit(1);
+    if (!student) return { state: "student-not-found" as const };
+
+    const [duplicate] = await tx.select({
+      transactionType: feeAdvanceTransactions.transactionType,
+      studentId: feeAdvanceTransactions.studentId,
+      invoiceId: feeAdvanceTransactions.invoiceId,
+      paymentId: feeAdvanceTransactions.paymentId,
+    }).from(feeAdvanceTransactions).where(and(
+      eq(feeAdvanceTransactions.schoolId, context.schoolId),
+      eq(feeAdvanceTransactions.idempotencyKey, result.data.idempotencyKey),
+    )).limit(1);
+    if (duplicate) {
+      if (duplicate.transactionType !== "applied" || duplicate.studentId !== result.data.studentId ||
+        duplicate.invoiceId !== result.data.invoiceId || duplicate.paymentId === null) return { state: "conflict" as const };
+      const [existing] = await tx.select({ publicId: feePayments.publicId, receiptNumber: feePayments.receiptNumber })
+        .from(feePayments).where(and(
+          eq(feePayments.id, duplicate.paymentId),
+          eq(feePayments.schoolId, context.schoolId),
+        )).limit(1);
+      return existing
+        ? { state: "saved" as const, publicId: existing.publicId, receiptNumber: existing.receiptNumber, amountMinor: 0 }
+        : { state: "conflict" as const };
+    }
+
+    const [invoice] = await tx.select().from(studentFeeInvoices).where(and(
+      eq(studentFeeInvoices.id, result.data.invoiceId),
+      eq(studentFeeInvoices.schoolId, context.schoolId),
+      eq(studentFeeInvoices.studentId, student.id),
+    )).for("update").limit(1);
+    if (!invoice) return { state: "invoice-not-found" as const };
+
+    const [creditTotal] = await tx.select({ balance: sum(sql`
+      CASE WHEN ${feeAdvanceTransactions.transactionType} = 'applied'
+        THEN -${feeAdvanceTransactions.amount} ELSE ${feeAdvanceTransactions.amount} END
+    `) }).from(feeAdvanceTransactions).where(and(
+      eq(feeAdvanceTransactions.schoolId, context.schoolId),
+      eq(feeAdvanceTransactions.studentId, student.id),
+    ));
+    const availableCreditMinor = parseMoneyToMinorUnits(creditTotal?.balance ?? "0");
+    if (availableCreditMinor === null) throw new Error("Stored advance credit balance is invalid.");
+    if (availableCreditMinor <= 0) return { state: "no-credit" as const };
+
+    const invoicePayments = await tx.select({
+      amount: feePayments.amount,
+      reversedAmount: feePayments.reversedAmount,
+      fineAmount: feePayments.fineAmount,
+    }).from(feePayments).where(and(
+      eq(feePayments.schoolId, context.schoolId),
+      eq(feePayments.invoiceId, invoice.id),
+    )).for("update");
+    const paymentTotals = invoicePayments.map((payment) => ({
+      amount: parseMoneyToMinorUnits(payment.amount),
+      reversed: parseMoneyToMinorUnits(payment.reversedAmount),
+      fine: parseMoneyToMinorUnits(payment.fineAmount),
+    }));
+    if (paymentTotals.some((payment) => payment.amount === null || payment.reversed === null || payment.fine === null)) {
+      throw new Error("Stored invoice payment total is invalid.");
+    }
+    const totalPaidMinor = paymentTotals.reduce((total, payment) => total + (payment.amount! - payment.reversed!), 0);
+    const totalFinePaidMinor = paymentTotals.reduce((total, payment) =>
+      total + Math.max(0, payment.fine! - Math.min(payment.reversed!, payment.fine!)), 0);
+    const amountMinor = parseMoneyToMinorUnits(invoice.amount);
+    const discountMinor = parseMoneyToMinorUnits(invoice.discountAmount);
+    if (amountMinor === null || discountMinor === null) {
+      throw new Error("Stored invoice amount is invalid.");
+    }
+    const [school] = await tx.select({ timezone: schools.timezone }).from(schools)
+      .where(eq(schools.id, context.schoolId)).limit(1);
+    if (!school) return { state: "school-not-found" as const };
+    const paidDate = todayInTimezone(school.timezone);
+    const fineMinor = paidDate > invoice.dueDate
+      ? calculateFineMinorUnits(amountMinor - discountMinor, invoice.fineType, invoice.fineValue)
+      : 0;
+    if (fineMinor === null) throw new Error("Stored fee fine is invalid.");
+    const totalDueMinor = amountMinor - discountMinor + fineMinor;
+    const remainingMinor = totalDueMinor - totalPaidMinor;
+    if (remainingMinor <= 0) return { state: "invoice-paid" as const };
+    const appliedMinor = Math.min(availableCreditMinor, remainingMinor);
+    const appliedAmount = (appliedMinor / 100).toFixed(2);
+    const receiptNumber = `RCT-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+    await tx.insert(feePayments).values({
+      publicId: paymentPublicId,
+      schoolId: context.schoolId,
+      invoiceId: invoice.id,
+      receiptNumber,
+      idempotencyKey: result.data.idempotencyKey,
+      amount: appliedAmount,
+      fineAmount: (
+        Math.min(
+          Math.max(0, fineMinor - totalFinePaidMinor),
+          Math.max(0, appliedMinor - Math.max(0, amountMinor - discountMinor - totalPaidMinor)),
+        ) / 100
+      ).toFixed(2),
+      paymentMethod: "advance_credit",
+      reference: "Advance fee credit",
+      notes: "Applied from the student carry-forward balance.",
+      recordedBy: context.user.id,
+    });
+    const [payment] = await tx.select({ id: feePayments.id, receiptNumber: feePayments.receiptNumber })
+      .from(feePayments).where(and(
+        eq(feePayments.publicId, paymentPublicId),
+        eq(feePayments.schoolId, context.schoolId),
+      )).limit(1);
+    if (!payment) throw new Error("Advance credit payment could not be loaded.");
+    const transactionId = randomUUID();
+    await tx.insert(feeAdvanceTransactions).values({
+      publicId: transactionId,
+      schoolId: context.schoolId,
+      studentId: student.id,
+      invoiceId: invoice.id,
+      paymentId: payment.id,
+      transactionType: "applied",
+      amount: appliedAmount,
+      idempotencyKey: result.data.idempotencyKey,
+      notes: `Applied to invoice ${invoice.invoiceNumber}.`,
+      recordedBy: context.user.id,
+    });
+    const status = feeInvoiceStatus(totalDueMinor, totalPaidMinor + appliedMinor);
+    if (!status) throw new Error("Invoice balance is inconsistent.");
+    await tx.update(studentFeeInvoices).set({ status }).where(eq(studentFeeInvoices.id, invoice.id));
+    await writeAudit(tx, context.schoolId, context.user.id, "fee_advance.applied", "fee_advance_transaction", transactionId,
+      ["studentId", "invoiceId", "amount"]);
+    return { state: "saved" as const, publicId: paymentPublicId, receiptNumber: payment.receiptNumber, amountMinor: appliedMinor };
+  });
+  if (outcome.state === "conflict") return { error: "This advance-credit request was already used with different details. Refresh and try again." };
+  if (outcome.state === "student-not-found") return { error: "Student record was not found in this school." };
+  if (outcome.state === "invoice-not-found") return { error: "Choose an outstanding invoice belonging to this student." };
+  if (outcome.state === "no-credit") return { error: "This student has no available carry-forward credit." };
+  if (outcome.state === "invoice-paid") return { error: "This invoice has no remaining balance." };
+  if (outcome.state === "school-not-found") return { error: "School settings were not found." };
+  revalidateFees();
+  const suffix = outcome.amountMinor > 0
+    ? ` ${(outcome.amountMinor / 100).toFixed(2)} was applied.`
+    : " This request had already been applied.";
+  return {
+    success: true,
+    message: `Advance credit applied. Receipt ${outcome.receiptNumber}.${suffix}`,
+    receiptUrl: `/admin/fees/receipt/${outcome.publicId}`,
+  };
+}
+
 export async function recordFeePayment(
   _previousState: FeeActionState,
   formData: FormData,
@@ -1245,16 +1511,39 @@ export async function reverseFeePayment(
         duplicate.reference !== result.data.reference) return { state: "conflict" as const, paymentPublicId: duplicate.paymentPublicId };
       return { state: "duplicate" as const, paymentPublicId: duplicate.paymentPublicId };
     }
-    const [payment] = await tx.select().from(feePayments)
-      .where(and(eq(feePayments.id, result.data.paymentId), eq(feePayments.schoolId, context.schoolId)))
-      .for("update").limit(1);
-    if (!payment) return { state: "not-found" as const };
+    const [paymentReference] = await tx.select({
+      id: feePayments.id,
+      invoiceId: feePayments.invoiceId,
+    }).from(feePayments).where(and(
+      eq(feePayments.id, result.data.paymentId),
+      eq(feePayments.schoolId, context.schoolId),
+    )).limit(1);
+    if (!paymentReference) return { state: "not-found" as const };
+    const [invoiceReference] = await tx.select({
+      id: studentFeeInvoices.id,
+      studentId: studentFeeInvoices.studentId,
+    }).from(studentFeeInvoices).where(and(
+      eq(studentFeeInvoices.id, paymentReference.invoiceId),
+      eq(studentFeeInvoices.schoolId, context.schoolId),
+    )).limit(1);
+    if (!invoiceReference) return { state: "not-found" as const };
+    const [student] = await tx.select({ id: students.id }).from(students).where(and(
+      eq(students.id, invoiceReference.studentId),
+      eq(students.schoolId, context.schoolId),
+    )).for("update").limit(1);
+    if (!student) return { state: "not-found" as const };
     const [invoice] = await tx.select().from(studentFeeInvoices)
       .where(and(
-        eq(studentFeeInvoices.id, payment.invoiceId),
+        eq(studentFeeInvoices.id, paymentReference.invoiceId),
         eq(studentFeeInvoices.schoolId, context.schoolId),
       )).for("update").limit(1);
     if (!invoice) return { state: "not-found" as const };
+    const [payment] = await tx.select().from(feePayments)
+      .where(and(
+        eq(feePayments.id, paymentReference.id),
+        eq(feePayments.schoolId, context.schoolId),
+      )).for("update").limit(1);
+    if (!payment) return { state: "not-found" as const };
     const paymentMinor = parseMoneyToMinorUnits(payment.amount);
     const reversedMinor = parseMoneyToMinorUnits(payment.reversedAmount);
     const paymentFineMinor = parseMoneyToMinorUnits(payment.fineAmount);
@@ -1286,6 +1575,36 @@ export async function reverseFeePayment(
       idempotencyKey: result.data.idempotencyKey,
       recordedBy: context.user.id,
     });
+    const [advanceApplication] = await tx.select({
+      studentId: feeAdvanceTransactions.studentId,
+      invoiceId: feeAdvanceTransactions.invoiceId,
+      amount: feeAdvanceTransactions.amount,
+    }).from(feeAdvanceTransactions).where(and(
+      eq(feeAdvanceTransactions.schoolId, context.schoolId),
+      eq(feeAdvanceTransactions.paymentId, payment.id),
+      eq(feeAdvanceTransactions.transactionType, "applied"),
+    )).limit(1);
+    if (advanceApplication) {
+      const appliedCreditMinor = parseMoneyToMinorUnits(advanceApplication.amount);
+      if (appliedCreditMinor === null) {
+        throw new Error("Stored advance credit reversal total is invalid.");
+      }
+      const restoreMinor = Math.min(reversalMinor, Math.max(0, appliedCreditMinor - reversedMinor));
+      if (restoreMinor > 0) {
+        await tx.insert(feeAdvanceTransactions).values({
+          publicId: randomUUID(),
+          schoolId: context.schoolId,
+          studentId: advanceApplication.studentId,
+          invoiceId: advanceApplication.invoiceId,
+          paymentId: payment.id,
+          transactionType: "restored",
+          amount: (restoreMinor / 100).toFixed(2),
+          idempotencyKey: `reversal-${result.data.idempotencyKey}`,
+          notes: `Credit restored from ${result.data.reversalType}.`,
+          recordedBy: context.user.id,
+        });
+      }
+    }
     const nextReversed = reversedMinor + reversalMinor;
     await tx.update(feePayments).set({ reversedAmount: (nextReversed / 100).toFixed(2) })
       .where(eq(feePayments.id, payment.id));

@@ -7,6 +7,7 @@ import { RequiredMark } from "@/components/required-mark";
 import { AdminConfirmSubmitButton, AdminDeleteButton } from "@/components/admin-data-table";
 import {
   assignStudentFeeDiscount,
+  applyFeeAdvanceCredit,
   deleteFeeDiscount,
   deleteFeeGroup,
   deleteFeeStructure,
@@ -19,6 +20,7 @@ import {
   generateStudentFeeInvoices,
   recordFeePayment,
   recordBulkFeePayments,
+  recordFeeAdvanceCredit,
   reverseFeePayment,
   updateFeeInvoice,
   type FeeActionState,
@@ -409,6 +411,59 @@ export function RecordFeePaymentForm({
       <Field label="Reference" name="reference" required={false} placeholder="Receipt or transaction reference" />
       <Field label="Notes" name="notes" required={false} />
       {maxAmount && <p className="text-xs text-slate-500">Outstanding balance: {currency} {maxAmount}</p>}
+    </ActionForm>
+  );
+}
+
+export function RecordFeeAdvanceCreditForm({
+  students,
+  currency,
+  idempotencyKey,
+}: {
+  students: FeeOption[];
+  currency: string;
+  idempotencyKey: string;
+}) {
+  return (
+    <ActionForm action={recordFeeAdvanceCredit} title="Record advance fee payment" submitLabel="Record advance payment">
+      <p className="text-sm text-slate-600">
+        Record money received for a student&apos;s future fees. The credit stays on the student&apos;s account until it is applied to an invoice.
+      </p>
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      <SelectField label="Student" name="studentId" options={students} />
+      <Field label={`Amount (${currency})`} name="amount" type="number" placeholder="Enter amount received" />
+      <ValueSelectField label="Payment method" name="paymentMethod" options={[
+        { value: "cash", label: "Cash" },
+        { value: "bank_transfer", label: "Bank transfer" },
+        { value: "card", label: "Card" },
+        { value: "mobile_money", label: "Mobile money" },
+        { value: "cheque", label: "Cheque" },
+        { value: "other", label: "Other" },
+      ]} />
+      <Field label="Reference" name="reference" required={false} placeholder="Receipt or transaction reference" />
+      <Field label="Notes" name="notes" required={false} />
+    </ActionForm>
+  );
+}
+
+export function ApplyFeeAdvanceCreditForm({
+  studentId,
+  invoices,
+  idempotencyKey,
+}: {
+  studentId: number;
+  invoices: FeeOption[];
+  idempotencyKey: string;
+}) {
+  return (
+    <ActionForm action={applyFeeAdvanceCredit} title="Apply carry-forward credit" submitLabel="Apply credit to invoice">
+      <p className="text-sm text-slate-600">
+        The system applies up to the invoice&apos;s remaining balance. Any unused credit stays available for later fees.
+      </p>
+      <input type="hidden" name="studentId" value={studentId} />
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      <SelectField label="Outstanding invoice" name="invoiceId" options={invoices} />
+      <p className="text-xs text-slate-500">The advance is applied as an internal credit; no new payment is collected.</p>
     </ActionForm>
   );
 }

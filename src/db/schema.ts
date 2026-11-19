@@ -1814,6 +1814,42 @@ export const feePaymentReversals = mysqlTable(
   ],
 );
 
+export const feeAdvanceTransactions = mysqlTable(
+  "fee_advance_transactions",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => students.id),
+    invoiceId: bigint("invoiceId", { mode: "number", unsigned: true })
+      .references(() => studentFeeInvoices.id),
+    paymentId: bigint("paymentId", { mode: "number", unsigned: true })
+      .references(() => feePayments.id),
+    transactionType: varchar("transactionType", { length: 20 }).notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    receiptNumber: varchar("receiptNumber", { length: 40 }),
+    idempotencyKey: varchar("idempotencyKey", { length: 64 }).notNull(),
+    paymentMethod: varchar("paymentMethod", { length: 30 }),
+    reference: varchar("reference", { length: 120 }),
+    notes: varchar("notes", { length: 500 }),
+    recordedBy: varchar("recordedBy", { length: 36 })
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("fee_advance_transactions_school_receipt_uq").on(table.schoolId, table.receiptNumber),
+    uniqueIndex("fee_advance_transactions_school_idempotency_uq").on(table.schoolId, table.idempotencyKey),
+    index("fee_advance_transactions_school_student_idx").on(table.schoolId, table.studentId, table.createdAt),
+    index("fee_advance_transactions_school_invoice_idx").on(table.schoolId, table.invoiceId),
+    index("fee_advance_transactions_school_payment_idx").on(table.schoolId, table.paymentId),
+  ],
+);
+
 export const uploadedFiles = mysqlTable(
   "uploaded_files",
   {

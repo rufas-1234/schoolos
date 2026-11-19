@@ -171,6 +171,13 @@ const navigation: NavigationItem[] = [
         permissionAlternatives: ["fees.manage"],
       },
       {
+        id: "fee-carry-forward",
+        label: "Carry-forward fees",
+        href: "/admin/fees/collection/carry-forward",
+        permission: "payments.record",
+        permissionAlternatives: ["fees.manage"],
+      },
+      {
         id: "fee-reports",
         label: "Fee reports",
         href: "/admin/fees/reports",

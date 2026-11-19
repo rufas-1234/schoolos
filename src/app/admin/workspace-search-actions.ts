@@ -12,6 +12,7 @@ import {
   classSubjects,
   dormitories,
   dormitoryRooms,
+  feeAdvanceTransactions,
   examClasses,
   examSubjects,
   examinations,
@@ -195,6 +196,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       addPage("fee-setup", "Fee setup", "Configure fee groups, types, discounts, and structures", "/admin/fees", ["fees setup", "fee structure", "fee types", "discounts"]);
     }
     addPage("fee-collection", "Fee collection", "Find invoices and record payments", "/admin/fees/collection", ["fees", "invoice", "payment"]);
+    addPage("fee-carry-forward", "Carry-forward fees", "Record advance fee payments and apply student credit to future invoices", "/admin/fees/collection/carry-forward", ["advance fees", "prepaid fees", "student credit", "future fees"]);
     addPage("fee-reports", "Fee reports", "Collection and outstanding balance reports", "/admin/fees/reports", ["report", "reports", "balance", "finance"]);
   }
   if (canManageAccounts) {
@@ -264,6 +266,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     inventorySupplierRows,
     invoiceRows,
     paymentRows,
+    advanceRows,
     accountTransactionRows,
     staffRows,
     staffApplicationRows,
@@ -449,6 +452,35 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           ),
         ))
         .orderBy(asc(feePayments.paidAt))
+        .limit(20)
+      : Promise.resolve([]),
+    canManageFees
+      ? db.select({
+        publicId: feeAdvanceTransactions.publicId,
+        receiptNumber: feeAdvanceTransactions.receiptNumber,
+        reference: feeAdvanceTransactions.reference,
+        transactionType: feeAdvanceTransactions.transactionType,
+        firstName: students.firstName,
+        lastName: students.lastName,
+        admissionNumber: students.admissionNumber,
+      }).from(feeAdvanceTransactions)
+        .innerJoin(students, and(
+          eq(students.id, feeAdvanceTransactions.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(feeAdvanceTransactions.schoolId, context.schoolId),
+          eq(feeAdvanceTransactions.transactionType, "received"),
+          or(
+            tokenMatch(feeAdvanceTransactions.receiptNumber),
+            tokenMatch(feeAdvanceTransactions.reference),
+            tokenMatch(students.firstName),
+            tokenMatch(students.lastName),
+            tokenMatch(students.admissionNumber),
+            fuzzyTextMatch(queryTokens, students.firstName, students.lastName, feeAdvanceTransactions.receiptNumber),
+          ),
+        ))
+        .orderBy(asc(feeAdvanceTransactions.createdAt))
         .limit(20)
       : Promise.resolve([]),
     canManageAccounts
@@ -963,6 +995,15 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       title: payment.receiptNumber,
       description: `Fee payment · ${payment.studentName} ${payment.studentLastName} · ${payment.invoiceNumber}`,
       href: `/admin/fees/receipt/${payment.id}`,
+      category: "Fees",
+    });
+  }
+  for (const advance of advanceRows) {
+    results.push({
+      id: `fee-advance-${advance.publicId}`,
+      title: advance.receiptNumber ?? "Advance fee payment",
+      description: `Carry-forward fee credit · ${advance.firstName} ${advance.lastName} · ${advance.admissionNumber ?? "No admission number"}`,
+      href: `/admin/fees/collection/carry-forward/receipt/${advance.publicId}`,
       category: "Fees",
     });
   }

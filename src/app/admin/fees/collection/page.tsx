@@ -329,7 +329,12 @@ export default async function FeeCollectionPage({
           <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee collection</h1>
           <p className="mt-2 text-sm text-slate-600">Find invoices, review payments and collect full or partial balances.</p>
         </div>
-        <Link href="/admin/fees" className="text-sm font-semibold text-violet-700 hover:text-violet-900">Fee setup</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/fees/collection/carry-forward" className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-100">
+            Carry-forward fees
+          </Link>
+          <Link href="/admin/fees" className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Fee setup</Link>
+        </div>
       </header>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
