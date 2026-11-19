@@ -16,6 +16,7 @@ export type StudentIdCardRecord = {
   rollNumber: string | null;
   yearName: string | null;
   fatherName: string | null;
+  motherName: string | null;
   phone: string | null;
   address: string | null;
   photoUrl: string | null;
@@ -108,8 +109,8 @@ function StudentIdCard({ record, schoolName, schoolLogo, schoolPhone, schoolAddr
         <div className={styles.studentName}>{record.name}</div>
         <div className={styles.classPill}>{classLabel}</div>
         <div className={styles.details}>
-          <IdDetail label="Admission No." value={record.admissionNumber} />
-          <IdDetail label="Father / Guardian" value={record.fatherName} />
+          <IdDetail label="Father Name" value={record.fatherName} />
+          <IdDetail label="Mother Name" value={record.motherName} />
           <IdDetail label="Date of Birth" value={record.dateOfBirth ? new Date(`${record.dateOfBirth}T00:00:00`).toLocaleDateString("en-GB") : null} />
           <IdDetail label="Mobile No." value={record.phone} />
           <IdDetail label="Address" value={record.address} />
