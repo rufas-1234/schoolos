@@ -94,6 +94,12 @@ function StudentIdCard({ record, schoolName, schoolLogo, schoolPhone, schoolAddr
           <div className={styles.yearTag}>{record.yearName ?? new Date().getFullYear()}</div>
           <div className={styles.schoolCopy}><strong>{schoolName}</strong><span>{schoolAddress ?? "Official student identification"}</span></div>
         </div>
+        <svg className={styles.planeMark} viewBox="0 0 84 72" aria-hidden="true">
+          <path d="M4 10 79 2 38 34 4 10Z" fill="#f5d837" stroke="#28242a" strokeWidth="2.2" />
+          <path d="m4 10 34 24 9 32 9-43L4 10Z" fill="#22a9df" stroke="#28242a" strokeWidth="2.2" />
+          <path d="m38 34 41-32-23 21-9 43-9-32Z" fill="#f8e54b" stroke="#28242a" strokeWidth="2.2" />
+          <path d="m14 15 47 7-23 12" fill="none" stroke="#fff" strokeWidth="2" opacity=".8" />
+        </svg>
         <h2 className={styles.schoolTitle}>{schoolName}</h2>
         <p className={styles.schoolSubtitle}>{schoolAddress ?? "STUDENT IDENTIFICATION CARD"}</p>
         <div className={styles.studentPortrait}>
@@ -109,9 +115,10 @@ function StudentIdCard({ record, schoolName, schoolLogo, schoolPhone, schoolAddr
           <IdDetail label="Address" value={record.address} />
         </div>
         <div className={styles.cardFooter}>
-          <div className={styles.signature}>Authorized<br /><b>Principal</b></div>
-          <div className={styles.phoneBadge}><span>☎</span>{schoolPhone ?? record.phone ?? "Student ID"}</div>
+          <div className={styles.signature}><span>Authorized signature</span><b>Principal</b></div>
+          <div className={styles.phoneBadge}><span aria-hidden="true">☎</span>{record.phone ?? schoolPhone ?? "Student ID"}</div>
         </div>
+        <div className={styles.watermark} aria-hidden="true"><span>✦</span></div>
         <div className={styles.bottomRibbon} />
       </div>
     </div>

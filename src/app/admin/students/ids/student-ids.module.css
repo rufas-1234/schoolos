@@ -2,3 +2,33 @@
 @media(max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.searchField{grid-column:span 3}}
 @media(max-width:650px){.page{gap:14px;padding:16px}.heading h1{font-size:21px}.filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px}.searchField{grid-column:span 2}.registerBar{align-items:flex-start;flex-direction:column}.registerActions{width:100%}.selectButton,.printButton{flex:1;padding:0 8px}.cardGrid{grid-template-columns:1fr}.idCard{max-width:330px}}
 @media print{.page{gap:0;padding:0}.heading,.filters,.registerBar,.cardSelect,.printHint,.limitNotice{display:none!important}.register,.cardGrid{display:block}.cardGrid{display:grid;grid-template-columns:repeat(2,68mm);justify-content:start;align-items:start;gap:5mm 7mm}.cardItem{display:none;break-inside:avoid;page-break-inside:avoid}.cardItem[data-selected="true"]{display:block}.idCard{width:68mm;height:102mm;max-width:none;aspect-ratio:auto;padding:2mm;border:0;border-radius:0;box-shadow:none;print-color-adjust:exact;-webkit-print-color-adjust:exact}.cardBorder{border-width:1.2mm;border-radius:3mm;padding:3mm 3.2mm 2.3mm}.cardTopArt{height:27%}.cardHeader{grid-template-columns:10mm 1fr;min-height:10mm}.logoFrame{width:9mm;height:9mm;border-width:.5mm;font-size:5mm}.logoFrame img{width:100%;height:100%}.yearTag{font-size:2.3mm}.schoolTitle{margin:1mm 0 .4mm;font-size:4.1mm}.schoolSubtitle{height:3.5mm;margin:.4mm 0 1mm;font-size:2.1mm}.studentPortrait{margin-bottom:1mm;border-width:.7mm;border-radius:2mm 2mm 1mm 1mm;font-size:5mm}.studentName{font-size:3.4mm}.classPill{margin:.8mm 0 1mm;padding:.7mm 2mm;font-size:2.2mm}.details{gap:.7mm;padding:.5mm .2mm 1mm}.detail{grid-template-columns:21mm 1.5mm minmax(0,1fr);gap:.8mm;font-size:2.15mm;line-height:1.2}.phoneBadge{gap:1mm;border-radius:3mm;padding:.7mm 1.5mm;font-size:2mm}.phoneBadge span{width:3mm;height:3mm;font-size:1.8mm}.signature{font-size:1.7mm}.signature b{font-size:2.2mm}.bottomRibbon{height:12%}@page{size:A4;margin:10mm}}
+
+/* ID face: match the portrait layout, warm diagonal header, and school-color footer in the supplied reference. */
+.cardBorder{background-color:#fff;background-image:radial-gradient(ellipse at 52% 46%,#fff 0 30%,#fbfaf8 69%,#f3f1ed 100%);}
+.cardTopArt{height:29%;background:linear-gradient(144deg,#f0dfbd 0 39%,#d5bd91 39.4% 40.5%,transparent 41%),linear-gradient(32deg,transparent 0 68%,#fbf2e0 68.3% 73%,transparent 73.4%),linear-gradient(157deg,transparent 0 43%,#9b1f28 43.4% 73%,transparent 73.5%);}
+.cardTopArt:before{position:absolute;inset:0;content:"";background:linear-gradient(145deg,transparent 0 54%,#fff9 54.4% 57%,transparent 57.4%),linear-gradient(22deg,transparent 0 73%,#c99c4c 73.4% 75%,transparent 75.4%);}
+.cardTopArt:after{right:-7%;width:37%;background:linear-gradient(148deg,#b5262e 0 55%,#e3c242 55.5% 58%,transparent 58.5%);clip-path:polygon(31% 0,100% 0,100% 100%,0 13%);}
+.cardHeader{display:block;min-height:44px;}
+.logoFrame{position:absolute;top:0;left:50%;width:43px;height:43px;transform:translateX(-50%);border:3px solid #fff;border-radius:50%;background:radial-gradient(circle,#fbf0c8 0 49%,#b28b3e 51% 57%,#fff 59%);box-shadow:0 2px 8px #241b2530;}
+.yearTag{z-index:2;top:0;right:0;border-radius:0 0 0 8px;background:#a5222b;padding:4px 7px;color:#fff;font-size:10px;letter-spacing:.04em;}
+.planeMark{position:absolute;z-index:2;top:23px;right:7px;width:21%;height:auto;filter:drop-shadow(0 2px 1px #54202b26);}
+.schoolTitle{margin-top:3px;color:#851e27;font-family:var(--font-display),Impact,sans-serif;font-size:clamp(15px,4.3vw,23px);font-stretch:condensed;font-weight:900;letter-spacing:-.035em;text-shadow:0 1px #fff8;}
+.schoolSubtitle{height:18px;margin:2px 0 5px;color:#39799e;font-size:10px;letter-spacing:.035em;}
+.studentPortrait{width:34%;height:30%;margin-bottom:7px;border:4px solid #fff;border-radius:48% 48% 5px 5px;background:linear-gradient(150deg,#d9eaec,#fbf1e6 72%);box-shadow:0 3px 10px #201c2422,0 0 0 1px #e7e3df;}
+.studentName{color:#387da7;font-size:clamp(13px,3.4vw,18px);letter-spacing:.015em;text-shadow:0 1px #fff;}
+.classPill{margin:5px 0 7px;border-radius:2px;background:linear-gradient(90deg,#7d1722,#a1222b 50%,#7d1722);box-shadow:0 2px 3px #50101826;letter-spacing:.02em;}
+.details{gap:4px;padding:3px 3px 7px;}
+.detail{grid-template-columns:minmax(88px,40%) 8px minmax(0,1fr);gap:5px;font-size:clamp(8px,2.15vw,10.5px);line-height:1.24;}
+.detail b{color:#292328;}
+.detail span:nth-child(2){color:#b9935c;font-weight:900;}
+.cardFooter{padding:5px 1px 1px;}
+.signature{min-width:80px;border-bottom:1px solid #5f5960;padding:0 6px 3px;color:#81767e;font-family:cursive;font-size:8px;text-align:center;transform:rotate(-5deg);}
+.signature b{display:block;color:#312b30;font-family:var(--font-body),sans-serif;font-size:8px;font-weight:800;}
+.phoneBadge{max-width:76%;gap:5px;border:1px solid #d8bd69;border-radius:15px;background:linear-gradient(90deg,#ae8a36,#c6a24a);padding:4px 9px;font-size:10px;box-shadow:0 2px 4px #6e531d29;}
+.phoneBadge span{width:17px;height:17px;font-size:10px;}
+.watermark{position:absolute;bottom:3%;left:-5%;display:grid;place-items:center;width:19%;aspect-ratio:1;border:2px solid #67c5ce;border-radius:50%;color:#42afbd;opacity:.65;}
+.watermark:before,.watermark:after{position:absolute;width:75%;height:75%;border:1px solid #67c5ce;border-radius:50%;content:"";}
+.watermark:after{width:48%;height:48%;}
+.watermark span{font-size:16px;}
+.bottomRibbon{right:-7%;bottom:-1px;width:48%;height:13%;background:linear-gradient(145deg,transparent 0 16%,#841a23 16.5% 50%,#fff 50.5% 53%,#b21f28 53.5% 100%);}
+@media print{.cardHeader{min-height:10mm}.logoFrame{top:0;left:50%;width:9mm;height:9mm;border-width:.6mm}.yearTag{top:0;right:0;padding:1mm 1.7mm;font-size:2.2mm}.planeMark{top:5mm;right:1.5mm;width:21%;}.schoolTitle{margin-top:.6mm;font-size:4.2mm}.schoolSubtitle{height:3.8mm;margin:.5mm 0 1.1mm;font-size:2.1mm}.studentPortrait{width:34%;height:30%;margin-bottom:1.5mm;border-width:.8mm}.studentName{font-size:3.4mm}.classPill{margin:.9mm 0 1.2mm}.details{gap:.8mm;padding:.6mm .5mm 1.3mm}.detail{grid-template-columns:21mm 1.8mm minmax(0,1fr);gap:1mm;font-size:2.15mm}.signature{min-width:19mm;padding:0 1mm .7mm;font-size:1.8mm}.signature b{font-size:1.8mm}.phoneBadge{gap:1.2mm;padding:.9mm 2mm;font-size:2.2mm}.phoneBadge span{width:3.5mm;height:3.5mm;font-size:2mm}.watermark span{font-size:3.5mm}}
