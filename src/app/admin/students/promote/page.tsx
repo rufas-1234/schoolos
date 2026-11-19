@@ -154,6 +154,7 @@ export default async function StudentPromotionPage() {
               enrollments={enrollmentOptions}
               years={yearOptions}
               sections={sectionOptions}
+              allowBulkSelection
             />
           </AdminActionDialog>
         )}
