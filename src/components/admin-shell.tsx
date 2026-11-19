@@ -223,6 +223,16 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
+    href: "/admin/system/settings",
+    label: "System",
+    icon: Settings,
+    permission: "school.settings.manage",
+    children: [
+      { id: "user-logs", label: "User Logs", href: "/admin/system/user-logs" },
+      { id: "system-settings", label: "System Settings", href: "/admin/system/settings" },
+    ],
+  },
+  {
     href: "/admin/settings",
     label: "School profile",
     icon: School,
@@ -285,6 +295,7 @@ export function AdminShell({
   );
   const [libraryOpen, setLibraryOpen] = useState(() => pathname.startsWith("/admin/library"));
   const [dormitoriesOpen, setDormitoriesOpen] = useState(() => pathname.startsWith("/admin/dormitories"));
+  const [systemOpen, setSystemOpen] = useState(() => pathname.startsWith("/admin/system"));
   const router = useRouter();
   const visibleNavigation = navigation
     .filter((item) =>
@@ -381,6 +392,8 @@ export function AdminShell({
     ? pathname.startsWith("/admin/academics/attendance-reports")
       ? "Student attendance reports"
       : activeSection?.label ?? "Academics"
+    : pathname.startsWith("/admin/system")
+      ? pathname.endsWith("/user-logs") ? "User Logs" : "System Settings"
     : pathname.startsWith("/admin/students")
       ? activeStudentSection?.label ?? "Student Info"
       : pathname.startsWith("/admin/staff")
@@ -501,7 +514,8 @@ export function AdminShell({
               pathname.startsWith("/admin/accounts")
             )) ||
             (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees")) ||
-            (href === "/admin/hr" && pathname === "/admin/settings/roles");
+            (href === "/admin/hr" && pathname === "/admin/settings/roles") ||
+            (label === "System" && pathname.startsWith("/admin/system"));
           if (children) {
             const visibleSections = children.filter(
               (section) =>
@@ -526,6 +540,7 @@ export function AdminShell({
             const isDormitories = label === "Dormitories";
             const isFees = href === "/admin/fees/collection";
             const isExaminations = href === "/admin/examinations";
+            const isSystem = label === "System";
             const sectionOpen = isStudentInfo
               ? studentInfoOpen
               : isUsers
@@ -542,6 +557,8 @@ export function AdminShell({
                   ? feesOpen
                   : isExaminations
                     ? examinationsOpen
+                  : isSystem
+                    ? systemOpen
                   : academicsOpen;
             const setSectionOpen = isStudentInfo
               ? setStudentInfoOpen
@@ -559,6 +576,8 @@ export function AdminShell({
                   ? setFeesOpen
                   : isExaminations
                     ? setExaminationsOpen
+                  : isSystem
+                    ? setSystemOpen
                   : setAcademicsOpen;
             const activeChild = resolvedSections.find((section) => {
               if (!section.href) return false;

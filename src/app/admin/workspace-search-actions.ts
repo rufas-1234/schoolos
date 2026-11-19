@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import {
   academicYears,
+  auditLogs,
   accountTransactions,
   chartOfAccounts,
   classLevels,
@@ -243,6 +244,8 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (permissions.has("school.settings.manage")) {
     addPage("school-profile", "School profile", "School details and configuration", "/admin/settings", ["settings", "school settings"]);
+    addPage("system-settings", "System Settings", "Configure school profile, student settings, staff settings, and role access", "/admin/system/settings", ["system", "configuration"]);
+    addPage("user-logs", "User Logs", "Review school-scoped user and system activity logs", "/admin/system/user-logs", ["audit log", "activity log", "user activity", "history"]);
   }
   if (canManageStudentSettings) {
     addPage("student-settings", "Student settings", "Configure student admission numbers, roll numbers, and profile fields", "/admin/students/settings", ["student settings", "admission format", "roll number format", "student fields"]);
@@ -277,6 +280,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     libraryRows,
     libraryMemberRows,
     libraryLoanRows,
+    auditLogRows,
   ] = await Promise.all([
     permissions.has("roles.manage")
       ? db.select({
@@ -846,6 +850,27 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         .orderBy(asc(libraryLoans.dueDate))
         .limit(20)
       : Promise.resolve([]),
+    permissions.has("school.settings.manage")
+      ? db.select({
+        id: auditLogs.id,
+        actorName: user.name,
+        actorEmail: user.email,
+        action: auditLogs.action,
+        resourceType: auditLogs.resourceType,
+        resourcePublicId: auditLogs.resourcePublicId,
+        createdAt: auditLogs.createdAt,
+      }).from(auditLogs)
+        .innerJoin(user, eq(auditLogs.actorUserId, user.id))
+        .where(and(
+          eq(auditLogs.schoolId, context.schoolId),
+          or(
+            tokenMatch(user.name), tokenMatch(user.email), tokenMatch(auditLogs.action),
+            tokenMatch(auditLogs.resourceType), tokenMatch(auditLogs.resourcePublicId),
+          ),
+        ))
+        .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
+        .limit(20)
+      : Promise.resolve([]),
   ]);
 
   const [dormitorySearchRows, residentSearchRows] = canManageDormitories
@@ -970,6 +995,16 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       href: `/admin/users?search=${encodeURIComponent(account.email)}`,
       category: "Users",
       searchTerms: [account.email],
+    });
+  }
+  for (const log of auditLogRows) {
+    results.push({
+      id: `user-log-${log.id}`,
+      title: `${log.action.replaceAll("_", " ").replaceAll(".", " · ")} · ${log.actorName}`,
+      description: `${log.resourceType.replaceAll("_", " ")} · ${log.resourcePublicId} · ${log.createdAt.toISOString()}`,
+      href: `/admin/system/user-logs?search=${encodeURIComponent(query)}`,
+      category: "Users",
+      searchTerms: [log.actorName, log.actorEmail, log.action, log.resourceType, log.resourcePublicId],
     });
   }
   for (const student of studentRows) {
