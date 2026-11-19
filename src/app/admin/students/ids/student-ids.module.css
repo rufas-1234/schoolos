@@ -32,3 +32,18 @@
 .watermark span{font-size:16px;}
 .bottomRibbon{right:-7%;bottom:-1px;width:48%;height:13%;background:linear-gradient(145deg,transparent 0 16%,#841a23 16.5% 50%,#fff 50.5% 53%,#b21f28 53.5% 100%);}
 @media print{.cardHeader{min-height:10mm}.logoFrame{top:0;left:50%;width:9mm;height:9mm;border-width:.6mm}.yearTag{top:0;right:0;padding:1mm 1.7mm;font-size:2.2mm}.planeMark{top:5mm;right:1.5mm;width:21%;}.schoolTitle{margin-top:.6mm;font-size:4.2mm}.schoolSubtitle{height:3.8mm;margin:.5mm 0 1.1mm;font-size:2.1mm}.studentPortrait{width:34%;height:30%;margin-bottom:1.5mm;border-width:.8mm}.studentName{font-size:3.4mm}.classPill{margin:.9mm 0 1.2mm}.details{gap:.8mm;padding:.6mm .5mm 1.3mm}.detail{grid-template-columns:21mm 1.8mm minmax(0,1fr);gap:1mm;font-size:2.15mm}.signature{min-width:19mm;padding:0 1mm .7mm;font-size:1.8mm}.signature b{font-size:1.8mm}.phoneBadge{gap:1.2mm;padding:.9mm 2mm;font-size:2.2mm}.phoneBadge span{width:3.5mm;height:3.5mm;font-size:2mm}.watermark span{font-size:3.5mm}}
+
+.cardHeader{height:18%;min-height:70px;flex:0 0 18%;}
+.logoFrame{top:6px;left:50%;width:15%;height:auto;aspect-ratio:1;}
+.schoolTitle{margin-top:7px;}
+.studentPortrait{height:24%;flex:0 0 24%;margin:10px auto 7px;}
+.cardFooter{z-index:2;}
+.phoneBadge{position:absolute;left:50%;bottom:0;max-width:58%;transform:translateX(-50%);}
+.watermark,.bottomRibbon{z-index:0;pointer-events:none;}
+@media print{
+  .cardHeader{height:16%;min-height:16mm;flex-basis:16%;}
+  .logoFrame{top:1mm;width:15%;height:auto;}
+  .schoolTitle{margin-top:1mm;}
+  .studentPortrait{height:24%;flex-basis:24%;margin:2mm auto 1.5mm;}
+  .phoneBadge{left:50%;bottom:0;max-width:58%;transform:translateX(-50%);}
+}
