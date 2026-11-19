@@ -337,6 +337,13 @@
       "when": 1795090000000,
       "tag": "0047_student_behavior_records",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "5",
+      "when": 1795093600000,
+      "tag": "0048_student_behavior_options",
+      "breakpoints": true
     }
   ]
 }

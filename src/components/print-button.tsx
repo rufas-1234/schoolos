@@ -5,6 +5,7 @@ type PrintOptions = {
   targetId?: string;
   pageOrientation?: "portrait" | "landscape";
   pageSize?: "A4";
+  pageMargin?: string;
 };
 
 const printHiddenAttribute = "data-print-hidden";
@@ -16,6 +17,7 @@ export function printCurrentPage({
   targetId,
   pageOrientation = "portrait",
   pageSize = "A4",
+  pageMargin,
 }: PrintOptions = {}) {
   const target = targetId ? document.getElementById(targetId) : null;
   if (targetId && !target) {
@@ -41,7 +43,7 @@ export function printCurrentPage({
   const previousPrintOrientation = document.body.getAttribute("data-print-orientation");
   const pageStyle = document.createElement("style");
   pageStyle.dataset.adminPrintPage = "true";
-  pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: ${isExamReport ? "5mm" : "27mm 14mm 20mm"}; }`;
+  pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: ${isExamReport ? "5mm" : pageMargin ?? "27mm 14mm 20mm"}; }`;
   document.head.append(pageStyle);
   document.body.classList.add("print-target-active");
   if (isExamReport) document.body.classList.add("print-exam-report");
@@ -127,19 +129,21 @@ export function PrintButton({
   targetId,
   pageOrientation,
   pageSize,
+  pageMargin,
   disabled = false,
 }: {
   label?: string;
   targetId?: string;
   pageOrientation?: "portrait" | "landscape";
   pageSize?: "A4";
+  pageMargin?: string;
   disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
-      onClick={() => printCurrentPage({ targetId, title: label, pageOrientation, pageSize })}
+      onClick={() => printCurrentPage({ targetId, title: label, pageOrientation, pageSize, pageMargin })}
       className="print:hidden rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {label}

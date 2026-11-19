@@ -348,6 +348,24 @@ export const studentBehaviorRecords = mysqlTable(
   ],
 );
 
+export const studentBehaviorOptions = mysqlTable(
+  "student_behavior_options",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    kind: varchar("kind", { length: 20 }).notNull(),
+    name: varchar("name", { length: 40 }).notNull(),
+    createdBy: varchar("createdBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("student_behavior_options_school_kind_name_uq").on(table.schoolId, table.kind, table.name),
+    index("student_behavior_options_school_kind_idx").on(table.schoolId, table.kind),
+  ],
+);
+
 export const dormitories = mysqlTable(
   "dormitories",
   {

@@ -55,6 +55,12 @@ export const studentSections = [
     permission: "students.update",
   },
   {
+    id: "behavior-settings",
+    label: "Behaviour Categories & Actions",
+    href: "/admin/students/behavior/settings",
+    permission: "students.update",
+  },
+  {
     id: "promote",
     label: "Student Promote",
     href: "/admin/students/promote",

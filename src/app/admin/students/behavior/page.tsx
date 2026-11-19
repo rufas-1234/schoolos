@@ -2,8 +2,9 @@ import { and, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { AdminActionDialog, AdminDataTable, AdminRecordDialog } from "@/components/admin-data-table";
 import { db } from "@/db";
-import { studentBehaviorRecords, students, user } from "@/db/schema";
+import { studentBehaviorOptions, studentBehaviorRecords, students, user } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { defaultBehaviorActions, defaultBehaviorCategories } from "@/lib/behavior-policy";
 import { BehaviorRecordForm, type BehaviorRecordFormData } from "./behavior-form";
 
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -31,7 +32,13 @@ export default async function StudentBehaviorPage({ searchParams }: { searchPara
     .orderBy(desc(studentBehaviorRecords.incidentDate), desc(studentBehaviorRecords.id));
   const studentRows = await db.select({ publicId: students.publicId, firstName: students.firstName, lastName: students.lastName, admissionNumber: students.admissionNumber })
     .from(students).where(eq(students.schoolId, context.schoolId)).orderBy(students.firstName, students.lastName);
+  const configuredOptions = await db.select({ kind: studentBehaviorOptions.kind, name: studentBehaviorOptions.name })
+    .from(studentBehaviorOptions).where(eq(studentBehaviorOptions.schoolId, context.schoolId));
   const studentOptions = studentRows.map((student) => ({ value: student.publicId, label: `${student.firstName} ${student.lastName}${student.admissionNumber ? ` · ${student.admissionNumber}` : ""}` }));
+  const categories = [...defaultBehaviorCategories, ...configuredOptions.filter((option) => option.kind === "category").map((option) => option.name)]
+    .map((value) => ({ value, label: title(value) }));
+  const actions = [...defaultBehaviorActions, ...configuredOptions.filter((option) => option.kind === "action").map((option) => option.name)]
+    .map((value) => ({ value, label: title(value) }));
   const search = typeof params.search === "string" ? params.search.slice(0, 120) : "";
   const canEdit = context.grantedPermissions.includes("students.update");
   return (
@@ -42,8 +49,8 @@ export default async function StudentBehaviorPage({ searchParams }: { searchPara
       ]} rows={records.map((record) => {
         const formRecord: BehaviorRecordFormData = { publicId: record.publicId, studentPublicId: record.studentPublicId, incidentDate: record.incidentDate, category: record.category, severity: record.severity, details: record.details, actionTaken: record.actionTaken, followUpDate: record.followUpDate };
         const searchable = `${record.firstName} ${record.lastName} ${record.admissionNumber ?? ""} ${record.category} ${record.severity} ${record.details} ${record.actionTaken}`;
-        return { id: record.id, searchableText: searchable, values: { student: `${record.firstName} ${record.lastName}`, admission: record.admissionNumber ?? "—", date: record.incidentDate, category: title(record.category), severity: title(record.severity), action: title(record.actionTaken), recordedBy: record.recordedByName }, actions: <div className="flex flex-wrap items-center gap-2"><Link className="text-sm font-semibold text-violet-700 hover:underline" href={`/admin/students?profile=${record.studentPublicId}`}>Profile</Link>{canEdit && <AdminRecordDialog title={`Edit behaviour record for ${record.firstName} ${record.lastName}`}><BehaviorRecordForm students={studentOptions} record={formRecord} /></AdminRecordDialog>}</div> };
-      })} toolbarActions={canEdit ? <AdminActionDialog label="Add behaviour record" title="Add student behaviour record"><BehaviorRecordForm students={studentOptions} /></AdminActionDialog> : null} emptyMessage="No behaviour records have been created yet." />
+        return { id: record.id, searchableText: searchable, values: { student: `${record.firstName} ${record.lastName}`, admission: record.admissionNumber ?? "—", date: record.incidentDate, category: title(record.category), severity: title(record.severity), action: title(record.actionTaken), recordedBy: record.recordedByName }, actions: <div className="flex flex-wrap items-center gap-2"><Link className="text-sm font-semibold text-violet-700 hover:underline" href={`/admin/students?profile=${record.studentPublicId}`}>Profile</Link>{canEdit && <AdminRecordDialog title={`Edit behaviour record for ${record.firstName} ${record.lastName}`}><BehaviorRecordForm students={studentOptions} categories={categories} actions={actions} record={formRecord} /></AdminRecordDialog>}</div> };
+      })} toolbarActions={canEdit ? <AdminActionDialog label="Add behaviour record" title="Add student behaviour record"><BehaviorRecordForm students={studentOptions} categories={categories} actions={actions} /></AdminActionDialog> : null} emptyMessage="No behaviour records have been created yet." />
     </div>
   );
 }

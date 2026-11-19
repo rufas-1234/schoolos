@@ -27,9 +27,12 @@ import {
   feePaymentReversals,
   feeStructures,
   feeTypes,
+  dormitories,
+  dormitoryRooms,
   libraryBooks,
   libraryLoans,
   studentAttendance,
+  studentDormitoryAssignments,
   studentEnrollments,
   studentFeeInvoices,
   schoolBranches,
@@ -39,6 +42,7 @@ import {
   userStudentLinks,
 } from "@/db/schema";
 import { PrintButton } from "@/components/print-button";
+import { StudentProfilePrintout } from "@/components/student-profile-printout";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { requireSchoolMember } from "@/lib/access-control";
 import {
@@ -121,6 +125,10 @@ export default async function StudentPortalPage({
     guardianEmail: students.guardianEmail,
     guardianPhone: students.guardianPhone,
     guardianAddress: students.guardianAddress,
+    fatherOccupation: students.fatherOccupation,
+    motherOccupation: students.motherOccupation,
+    guardianOccupation: students.guardianOccupation,
+    additionalDetails: students.additionalDetails,
     status: students.status,
   }).from(students)
     .where(and(
@@ -133,7 +141,7 @@ export default async function StudentPortalPage({
     : [];
   const studentIds = linkedStudents.map((student) => student.id);
 
-  const [enrollments, attendance, resultRows, invoices, loans, books] = studentIds.length
+  const [enrollments, attendance, resultRows, invoices, loans, books, dormitoryRows] = studentIds.length
     ? await Promise.all([
       db.select({
         id: studentEnrollments.id,
@@ -143,6 +151,7 @@ export default async function StudentPortalPage({
         sectionName: classSections.name,
         yearName: academicYears.name,
         academicYearId: studentEnrollments.academicYearId,
+        rollNumber: studentEnrollments.rollNumber,
       }).from(studentEnrollments)
         .innerJoin(classSections, and(
           eq(classSections.id, studentEnrollments.classSectionId),
@@ -372,8 +381,27 @@ export default async function StudentPortalPage({
         ))
         .orderBy(libraryBooks.title)
         .limit(libraryFilter ? 250 : 50),
+      db.select({
+        studentId: studentDormitoryAssignments.studentId,
+        dormitoryName: dormitories.name,
+        roomNumber: dormitoryRooms.roomNumber,
+        assignedAt: studentDormitoryAssignments.assignedAt,
+      }).from(studentDormitoryAssignments)
+        .innerJoin(dormitoryRooms, and(eq(studentDormitoryAssignments.roomId, dormitoryRooms.id), eq(dormitoryRooms.schoolId, context.schoolId)))
+        .innerJoin(dormitories, and(eq(dormitoryRooms.dormitoryId, dormitories.id), eq(dormitories.schoolId, context.schoolId)))
+        .where(and(
+          eq(studentDormitoryAssignments.schoolId, context.schoolId),
+          eq(studentDormitoryAssignments.status, "active"),
+          inArray(studentDormitoryAssignments.studentId, studentIds),
+        ))
+        .orderBy(desc(studentDormitoryAssignments.assignedAt), desc(studentDormitoryAssignments.id)),
     ])
-    : [[], [], [], [], [], []];
+    : [[], [], [], [], [], [], []];
+
+  const dormitoryByStudent = new Map<number, (typeof dormitoryRows)[number]>();
+  for (const assignment of dormitoryRows) {
+    if (!dormitoryByStudent.has(assignment.studentId)) dormitoryByStudent.set(assignment.studentId, assignment);
+  }
 
   const newestEnrollmentByStudent = new Map<number, (typeof enrollments)[number]>();
   for (const enrollment of enrollments) {
@@ -1307,7 +1335,7 @@ export default async function StudentPortalPage({
                         <h3 className="text-lg font-bold text-slate-950">{student.firstName} {student.lastName}</h3>
                         <p className="mt-1 text-sm text-slate-500">{student.admissionNumber ?? "Admission number not recorded"}</p>
                       </div>
-                      <PrintButton targetId={`student-profile-${student.id}`} label="Print profile" />
+                      <PrintButton targetId={`student-profile-printout-${student.id}`} label="Print profile" pageMargin="8mm" />
                     </div>
                     <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <InfoItem label="Date of birth" value={student.dateOfBirth} />
@@ -1329,6 +1357,52 @@ export default async function StudentPortalPage({
                       <InfoItem label="Guardian email" value={student.guardianEmail} />
                       <InfoItem label="Guardian phone" value={student.guardianPhone} />
                     </dl>
+                    <StudentProfilePrintout
+                      schoolName={context.schoolName}
+                      studentName={`${student.firstName} ${student.lastName}`}
+                      admissionNumber={student.admissionNumber}
+                      sections={[
+                        { title: "1. Personal Information", fields: [
+                          { label: "Full name", value: `${student.firstName} ${student.lastName}` }, { label: "Date of birth", value: student.dateOfBirth },
+                          { label: "Gender", value: student.gender }, { label: "Nationality", value: "Not recorded" },
+                          { label: "Current address", value: student.currentAddress }, { label: "Permanent address", value: student.permanentAddress },
+                          { label: "Phone number", value: student.phone }, { label: "Email address", value: student.email },
+                        ] },
+                        { title: "2. Academic Information", fields: [
+                          { label: "Admission number", value: student.admissionNumber },
+                          { label: "Grade / Class", value: newestEnrollmentByStudent.get(student.id)?.className },
+                          { label: "Section", value: newestEnrollmentByStudent.get(student.id)?.sectionName },
+                          { label: "Academic year", value: newestEnrollmentByStudent.get(student.id)?.yearName },
+                          { label: "Admission date", value: student.admissionDate }, { label: "Status", value: student.status },
+                          { label: "Previous school", value: student.additionalDetails?.previousSchoolDetails },
+                          { label: "Roll number", value: currentEnrollments.find((entry) => entry.studentId === student.id)?.rollNumber ?? null },
+                        ] },
+                        { title: "3. Parent / Guardian Information", fields: [
+                          { label: "Father / guardian", value: student.fatherName }, { label: "Occupation", value: student.fatherOccupation },
+                          { label: "Contact number", value: student.fatherPhone }, { label: "Mother / guardian", value: student.motherName },
+                          { label: "Occupation", value: student.motherOccupation }, { label: "Contact number", value: student.motherPhone },
+                          { label: "Guardian", value: student.guardianName }, { label: "Relationship", value: student.guardianRelation },
+                          { label: "Contact number", value: student.guardianPhone }, { label: "Occupation", value: student.guardianOccupation },
+                          { label: "Email", value: student.guardianEmail },
+                        ] },
+                        { title: "4. Emergency Contact", fields: [
+                          { label: "Name", value: student.guardianName || student.fatherName },
+                          { label: "Relationship", value: student.guardianRelation || "Parent / guardian" },
+                          { label: "Contact number", value: student.guardianPhone || student.fatherPhone },
+                        ] },
+                        { title: "5. Medical Information", fields: [
+                          { label: "Blood group", value: student.bloodGroup }, { label: "Medical conditions", value: "Not recorded" },
+                          { label: "Allergies", value: "Not recorded" },
+                        ] },
+                        { title: "6. Additional Information", fields: [
+                          { label: "Religion", value: student.religion }, { label: "Transport route", value: student.additionalDetails?.transportRoute },
+                          { label: "Dormitory", value: dormitoryByStudent.get(student.id)?.dormitoryName ?? student.additionalDetails?.dormitoryName },
+                          { label: "Room number", value: dormitoryByStudent.get(student.id)?.roomNumber ?? student.additionalDetails?.dormitoryRoom },
+                        ] },
+                        { title: "Declaration", fields: [] },
+                      ]}
+                      id={`student-profile-printout-${student.id}`}
+                    />
                   </article>
                 ))}
               </div>

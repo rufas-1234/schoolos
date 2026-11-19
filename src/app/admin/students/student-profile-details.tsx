@@ -6,8 +6,9 @@ import { Printer } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { printCurrentPage } from "@/components/print-button";
 import { LibraryLoanHistory, type LibraryLoanHistoryItem } from "@/components/library-loan-history";
+import { StudentProfilePrintout } from "@/components/student-profile-printout";
 
-type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams" | "library" | "behaviour";
+type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams" | "library" | "behaviour" | "dormitory";
 type ProfileField = {
   label: string;
   value: string | null;
@@ -29,6 +30,7 @@ const tabs: { id: ProfileTab; label: string; emptyMessage?: string }[] = [
   { id: "exams", label: "Exam Results", emptyMessage: "No published exam results are attached to this student." },
   { id: "library", label: "Library", emptyMessage: "No library borrowing history is recorded." },
   { id: "behaviour", label: "Behaviour", emptyMessage: "No behaviour records have been recorded for this student." },
+  { id: "dormitory", label: "Dormitory", emptyMessage: "No active dormitory assignment is recorded for this student." },
 ];
 
 export function StudentProfileDetails({
@@ -36,6 +38,9 @@ export function StudentProfileDetails({
   studentName,
   admissionNumber,
   photoUrl,
+  schoolName,
+  dormitoryAssignment,
+  studentPublicId,
   examHistory = [],
   libraryHistory = [],
   behaviourHistory = [],
@@ -44,6 +49,9 @@ export function StudentProfileDetails({
   studentName: string;
   admissionNumber: string | null;
   photoUrl: string | null;
+  schoolName: string;
+  studentPublicId: string;
+  dormitoryAssignment?: { dormitoryName: string; roomNumber: string; assignedAt: string } | null;
   examHistory?: Array<{
     enrollmentId: number;
     examId: number;
@@ -69,20 +77,23 @@ export function StudentProfileDetails({
   const id = useId();
   const activeTabDetails = tabs.find((tab) => tab.id === activeTab);
   const visibleFields = fields.filter((field) => field.tab === activeTab);
+  const fieldValue = (label: string) => fields.find((field) => field.label === label)?.value;
+  const dormitoryName = dormitoryAssignment?.dormitoryName ?? fieldValue("Dormitory");
+  const dormitoryRoom = dormitoryAssignment?.roomNumber ?? fieldValue("Room number");
 
   useEffect(() => {
     if (!printing) return;
     const resetPrinting = () => setPrinting(false);
     window.addEventListener("afterprint", resetPrinting);
-    const timer = window.setTimeout(() => printCurrentPage({ title: `${studentName} · Student profile` }), 0);
+    const timer = window.setTimeout(() => printCurrentPage({ targetId: `student-profile-print-${studentPublicId}`, title: `${studentName} · Student profile`, pageMargin: "8mm" }), 0);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("afterprint", resetPrinting);
     };
-  }, [printing, studentName]);
+  }, [printing, studentName, studentPublicId]);
 
   return (
-    <div className={`student-profile-printable space-y-5${printing ? " student-profile-printing" : ""}`}>
+    <div id={`student-profile-print-${studentPublicId}`} className={`student-profile-printable space-y-5${printing ? " student-profile-printing" : ""}`}>
       <header className="flex items-center gap-4">
         {photoUrl ? (
           <Image
@@ -116,7 +127,7 @@ export function StudentProfileDetails({
           Print / Save as PDF
         </button>
       </header>
-      <div className="student-profile-print-only">
+      <div className="student-profile-legacy-print-only">
         {tabs.map((tab) => {
           const tabFields = fields.filter((field) => field.tab === tab.id && field.value);
           if (tabFields.length === 0) return null;
@@ -160,6 +171,43 @@ export function StudentProfileDetails({
             ))}</ul>
           </section>
         )}
+      </div>
+      <div className="student-profile-print-only">
+        <StudentProfilePrintout schoolName={schoolName} studentName={studentName} admissionNumber={admissionNumber} photoUrl={photoUrl} sections={[
+          { title: "1. Personal Information", fields: [
+            { label: "Full name", value: studentName }, { label: "Date of birth", value: fieldValue("Date of birth") },
+            { label: "Gender", value: fieldValue("Gender") }, { label: "Nationality", value: "Not recorded" },
+            { label: "Current address", value: fieldValue("Current address") }, { label: "Permanent address", value: fieldValue("Permanent address") },
+            { label: "Phone number", value: fieldValue("Phone") }, { label: "Email address", value: fieldValue("Email") },
+          ] },
+          { title: "2. Academic Information", fields: [
+            { label: "Admission number", value: admissionNumber }, { label: "Grade / Class", value: fieldValue("Class") },
+            { label: "Section", value: fieldValue("Section") }, { label: "Academic year", value: fieldValue("Academic year") },
+            { label: "Student category", value: fieldValue("Category") }, { label: "Admission date", value: fieldValue("Admission date") },
+            { label: "Previous school", value: fieldValue("Previous school details") }, { label: "Roll number", value: fieldValue("Roll number") },
+          ] },
+          { title: "3. Parent / Guardian Information", fields: [
+            { label: "Father / guardian", value: fieldValue("Father / guardian 1") }, { label: "Occupation", value: fieldValue("Father occupation") },
+            { label: "Contact number", value: fieldValue("Father phone") }, { label: "Mother / guardian", value: fieldValue("Mother / guardian 2") },
+            { label: "Occupation", value: fieldValue("Mother occupation") }, { label: "Contact number", value: fieldValue("Mother phone") },
+            { label: "Guardian", value: fieldValue("Guardian") }, { label: "Relationship", value: fieldValue("Guardian relationship") },
+            { label: "Contact number", value: fieldValue("Guardian phone") }, { label: "Email", value: fieldValue("Guardian email") },
+          ] },
+          { title: "4. Emergency Contact", fields: [
+            { label: "Name", value: fieldValue("Guardian") || fieldValue("Father / guardian 1") },
+            { label: "Relationship", value: fieldValue("Guardian relationship") || "Parent / guardian" },
+            { label: "Contact number", value: fieldValue("Guardian phone") || fieldValue("Father phone") },
+          ] },
+          { title: "5. Medical Information", fields: [
+            { label: "Blood group", value: fieldValue("Blood group") }, { label: "Medical conditions", value: "Not recorded" },
+            { label: "Allergies", value: "Not recorded" },
+          ] },
+          { title: "6. Additional Information", fields: [
+            { label: "Religion", value: fieldValue("Religion") }, { label: "Transport route", value: fieldValue("Transport route") },
+            { label: "Dormitory", value: dormitoryName }, { label: "Room number", value: dormitoryRoom },
+          ] },
+          { title: "Declaration", fields: [] },
+        ]} />
       </div>
       <div
         role="tablist"
@@ -243,6 +291,17 @@ export function StudentProfileDetails({
             <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
               {activeTabDetails?.emptyMessage}
             </p>
+          )
+        ) : activeTab === "dormitory" ? (
+          dormitoryAssignment ? (
+            <dl className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dormitory</dt><dd className="mt-1 text-sm font-medium text-slate-900">{dormitoryAssignment.dormitoryName}</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Room</dt><dd className="mt-1 text-sm font-medium text-slate-900">{dormitoryAssignment.roomNumber}</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned</dt><dd className="mt-1 text-sm font-medium text-slate-900">{dormitoryAssignment.assignedAt}</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</dt><dd className="mt-1 text-sm font-medium text-emerald-700">Boarding</dd></div>
+            </dl>
+          ) : (
+            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">{dormitoryName ? `Dormitory: ${dormitoryName}${dormitoryRoom ? ` · Room ${dormitoryRoom}` : ""} (manual profile detail)` : activeTabDetails?.emptyMessage}</p>
           )
         ) : visibleFields.length > 0 ? (
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">

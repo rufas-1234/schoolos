@@ -22,6 +22,9 @@ import {
   schoolBranches,
   studentCategories,
   studentBehaviorRecords,
+  studentDormitoryAssignments,
+  dormitoryRooms,
+  dormitories,
   studentEnrollments,
   studentSettings,
   students,
@@ -195,6 +198,26 @@ export default async function StudentsPage({
     rollNumber: [...rollNumbers].join(", ") || null,
   }));
   const studentIds = records.map((record) => record.id);
+  const dormitoryAssignmentRows = studentIds.length
+    ? await db.select({
+      studentId: studentDormitoryAssignments.studentId,
+      dormitoryName: dormitories.name,
+      roomNumber: dormitoryRooms.roomNumber,
+      assignedAt: studentDormitoryAssignments.assignedAt,
+    }).from(studentDormitoryAssignments)
+      .innerJoin(dormitoryRooms, and(eq(studentDormitoryAssignments.roomId, dormitoryRooms.id), eq(dormitoryRooms.schoolId, context.schoolId)))
+      .innerJoin(dormitories, and(eq(dormitoryRooms.dormitoryId, dormitories.id), eq(dormitories.schoolId, context.schoolId)))
+      .where(and(
+        eq(studentDormitoryAssignments.schoolId, context.schoolId),
+        eq(studentDormitoryAssignments.status, "active"),
+        inArray(studentDormitoryAssignments.studentId, studentIds),
+      ))
+      .orderBy(desc(studentDormitoryAssignments.assignedAt), desc(studentDormitoryAssignments.id))
+    : [];
+  const dormitoryByStudent = new Map<number, typeof dormitoryAssignmentRows[number]>();
+  for (const assignment of dormitoryAssignmentRows) {
+    if (!dormitoryByStudent.has(assignment.studentId)) dormitoryByStudent.set(assignment.studentId, assignment);
+  }
   const behaviourRows = studentIds.length
     ? await db.select({
       id: studentBehaviorRecords.id,
@@ -587,6 +610,9 @@ export default async function StudentsPage({
                   <StudentProfileDetails
                     studentName={`${record.firstName} ${record.lastName}`}
                     admissionNumber={record.admissionNumber}
+                    schoolName={context.schoolName}
+                    studentPublicId={record.publicId}
+                    dormitoryAssignment={dormitoryByStudent.get(record.id) ?? null}
                     photoUrl={record.additionalDetails?.profilePhoto?.objectKey
                       ? `/api/admin/students/${record.publicId}/photo`
                       : null}
