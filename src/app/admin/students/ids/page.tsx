@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { schoolLogoSource } from "@/lib/school-logo";
 import { StudentIdPrintRegister, type StudentIdCardRecord } from "./student-id-print-register";
 import styles from "./student-ids.module.css";
 
@@ -25,7 +26,13 @@ const validOption = (value: string, options: Array<{ id: number }>) => {
 export default async function StudentIdsPage({ searchParams }: { searchParams: SearchParams }) {
   const query = await searchParams;
   const context = await requireSchoolPermission("students.view");
-  const [school] = await db.select({ name: schools.name, phone: schools.phone, address: schools.address, logoUrl: schools.logoUrl })
+  const [school] = await db.select({
+    name: schools.name,
+    email: schools.email,
+    phone: schools.phone,
+    address: schools.address,
+    logoUrl: schools.logoUrl,
+  })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
 
   const [branches, classes, sections, years] = await Promise.all([
@@ -132,7 +139,8 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
       <StudentIdPrintRegister
         records={records}
         schoolName={school?.name ?? context.schoolName}
-        schoolLogo={school?.logoUrl ?? null}
+        schoolEmail={school?.email ?? null}
+        schoolLogo={schoolLogoSource(school?.logoUrl ?? null)}
         schoolPhone={school?.phone ?? null}
         schoolAddress={school?.address ?? null}
       />

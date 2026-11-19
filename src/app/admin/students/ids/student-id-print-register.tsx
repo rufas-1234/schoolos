@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Check, Printer, Square, Users } from "lucide-react";
+import { Check, Printer, Square, UserRound, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./student-ids.module.css";
 
@@ -25,12 +25,13 @@ export type StudentIdCardRecord = {
 type Props = {
   records: StudentIdCardRecord[];
   schoolName: string;
+  schoolEmail: string | null;
   schoolLogo: string | null;
   schoolPhone: string | null;
   schoolAddress: string | null;
 };
 
-export function StudentIdPrintRegister({ records, schoolName, schoolLogo, schoolPhone, schoolAddress }: Props) {
+export function StudentIdPrintRegister({ records, schoolName, schoolEmail, schoolLogo, schoolPhone, schoolAddress }: Props) {
   const [selectedIds, setSelectedIds] = useState<number[]>(() => records.map((record) => record.id));
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const allSelected = records.length > 0 && records.every((record) => selected.has(record.id));
@@ -71,7 +72,7 @@ export function StudentIdPrintRegister({ records, schoolName, schoolLogo, school
                   <input type="checkbox" checked={isSelected} onChange={() => toggle(record.id)} />
                   <span>{isSelected ? "Selected" : "Select card"}</span>
                 </label>
-                <StudentIdCard record={record} schoolName={schoolName} schoolLogo={schoolLogo} schoolPhone={schoolPhone} schoolAddress={schoolAddress} />
+                <StudentIdCard record={record} schoolName={schoolName} schoolEmail={schoolEmail} schoolLogo={schoolLogo} schoolPhone={schoolPhone} schoolAddress={schoolAddress} />
               </article>
             );
           })}
@@ -83,15 +84,16 @@ export function StudentIdPrintRegister({ records, schoolName, schoolLogo, school
   );
 }
 
-function StudentIdCard({ record, schoolName, schoolLogo, schoolPhone, schoolAddress }: Omit<Props, "records"> & { record: StudentIdCardRecord }) {
+function StudentIdCard({ record, schoolName, schoolEmail, schoolLogo, schoolPhone, schoolAddress }: Omit<Props, "records"> & { record: StudentIdCardRecord }) {
   const classLabel = [record.className, record.sectionName].filter(Boolean).join(" · ") || "Student";
   const photoUrl = record.photoUrl;
+  const initials = record.name.split(/\s+/).filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
   return (
     <div className={styles.idCard}>
       <div className={styles.cardBorder}>
         <div className={styles.cardTopArt} />
         <div className={styles.cardHeader}>
-          <div className={styles.logoFrame}>{schoolLogo ? <Image src={schoolLogo} alt="" width={42} height={42} unoptimized /> : <span>{schoolName.slice(0, 1).toUpperCase()}</span>}</div>
+          <div className={styles.logoFrame}>{schoolLogo ? <Image src={schoolLogo} alt={`${schoolName} logo`} width={42} height={42} unoptimized /> : <span>{schoolName.slice(0, 1).toUpperCase()}</span>}</div>
           <div className={styles.yearTag}>{record.yearName ?? new Date().getFullYear()}</div>
           <div className={styles.schoolCopy}><strong>{schoolName}</strong><span>{schoolAddress ?? "Official student identification"}</span></div>
         </div>
@@ -104,16 +106,23 @@ function StudentIdCard({ record, schoolName, schoolLogo, schoolPhone, schoolAddr
         <h2 className={styles.schoolTitle}>{schoolName}</h2>
         <p className={styles.schoolSubtitle}>{schoolAddress ?? "STUDENT IDENTIFICATION CARD"}</p>
         <div className={styles.studentPortrait}>
-          {photoUrl ? <Image src={photoUrl} alt={`${record.name} portrait`} fill unoptimized sizes="120px" /> : <span>{record.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</span>}
+          {photoUrl
+            ? <Image src={photoUrl} alt={`${record.name} portrait`} fill unoptimized sizes="120px" />
+            : <div className={styles.avatarFallback} role="img" aria-label={`${record.name} avatar`}>
+                <UserRound aria-hidden="true" size={44} strokeWidth={1.5} />
+                <span>{initials}</span>
+              </div>}
         </div>
         <div className={styles.studentName}>{record.name}</div>
         <div className={styles.classPill}>{classLabel}</div>
         <div className={styles.details}>
+          <IdDetail label="Admission No." value={record.admissionNumber} />
           <IdDetail label="Father Name" value={record.fatherName} />
           <IdDetail label="Mother Name" value={record.motherName} />
           <IdDetail label="Date of Birth" value={record.dateOfBirth ? new Date(`${record.dateOfBirth}T00:00:00`).toLocaleDateString("en-GB") : null} />
           <IdDetail label="Mobile No." value={record.phone} />
           <IdDetail label="Address" value={record.address} />
+          <IdDetail label="School Email" value={schoolEmail} wrapValue />
         </div>
         <div className={styles.cardFooter}>
           <div className={styles.signature}><span>Authorized signature</span><b>Principal</b></div>
@@ -126,6 +135,6 @@ function StudentIdCard({ record, schoolName, schoolLogo, schoolPhone, schoolAddr
   );
 }
 
-function IdDetail({ label, value }: { label: string; value: string | null }) {
-  return <div className={styles.detail}><b>{label}</b><span>:</span><span>{value || "—"}</span></div>;
+function IdDetail({ label, value, wrapValue = false }: { label: string; value: string | null; wrapValue?: boolean }) {
+  return <div className={styles.detail}><b>{label}</b><span>:</span><span className={wrapValue ? styles.detailValueWrap : undefined}>{value || "—"}</span></div>;
 }
