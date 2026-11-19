@@ -30,7 +30,9 @@ import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report
 import {
   calculateWeightedAverage,
   canPreviewDraftTestReport,
+  examAssessmentResultState,
   gradeForPercentage,
+  hasCompleteExamResult,
   rankScores,
   type GradeBand,
 } from "@/lib/examination-policy";
@@ -114,15 +116,14 @@ export default async function ClassMarksheetReportPage({
     examStatus: exam.status,
     canManage,
   });
-  if (exam.status !== "published" && !draftPreview) notFound();
-  const subjectStatus = draftPreview ? "draft" : "published";
-
   const assessmentRows = await db.select({
     id: examSubjects.id,
     name: subjects.name,
     code: subjects.code,
     maxMarks: examSubjects.maxMarks,
     weight: examSubjects.weight,
+    status: examSubjects.status,
+    isCompulsory: classSubjects.isCompulsory,
   }).from(examSubjects)
     .innerJoin(classSubjects, and(
       eq(classSubjects.id, examSubjects.classSubjectId),
@@ -135,10 +136,13 @@ export default async function ClassMarksheetReportPage({
     .where(and(
       eq(examSubjects.schoolId, context.schoolId),
       eq(examSubjects.examClassId, examClassId),
-      eq(examSubjects.status, subjectStatus),
+      draftPreview ? eq(examSubjects.status, "draft") : undefined,
     ))
     .orderBy(asc(subjects.name));
-  if (!assessmentRows.length) notFound();
+  if (
+    !assessmentRows.length ||
+    !draftPreview && assessmentRows.some((assessment) => assessment.status !== "published")
+  ) notFound();
 
   const roster = await db.select({
     id: studentEnrollments.id,
@@ -183,6 +187,7 @@ export default async function ClassMarksheetReportPage({
     )),
     db.select({
       enrollmentId: examAttendance.enrollmentId,
+      examSubjectId: examAttendance.examSubjectId,
       status: examAttendance.status,
     }).from(examAttendance).where(and(
       eq(examAttendance.schoolId, context.schoolId),
@@ -212,30 +217,45 @@ export default async function ClassMarksheetReportPage({
     marksByStudent.set(mark.enrollmentId, studentMarks);
   }
   const attendanceByStudent = new Map<number, { present: number; total: number }>();
+  const attendanceStatusByStudent = new Map<number, Map<number, string>>();
   for (const entry of attendance) {
     const current = attendanceByStudent.get(entry.enrollmentId) ?? { present: 0, total: 0 };
     current.total += 1;
     if (entry.status === "present" || entry.status === "late") current.present += 1;
     attendanceByStudent.set(entry.enrollmentId, current);
+    const statuses = attendanceStatusByStudent.get(entry.enrollmentId) ?? new Map<number, string>();
+    statuses.set(entry.examSubjectId, entry.status);
+    attendanceStatusByStudent.set(entry.enrollmentId, statuses);
   }
   const results = roster.map((student) => {
     const studentMarks = marksByStudent.get(student.id) ?? new Map<number, number | null>();
+    const studentAttendance = attendanceStatusByStudent.get(student.id) ?? new Map<number, string>();
+    const assessmentStates = new Map(assessmentRows.map((assessment) => [
+      assessment.id,
+      examAssessmentResultState({
+        attendanceStatus: studentAttendance.get(assessment.id) ?? null,
+        isCompulsory: assessment.isCompulsory,
+        hasMark: studentMarks.get(assessment.id) !== null && studentMarks.has(assessment.id),
+      }),
+    ]));
     const scores: Array<{ marks: number; maxMarks: number; weight: number }> = [];
     for (const assessment of assessmentRows) {
       const mark = studentMarks.get(assessment.id);
-      if (typeof mark !== "number") continue;
+      if (assessmentStates.get(assessment.id) !== "scored" || typeof mark !== "number") continue;
       scores.push({
         marks: mark,
         maxMarks: Number(assessment.maxMarks),
         weight: Number(assessment.weight),
       });
     }
-    const complete = scores.length === assessmentRows.length;
+    const complete = hasCompleteExamResult(assessmentStates.values());
     const overall = complete ? calculateWeightedAverage(scores) : null;
     return {
       ...student,
       complete,
       marks: studentMarks,
+      attendanceStatuses: studentAttendance,
+      assessmentStates,
       overall,
       grade: overall ? gradeForPercentage(overall.percentage, bands) : null,
       attendance: attendanceByStudent.get(student.id) ?? { present: 0, total: 0 },
@@ -297,7 +317,17 @@ export default async function ClassMarksheetReportPage({
                 <td className="p-2">{result.rollNumber ?? "—"}</td>
                 {assessmentRows.map((assessment) => {
                   const mark = result.marks.get(assessment.id);
-                  return <td key={assessment.id} className="p-2">{typeof mark === "number" ? mark : "—"}</td>;
+                  const status = result.attendanceStatuses.get(assessment.id);
+                  const state = result.assessmentStates.get(assessment.id);
+                  const display = state === "scored" && typeof mark === "number" ? String(mark)
+                    : status === "x" ? "X · No Result"
+                    : status === "y" ? "Y · School-defined"
+                    : status === "not_applicable" ? "Not taking"
+                    : status === "absent" ? "Absent"
+                    : status === "excused" ? "Excused"
+                    : state === "missing" ? "Missing"
+                    : "—";
+                  return <td key={assessment.id} className="p-2">{display}</td>;
                 })}
               </tr>
             ))}</tbody>
@@ -354,9 +384,21 @@ export default async function ClassMarksheetReportPage({
                   <td className="p-2">{result.rollNumber ?? "—"}</td>
                   {assessmentRows.map((assessment) => {
                     const mark = result.marks.get(assessment.id);
-                    const percentage = mark === null || mark === undefined ? null : mark / Number(assessment.maxMarks) * 100;
+                    const state = result.assessmentStates.get(assessment.id);
+                    const percentage = state !== "scored" || mark === null || mark === undefined
+                      ? null
+                      : mark / Number(assessment.maxMarks) * 100;
                     const grade = percentage === null ? null : gradeForPercentage(percentage, bands);
-                    return <td key={assessment.id} className="p-2">{mark ?? "Incomplete"}{grade && <span className="block text-slate-500">{grade.grade}</span>}</td>;
+                    const status = result.attendanceStatuses.get(assessment.id);
+                    const display = state === "scored" && typeof mark === "number" ? String(mark)
+                      : status === "x" ? "X · No Result"
+                      : status === "y" ? "Y · School-defined"
+                      : status === "not_applicable" ? "Not taking"
+                      : status === "absent" ? "Absent"
+                      : status === "excused" ? "Excused"
+                      : state === "missing" ? "Missing"
+                      : "—";
+                    return <td key={assessment.id} className="p-2">{display}{grade && <span className="block text-slate-500">{grade.grade}</span>}</td>;
                   })}
                   <td className="p-2">{result.overall ? `${result.overall.totalMarks.toFixed(2)} / ${result.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td>
                   <td className="p-2">{result.overall ? `${result.overall.percentage.toFixed(2)}%` : "—"}</td>

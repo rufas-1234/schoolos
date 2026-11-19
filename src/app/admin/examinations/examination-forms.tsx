@@ -9,6 +9,7 @@ import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
 import {
   createExamType,
   createExamination,
+  assignExamClassTeacher,
   createGradingScale,
   deleteExamination,
   publishExamination,
@@ -408,9 +409,11 @@ export function EditGradingScaleForm({ scale }: { scale: GradingScaleEditorData 
 export function SaveExamAttendanceForm({
   examSubjectId,
   students,
+  isCompulsory,
   editable,
 }: {
   examSubjectId: number;
+  isCompulsory: boolean;
   editable: boolean;
   students: Array<{
     enrollmentId: number;
@@ -469,8 +472,8 @@ export function SaveExamAttendanceForm({
             >
               <td className="p-3 font-medium">{student.name}</td>
               <td className="p-3">{student.admissionNumber ?? "—"}</td>
-              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} value={statuses[student.enrollmentId] ?? ""} onChange={(event) => setStatuses((current) => ({ ...current, [student.enrollmentId]: event.target.value }))} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></td>
-              <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} defaultValue={student.note ?? ""} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
+              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} value={statuses[student.enrollmentId] ?? ""} onChange={(event) => setStatuses((current) => ({ ...current, [student.enrollmentId]: event.target.value }))} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option>{!isCompulsory && <option value="not_applicable">Not taking optional subject</option>}<option value="x">X — No result</option><option value="y">Y — School-defined irregularity</option></select></td>
+              <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} required={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y"} placeholder={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y" ? "Required: record the reason" : ""} defaultValue={student.note ?? ""} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
             </tr>
           ))}</tbody>
         </table>
@@ -518,6 +521,7 @@ export function SaveMarksForm({
     enrollmentId: number;
     name: string;
     admissionNumber: string | null;
+    attendanceStatus: string | null;
     teacherRemark: string | null;
     components: Array<{ id: number; title: string; maxMarks: string; marks: string | null }>;
   }>;
@@ -598,7 +602,7 @@ export function SaveMarksForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
-      <p className="text-sm text-slate-600">Only students marked Present or Late in exam attendance appear here. Record attendance first; absent, excused, and unmarked students cannot receive marks. The total is calculated from the components entered, out of {maxMarks}; remarks are optional.</p>
+      <p className="text-sm text-slate-600">All enrolled students appear on the marks roster regardless of attendance. Attendance remains visible for reference but does not restrict marks entry. The total is calculated from the components entered, out of {maxMarks}; remarks are optional.</p>
       <label className="block max-w-lg text-sm font-medium text-slate-700">
         Search students
         <input
@@ -625,19 +629,20 @@ export function SaveMarksForm({
         </select>
       </label>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th>{students[0]?.components.map((component) => <th key={component.id} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Teacher remark</th></tr></thead>
+        <table className="w-full min-w-[700px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Attendance</th>{students[0]?.components.map((component) => <th key={component.id} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Teacher remark</th></tr></thead>
           <tbody>{visibleStudents.length > 0 ? visibleStudents.map((student) => (
               <tr key={student.enrollmentId} className="border-t">
                 <td className="p-3 font-medium">{student.name}</td>
                 <td className="p-3">{student.admissionNumber ?? "—"}</td>
+                <td className="p-3">{student.attendanceStatus ?? "Not recorded"}</td>
                 {student.components.map((component) => {
                   const name = `component_${student.markId}_${component.id}`;
                   return <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={name} min="0" max={component.maxMarks} step="0.01" value={values[name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} className="w-28 rounded-lg border p-2" /></td>;
                 })}
                 <td className="p-3"><input aria-label={`Optional teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} value={values[`remark_${student.enrollmentId}`] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [`remark_${student.enrollmentId}`]: event.target.value }))} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
               </tr>
-            )) : <tr><td colSpan={(students[0]?.components.length ?? 0) + 3} className="p-4 text-center text-slate-500">No students match this search.</td></tr>}</tbody>
+            )) : <tr><td colSpan={(students[0]?.components.length ?? 0) + 4} className="p-4 text-center text-slate-500">No students match this search.</td></tr>}</tbody>
         </table>
       </div>
       {pageCount > 1 && (
@@ -762,14 +767,48 @@ export function ReopenApprovedSubjectForm({ examSubjectId }: { examSubjectId: nu
   );
 }
 
-export function PublishExaminationForm({ examinationId }: { examinationId: number }) {
+export function AssignExamClassTeacherForm({
+  examClassId,
+  classTeacherId,
+  teachers,
+}: {
+  examClassId: number;
+  classTeacherId: number | null;
+  teachers: Array<{ id: number; name: string }>;
+}) {
+  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(assignExamClassTeacher, {});
+  return (
+    <form action={action} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-3">
+      <input type="hidden" name="examClassId" value={examClassId} />
+      <label className="min-w-60 flex-1 text-xs font-medium text-slate-600">
+        Class teacher responsible for publishing
+        <select name="teacherId" defaultValue={classTeacherId ? String(classTeacherId) : ""} required className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900">
+          <option value="">Select class teacher</option>
+          {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
+        </select>
+      </label>
+      <SubmitButton pending={pending}>Assign</SubmitButton>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+export function PublishExamClassForm({
+  examClassId,
+  disabled,
+}: {
+  examClassId: number;
+  disabled: boolean;
+}) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(publishExamination, {});
   return (
-    <form action={action} className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-      <input type="hidden" name="examinationId" value={examinationId} />
-      <h2 className="font-bold text-emerald-950">Publish results</h2>
-      <p className="my-2 text-sm text-emerald-900">Publication locks marks. Every assessment must have complete, approved marks. Any corrections must be reviewed before results are published.</p>
-      <SubmitButton pending={pending}>Publish all results</SubmitButton>
+    <form action={action} className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <input type="hidden" name="examClassId" value={examClassId} />
+      <p className="text-sm font-semibold text-emerald-950">Publish this class&apos;s results</p>
+      <p className="mt-1 text-xs text-emerald-900">Only the assigned class teacher can publish. Attendance must be recorded for every enrolled student before publication, but it does not block marks entry or submission. Results stay locked after publication.</p>
+      <button disabled={disabled || pending} className="mt-3 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        {pending ? "Publishing..." : "Publish class results"}
+      </button>
       <Feedback state={state} />
     </form>
   );

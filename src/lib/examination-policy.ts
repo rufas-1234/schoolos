@@ -6,6 +6,38 @@ export type GradeBand = {
   performanceRemark: string;
 };
 
+export type ExamAttendanceStatus =
+  | "present"
+  | "absent"
+  | "late"
+  | "excused"
+  | "not_applicable"
+  | "x"
+  | "y";
+
+export type ExamAssessmentResultState = "scored" | "not-applicable" | "no-result" | "missing";
+
+export function examAssessmentResultState(input: {
+  attendanceStatus: string | null;
+  isCompulsory: boolean;
+  hasMark: boolean;
+}): ExamAssessmentResultState {
+  if (
+    input.attendanceStatus !== null &&
+    !["present", "absent", "late", "excused", "not_applicable", "x", "y"].includes(input.attendanceStatus)
+  ) return "missing";
+  if (input.attendanceStatus === "not_applicable" && !input.isCompulsory) return "not-applicable";
+  if (input.attendanceStatus === "x" || input.attendanceStatus === "y") return "no-result";
+  return input.hasMark ? "scored" : "missing";
+}
+
+export function hasCompleteExamResult(states: Iterable<ExamAssessmentResultState>): boolean {
+  for (const state of states) {
+    if (state !== "scored" && state !== "not-applicable") return false;
+  }
+  return true;
+}
+
 export type ExamComponent = { title: string; maxMarks: number };
 
 export function missingExamRosterEnrollmentIds(
@@ -14,6 +46,19 @@ export function missingExamRosterEnrollmentIds(
 ): number[] {
   const existing = new Set(existingEnrollmentIds);
   return eligibleEnrollmentIds.filter((enrollmentId) => !existing.has(enrollmentId));
+}
+
+export function missingExamMarkEnrollmentIds(
+  rosterEnrollmentIds: number[],
+  marks: Array<{ enrollmentId: number; marks: number | string | null }>,
+  allowedUnmarkedEnrollmentIds: number[] = [],
+): number[] {
+  const marksByEnrollment = new Map(marks.map((mark) => [mark.enrollmentId, mark.marks]));
+  const allowedUnmarked = new Set(allowedUnmarkedEnrollmentIds);
+  return rosterEnrollmentIds.filter((enrollmentId) =>
+    !allowedUnmarked.has(enrollmentId) &&
+    (marksByEnrollment.get(enrollmentId) === null || !marksByEnrollment.has(enrollmentId)),
+  );
 }
 
 export function canPreviewDraftTestReport(input: {

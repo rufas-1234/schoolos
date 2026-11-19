@@ -47,7 +47,7 @@ export const academicSections = [
   {
     id: "teachers",
     label: "Teachers",
-    description: "Manage teacher profiles for this school.",
+    description: "Review teachers' year-specific class, section, and subject assignments and teaching roles.",
   },
   {
     id: "holidays",

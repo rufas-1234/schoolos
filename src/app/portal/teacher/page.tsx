@@ -29,6 +29,7 @@ import { PrintButton } from "@/components/print-button";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { TeacherPortalShell } from "./teacher-portal-shell";
 import { TeacherClassAttendance } from "./teacher-class-attendance";
+import { PublishExamClassForm } from "@/app/admin/examinations/examination-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -289,6 +290,56 @@ export default async function TeacherPortalPage({
         .orderBy(asc(academicYears.startDate), asc(classLevels.name), asc(classSections.name)) : Promise.resolve([]),
     ])
     : [[], [], [], []];
+
+  const classTeacherExamRows = teacherIds.length && (showOverview || activeSection === "assessments")
+    ? await db.select({
+      examClassId: examClasses.id,
+      classTeacherId: examClasses.classTeacherId,
+      examId: examinations.id,
+      examName: examinations.name,
+      examStatus: examinations.status,
+      yearName: academicYears.name,
+      className: classLevels.name,
+    }).from(examClasses)
+      .innerJoin(examinations, and(
+        eq(examinations.id, examClasses.examinationId),
+        eq(examinations.schoolId, context.schoolId),
+        eq(examinations.status, "open"),
+      ))
+      .innerJoin(academicYears, and(
+        eq(academicYears.id, examinations.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+        eq(academicYears.status, "active"),
+      ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, examClasses.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+        eq(classLevels.status, "active"),
+      ))
+      .where(and(
+        eq(examClasses.schoolId, context.schoolId),
+        inArray(examClasses.classTeacherId, teacherIds),
+      ))
+      .orderBy(asc(examinations.startDate), asc(classLevels.name))
+    : [];
+  const classTeacherExamClassIds = classTeacherExamRows.map((row) => row.examClassId);
+  const classTeacherSubjectStatuses = classTeacherExamClassIds.length
+    ? await db.select({
+      examClassId: examSubjects.examClassId,
+      status: examSubjects.status,
+    }).from(examSubjects).where(and(
+      eq(examSubjects.schoolId, context.schoolId),
+      inArray(examSubjects.examClassId, classTeacherExamClassIds),
+    ))
+    : [];
+  const classTeacherProgress = new Map<number, { total: number; approved: number; published: number }>();
+  for (const subject of classTeacherSubjectStatuses) {
+    const progress = classTeacherProgress.get(subject.examClassId) ?? { total: 0, approved: 0, published: 0 };
+    progress.total += 1;
+    if (subject.status === "approved") progress.approved += 1;
+    if (subject.status === "published") progress.published += 1;
+    classTeacherProgress.set(subject.examClassId, progress);
+  }
 
   const uniqueAssignments = [...new Map(assignments.map((assignment) => [
     `${assignment.yearName}:${assignment.className}:${assignment.sectionName}:${assignment.subjectName}`,
@@ -672,6 +723,29 @@ export default async function TeacherPortalPage({
                 </>
               ) : (
                 <EmptyState>{search || assessmentStatusFilter || assessmentTitleFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
+              )}
+              {classTeacherExamRows.length > 0 && (
+                <section className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/60 p-4 sm:p-5">
+                  <SectionHeading title="Class results to publish" description="As the assigned class teacher, review approved subject marks and publish results for your class only." />
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {classTeacherExamRows.map((examClass) => {
+                      const progress = classTeacherProgress.get(examClass.examClassId) ?? { total: 0, approved: 0, published: 0 };
+                      const published = progress.total > 0 && progress.published === progress.total;
+                      const ready = progress.total > 0 && progress.approved === progress.total;
+                      return (
+                        <article key={examClass.examClassId} className="rounded-xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">{examClass.yearName} · {examClass.className}</p>
+                          <h3 className="mt-1 font-bold text-slate-950">{examClass.examName}</h3>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {published ? "Published — marks are locked." : `${progress.approved} of ${progress.total} subjects approved.`}
+                          </p>
+                          {!published && <div className="mt-3"><PublishExamClassForm examClassId={examClass.examClassId} disabled={!ready} /></div>}
+                          <Link href={`/admin/examinations/${examClass.examId}`} className="mt-3 inline-block text-sm font-semibold text-violet-700">Review class assessment details →</Link>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
               )}
             </section>}
 

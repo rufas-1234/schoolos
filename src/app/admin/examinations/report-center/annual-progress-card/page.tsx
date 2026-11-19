@@ -12,6 +12,7 @@ import {
   classSections,
   classSubjects,
   examClasses,
+  examAttendance,
   examMarks,
   examReportSignatures,
   examSubjects,
@@ -27,6 +28,8 @@ import {
   buildExamProgressPeriods,
   calculateAnnualProgress,
   calculateWeightedAverage,
+  examAssessmentResultState,
+  hasCompleteExamResult,
 } from "@/lib/examination-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
@@ -51,6 +54,7 @@ type SubjectProgress = {
   subjectId: number;
   subjectName: string;
   examScores: Map<string, { totalMarks: number; maxMarks: number; percentage: number } | null>;
+  examStatuses: Map<string, string | null>;
   annualPercentage: number | null;
 };
 
@@ -94,17 +98,40 @@ function buildProgressRows(input: {
     examKey: string;
     maxMarks: string;
     weight: string;
+    isCompulsory: boolean;
   }>;
   marks: Array<{ enrollmentId: number; examSubjectId: number; marks: string | null }>;
+  attendance: Array<{ enrollmentId: number; examSubjectId: number; status: string }>;
   studentByEnrollment: Map<number, number>;
 }): StudentProgress[] {
   const scores = new Map<number, Map<string, Map<number, Array<{ marks: number; maxMarks: number; weight: number }>>>>();
   const assessmentById = new Map(input.assessments.map((assessment) => [assessment.id, assessment]));
+  const attendanceByEnrollment = new Map<number, Map<number, string>>();
+  const statusesByStudent = new Map<number, Map<string, Map<number, string>>>();
+  for (const attendance of input.attendance) {
+    const statuses = attendanceByEnrollment.get(attendance.enrollmentId) ?? new Map<number, string>();
+    statuses.set(attendance.examSubjectId, attendance.status);
+    attendanceByEnrollment.set(attendance.enrollmentId, statuses);
+    const assessment = assessmentById.get(attendance.examSubjectId);
+    const studentId = input.studentByEnrollment.get(attendance.enrollmentId);
+    if (!assessment || studentId === undefined) continue;
+    const studentStatuses = statusesByStudent.get(studentId) ?? new Map<string, Map<number, string>>();
+    const examStatuses = studentStatuses.get(assessment.examKey) ?? new Map<number, string>();
+    examStatuses.set(assessment.subjectId, attendance.status);
+    studentStatuses.set(assessment.examKey, examStatuses);
+    statusesByStudent.set(studentId, studentStatuses);
+  }
   for (const mark of input.marks) {
     if (mark.marks === null) continue;
     const assessment = assessmentById.get(mark.examSubjectId);
     const studentId = input.studentByEnrollment.get(mark.enrollmentId);
     if (!assessment || studentId === undefined) continue;
+    const attendanceStatus = attendanceByEnrollment.get(mark.enrollmentId)?.get(mark.examSubjectId) ?? null;
+    if (examAssessmentResultState({
+      attendanceStatus,
+      isCompulsory: assessment.isCompulsory,
+      hasMark: true,
+    }) !== "scored") continue;
     const studentScores = scores.get(studentId) ?? new Map();
     const examScores = studentScores.get(assessment.examKey) ?? new Map();
     const subjectScores = examScores.get(assessment.subjectId) ?? [];
@@ -129,27 +156,66 @@ function buildProgressRows(input: {
     for (const exam of input.exams) {
       const examSubjectScores = studentScores.get(exam.key);
       const allScores = examSubjectScores ? [...examSubjectScores.values()].flat() : [];
+      const examAssessments = input.assessments.filter((assessment) => assessment.examKey === exam.key);
+      const examStates = examAssessments.map((assessment) => {
+        const status = statusesByStudent.get(student.studentId)?.get(exam.key)?.get(assessment.subjectId) ?? null;
+        const hasMark = (examSubjectScores?.get(assessment.subjectId)?.length ?? 0) > 0;
+        return examAssessmentResultState({
+          attendanceStatus: status,
+          isCompulsory: assessment.isCompulsory,
+          hasMark,
+        });
+      });
       examAverages.set(
         exam.key,
-        calculateWeightedAverage(allScores)?.percentage ?? null,
+        hasCompleteExamResult(examStates)
+          ? calculateWeightedAverage(allScores)?.percentage ?? null
+          : null,
       );
     }
 
     const subjectRows = subjects.map((subject) => {
       const examScores = new Map<string, { totalMarks: number; maxMarks: number; percentage: number } | null>();
+      const examStatuses = new Map<string, string | null>();
       for (const exam of input.exams) {
         const subjectScores = studentScores.get(exam.key)?.get(subject.subjectId) ?? [];
+        const assessment = input.assessments.find((item) =>
+          item.examKey === exam.key && item.subjectId === subject.subjectId,
+        );
+        const status = statusesByStudent.get(student.studentId)?.get(exam.key)?.get(subject.subjectId) ?? null;
+        examStatuses.set(exam.key, status);
+        const state = assessment
+          ? examAssessmentResultState({
+            attendanceStatus: status,
+            isCompulsory: assessment.isCompulsory,
+            hasMark: subjectScores.length > 0,
+          })
+          : null;
         examScores.set(
           exam.key,
-          calculateWeightedAverage(subjectScores),
+          state === "scored" ? calculateWeightedAverage(subjectScores) : null,
         );
       }
+      const subjectHasNoResult = input.assessments.some((assessment) => {
+        if (assessment.subjectId !== subject.subjectId) return false;
+        const status = statusesByStudent.get(student.studentId)?.get(assessment.examKey)?.get(subject.subjectId) ?? null;
+        const hasMark = (studentScores.get(assessment.examKey)?.get(subject.subjectId)?.length ?? 0) > 0;
+        const state = examAssessmentResultState({
+          attendanceStatus: status,
+          isCompulsory: assessment.isCompulsory,
+          hasMark,
+        });
+        return state === "no-result" || state === "missing";
+      });
       return {
         ...subject,
         examScores,
-        annualPercentage: calculateAnnualProgress(
-          input.exams.map((exam) => examScores.get(exam.key)?.percentage ?? null),
-        ).average,
+        examStatuses,
+        annualPercentage: subjectHasNoResult
+          ? null
+          : calculateAnnualProgress(
+            input.exams.map((exam) => examScores.get(exam.key)?.percentage ?? null),
+          ).average,
       };
     });
     const annualProgress = calculateAnnualProgress(
@@ -288,10 +354,17 @@ function StudentProgressCard({
                   <td>{subject.subjectName}</td>
                   {exams.map((exam) => {
                     const score = subject.examScores.get(exam.key);
+                    const status = subject.examStatuses.get(exam.key);
                     return (
                       <td key={exam.key}>
                         {score
                           ? `${score.totalMarks.toFixed(1)} / ${score.maxMarks.toFixed(1)} · ${percentageLabel(score.percentage)}`
+                          : status === "not_applicable" ? "Not taking"
+                          : status === "x" ? "X · No Result"
+                          : status === "y" ? "Y · School-defined"
+                          : status === "absent" ? "Absent"
+                          : status === "excused" ? "Excused"
+                          : status === "present" || status === "late" ? "Missing mark"
                           : "—"}
                       </td>
                     );
@@ -428,6 +501,7 @@ export default async function AnnualProgressCardPage({
       subjectName: subjects.name,
       maxMarks: examSubjects.maxMarks,
       weight: examSubjects.weight,
+      isCompulsory: classSubjects.isCompulsory,
     }).from(examSubjects)
       .innerJoin(classSubjects, and(
         eq(classSubjects.id, examSubjects.classSubjectId),
@@ -510,23 +584,36 @@ export default async function AnnualProgressCardPage({
       ? `/api/admin/students/${row.studentPublicId}/photo`
       : null,
   }));
-  const markRows = assessments.length && rawRoster.length
-    ? await db.select({
-      enrollmentId: examMarks.enrollmentId,
-      examSubjectId: examMarks.examSubjectId,
-      marks: examMarks.marks,
-    }).from(examMarks)
-      .where(and(
-        eq(examMarks.schoolId, context.schoolId),
-        inArray(examMarks.examSubjectId, assessments.map((assessment) => assessment.id)),
-        inArray(examMarks.enrollmentId, rawRoster.map((row) => row.enrollmentId)),
-      ))
-    : [];
+  const [markRows, attendanceRows] = assessments.length && rawRoster.length
+    ? await Promise.all([
+      db.select({
+        enrollmentId: examMarks.enrollmentId,
+        examSubjectId: examMarks.examSubjectId,
+        marks: examMarks.marks,
+      }).from(examMarks)
+        .where(and(
+          eq(examMarks.schoolId, context.schoolId),
+          inArray(examMarks.examSubjectId, assessments.map((assessment) => assessment.id)),
+          inArray(examMarks.enrollmentId, rawRoster.map((row) => row.enrollmentId)),
+        )),
+      db.select({
+        enrollmentId: examAttendance.enrollmentId,
+        examSubjectId: examAttendance.examSubjectId,
+        status: examAttendance.status,
+      }).from(examAttendance)
+        .where(and(
+          eq(examAttendance.schoolId, context.schoolId),
+          inArray(examAttendance.examSubjectId, assessments.map((assessment) => assessment.id)),
+          inArray(examAttendance.enrollmentId, rawRoster.map((row) => row.enrollmentId)),
+        )),
+    ])
+    : [[], []];
   const studentProgress = buildProgressRows({
     roster,
     exams: examPeriods,
     assessments,
     marks: markRows,
+    attendance: attendanceRows,
     studentByEnrollment,
   });
   const requestedStudentId = validId(first(query.studentId));

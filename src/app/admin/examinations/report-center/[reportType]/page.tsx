@@ -13,6 +13,7 @@ import {
   classSections,
   classSubjects,
   examClasses,
+  examAttendance,
   examGradeBands,
   examGradingScales,
   examMarks,
@@ -35,7 +36,9 @@ import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
   calculateWeightedAverage,
+  examAssessmentResultState,
   gradeForPercentage,
+  hasCompleteExamResult,
   rankScores,
   type GradeBand,
 } from "@/lib/examination-policy";
@@ -45,7 +48,7 @@ import {
 } from "@/lib/fees-policy";
 
 export const dynamic = "force-dynamic";
-type ProgressAssessment = { id: number; name: string; maxMarks: string; weight: string };
+type ProgressAssessment = { id: number; name: string; maxMarks: string; weight: string; isCompulsory: boolean };
 
 const reportDefinitions = {
   "exam-routine": { title: "Exam Routine", description: "Print an examination schedule by class and subject.", results: false },
@@ -81,6 +84,17 @@ function reportUrl(reportType: ReportType, params: Record<string, string | numbe
 
 function formatMarks(value: number | null | undefined): string {
   return typeof value === "number" ? Number.isInteger(value) ? String(value) : value.toFixed(2) : "—";
+}
+
+function assessmentStatusLabel(status: string | undefined, state: string | undefined): string {
+  if (status === "not_applicable") return "Not taking";
+  if (status === "x") return "X · No Result";
+  if (status === "y") return "Y · School-defined";
+  if (status === "absent") return "Absent";
+  if (status === "excused") return "Excused";
+  if (state === "missing") return "Missing mark";
+  if (state === "no-result") return "No result";
+  return "—";
 }
 
 function todayInTimezone(timezone: string): string {
@@ -175,6 +189,8 @@ function ProgressCard({
     sectionName: string;
     rollNumber: string | null;
     marks: Map<number, number | null>;
+    assessmentStates: Map<number, string>;
+    attendanceStatuses: Map<number, string>;
     overall: { totalMarks: number; maxMarks: number; percentage: number } | null;
     complete: boolean;
   };
@@ -200,7 +216,7 @@ function ProgressCard({
   const strongestSubjects = exam.assessments
     .flatMap((assessment) => {
       const mark = row.marks.get(assessment.id);
-      if (typeof mark !== "number") return [];
+      if (row.assessmentStates.get(assessment.id) !== "scored" || typeof mark !== "number") return [];
       const percentage = mark / Number(assessment.maxMarks) * 100;
       return [{
         assessment,
@@ -212,7 +228,7 @@ function ProgressCard({
     .slice(0, 4);
   const studentReference = row.admissionNumber || `Enrollment ${row.enrollmentId}`;
   const schoolLogo = schoolLogoSource(schoolLogoUrl);
-  const completedSubjectCount = exam.assessments.filter((assessment) => typeof row.marks.get(assessment.id) === "number").length;
+  const completedSubjectCount = exam.assessments.filter((assessment) => row.assessmentStates.get(assessment.id) === "scored").length;
   return (
     <article className={`academic-progress-card a4-report-card${last ? " a4-report-card-last" : ""}`}>
       <header className="academic-progress-header">
@@ -313,12 +329,19 @@ function ProgressCard({
             </thead>
             <tbody>{exam.assessments.map((assessment) => {
               const mark = row.marks.get(assessment.id);
-              const percentage = typeof mark === "number" ? mark / Number(assessment.maxMarks) * 100 : null;
+              const status = row.assessmentStates.get(assessment.id);
+              const percentage = status === "scored" && typeof mark === "number"
+                ? mark / Number(assessment.maxMarks) * 100
+                : null;
               const band = percentage === null ? null : gradeForPercentage(percentage, bands);
+              const scoreLabel = status === "scored" && typeof mark === "number"
+                ? showPercentages && percentage !== null ? `${percentage.toFixed(2)}%`
+                  : `${formatMarks(mark)} / ${assessment.maxMarks}`
+                : assessmentStatusLabel(row.attendanceStatuses.get(assessment.id), status);
               return (
                 <tr key={assessment.id}>
                   <td>{assessment.name}</td>
-                  <td>{showPercentages ? percentage === null ? "—" : `${percentage.toFixed(2)}%` : `${formatMarks(mark)} / ${assessment.maxMarks}`}</td>
+                  <td>{scoreLabel}</td>
                   {!showPercentages && <td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td>}
                   <td>{band?.grade ?? "—"}{band?.description ? <span className="academic-progress-grade-description">{band.description}</span> : null}</td>
                 </tr>
@@ -532,6 +555,7 @@ export default async function ExaminationReportPage({
       weight: examSubjects.weight,
       status: examSubjects.status,
       classSubjectId: classSubjects.id,
+      isCompulsory: classSubjects.isCompulsory,
     }).from(examSubjects)
       .innerJoin(classSubjects, and(
         eq(classSubjects.id, examSubjects.classSubjectId),
@@ -609,7 +633,7 @@ export default async function ExaminationReportPage({
     : [];
   const sectionSummary = [...new Set(resultRows.map((row) => row.sectionName))].join(", ");
   const canViewPhotos = context.grantedPermissions.includes("students.view");
-  const [markRows, gradeRows, remarksRows] = resultRows.length && assessments.length
+  const [markRows, attendanceRows, gradeRows, remarksRows] = resultRows.length && assessments.length
     ? await Promise.all([
       db.select({
         enrollmentId: examMarks.enrollmentId,
@@ -620,6 +644,15 @@ export default async function ExaminationReportPage({
         eq(examMarks.schoolId, context.schoolId),
         inArray(examMarks.enrollmentId, resultRows.map((row) => row.enrollmentId)),
         inArray(examMarks.examSubjectId, assessments.map((row) => row.id)),
+      )),
+      db.select({
+        enrollmentId: examAttendance.enrollmentId,
+        examSubjectId: examAttendance.examSubjectId,
+        status: examAttendance.status,
+      }).from(examAttendance).where(and(
+        eq(examAttendance.schoolId, context.schoolId),
+        inArray(examAttendance.enrollmentId, resultRows.map((row) => row.enrollmentId)),
+        inArray(examAttendance.examSubjectId, assessments.map((row) => row.id)),
       )),
       db.select({
         minPercent: examGradeBands.minPercent,
@@ -638,7 +671,7 @@ export default async function ExaminationReportPage({
         inArray(examStudentRemarks.enrollmentId, resultRows.map((row) => row.enrollmentId)),
       )),
     ])
-    : [[], [], []];
+    : [[], [], [], []];
   const bands = gradeBands(gradeRows);
   const marksByEnrollment = new Map<number, Map<number, number | null>>();
   const teacherRemarksByMark = new Map<string, string | null>();
@@ -648,15 +681,31 @@ export default async function ExaminationReportPage({
     marksByEnrollment.set(mark.enrollmentId, marks);
     teacherRemarksByMark.set(`${mark.enrollmentId}:${mark.examSubjectId}`, mark.teacherRemark);
   }
+  const attendanceByEnrollment = new Map<number, Map<number, string>>();
+  for (const attendance of attendanceRows) {
+    const statuses = attendanceByEnrollment.get(attendance.enrollmentId) ?? new Map<number, string>();
+    statuses.set(attendance.examSubjectId, attendance.status);
+    attendanceByEnrollment.set(attendance.enrollmentId, statuses);
+  }
   const classRemarkByEnrollment = new Map(remarksRows.map((row) => [row.enrollmentId, row.remark]));
   const results = resultRows.map((row) => {
     const marks = marksByEnrollment.get(row.enrollmentId) ?? new Map<number, number | null>();
-    const complete = assessments.every((assessment) => typeof marks.get(assessment.id) === "number");
-    const overall = complete ? calculateWeightedAverage(assessments.map((assessment) => ({
-      marks: Number(marks.get(assessment.id)),
-      maxMarks: Number(assessment.maxMarks),
-      weight: Number(assessment.weight),
-    }))) : null;
+    const attendanceStatuses = attendanceByEnrollment.get(row.enrollmentId) ?? new Map<number, string>();
+    const assessmentStates = new Map(assessments.map((assessment) => [
+      assessment.id,
+      examAssessmentResultState({
+        attendanceStatus: attendanceStatuses.get(assessment.id) ?? null,
+        isCompulsory: assessment.isCompulsory,
+        hasMark: marks.get(assessment.id) !== null && marks.has(assessment.id),
+      }),
+    ]));
+    const complete = hasCompleteExamResult(assessmentStates.values());
+    const overall = complete ? calculateWeightedAverage(assessments.flatMap((assessment) => {
+      const mark = marks.get(assessment.id);
+      return assessmentStates.get(assessment.id) === "scored" && typeof mark === "number"
+        ? [{ marks: mark, maxMarks: Number(assessment.maxMarks), weight: Number(assessment.weight) }]
+        : [];
+    })) : null;
     return {
       enrollmentId: row.enrollmentId,
       studentId: row.studentId,
@@ -672,6 +721,8 @@ export default async function ExaminationReportPage({
       sectionName: row.sectionName,
       className: examClass?.className ?? "",
       marks,
+      assessmentStates,
+      attendanceStatuses,
       overall,
       complete,
       grade: overall ? gradeForPercentage(overall.percentage, bands) : null,
@@ -951,10 +1002,16 @@ export default async function ExaminationReportPage({
                         <thead><tr><th>Subject</th><th>Marks</th><th>Percentage</th><th>Grade</th><th>Teacher remark</th></tr></thead>
                         <tbody>{assessments.map((item) => {
                           const mark = activeResult.marks.get(item.id);
-                          const percentage = typeof mark === "number" ? mark / Number(item.maxMarks) * 100 : null;
+                          const state = activeResult.assessmentStates.get(item.id);
+                          const percentage = state === "scored" && typeof mark === "number"
+                            ? mark / Number(item.maxMarks) * 100
+                            : null;
                           const band = percentage === null ? null : gradeForPercentage(percentage, bands);
                           const teacherRemark = teacherRemarksByMark.get(`${activeResult.enrollmentId}:${item.id}`);
-                          return <tr key={item.id}><td>{item.name}</td><td>{formatMarks(mark)} / {item.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td><td>{teacherRemark || band?.performanceRemark || "—"}</td></tr>;
+                          const marksLabel = state === "scored" && typeof mark === "number"
+                            ? `${formatMarks(mark)} / ${item.maxMarks}`
+                            : assessmentStatusLabel(activeResult.attendanceStatuses.get(item.id), state);
+                          return <tr key={item.id}><td>{item.name}</td><td>{marksLabel}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td><td>{teacherRemark || band?.performanceRemark || "—"}</td></tr>;
                         })}</tbody>
                         <tfoot><tr><td>Overall</td><td>{activeResult.overall ? `${activeResult.overall.totalMarks.toFixed(2)} / ${activeResult.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{activeResult.overall ? `${activeResult.overall.percentage.toFixed(2)}%` : "—"}</td><td>{activeResult.grade?.grade ?? "—"}</td><td>{activeResult.grade?.performanceRemark ?? ""}</td></tr></tfoot>
                       </table>
@@ -973,9 +1030,15 @@ export default async function ExaminationReportPage({
                         <thead><tr><th>Roll no.</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Marks</th><th>Percentage</th><th>Grade</th></tr></thead>
                         <tbody>{results.map((row) => {
                           const mark = row.marks.get(selectedSubject.id);
-                          const percentage = typeof mark === "number" ? mark / Number(selectedSubject.maxMarks) * 100 : null;
+                          const state = row.assessmentStates.get(selectedSubject.id);
+                          const percentage = state === "scored" && typeof mark === "number"
+                            ? mark / Number(selectedSubject.maxMarks) * 100
+                            : null;
                           const band = percentage === null ? null : gradeForPercentage(percentage, bands);
-                          return <tr key={row.enrollmentId}><td>{row.rollNumber ?? "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{formatMarks(mark)} / {selectedSubject.maxMarks}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td></tr>;
+                          const marksLabel = state === "scored" && typeof mark === "number"
+                            ? `${formatMarks(mark)} / ${selectedSubject.maxMarks}`
+                            : assessmentStatusLabel(row.attendanceStatuses.get(selectedSubject.id), state);
+                          return <tr key={row.enrollmentId}><td>{row.rollNumber ?? "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{marksLabel}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td></tr>;
                         })}</tbody>
                       </table>
                       <ReportSignatureStrip signatures={configuredSignatures} />
@@ -990,7 +1053,14 @@ export default async function ExaminationReportPage({
                   <div className="overflow-x-auto">
                     <table className="print-report-table w-full border-collapse text-left text-xs">
                       <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th></tr></thead>
-                      <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => <td key={item.id}>{formatMarks(row.marks.get(item.id))}</td>)}<td>{row.overall ? `${row.overall.totalMarks.toFixed(2)} / ${row.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{row.overall ? `${row.overall.percentage.toFixed(2)}%` : "—"}</td><td>{row.grade?.grade ?? "—"}</td></tr>)}</tbody>
+                      <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => {
+                        const mark = row.marks.get(item.id);
+                        const state = row.assessmentStates.get(item.id);
+                        const label = state === "scored" && typeof mark === "number"
+                          ? formatMarks(mark)
+                          : assessmentStatusLabel(row.attendanceStatuses.get(item.id), state);
+                        return <td key={item.id}>{label}</td>;
+                      })}<td>{row.overall ? `${row.overall.totalMarks.toFixed(2)} / ${row.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{row.overall ? `${row.overall.percentage.toFixed(2)}%` : "—"}</td><td>{row.grade?.grade ?? "—"}</td></tr>)}</tbody>
                     </table>
                   </div>
                   <ReportSignatureStrip signatures={configuredSignatures} />

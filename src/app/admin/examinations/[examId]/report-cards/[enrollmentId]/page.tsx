@@ -10,6 +10,7 @@ import {
   classSections,
   classSubjects,
   examClasses,
+  examAttendance,
   examGradeBands,
   examGradingScales,
   examMarks,
@@ -32,7 +33,9 @@ import { schoolLogoSource } from "@/lib/school-logo";
 import {
   calculateWeightedAverage,
   canPreviewDraftTestReport,
+  examAssessmentResultState,
   gradeForPercentage,
+  hasCompleteExamResult,
   rankScores,
   type GradeBand,
 } from "@/lib/examination-policy";
@@ -136,7 +139,13 @@ export default async function ReportCardPage({
     examStatus: record.examinationStatus,
     canManage,
   });
-  if (record.examinationStatus !== "published" && !draftPreview) notFound();
+  const classSubjectStatuses = await db.select({ status: examSubjects.status }).from(examSubjects)
+    .where(and(
+      eq(examSubjects.schoolId, context.schoolId),
+      eq(examSubjects.examClassId, record.examClassId),
+    ));
+  const classPublished = classSubjectStatuses.length > 0 && classSubjectStatuses.every((subject) => subject.status === "published");
+  if (!classPublished && !draftPreview) notFound();
 
   const signatureRows = await db.select({
     role: examReportSignatures.role,
@@ -212,29 +221,54 @@ export default async function ReportCardPage({
       .limit(1);
     if (!appointedTeacher.length) notFound();
   }
-  const marks = await db.select({
+  const assessments = await db.select({
+    id: examSubjects.id,
     subjectName: subjects.name,
     subjectCode: subjects.code,
-    marks: examMarks.marks,
     maxMarks: examSubjects.maxMarks,
     weight: examSubjects.weight,
-    teacherRemark: examMarks.teacherRemark,
-    markId: examMarks.id,
-  }).from(examMarks)
-    .innerJoin(examSubjects, and(
-      eq(examSubjects.id, examMarks.examSubjectId),
+    isCompulsory: classSubjects.isCompulsory,
+  }).from(examSubjects)
+    .innerJoin(classSubjects, and(
+      eq(classSubjects.id, examSubjects.classSubjectId),
+      eq(classSubjects.schoolId, context.schoolId),
+    ))
+    .innerJoin(subjects, and(
+      eq(subjects.id, classSubjects.subjectId),
+      eq(subjects.schoolId, context.schoolId),
+    ))
+    .where(and(
       eq(examSubjects.examClassId, record.examClassId),
       eq(examSubjects.schoolId, context.schoolId),
       draftPreview ? eq(examSubjects.status, "draft") : eq(examSubjects.status, "published"),
     ))
-    .innerJoin(classSubjects, and(eq(classSubjects.id, examSubjects.classSubjectId), eq(classSubjects.schoolId, context.schoolId)))
-    .innerJoin(subjects, and(eq(subjects.id, classSubjects.subjectId), eq(subjects.schoolId, context.schoolId)))
-    .where(and(
-      eq(examMarks.schoolId, context.schoolId),
-      eq(examMarks.enrollmentId, record.enrollmentId),
-    ))
     .orderBy(asc(subjects.name));
-  if (!marks.length || marks.some((mark) => mark.marks === null)) notFound();
+  const assessmentIds = assessments.map((assessment) => assessment.id);
+  const [markRows, attendanceRows] = assessmentIds.length
+    ? await Promise.all([
+      db.select({
+        id: examMarks.id,
+        examSubjectId: examMarks.examSubjectId,
+        marks: examMarks.marks,
+        teacherRemark: examMarks.teacherRemark,
+      }).from(examMarks).where(and(
+        eq(examMarks.schoolId, context.schoolId),
+        eq(examMarks.enrollmentId, record.enrollmentId),
+        inArray(examMarks.examSubjectId, assessmentIds),
+      )),
+      db.select({
+        examSubjectId: examAttendance.examSubjectId,
+        status: examAttendance.status,
+        note: examAttendance.note,
+      }).from(examAttendance).where(and(
+        eq(examAttendance.schoolId, context.schoolId),
+        eq(examAttendance.enrollmentId, record.enrollmentId),
+        inArray(examAttendance.examSubjectId, assessmentIds),
+      )),
+    ])
+    : [[], []];
+  const markByAssessment = new Map(markRows.map((mark) => [mark.examSubjectId, mark]));
+  const attendanceByAssessment = new Map(attendanceRows.map((entry) => [entry.examSubjectId, entry]));
   const gradeBands = await db.select({
     minPercent: examGradeBands.minPercent,
     maxPercent: examGradeBands.maxPercent,
@@ -250,32 +284,50 @@ export default async function ReportCardPage({
     description: band.description,
     performanceRemark: band.performanceRemark,
   }));
-  const outcomes = marks.map((mark) => {
-    const score = Number(mark.marks);
-    const max = Number(mark.maxMarks);
-    const percentage = score / max * 100;
+  const outcomes = assessments.map((assessment) => {
+    const mark = markByAssessment.get(assessment.id);
+    const attendance = attendanceByAssessment.get(assessment.id);
+    const resultState = examAssessmentResultState({
+      attendanceStatus: attendance?.status ?? null,
+      isCompulsory: assessment.isCompulsory,
+      hasMark: mark?.marks !== null && mark?.marks !== undefined,
+    });
+    const score = resultState === "scored" && mark?.marks !== null && mark?.marks !== undefined
+      ? Number(mark.marks)
+      : null;
+    const percentage = score === null ? null : score / Number(assessment.maxMarks) * 100;
     return {
-      ...mark,
+      ...assessment,
+      markId: mark?.id ?? assessment.id,
+      marks: score,
+      teacherRemark: mark?.teacherRemark ?? null,
+      attendanceStatus: attendance?.status ?? null,
+      attendanceNote: attendance?.note ?? null,
+      resultState,
       percentage,
-      grade: gradeForPercentage(percentage, bands),
+      grade: percentage === null ? null : gradeForPercentage(percentage, bands),
     };
   });
-  const overall = calculateWeightedAverage(marks.map((mark) => ({
-    marks: Number(mark.marks),
-    maxMarks: Number(mark.maxMarks),
-    weight: Number(mark.weight),
-  })));
-  if (!overall) notFound();
-  const overallGrade = gradeForPercentage(overall.percentage, bands);
+  const overall = hasCompleteExamResult(outcomes.map((item) => item.resultState))
+    ? calculateWeightedAverage(outcomes.flatMap((item) =>
+      item.resultState === "scored" && item.marks !== null
+        ? [{ marks: item.marks, maxMarks: Number(item.maxMarks), weight: Number(item.weight) }]
+        : [],
+    ))
+    : null;
+  const overallGrade = overall ? gradeForPercentage(overall.percentage, bands) : null;
   let classRank: number | null = null;
   let classSize = 0;
   if (record.allowRanking) {
     const classScores = await db.select({
       enrollmentId: studentEnrollments.id,
       examMarkId: examMarks.id,
+      examSubjectId: examSubjects.id,
       marks: examMarks.marks,
       maxMarks: examSubjects.maxMarks,
       weight: examSubjects.weight,
+      isCompulsory: classSubjects.isCompulsory,
+      attendanceStatus: examAttendance.status,
     }).from(studentEnrollments)
       .innerJoin(classSections, and(
         eq(classSections.id, studentEnrollments.classSectionId),
@@ -293,6 +345,15 @@ export default async function ReportCardPage({
         eq(examSubjects.schoolId, context.schoolId),
         draftPreview ? eq(examSubjects.status, "draft") : eq(examSubjects.status, "published"),
       ))
+      .innerJoin(classSubjects, and(
+        eq(classSubjects.id, examSubjects.classSubjectId),
+        eq(classSubjects.schoolId, context.schoolId),
+      ))
+      .leftJoin(examAttendance, and(
+        eq(examAttendance.examSubjectId, examSubjects.id),
+        eq(examAttendance.enrollmentId, studentEnrollments.id),
+        eq(examAttendance.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.academicYearId, record.academicYearId),
@@ -300,7 +361,11 @@ export default async function ReportCardPage({
       ));
     const totals = new Map<number, Array<{ marks: number; maxMarks: number; weight: number }>>();
     for (const mark of classScores) {
-      if (mark.marks === null) continue;
+      if (mark.marks === null || examAssessmentResultState({
+        attendanceStatus: mark.attendanceStatus,
+        isCompulsory: mark.isCompulsory,
+        hasMark: true,
+      }) !== "scored") continue;
       const current = totals.get(mark.enrollmentId) ?? [];
       current.push({ marks: Number(mark.marks), maxMarks: Number(mark.maxMarks), weight: Number(mark.weight) });
       totals.set(mark.enrollmentId, current);
@@ -360,8 +425,10 @@ export default async function ReportCardPage({
         <section className="grid gap-3 sm:grid-cols-2">
           <article className="rounded-xl bg-violet-800 p-4 text-white">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">Overall performance</p>
-            <p className="mt-1 text-3xl font-bold">{overall.percentage.toFixed(2)}%</p>
-            <p className="mt-1 text-sm text-violet-100">{overall.totalMarks.toFixed(2)} of {overall.maxMarks.toFixed(2)} · Grade {overallGrade?.grade ?? "—"}{overallGrade?.description ? ` · ${overallGrade.description}` : ""}</p>
+            <p className="mt-1 text-3xl font-bold">{overall ? `${overall.percentage.toFixed(2)}%` : "—"}</p>
+            <p className="mt-1 text-sm text-violet-100">{overall
+              ? `${overall.totalMarks.toFixed(2)} of ${overall.maxMarks.toFixed(2)} · Grade ${overallGrade?.grade ?? "—"}${overallGrade?.description ? ` · ${overallGrade.description}` : ""}`
+              : "Incomplete or no numeric results"}</p>
           </article>
           {canViewFeeBalance && (
             <article className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -377,14 +444,20 @@ export default async function ReportCardPage({
             <tbody>{outcomes.map((item) => (
               <tr key={item.markId} className="border-t border-slate-200">
                 <td className="p-3 font-medium">{item.subjectName} <span className="text-xs text-slate-500">{item.subjectCode}</span></td>
-                <td className="p-3">{item.marks} / {item.maxMarks}</td>
-                <td className="p-3">{item.percentage.toFixed(2)}%</td>
+                <td className="p-3">{item.resultState === "scored" ? `${item.marks} / ${item.maxMarks}`
+                  : item.attendanceStatus === "not_applicable" ? "Not taking"
+                  : item.attendanceStatus === "x" ? `X · No Result${item.attendanceNote ? ` · ${item.attendanceNote}` : ""}`
+                  : item.attendanceStatus === "y" ? `Y · School-defined${item.attendanceNote ? ` · ${item.attendanceNote}` : ""}`
+                  : item.attendanceStatus === "absent" ? "Absent"
+                  : item.attendanceStatus === "excused" ? "Excused"
+                  : "Missing mark"}</td>
+                <td className="p-3">{item.percentage === null ? "—" : `${item.percentage.toFixed(2)}%`}</td>
                 <td className="p-3">{item.grade?.grade ?? "—"}{item.grade && <span className="ml-1 text-xs text-slate-500">{item.grade.description}</span>}</td>
                 <td className="p-3">{item.teacherRemark || item.grade?.performanceRemark || "—"}</td>
               </tr>
             ))}</tbody>
             <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
-              <tr><td className="p-3">Overall</td><td className="p-3">{overall.totalMarks.toFixed(2)} / {overall.maxMarks.toFixed(2)}</td><td className="p-3">{overall.percentage.toFixed(2)}%</td><td className="p-3">{overallGrade?.grade ?? "—"} {overallGrade?.description}</td><td className="p-3">{overallGrade?.performanceRemark ?? ""}</td></tr>
+              <tr><td className="p-3">Overall</td><td className="p-3">{overall ? `${overall.totalMarks.toFixed(2)} / ${overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td className="p-3">{overall ? `${overall.percentage.toFixed(2)}%` : "—"}</td><td className="p-3">{overallGrade?.grade ?? "—"} {overallGrade?.description}</td><td className="p-3">{overallGrade?.performanceRemark ?? ""}</td></tr>
             </tfoot>
           </table>
         </section>

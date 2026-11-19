@@ -61,6 +61,7 @@ export default async function SubjectMarksPage({
     examDate: examSubjects.examDate,
     maxMarks: examSubjects.maxMarks,
     weight: examSubjects.weight,
+    isCompulsory: classSubjects.isCompulsory,
     status: examSubjects.status,
     examStatus: examinations.status,
     examPublicId: examinations.publicId,
@@ -127,6 +128,7 @@ export default async function SubjectMarksPage({
     admissionNumber: students.admissionNumber,
     marks: examMarks.marks,
     teacherRemark: examMarks.teacherRemark,
+    attendanceStatus: examAttendance.status,
     sectionId: classSections.id,
     classTeacherId: classSections.classTeacherId,
     classTeacherRemark: examStudentRemarks.classTeacherRemark,
@@ -135,11 +137,10 @@ export default async function SubjectMarksPage({
       eq(studentEnrollments.id, examMarks.enrollmentId),
       eq(studentEnrollments.schoolId, context.schoolId),
     ))
-    .innerJoin(examAttendance, and(
+    .leftJoin(examAttendance, and(
       eq(examAttendance.examSubjectId, examMarks.examSubjectId),
       eq(examAttendance.enrollmentId, studentEnrollments.id),
       eq(examAttendance.schoolId, context.schoolId),
-      inArray(examAttendance.status, ["present", "late"]),
     ))
     .innerJoin(students, and(eq(students.id, studentEnrollments.studentId), eq(students.schoolId, context.schoolId)))
     .innerJoin(classSections, and(
@@ -156,6 +157,33 @@ export default async function SubjectMarksPage({
     .where(and(
       eq(examMarks.examSubjectId, subject.id),
       eq(examMarks.schoolId, context.schoolId),
+    ))
+    .orderBy(asc(students.lastName), asc(students.firstName));
+  const specialStatusRows = await db.select({
+    name: students.firstName,
+    lastName: students.lastName,
+    admissionNumber: students.admissionNumber,
+    status: examAttendance.status,
+    note: examAttendance.note,
+  }).from(examAttendance)
+    .innerJoin(studentEnrollments, and(
+      eq(studentEnrollments.id, examAttendance.enrollmentId),
+      eq(studentEnrollments.schoolId, context.schoolId),
+    ))
+    .innerJoin(classSections, and(
+      eq(classSections.id, studentEnrollments.classSectionId),
+      eq(classSections.schoolId, context.schoolId),
+      eq(classSections.classLevelId, subject.classLevelId),
+      eq(classSections.academicYearId, subject.yearId),
+    ))
+    .innerJoin(students, and(
+      eq(students.id, studentEnrollments.studentId),
+      eq(students.schoolId, context.schoolId),
+    ))
+    .where(and(
+      eq(examAttendance.examSubjectId, subject.id),
+      eq(examAttendance.schoolId, context.schoolId),
+      inArray(examAttendance.status, ["not_applicable", "x", "y"]),
     ))
     .orderBy(asc(students.lastName), asc(students.firstName));
   const componentRows = roster.length
@@ -207,7 +235,7 @@ export default async function SubjectMarksPage({
       ))
       .orderBy(asc(examMarkAudits.createdAt))
     : [];
-  const editable = subject.examStatus === "open" && subject.status === "draft" && (canConfigure || canReview || assignedTeacher);
+  const editable = subject.examStatus === "open" && subject.status === "draft" && assignedTeacher;
   const studentRows = roster.map((row) => ({
     markId: row.markId,
     enrollmentId: row.enrollmentId,
@@ -215,6 +243,7 @@ export default async function SubjectMarksPage({
     admissionNumber: row.admissionNumber,
     marks: row.marks,
     teacherRemark: row.teacherRemark,
+    attendanceStatus: row.attendanceStatus,
     components: (componentsByMark.get(row.markId) ?? []).map((component) => ({
       id: component.componentId,
       title: component.title,
@@ -247,7 +276,7 @@ export default async function SubjectMarksPage({
           <Link href={`/admin/examinations/${examId}`} className="text-sm font-semibold text-violet-700">← {subject.examName}</Link>
           <p className="mt-4 text-sm font-semibold text-violet-700">{context.schoolName} · {subject.scaleName}</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{subject.subjectName} marks</h1>
-          <p className="mt-2 text-sm text-slate-600">{subject.className} · {subject.subjectCode} · {subject.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · Exam date {subject.examDate} · Maximum {subject.maxMarks} · Weight {subject.weight} · {subject.status}</p>
+          <p className="mt-2 text-sm text-slate-600">{subject.className} · {subject.subjectCode} · {subject.isCompulsory ? "Compulsory" : "Optional"} · {subject.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · Exam date {subject.examDate} · Maximum {subject.maxMarks} · Weight {subject.weight} · {subject.status}</p>
         </div>
         <PrintButton label="Print marks-only sheet" targetId="exam-marks-only-sheet" pageOrientation="landscape" pageSize="A4" />
       </header>
@@ -269,11 +298,12 @@ export default async function SubjectMarksPage({
           </div>
         </header>
         <div className="overflow-x-auto">
-          <table className="print-report-table w-full min-w-[700px] border-collapse text-left text-sm">
+          <table className="print-report-table w-full min-w-[760px] border-collapse text-left text-sm">
             <thead>
               <tr>
                 <th className="p-2">Student</th>
                 <th className="p-2">Admission no.</th>
+                <th className="p-2">Attendance</th>
                 {(componentsByMark.get(roster[0]?.markId ?? -1) ?? []).map((component) => (
                   <th key={component.componentId} className="p-2">{component.title} / {component.maxMarks}</th>
                 ))}
@@ -284,6 +314,7 @@ export default async function SubjectMarksPage({
               <tr key={row.markId}>
                 <td className="p-2">{row.firstName} {row.lastName}</td>
                 <td className="p-2">{row.admissionNumber ?? "—"}</td>
+                <td className="p-2">{row.attendanceStatus ?? "Not recorded"}</td>
                 {(componentsByMark.get(row.markId) ?? []).map((component) => (
                   <td key={component.componentId} className="p-2">{component.marks ?? "—"}</td>
                 ))}
@@ -298,7 +329,7 @@ export default async function SubjectMarksPage({
       <section id="exam-mark-list" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="print-report-heading">
           <h2 className="text-xl font-bold">{subject.className} · {subject.subjectName} — marks roster</h2>
-          <p className="text-sm text-slate-600">{roster.length} students marked present or late · {subject.examSystem === "multi" ? "component marks are summed" : "single component"} · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
+          <p className="text-sm text-slate-600">{roster.length} enrolled students · {subject.examSystem === "multi" ? "component marks are summed" : "single component"} · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
         </div>
         {editable && <SaveMarksForm
           examSubjectId={subject.id}
@@ -309,23 +340,38 @@ export default async function SubjectMarksPage({
         />}
         {!editable && (
           <div className="overflow-x-auto">
-            <table className="print-report-table w-full min-w-[600px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th>{(componentsByMark.get(roster[0]?.markId ?? -1) ?? []).map((component) => <th key={component.componentId} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Total / {subject.maxMarks}</th><th className="p-3">Grade</th><th className="p-3">Teacher remark</th></tr></thead>
+            <table className="print-report-table w-full min-w-[700px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Attendance</th>{(componentsByMark.get(roster[0]?.markId ?? -1) ?? []).map((component) => <th key={component.componentId} className="p-3">{component.title} / {component.maxMarks}</th>)}<th className="p-3">Total / {subject.maxMarks}</th><th className="p-3">Grade</th><th className="p-3">Teacher remark</th></tr></thead>
               <tbody>{roster.map((row) => {
                 const percentage = row.marks === null ? null : Number(row.marks) / Number(subject.maxMarks) * 100;
                 const grade = percentage === null ? null : gradeBands.find((band) => percentage >= Number(band.minPercent) && (percentage < Number(band.maxPercent) || Number(band.maxPercent) === 100));
-                return <tr key={row.markId} className="border-t"><td className="p-3">{row.firstName} {row.lastName}</td><td className="p-3">{row.admissionNumber ?? "—"}</td>{(componentsByMark.get(row.markId) ?? []).map((component) => <td key={component.componentId} className="p-3">{component.marks ?? "Not entered"}</td>)}<td className="p-3">{row.marks ?? "Incomplete"}</td><td className="p-3">{grade?.grade ?? "—"}</td><td className="p-3">{row.teacherRemark ?? "—"}</td></tr>;
+                return <tr key={row.markId} className="border-t"><td className="p-3">{row.firstName} {row.lastName}</td><td className="p-3">{row.admissionNumber ?? "—"}</td><td className="p-3">{row.attendanceStatus ?? "Not recorded"}</td>{(componentsByMark.get(row.markId) ?? []).map((component) => <td key={component.componentId} className="p-3">{component.marks ?? "Not entered"}</td>)}<td className="p-3">{row.marks ?? "Incomplete"}</td><td className="p-3">{grade?.grade ?? "—"}</td><td className="p-3">{row.teacherRemark ?? "—"}</td></tr>;
               })}</tbody>
             </table>
           </div>
         )}
-        {roster.length === 0 && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">No students with Present or Late exam attendance were found. Record exam attendance first; absent, excused, and unmarked students cannot receive marks.</p>}
+        {roster.length === 0 && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">No enrolled students were found for this class and academic year.</p>}
       </section>
 
-      {subject.examStatus === "open" && subject.status === "draft" && (canConfigure || canReview || assignedTeacher) && roster.length > 0 && (
+      {specialStatusRows.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <h2 className="font-bold text-amber-950">No-score statuses</h2>
+          <p className="mt-1 text-sm text-amber-900">X is recorded as Cambridge-style “No result”; Y is a school-defined irregularity code and is not an official Cambridge grade. Neither code receives a numeric mark or grade.</p>
+          <ul className="mt-3 space-y-2 text-sm text-amber-950">
+            {specialStatusRows.map((row) => (
+              <li key={`${row.status}-${row.name}-${row.lastName}-${row.admissionNumber}`} className="rounded-lg border border-amber-200 bg-white p-3">
+                <span className="font-semibold">{row.name} {row.lastName}</span> · {row.admissionNumber ?? "No admission number"} · {row.status === "not_applicable" ? "Not taking optional subject" : row.status.toUpperCase()}
+                {row.note && <span className="block text-xs text-slate-600">Note: {row.note}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {subject.examStatus === "open" && subject.status === "draft" && assignedTeacher && roster.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-bold text-slate-900">Submit for approval</h2>
-          <p className="mt-1 text-sm text-slate-600">All marks must be saved and complete. After submission, you cannot edit marks unless a reviewer returns the assessment for correction. Published results cannot be changed through a teacher correction request.</p>
+          <p className="mt-1 text-sm text-slate-600">Submit a complete marks roster for review. Attendance is recorded separately and does not determine who appears on this marks sheet. After submission, you cannot edit marks unless a reviewer returns the assessment for correction. Published results cannot be changed through a teacher correction request.</p>
           <SubmitSubjectForm examSubjectId={subject.id} />
         </section>
       )}

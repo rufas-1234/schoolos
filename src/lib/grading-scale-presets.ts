@@ -43,4 +43,21 @@ export const GRADING_SCALE_PRESETS: GradingScalePreset[] = [
       { minPercent: 80, maxPercent: 100, grade: "A", description: "Outstanding", performanceRemark: "Outstanding work" },
     ],
   },
+  {
+    id: "cambridge-igcse",
+    label: "Cambridge IGCSE-style A*–G",
+    name: "Cambridge IGCSE-style",
+    note: "Illustrative editable bands only. Cambridge grade thresholds vary by syllabus, qualification and exam series; confirm the official thresholds for your course before use.",
+    bands: [
+      { minPercent: 0, maxPercent: 20, grade: "U", description: "Ungraded", performanceRemark: "Review learning goals and seek support" },
+      { minPercent: 20, maxPercent: 30, grade: "G", description: "Basic achievement", performanceRemark: "Keep practicing" },
+      { minPercent: 30, maxPercent: 40, grade: "F", description: "Developing", performanceRemark: "Keep building core skills" },
+      { minPercent: 40, maxPercent: 50, grade: "E", description: "Satisfactory", performanceRemark: "Making progress" },
+      { minPercent: 50, maxPercent: 60, grade: "D", description: "Good", performanceRemark: "Good effort" },
+      { minPercent: 60, maxPercent: 70, grade: "C", description: "Strong", performanceRemark: "Good work" },
+      { minPercent: 70, maxPercent: 80, grade: "B", description: "Very strong", performanceRemark: "Very good work" },
+      { minPercent: 80, maxPercent: 90, grade: "A", description: "Excellent", performanceRemark: "Excellent work" },
+      { minPercent: 90, maxPercent: 100, grade: "A*", description: "Outstanding", performanceRemark: "Outstanding work" },
+    ],
+  },
 ];

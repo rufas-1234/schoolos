@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyTeacherAcademicRole,
   canReceiveEnrollmentOperation,
   canTransitionAcademicYear,
   doDateRangesOverlap,
@@ -17,6 +18,15 @@ describe("class name policy", () => {
   it("normalizes whitespace and case for uniqueness checks", () => {
     expect(normalizeClassName("  Primary   One ")).toBe("primary one");
     expect(normalizeClassName("PRIMARY ONE")).toBe("primary one");
+  });
+});
+
+describe("teacher assignment roles", () => {
+  it("classifies subject, class, combined, and unassigned teachers", () => {
+    expect(classifyTeacherAcademicRole(true, false)).toBe("subject-teacher");
+    expect(classifyTeacherAcademicRole(false, true)).toBe("class-teacher");
+    expect(classifyTeacherAcademicRole(true, true)).toBe("both");
+    expect(classifyTeacherAcademicRole(false, false)).toBe("unassigned");
   });
 });
 

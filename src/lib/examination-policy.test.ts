@@ -6,7 +6,10 @@ import {
   calculateAnnualProgress,
   calculateWeightedAverage,
   completeSubmittedMarkIds,
+  examAssessmentResultState,
+  hasCompleteExamResult,
   gradeForPercentage,
+  missingExamMarkEnrollmentIds,
   missingExamRosterEnrollmentIds,
   parseExamComponents,
   rankScores,
@@ -29,11 +32,13 @@ describe("examination policy", () => {
   });
 
   it("provides complete editable starter bands for the supported grading systems", () => {
-    expect(GRADING_SCALE_PRESETS.map((preset) => preset.id)).toEqual(["south-sudan", "kenya-844"]);
+    expect(GRADING_SCALE_PRESETS.map((preset) => preset.id)).toEqual(["south-sudan", "kenya-844", "cambridge-igcse"]);
     for (const preset of GRADING_SCALE_PRESETS) {
       expect(validateGradeBands(preset.bands)).toBeNull();
     }
     expect(GRADING_SCALE_PRESETS.find((preset) => preset.id === "kenya-844")?.bands).toHaveLength(12);
+    expect(GRADING_SCALE_PRESETS.find((preset) => preset.id === "cambridge-igcse")?.bands.map((band) => band.grade))
+      .toEqual(["U", "G", "F", "E", "D", "C", "B", "A", "A*"]);
   });
 
   it("assigns inclusive lower bounds and the uppermost grade at 100%", () => {
@@ -48,6 +53,45 @@ describe("examination policy", () => {
       { marks: 20, maxMarks: 100, weight: 3 },
     ])).toEqual({ totalMarks: 60, maxMarks: 150, percentage: 35 });
     expect(calculateWeightedAverage([{ marks: 51, maxMarks: 50, weight: 1 }])).toBeNull();
+  });
+
+  it("distinguishes optional subjects, coded outcomes, and missing marks", () => {
+    expect(examAssessmentResultState({
+      attendanceStatus: "not_applicable",
+      isCompulsory: false,
+      hasMark: false,
+    })).toBe("not-applicable");
+    expect(examAssessmentResultState({
+      attendanceStatus: "not_applicable",
+      isCompulsory: true,
+      hasMark: false,
+    })).toBe("missing");
+    expect(examAssessmentResultState({
+      attendanceStatus: "x",
+      isCompulsory: true,
+      hasMark: false,
+    })).toBe("no-result");
+    expect(examAssessmentResultState({
+      attendanceStatus: "present",
+      isCompulsory: true,
+      hasMark: false,
+    })).toBe("missing");
+    expect(examAssessmentResultState({
+      attendanceStatus: "late",
+      isCompulsory: false,
+      hasMark: true,
+    })).toBe("scored");
+    expect(examAssessmentResultState({
+      attendanceStatus: "invalid",
+      isCompulsory: true,
+      hasMark: true,
+    })).toBe("missing");
+  });
+
+  it("only calculates an overall result when every applicable assessment has a score", () => {
+    expect(hasCompleteExamResult(["scored", "not-applicable"])).toBe(true);
+    expect(hasCompleteExamResult(["scored", "no-result"])).toBe(false);
+    expect(hasCompleteExamResult(["scored", "missing"])).toBe(false);
   });
 
   it("calculates annual averages from available periods and compares the first and last results", () => {
@@ -111,6 +155,29 @@ describe("examination policy", () => {
   it("finds missing eligible enrollments without removing existing mark rows", () => {
     expect(missingExamRosterEnrollmentIds([1, 2, 3, 4], [1, 3])).toEqual([2, 4]);
     expect(missingExamRosterEnrollmentIds([1, 2, 3, 4], [1, 2, 3, 4])).toEqual([]);
+  });
+
+  it("checks missing marks independently from attendance and exempts explicit no-result entries", () => {
+    expect(missingExamMarkEnrollmentIds(
+      [1, 2, 3],
+      [{ enrollmentId: 1, marks: "82.00" }, { enrollmentId: 2, marks: null }],
+      [2],
+    )).toEqual([3]);
+    expect(examAssessmentResultState({
+      attendanceStatus: null,
+      isCompulsory: true,
+      hasMark: true,
+    })).toBe("scored");
+    expect(examAssessmentResultState({
+      attendanceStatus: "absent",
+      isCompulsory: true,
+      hasMark: true,
+    })).toBe("scored");
+    expect(examAssessmentResultState({
+      attendanceStatus: "absent",
+      isCompulsory: true,
+      hasMark: false,
+    })).toBe("missing");
   });
 
   it("allows draft report previews only for managed, open test examinations", () => {

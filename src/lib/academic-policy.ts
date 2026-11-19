@@ -13,6 +13,18 @@ export const enrollmentOperationTypes = [
 ] as const;
 export type EnrollmentOperationType = (typeof enrollmentOperationTypes)[number];
 
+export type TeacherAcademicRole = "subject-teacher" | "class-teacher" | "both" | "unassigned";
+
+export function classifyTeacherAcademicRole(
+  hasSubjectAssignments: boolean,
+  hasClassAssignments: boolean,
+): TeacherAcademicRole {
+  if (hasSubjectAssignments && hasClassAssignments) return "both";
+  if (hasSubjectAssignments) return "subject-teacher";
+  if (hasClassAssignments) return "class-teacher";
+  return "unassigned";
+}
+
 export function canReceiveEnrollmentOperation(
   studentStatus: string,
   operation: EnrollmentOperationType,

@@ -12,6 +12,8 @@ import {
   type AdminTableFilter,
   type AdminTableRow,
 } from "@/components/admin-data-table";
+import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
   academicHolidays,
   academicTerms,
@@ -31,7 +33,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { academicSections, isAcademicSectionId } from "@/lib/academic-sections";
-import { isCalendarDate } from "@/lib/academic-policy";
+import { classifyTeacherAcademicRole, isCalendarDate } from "@/lib/academic-policy";
 import { AcademicQuickSearch } from "./academic-quick-search";
 import {
   AcademicTermForm,
@@ -76,6 +78,7 @@ export default async function AcademicStructurePage({
     search?: string | string[];
     attendanceSectionId?: string | string[];
     attendanceDate?: string | string[];
+    teacherYearId?: string | string[];
     notice?: string | string[];
   }>;
 }) {
@@ -84,6 +87,7 @@ export default async function AcademicStructurePage({
     search: requestedSearch,
     attendanceSectionId: requestedAttendanceSectionId,
     attendanceDate: requestedAttendanceDate,
+    teacherYearId: requestedTeacherYearId,
     notice: requestedNotice,
   } = await searchParams;
   const sectionId =
@@ -438,6 +442,29 @@ export default async function AcademicStructurePage({
     sectionStudentCounts.map((entry) => [entry.classSectionId, entry.studentCount]),
   );
   const activeAcademicYear = years.find((year) => year.status === "active");
+  const parsedTeacherYearId = typeof requestedTeacherYearId === "string" && /^\d+$/.test(requestedTeacherYearId)
+    ? Number(requestedTeacherYearId)
+    : null;
+  const teacherAcademicYear = years.find((year) => year.id === parsedTeacherYearId) ?? activeAcademicYear ?? null;
+  const teacherYearSections = sections.filter((section) => section.academicYearId === teacherAcademicYear?.id);
+  const teacherYearClassIds = new Set(teacherYearSections.map((section) => section.classLevelId));
+  const teacherYearSubjectAssignments = subjectAssignments.filter((assignment) =>
+    assignment.teacherId !== null && teacherYearClassIds.has(assignment.classLevelId),
+  );
+  const classSectionsByTeacher = new Map<number, typeof teacherYearSections>();
+  for (const section of teacherYearSections) {
+    if (section.classTeacherId === null) continue;
+    const assignedSections = classSectionsByTeacher.get(section.classTeacherId) ?? [];
+    assignedSections.push(section);
+    classSectionsByTeacher.set(section.classTeacherId, assignedSections);
+  }
+  const subjectsByTeacher = new Map<number, typeof teacherYearSubjectAssignments>();
+  for (const assignment of teacherYearSubjectAssignments) {
+    if (assignment.teacherId === null) continue;
+    const assignedSubjects = subjectsByTeacher.get(assignment.teacherId) ?? [];
+    assignedSubjects.push(assignment);
+    subjectsByTeacher.set(assignment.teacherId, assignedSubjects);
+  }
   const attendanceRoster =
     sectionId === "attendance" && activeAttendanceSection && canViewAttendance
       ? await db
@@ -483,6 +510,10 @@ export default async function AcademicStructurePage({
     .filter((year) => year.status !== "archived")
     .map((year) => ({ id: year.id, label: `${year.name} · ${year.status}` }));
   const allYearOptions = years.map((year) => ({ id: year.id, label: `${year.name} · ${year.status}` }));
+  const teacherYearOptions = years.map((year) => ({
+    value: String(year.id),
+    label: `${year.name} · ${year.status}`,
+  }));
   const classOptions = classes.filter((classLevel) => classLevel.status === "active").map((classLevel) => ({
     id: classLevel.id,
     branchId: classLevel.branchId,
@@ -534,6 +565,92 @@ export default async function AcademicStructurePage({
       label: branch.name,
     })),
   }];
+  const teacherRoleLabels = {
+    "subject-teacher": "Subject Teacher",
+    "class-teacher": "Class Teacher",
+    both: "Both",
+    unassigned: "Unassigned",
+  } as const;
+  const teacherDirectoryFilters: AdminTableFilter[] = [
+    ...branchFilters,
+    {
+      key: "roleFilter",
+      label: "teacher role",
+      options: Object.entries(teacherRoleLabels).map(([value, label]) => ({ value, label })),
+    },
+    {
+      key: "classSectionFilter",
+      label: "class / section",
+      options: teacherYearSections.map((section) => ({
+        value: String(section.id),
+        label: `${section.className} ${section.name}`,
+      })),
+    },
+    {
+      key: "subjectFilter",
+      label: "subject",
+      options: [...new Map(teacherYearSubjectAssignments.map((assignment) => [
+        assignment.subjectId,
+        { value: String(assignment.subjectId), label: assignment.subjectName },
+      ])).values()],
+    },
+  ];
+  const teacherDirectoryRecords = schoolTeachers.map((teacher) => {
+    const assignedClassSections = classSectionsByTeacher.get(teacher.id) ?? [];
+    const assignedSubjects = subjectsByTeacher.get(teacher.id) ?? [];
+    const role = classifyTeacherAcademicRole(assignedSubjects.length > 0, assignedClassSections.length > 0);
+    const assignedClassIds = new Set([
+      ...assignedClassSections.map((section) => section.classLevelId),
+      ...assignedSubjects.map((assignment) => assignment.classLevelId),
+    ]);
+    const allAssignedSections = teacherYearSections.filter((section) =>
+      section.classTeacherId === teacher.id || assignedClassIds.has(section.classLevelId),
+    );
+    const classSectionLabels = [...new Set(allAssignedSections.map((section) =>
+      `${section.className} ${section.name}`,
+    ))];
+    const subjectLabels = [...new Set(assignedSubjects.map((assignment) =>
+      `${assignment.className}: ${assignment.subjectName}`,
+    ))];
+    const branchIds = new Set([
+      teacher.branchId,
+      ...allAssignedSections.map((section) => section.branchId),
+      ...assignedSubjects.map((assignment) => assignment.branchId),
+    ]);
+    const branchNames = [...new Set([
+      teacher.branchName,
+      ...allAssignedSections.map((section) => section.branchName),
+      ...assignedSubjects.map((assignment) => assignment.branchName),
+    ])];
+    return {
+      id: teacher.id,
+      values: {
+        branch: branchNames.join(", "),
+        name: `${teacher.firstName} ${teacher.lastName}`,
+        employeeCode: teacher.employeeCode ?? "",
+        email: teacher.email ?? "",
+        role: teacherRoleLabels[role],
+        classes: classSectionLabels.join(", ") || "—",
+        subjects: subjectLabels.join(", ") || "—",
+        status: teacher.status,
+        branchId: [...branchIds].map(String).join("|"),
+        roleFilter: role,
+        classSectionFilter: [...new Set(allAssignedSections.map((section) => section.id))].map(String).join("|"),
+        subjectFilter: [...new Set(assignedSubjects.map((assignment) => assignment.subjectId))].map(String).join("|"),
+      },
+      searchableText: [
+        teacher.firstName,
+        teacher.lastName,
+        teacher.employeeCode ?? "",
+        teacher.email ?? "",
+        teacher.phone ?? "",
+        teacherRoleLabels[role],
+        ...branchNames,
+        ...classSectionLabels,
+        ...subjectLabels,
+      ].join(" "),
+    };
+  });
   const yearFilters: AdminTableFilter[] = [{
     key: "academicYearId",
     label: "academic year",
@@ -1068,37 +1185,48 @@ export default async function AcademicStructurePage({
               />
             )}
             {sectionId === "teachers" && (
-              <RecordList
-                title="Teachers"
-                columns={[
-                  { key: "branch", label: "Branch" },
-                  { key: "name", label: "Teacher" },
-                  { key: "employeeCode", label: "Employee code" },
-                  { key: "email", label: "Email" },
-                  { key: "status", label: "Status" },
-                ]}
-                empty="No teachers are linked yet. Add a staff member in Human Resources and set their staff role to Teacher."
-                toolbarActions={
-                  <Link
-                    href="/admin/staff"
-                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    Manage staff in Human Resources
-                  </Link>
-                }
-                records={schoolTeachers.map((teacher) => ({
-                  id: teacher.id,
-                  values: {
-                    branch: teacher.branchName,
-                    name: `${teacher.firstName} ${teacher.lastName}`,
-                    employeeCode: teacher.employeeCode ?? "",
-                    email: teacher.email ?? "",
-                    status: teacher.status,
-                    branchId: String(teacher.branchId),
-                  },
-                }))}
-                filters={branchFilters}
-              />
+              <div className="space-y-4">
+                <SmartFilterForm method="get" action="/admin/academics" className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <input type="hidden" name="section" value="teachers" />
+                  <div className="min-w-64 flex-1">
+                    <SearchableSelect
+                      label="Assignment year"
+                      name="teacherYearId"
+                      options={teacherYearOptions}
+                      defaultValue={teacherAcademicYear ? String(teacherAcademicYear.id) : ""}
+                      placeholder="Search academic years"
+                      disabled={teacherYearOptions.length === 0}
+                    />
+                  </div>
+                  <p className="pb-2 text-xs text-slate-500">
+                    Roles and assignments reflect classes, sections, and subjects for this year.
+                  </p>
+                </SmartFilterForm>
+                <RecordList
+                  title="Teachers"
+                  columns={[
+                    { key: "branch", label: "Branch" },
+                    { key: "name", label: "Teacher" },
+                    { key: "employeeCode", label: "Employee code" },
+                    { key: "email", label: "Email" },
+                    { key: "role", label: "Teaching role" },
+                    { key: "classes", label: "Classes / sections" },
+                    { key: "subjects", label: "Subjects" },
+                    { key: "status", label: "Status" },
+                  ]}
+                  empty="No teachers are linked yet. Add a staff member in Human Resources and set their staff role to Teacher."
+                  toolbarActions={
+                    <Link
+                      href="/admin/staff"
+                      className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Manage staff in Human Resources
+                    </Link>
+                  }
+                  records={teacherDirectoryRecords}
+                  filters={teacherDirectoryFilters}
+                />
+              </div>
             )}
             {sectionId === "classrooms" && (
               <ClassRoomList

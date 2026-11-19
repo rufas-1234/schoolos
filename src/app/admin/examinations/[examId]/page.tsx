@@ -5,6 +5,7 @@ import { db } from "@/db";
 import {
   academicYears,
   classLevels,
+  classSections,
   classSubjects,
   examClasses,
   examMarkCorrections,
@@ -21,8 +22,9 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import {
+  AssignExamClassTeacherForm,
   PrincipalRemarkForm,
-  PublishExaminationForm,
+  PublishExamClassForm,
   ReviewCorrectionForm,
   ReviewSubjectForm,
   SubjectSettingsForm,
@@ -67,6 +69,17 @@ export default async function ExaminationDetailPage({
 
   const canConfigure = context.grantedPermissions.includes("examinations.create");
   const canReview = context.grantedPermissions.includes("results.publish");
+  const myTeacherRows = context.grantedPermissions.includes("results.enter")
+    ? await db.select({ id: teachers.id }).from(teachers)
+      .innerJoin(staffMembers, and(
+        eq(staffMembers.id, teachers.staffMemberId!),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.linkedUserId, context.user.id),
+        eq(staffMembers.status, "active"),
+      ))
+      .where(and(eq(teachers.schoolId, context.schoolId), eq(teachers.status, "active")))
+    : [];
+  const myTeacherIds = myTeacherRows.map((teacher) => teacher.id);
   let assignedIds: number[] | null = null;
   if (!canConfigure && !canReview) {
     const assigned = await db.select({ id: examSubjects.id }).from(examSubjects)
@@ -87,7 +100,19 @@ export default async function ExaminationDetailPage({
         eq(staffMembers.status, "active"),
       ))
       .where(and(eq(examClasses.examinationId, exam.id), eq(examClasses.schoolId, context.schoolId)));
-    assignedIds = [...new Set(assigned.map((row) => row.id))];
+    const appointedClassSubjects = myTeacherIds.length
+      ? await db.select({ id: examSubjects.id }).from(examSubjects)
+        .innerJoin(examClasses, and(
+          eq(examClasses.id, examSubjects.examClassId),
+          eq(examClasses.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(examClasses.examinationId, exam.id),
+          inArray(examClasses.classTeacherId, myTeacherIds),
+          eq(examSubjects.schoolId, context.schoolId),
+        ))
+      : [];
+    assignedIds = [...new Set([...assigned.map((row) => row.id), ...appointedClassSubjects.map((row) => row.id)])];
     if (!assignedIds.length) notFound();
   }
   const allSubjects = await db.select({
@@ -145,11 +170,34 @@ export default async function ExaminationDetailPage({
     classLevelId: classLevels.id,
     className: classLevels.name,
     principalRemark: examClasses.principalRemark,
+    classTeacherId: examClasses.classTeacherId,
+    classTeacherFirstName: teachers.firstName,
+    classTeacherLastName: teachers.lastName,
   }).from(examClasses).innerJoin(classLevels, and(
     eq(classLevels.id, examClasses.classLevelId),
     eq(classLevels.schoolId, context.schoolId),
+  )).leftJoin(teachers, and(
+    eq(teachers.id, examClasses.classTeacherId!),
+    eq(teachers.schoolId, context.schoolId),
   )).where(and(eq(examClasses.schoolId, context.schoolId), eq(examClasses.examinationId, exam.id)))
     .orderBy(asc(classLevels.name));
+  const classTeacherOptions = canConfigure
+    ? await db.select({
+      classLevelId: classSections.classLevelId,
+      id: teachers.id,
+      name: teachers.firstName,
+      lastName: teachers.lastName,
+    }).from(classSections).innerJoin(teachers, and(
+      eq(teachers.id, classSections.classTeacherId!),
+      eq(teachers.schoolId, context.schoolId),
+      eq(teachers.status, "active"),
+    )).where(and(
+      eq(classSections.schoolId, context.schoolId),
+      eq(classSections.academicYearId, exam.academicYearId),
+      inArray(classSections.classLevelId, classRows.map((classRow) => classRow.classLevelId)),
+      eq(teachers.schoolId, context.schoolId),
+    )).orderBy(asc(teachers.firstName), asc(teachers.lastName))
+    : [];
   const pendingCorrections = canReview
     ? await db.select({
       id: examMarkCorrections.id,
@@ -175,7 +223,6 @@ export default async function ExaminationDetailPage({
       ))
     : [];
   const overallStatus = exam.status === "published" ? "Published — marks locked" : "Open for marks entry";
-  const publishReady = allSubjects.length > 0 && allSubjects.every((subject) => subject.status === "approved");
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
@@ -186,14 +233,13 @@ export default async function ExaminationDetailPage({
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{exam.name}</h1>
           <p className="mt-2 text-sm text-slate-600">{exam.examTypeName ? `${exam.examTypeName} · ` : ""}{exam.branchName ?? "All branches"} · {exam.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · {exam.startDate} – {exam.endDate} · {overallStatus}</p>
         </div>
-        {canReview && exam.status === "open" && <PublishExaminationForm examinationId={exam.id} />}
       </header>
 
       <section aria-label="Exam workflow" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { number: "1", title: "Check setup", detail: `${classRows.length} classes · ${allSubjects.length} subjects`, href: "/admin/examinations?section=setup", done: true },
           { number: "2", title: "Enter marks", detail: `${completeSubjects} of ${allSubjects.length} subject rosters complete`, href: "/admin/examinations?section=marks&examId=" + exam.id, done: completeSubjects === allSubjects.length && allSubjects.length > 0 },
-          { number: "3", title: "Review & publish", detail: `${allSubjects.filter((subject) => subject.status === "approved").length} of ${allSubjects.length} assessments approved`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
+          { number: "3", title: "Review & publish", detail: `${allSubjects.filter((subject) => subject.status === "published").length} of ${allSubjects.length} assessments published by their class teachers`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
           { number: "4", title: "Generate reports", detail: exam.status === "published" ? "A4 marksheets and individual or bulk progress cards are ready" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? `/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRows[0].id}` : null, done: exam.status === "published" },
         ].map((step) => (
           step.href ? (
@@ -215,7 +261,7 @@ export default async function ExaminationDetailPage({
       {canReview && exam.status === "open" && (
         <section id="publication-checklist" className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <h2 className="font-bold text-slate-900">Publication checklist</h2>
-          <p className="mt-1 text-sm text-slate-600">{allSubjects.filter((subject) => subject.status === "approved").length} of {allSubjects.length} assessments approved. {publishReady ? "All subject approvals are in; publication also rechecks every roster for complete marks." : "All assessments must be submitted and approved."}</p>
+          <p className="mt-1 text-sm text-slate-600">{allSubjects.filter((subject) => subject.status === "approved").length} of {allSubjects.length} assessments approved. Each assigned class teacher publishes their own class after every subject is approved and complete.</p>
         </section>
       )}
 
@@ -239,20 +285,53 @@ export default async function ExaminationDetailPage({
         {classRows.map((classRow) => {
           const subjectRows = visibleSubjects.filter((subject) => subject.examClassId === classRow.id);
           if (!subjectRows.length) return null;
+          const classPublished = subjectRows.every((subject) => subject.status === "published");
+          const classApproved = subjectRows.every((subject) => subject.status === "approved");
+          const isAssignedClassTeacher = classRow.classTeacherId !== null && myTeacherIds.includes(classRow.classTeacherId);
           return (
             <article key={classRow.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
                 <h3 className="text-lg font-bold">{classRow.className}</h3>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm text-slate-500">{subjectRows.length} subjects</span>
-                  {(exam.status === "published" || canPreviewReports) && (
+                  {(classPublished || canPreviewReports) && (
                     <>
-                      <Link href={`/admin/examinations/${exam.id}/reports/${classRow.id}${exam.status === "published" ? "" : "?preview=test"}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
-                        {exam.status === "published" ? "Generate class report" : "Preview test report"}
+                      <Link href={`/admin/examinations/${exam.id}/reports/${classRow.id}${classPublished ? "" : "?preview=test"}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                        {classPublished ? "Generate class report" : "Preview test report"}
                       </Link>
-                      {exam.status === "published" && <Link href={`/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRow.id}`} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">Bulk progress cards</Link>}
+                      {classPublished && exam.status === "published" && <Link href={`/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRow.id}`} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">Bulk progress cards</Link>}
                     </>
                   )}
+                </div>
+              </div>
+              <div className="grid gap-3 border-b p-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">Publishing class teacher</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {classRow.classTeacherFirstName
+                      ? `${classRow.classTeacherFirstName} ${classRow.classTeacherLastName}`
+                      : "Not assigned"}
+                  </p>
+                  {canConfigure && exam.status === "open" && (
+                    <AssignExamClassTeacherForm
+                      examClassId={classRow.id}
+                      classTeacherId={classRow.classTeacherId}
+                      teachers={classTeacherOptions.filter((teacher) => teacher.classLevelId === classRow.classLevelId)
+                        .map((teacher) => ({ id: teacher.id, name: `${teacher.name} ${teacher.lastName}` }))}
+                    />
+                  )}
+                  {isAssignedClassTeacher && exam.status === "open" && !classPublished && (
+                    <div className="mt-3">
+                      <PublishExamClassForm examClassId={classRow.id} disabled={!classApproved} />
+                      {!classApproved && <p className="mt-2 text-xs text-amber-800">All class subjects must be reviewed and approved first.</p>}
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">Class publication status</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {classPublished ? "Published — marks are locked." : `${subjectRows.filter((subject) => subject.status === "approved").length} of ${subjectRows.length} subjects approved.`}
+                  </p>
                 </div>
               </div>
               {canReview && exam.status === "open" && <div className="p-4"><PrincipalRemarkForm examClassId={classRow.id} remark={classRow.principalRemark} /></div>}
