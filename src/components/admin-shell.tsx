@@ -71,6 +71,7 @@ const navigation: NavigationItem[] = [
     label: "Student Info",
     icon: Users,
     permission: "students.view",
+    permissionAlternatives: ["students.update"],
     children: studentSections,
   },
   {
@@ -242,7 +243,7 @@ export function AdminShell({
     pathname.startsWith("/admin/academics"),
   );
   const [studentInfoOpen, setStudentInfoOpen] = useState(() =>
-    pathname.startsWith("/admin/students"),
+    pathname.startsWith("/admin/students") || pathname.startsWith("/admin/admissions"),
   );
   const [usersOpen, setUsersOpen] = useState(() =>
     pathname.startsWith("/admin/users") || pathname === "/admin/settings/roles",

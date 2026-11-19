@@ -56,6 +56,7 @@ type SubjectProgress = {
 
 type StudentProgress = {
   studentId: number;
+  photoUrl: string | null;
   name: string;
   admissionNumber: string | null;
   sectionName: string;
@@ -78,6 +79,7 @@ function changeLabel(value: number | null): string {
 function buildProgressRows(input: {
   roster: Array<{
     studentId: number;
+    photoUrl: string | null;
     firstName: string;
     lastName: string;
     admissionNumber: string | null;
@@ -156,6 +158,7 @@ function buildProgressRows(input: {
 
     return {
       studentId: student.studentId,
+      photoUrl: student.photoUrl,
       name: `${student.firstName} ${student.lastName}`,
       admissionNumber: student.admissionNumber,
       sectionName: student.sectionName,
@@ -194,76 +197,142 @@ function StudentProgressCard({
   last: boolean;
 }) {
   const logo = schoolLogoSource(schoolLogoUrl);
+  const strongestSubjects = student.subjects
+    .filter((subject): subject is SubjectProgress & { annualPercentage: number } => subject.annualPercentage !== null)
+    .sort((a, b) => b.annualPercentage - a.annualPercentage || a.subjectName.localeCompare(b.subjectName))
+    .slice(0, 4);
+  const examsWithResults = exams.filter((exam) => typeof student.examAverages.get(exam.key) === "number").length;
+  const reportDate = new Date().toISOString().slice(0, 10);
   return (
-    <article className={`a4-report-card space-y-4 rounded-xl border border-slate-200 bg-white p-5 text-slate-900${last ? " a4-report-card-last" : ""}`}>
-      <header className="flex items-center gap-4">
-        {logo && <Image src={logo} unoptimized width={56} height={56} alt={`${schoolName} logo`} className="h-14 w-14 object-contain" />}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold uppercase tracking-wide text-slate-700">{schoolName}</p>
-          {(schoolAddress || schoolPhone || schoolEmail) && (
-            <p className="mt-0.5 text-xs text-slate-600">{[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join(" · ")}</p>
-          )}
-          <h2 className="mt-1 text-xl font-bold">Annual Student Progress Card</h2>
-          <p className="mt-1 text-sm text-slate-600">{yearName} · {className}</p>
-        </div>
-      </header>
-      <section className="annual-progress-card-info grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs sm:grid-cols-4">
-        <p><b>Student</b><br />{student.name}</p>
-        <p><b>Admission no.</b><br />{student.admissionNumber ?? "—"}</p>
-        <p><b>Section / roll no.</b><br />{student.sectionName} · {student.rollNumber ?? "—"}</p>
-        <p><b>Annual average</b><br />{percentageLabel(student.annualAverage)}</p>
-      </section>
-      <div className="overflow-x-auto">
-        <table className="print-report-table w-full border-collapse text-left text-xs">
-          <thead>
-            <tr>
-              <th>Subject</th>
-              {exams.map((exam) => <th key={exam.key}>{exam.label}</th>)}
-              <th>Annual average</th>
-            </tr>
-          </thead>
-          <tbody>
-            {student.subjects.map((subject) => (
-              <tr key={subject.subjectId}>
-                <td>{subject.subjectName}</td>
-                {exams.map((exam) => {
-                  const score = subject.examScores.get(exam.key);
-                  return (
-                    <td key={exam.key}>
-                      {score
-                        ? `${score.totalMarks.toFixed(1)} / ${score.maxMarks.toFixed(1)} · ${percentageLabel(score.percentage)}`
-                        : "—"}
-                    </td>
-                  );
-                })}
-                <td>{percentageLabel(subject.annualPercentage)}</td>
-              </tr>
-            ))}
-            <tr className="font-bold">
-              <td>Overall average</td>
-              {exams.map((exam) => (
-                <td key={exam.key}>{percentageLabel(student.examAverages.get(exam.key) ?? null)}</td>
-              ))}
-              <td>{percentageLabel(student.annualAverage)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <section className="annual-progress-card-summary grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
-        {exams.map((exam) => (
-          <div key={exam.key} className="rounded-lg border border-slate-200 p-3">
-            <h3 className="font-bold">{exam.label}</h3>
-            <p className="mt-1 text-lg font-bold">{percentageLabel(student.examAverages.get(exam.key) ?? null)}</p>
+    <article className={`academic-progress-card annual-progress-card a4-report-card${last ? " a4-report-card-last" : ""}`}>
+      <header className="academic-progress-header">
+        <div className="academic-progress-brand">
+          {logo && <Image src={logo} unoptimized width={76} height={76} alt={`${schoolName} logo`} className="academic-progress-logo" />}
+          <div className="academic-progress-school">
+            <p>{schoolName}</p>
+            <span>{[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join(" · ")}</span>
           </div>
-        ))}
-        <div className="rounded-lg border border-violet-200 bg-violet-50 p-3">
-          <h3 className="font-bold">Progress change</h3>
-          <p className="mt-1 text-lg font-bold">{changeLabel(student.change)}</p>
-          <p>First to last published exam</p>
         </div>
+        <div className="academic-progress-title">
+          <h2>Annual Progress Report</h2>
+          <p>{yearName} · {className}</p>
+          <span>Academic performance report</span>
+        </div>
+        {student.photoUrl ? (
+          <Image src={student.photoUrl} unoptimized width={76} height={88} alt={`${student.name} photo`} className="academic-progress-photo" />
+        ) : <div className="academic-progress-photo-placeholder">Student<br />photo</div>}
+      </header>
+      <section className="academic-progress-overview">
+        <div className="academic-progress-student">
+          <h3>Student information</h3>
+          <AnnualReportField label="Student name" value={student.name} />
+          <AnnualReportField label="Admission number" value={student.admissionNumber ?? "—"} />
+          <AnnualReportField label="Class / section" value={`${className} · ${student.sectionName}`} />
+          <AnnualReportField label="Roll number" value={student.rollNumber ?? "—"} />
+          <AnnualReportField label="Academic year" value={yearName} />
+          <AnnualReportField label="Report date" value={reportDate} />
+          <AnnualReportField label="Exams with results" value={`${examsWithResults} of ${exams.length}`} />
+          <AnnualReportField label="Annual average" value={percentageLabel(student.annualAverage)} />
+          <AnnualReportField label="Progress change" value={changeLabel(student.change)} />
+        </div>
+        <div className="academic-progress-performance">
+          <div className="academic-progress-section-title">
+            <h3>Annual performance profile</h3>
+            <span>{examsWithResults} exams with results</span>
+          </div>
+          <div className="academic-progress-overall">
+            <div className="academic-progress-overall-score">
+              <span>Annual average</span>
+              <strong>{percentageLabel(student.annualAverage)}</strong>
+              <span>Across examinations with published results</span>
+            </div>
+            <div className="academic-progress-grade">
+              <span>Change</span>
+              <strong>{student.change === null ? "—" : student.change > 0 ? "+" : student.change < 0 ? "−" : "="}</strong>
+            </div>
+          </div>
+          {student.annualAverage !== null && (
+            <div className="academic-progress-meter" role="progressbar" aria-label="Annual average" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, student.annualAverage))}>
+              <span style={{ width: `${Math.max(0, Math.min(100, student.annualAverage))}%` }} />
+            </div>
+          )}
+          <div className="academic-progress-strengths">
+            <h4>Subject performance profile</h4>
+            {strongestSubjects.map((subject) => (
+              <div className="academic-progress-subject-score" key={subject.subjectId}>
+                <span className="academic-progress-subject-name">{subject.subjectName}</span>
+                <span className="academic-progress-subject-track" aria-hidden="true">
+                  <span style={{ width: `${Math.max(0, Math.min(100, subject.annualPercentage))}%` }} />
+                </span>
+                <strong>{subject.annualPercentage.toFixed(0)}%</strong>
+              </div>
+            ))}
+            {!strongestSubjects.length && <p className="academic-progress-empty">No subject averages are available.</p>}
+          </div>
+        </div>
+      </section>
+      <section className="academic-progress-assessment">
+        <h3>Detailed annual assessment</h3>
+        <div className="academic-progress-table-wrap">
+          <table className="print-report-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                {exams.map((exam) => <th key={exam.key}>{exam.label}</th>)}
+                <th>Annual average</th>
+              </tr>
+            </thead>
+            <tbody>
+              {student.subjects.map((subject) => (
+                <tr key={subject.subjectId}>
+                  <td>{subject.subjectName}</td>
+                  {exams.map((exam) => {
+                    const score = subject.examScores.get(exam.key);
+                    return (
+                      <td key={exam.key}>
+                        {score
+                          ? `${score.totalMarks.toFixed(1)} / ${score.maxMarks.toFixed(1)} · ${percentageLabel(score.percentage)}`
+                          : "—"}
+                      </td>
+                    );
+                  })}
+                  <td>{percentageLabel(subject.annualPercentage)}</td>
+                </tr>
+              ))}
+              <tr className="font-bold">
+                <td>Overall average</td>
+                {exams.map((exam) => (
+                  <td key={exam.key}>{percentageLabel(student.examAverages.get(exam.key) ?? null)}</td>
+                ))}
+                <td>{percentageLabel(student.annualAverage)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="academic-progress-comments annual-progress-summaries">
+        {exams.map((exam) => (
+          <article key={exam.key}>
+            <h3>{exam.label}</h3>
+            <p>{percentageLabel(student.examAverages.get(exam.key) ?? null)} average</p>
+          </article>
+        ))}
+        <article>
+          <h3>Progress change</h3>
+          <p>{changeLabel(student.change)} from first to last published exam.</p>
+        </article>
       </section>
       <ReportSignatureStrip signatures={signatures} />
     </article>
+  );
+}
+
+function AnnualReportField({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="academic-progress-field">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </p>
   );
 }
 
@@ -399,10 +468,13 @@ export default async function AnnualProgressCardPage({
       weight: String(assessment.weight),
     }];
   });
+  const canViewPhotos = context.grantedPermissions.includes("students.view");
   const rawRoster = selectedYear && selectedClass
     ? await db.select({
       enrollmentId: studentEnrollments.id,
       studentId: students.id,
+      studentPublicId: students.publicId,
+      profilePhoto: students.additionalDetails,
       firstName: students.firstName,
       lastName: students.lastName,
       admissionNumber: students.admissionNumber,
@@ -432,7 +504,12 @@ export default async function AnnualProgressCardPage({
     studentByEnrollment.set(row.enrollmentId, row.studentId);
     if (!rosterByStudent.has(row.studentId)) rosterByStudent.set(row.studentId, row);
   }
-  const roster = [...rosterByStudent.values()];
+  const roster = [...rosterByStudent.values()].map((row) => ({
+    ...row,
+    photoUrl: canViewPhotos && row.profilePhoto?.profilePhoto?.objectKey && row.profilePhoto.profilePhoto.fileName
+      ? `/api/admin/students/${row.studentPublicId}/photo`
+      : null,
+  }));
   const markRows = assessments.length && rawRoster.length
     ? await db.select({
       enrollmentId: examMarks.enrollmentId,
@@ -471,7 +548,7 @@ export default async function AnnualProgressCardPage({
           <p className="mt-2 max-w-3xl text-sm text-slate-600">Compare published subject results across every examination in an academic year, with annual averages and progress from the first to the latest exam.</p>
         </div>
         {selectedYear && selectedClass && visibleProgress.length > 0 && (
-          <PrintButton label={selectedStudentId ? "Print progress card / Save PDF" : "Print class progress cards / Save PDF"} targetId="annual-progress-output" pageOrientation="landscape" pageSize="A4" />
+          <PrintButton label={selectedStudentId ? "Print progress card / Save PDF" : "Print class progress cards / Save PDF"} targetId="annual-progress-output" pageOrientation="portrait" pageSize="A4" />
         )}
       </header>
       <SmartFilterForm method="get" className="grid max-w-6xl gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4 print:hidden">

@@ -1796,7 +1796,6 @@ export const uploadedFiles = mysqlTable(
       .notNull()
       .references(() => schools.id),
     uploadedBy: varchar("uploadedBy", { length: 36 })
-      .notNull()
       .references(() => user.id),
     storageKey: varchar("storageKey", { length: 700 }).notNull(),
     fileName: varchar("fileName", { length: 255 }).notNull(),

@@ -13,6 +13,12 @@ export const studentSections = [
     permission: "students.create",
   },
   {
+    id: "admission-desk",
+    label: "Admission Desk",
+    href: "/admin/admissions",
+    permission: "students.update",
+  },
+  {
     id: "list",
     label: "Student List",
     href: "/admin/students",

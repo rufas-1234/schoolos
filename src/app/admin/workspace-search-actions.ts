@@ -152,6 +152,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       );
     }
   }
+  if (!canManageStudents && permissions.has("students.update")) {
+    addPage("student-admission-desk", "Admission Desk", "Review online registrations and manage pending student admissions", "/admin/admissions", ["admission applications", "online registration", "pending admissions"]);
+  }
   if (canEnterResults) {
     addPage("exam-types", "Exam type", "Configure examination types", "/admin/examinations?section=types", ["examination type", "assessment type"]);
     addPage("examination-setup", "Examination setup", "Create, configure, and manage examinations", "/admin/examinations?section=setup", ["exams", "exam setup"]);

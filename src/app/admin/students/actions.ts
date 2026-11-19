@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -11,15 +12,18 @@ import {
   classLevels,
   classSections,
   schoolBranches,
+  schools,
   studentCategories,
   studentEnrollments,
   studentSettings,
   students,
+  uploadedFiles,
   type StudentAdditionalDetails,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
 import { canTransitionStudentStatus, studentStatuses } from "@/lib/student-policy";
 import {
   defaultStudentFieldSettings,
@@ -492,6 +496,210 @@ export async function createStudent(
   return { success: true };
 }
 
+export async function createPublicStudentAdmissionApplication(
+  _previousState: StudentActionState,
+  formData: FormData,
+): Promise<StudentActionState> {
+  const schoolPublicId = z.string().uuid().safeParse(formData.get("schoolPublicId"));
+  if (!schoolPublicId.success) return { error: "This registration link is invalid." };
+  if (formData.get("consent") !== "on") return { error: "Please confirm that the information is accurate." };
+
+  const [school] = await db.select({
+    id: schools.id,
+    publicId: schools.publicId,
+  }).from(schools).where(eq(schools.publicId, schoolPublicId.data)).limit(1);
+  if (!school) return { error: "This registration link is no longer available." };
+
+  const [savedSettings] = await db.select({ fields: studentSettings.fields })
+    .from(studentSettings).where(eq(studentSettings.schoolId, school.id)).limit(1);
+  const fieldSettings = normalizeStudentFieldSettings(savedSettings?.fields);
+  for (const field of studentSettingFields) {
+    if (fieldSettings[field.name].enabled) continue;
+    if (field.name === "profilePhoto") {
+      formData.set("profilePhotoFileName", "");
+      formData.set("profilePhotoObjectKey", "");
+    } else if (field.name === "studentDocuments") {
+      for (let slot = 1; slot <= 4; slot++) {
+        formData.set(`documentTitle${slot}`, "");
+        formData.set(`documentFileName${slot}`, "");
+        formData.set(`documentObjectKey${slot}`, "");
+      }
+    } else {
+      formData.set(field.name, "");
+    }
+  }
+  const requiredError = requiredStudentFieldError(formData, fieldSettings);
+  if (requiredError) return { error: requiredError };
+  const result = admissionSchema.safeParse({
+    ...readPersonalDetails(formData),
+    branchId: readFormValue(formData, "branchId"),
+    academicYearId: readFormValue(formData, "academicYearId"),
+    classLevelId: readFormValue(formData, "classLevelId"),
+    classSectionId: readFormValue(formData, "classSectionId"),
+    admissionDate: readFormValue(formData, "admissionDate"),
+  });
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    return { error: issue ? `${String(issue.path.at(-1) ?? "Student details")}: ${issue.message}` : "Review the student details and try again." };
+  }
+
+  const admission = result.data;
+  if (!hasValidDocumentScope(admission.additionalDetails, school.publicId)) {
+    return { error: "The uploaded documents do not belong to this school." };
+  }
+  const documentReferences = [
+    ...(admission.additionalDetails.profilePhoto?.objectKey
+      ? [{ objectKey: admission.additionalDetails.profilePhoto.objectKey, fileName: admission.additionalDetails.profilePhoto.fileName, photo: true }]
+      : []),
+    ...admission.additionalDetails.documents.filter((document) => document.objectKey)
+      .map((document) => ({ objectKey: document.objectKey, fileName: document.fileName, photo: false })),
+  ];
+  if (documentReferences.length) {
+    const fileRows = await db.select({
+      storageKey: uploadedFiles.storageKey,
+      fileName: uploadedFiles.fileName,
+      contentType: uploadedFiles.contentType,
+    }).from(uploadedFiles).where(and(
+      eq(uploadedFiles.schoolId, school.id),
+      inArray(uploadedFiles.storageKey, documentReferences.map((file) => file.objectKey)),
+    ));
+    if (fileRows.length !== documentReferences.length || documentReferences.some((file) => {
+      const saved = fileRows.find((candidate) => candidate.storageKey === file.objectKey);
+      return !saved || saved.fileName !== file.fileName ||
+        (file.photo ? !["image/jpeg", "image/png", "image/webp"].includes(saved.contentType) :
+          !["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(saved.contentType));
+    })) {
+      return { error: "One or more uploaded files are invalid. Upload them again and retry." };
+    }
+  }
+
+  const requestHeaders = await headers();
+  const clientAddress = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || requestHeaders.get("x-real-ip")?.trim()
+    || "";
+  const allowed = await consumePublicAdmissionRateLimit({
+    schoolId: school.id,
+    operation: "submission",
+    clientAddress,
+    maxRequests: 5,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!allowed) return { error: "Too many registration attempts. Please wait before submitting again." };
+
+  const admissionDate = admission.admissionDate ?? new Date().toISOString().slice(0, 10);
+  if (!isCalendarDate(admissionDate)) return { error: "Enter a valid admission date." };
+  const publicId = randomUUID();
+  const enrollmentPublicId = randomUUID();
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      await tx.insert(studentSettings).values({
+        schoolId: school.id,
+        fields: defaultStudentFieldSettings,
+      }).onDuplicateKeyUpdate({ set: { schoolId: school.id } });
+      const [identifierSettings] = await tx.select().from(studentSettings)
+        .where(eq(studentSettings.schoolId, school.id)).for("update").limit(1);
+      if (!identifierSettings) throw new Error("Student identifier settings could not be initialized.");
+
+      const [branch] = await tx.select({ id: schoolBranches.id }).from(schoolBranches).where(and(
+        eq(schoolBranches.id, admission.branchId),
+        eq(schoolBranches.schoolId, school.id),
+        eq(schoolBranches.status, "active"),
+      )).limit(1);
+      if (!branch) return "branch-not-found";
+
+      const [year] = await tx.select({ id: academicYears.id }).from(academicYears).where(and(
+        eq(academicYears.id, admission.academicYearId),
+        eq(academicYears.schoolId, school.id),
+        eq(academicYears.status, "active"),
+      )).limit(1);
+      if (!year) return "year-not-found";
+
+      const [classLevel] = await tx.select({ id: classLevels.id }).from(classLevels).where(and(
+        eq(classLevels.id, admission.classLevelId),
+        eq(classLevels.schoolId, school.id),
+        eq(classLevels.branchId, admission.branchId),
+      )).limit(1);
+      if (!classLevel) return "class-not-found";
+
+      const [section] = await tx.select({ id: classSections.id }).from(classSections).where(and(
+        eq(classSections.id, admission.classSectionId),
+        eq(classSections.schoolId, school.id),
+        eq(classSections.academicYearId, admission.academicYearId),
+        eq(classSections.classLevelId, admission.classLevelId),
+      )).limit(1);
+      if (!section) return "section-not-found";
+
+      if (admission.categoryId !== null) {
+        const [category] = await tx.select({ id: studentCategories.id }).from(studentCategories).where(and(
+          eq(studentCategories.id, admission.categoryId),
+          eq(studentCategories.schoolId, school.id),
+          eq(studentCategories.branchId, admission.branchId),
+        )).limit(1);
+        if (!category) return "category-not-found";
+      }
+
+      const generatedAdmission = await generateIdentifier(
+        tx,
+        school.id,
+        identifierSettings.admissionFormat,
+        identifierSettings.nextAdmissionSequence,
+        "admission",
+        admissionDate,
+      );
+      const generatedRoll = await generateIdentifier(
+        tx,
+        school.id,
+        identifierSettings.rollFormat,
+        identifierSettings.nextRollSequence,
+        "roll",
+        admissionDate,
+      );
+      const [createdStudent] = await tx.insert(students).values({
+        publicId,
+        ...studentInsertValues(
+          school.id,
+          admission.branchId,
+          generatedAdmission.value,
+          admissionDate,
+          admission,
+        ),
+        status: "pending",
+      }).$returningId();
+      await tx.insert(studentEnrollments).values({
+        publicId: enrollmentPublicId,
+        schoolId: school.id,
+        studentId: createdStudent.id,
+        academicYearId: admission.academicYearId,
+        classSectionId: admission.classSectionId,
+        rollNumber: generatedRoll.value,
+        status: "pending",
+        enrolledAt: admissionDate,
+      });
+      await tx.update(studentSettings).set({
+        nextAdmissionSequence: generatedAdmission.nextSequence,
+        nextRollSequence: generatedRoll.nextSequence,
+      }).where(eq(studentSettings.id, identifierSettings.id));
+      return "created";
+    });
+
+    if (outcome === "branch-not-found") return { error: "Choose an active branch in this school." };
+    if (outcome === "year-not-found") return { error: "Choose an active academic year in this school." };
+    if (outcome === "class-not-found") return { error: "Choose a class belonging to the selected branch." };
+    if (outcome === "section-not-found") return { error: "Choose a section belonging to the selected class and academic year." };
+    if (outcome === "category-not-found") return { error: "Choose a category belonging to the selected branch." };
+  } catch (error) {
+    if (isDuplicateEntryError(error)) {
+      return { error: "We could not assign a unique admission number. Please submit again." };
+    }
+    throw error;
+  }
+
+  revalidatePath("/admin/admissions");
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
 export async function updateStudent(
   _previousState: StudentActionState,
   formData: FormData,
@@ -710,5 +918,6 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
   }
 
   revalidateStudentPages();
+  revalidatePath("/admin/admissions");
   revalidatePath("/admin/dashboard");
 }

@@ -162,6 +162,7 @@ function ProgressCard({
   currency,
   feeBalanceMinor,
   showFeeBalance,
+  reportDate,
   last,
 }: {
   row: {
@@ -192,77 +193,173 @@ function ProgressCard({
   currency: string;
   feeBalanceMinor: number;
   showFeeBalance: boolean;
+  reportDate: string;
   last: boolean;
 }) {
   const overallGrade = row.overall ? gradeForPercentage(row.overall.percentage, bands) : null;
-  const summary = `${exam.name} · ${exam.termName ?? exam.yearName}`;
+  const strongestSubjects = exam.assessments
+    .flatMap((assessment) => {
+      const mark = row.marks.get(assessment.id);
+      if (typeof mark !== "number") return [];
+      const percentage = mark / Number(assessment.maxMarks) * 100;
+      return [{
+        assessment,
+        percentage,
+        grade: gradeForPercentage(percentage, bands)?.grade ?? "—",
+      }];
+    })
+    .sort((a, b) => b.percentage - a.percentage || a.assessment.name.localeCompare(b.assessment.name))
+    .slice(0, 4);
+  const studentReference = row.admissionNumber || `Enrollment ${row.enrollmentId}`;
+  const schoolLogo = schoolLogoSource(schoolLogoUrl);
+  const completedSubjectCount = exam.assessments.filter((assessment) => typeof row.marks.get(assessment.id) === "number").length;
   return (
-    <article className={`a4-report-card${last ? " a4-report-card-last" : ""} space-y-3 rounded-xl border border-slate-200 bg-white p-5 text-slate-900`}>
-      <div className="flex items-center gap-3">
-        <ReportHeading
-          schoolName={schoolName}
-          schoolLogoUrl={schoolLogoUrl}
-          schoolAddress={schoolAddress}
-          schoolPhone={schoolPhone}
-          schoolEmail={schoolEmail}
-          title="Student Progress Card"
-          subtitle={summary}
-        />
-        {row.photoUrl && (
-          <Image
-            src={row.photoUrl}
-            unoptimized
-            width={56}
-            height={56}
-            alt={`${row.name} photo`}
-            className="h-14 w-14 rounded-lg object-cover"
-          />
-        )}
-      </div>
-      <section className="exam-report-student-details grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs sm:grid-cols-3">
-        <p><b>Student</b><br />{row.name}</p>
-        <p><b>Admission no.</b><br />{row.admissionNumber ?? "—"}</p>
-        <p><b>Class / section</b><br />{row.className} · {row.sectionName}</p>
-        <p><b>Roll no.</b><br />{row.rollNumber ?? "—"}</p>
-        <p><b>Academic year</b><br />{exam.yearName}</p>
-        {exam.allowRanking && <p><b>Position</b><br />{position ?? "—"}</p>}
-      </section>
-      <table className="print-report-table w-full border-collapse text-left text-xs">
-        <thead><tr><th>Subject</th><th>{showPercentages ? "Score (%)" : "Marks"}</th><th>Grade</th></tr></thead>
-        <tbody>{exam.assessments.map((assessment) => {
-          const mark = row.marks.get(assessment.id);
-          const percentage = typeof mark === "number" ? mark / Number(assessment.maxMarks) * 100 : null;
-          const band = percentage === null ? null : gradeForPercentage(percentage, bands);
-          return (
-            <tr key={assessment.id}>
-              <td>{assessment.name}</td>
-              <td>{showPercentages ? percentage === null ? "—" : `${percentage.toFixed(2)}%` : `${formatMarks(mark)} / ${assessment.maxMarks}`}</td>
-              <td>{band?.grade ?? "—"}</td>
-            </tr>
-          );
-        })}</tbody>
-      </table>
-      <section className="grid grid-cols-2 gap-3 text-xs">
-        <div className="rounded-lg border border-slate-200 p-3">
-          <h3 className="font-bold">Overall performance</h3>
-          <p className="mt-1 text-lg font-bold">{row.overall ? `${row.overall.percentage.toFixed(2)}%` : "Incomplete"}</p>
-          <p>{row.overall ? `${row.overall.totalMarks.toFixed(2)} / ${row.overall.maxMarks.toFixed(2)} · Grade ${overallGrade?.grade ?? "—"}` : "All published subject marks are required."}</p>
-        </div>
-        {showFeeBalance && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <h3 className="font-bold">Outstanding fee balance</h3>
-            <p className="mt-1 text-lg font-bold">{currency} {(feeBalanceMinor / 100).toFixed(2)}</p>
-            <p>Includes overdue fines and payments net of reversals.</p>
+    <article className={`academic-progress-card a4-report-card${last ? " a4-report-card-last" : ""}`}>
+      <header className="academic-progress-header">
+        <div className="academic-progress-brand">
+          {schoolLogo && <Image src={schoolLogo} unoptimized width={76} height={76} alt={`${schoolName} logo`} className="academic-progress-logo" />}
+          <div className="academic-progress-school">
+            <p>{schoolName}</p>
+            <span>{[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join(" · ")}</span>
           </div>
-        )}
+        </div>
+        <div className="academic-progress-title">
+          <h2>Progress Report</h2>
+          <p>{exam.name} · {exam.termName ?? exam.yearName}</p>
+          <span>Academic performance report</span>
+        </div>
+        {row.photoUrl ? (
+          <Image src={row.photoUrl} unoptimized width={76} height={88} alt={`${row.name} photo`} className="academic-progress-photo" />
+        ) : <div className="academic-progress-photo-placeholder">Student<br />photo</div>}
+      </header>
+
+      <section className="academic-progress-overview">
+        <div className="academic-progress-student">
+          <h3>Student information</h3>
+          <ReportField label="Student name" value={row.name} />
+          <ReportField label="Student reference" value={studentReference} />
+          <ReportField label="Class / section" value={`${row.className} · ${row.sectionName}`} />
+          <ReportField label="Roll number" value={row.rollNumber ?? "—"} />
+          <ReportField label="Academic year" value={exam.yearName} />
+          <ReportField label="Examination" value={exam.name} />
+          <ReportField label="Subjects completed" value={`${completedSubjectCount} of ${exam.assessments.length}`} />
+          <ReportField label="Report date" value={reportDate} />
+        </div>
+
+        <div className="academic-progress-performance">
+          <div className="academic-progress-section-title">
+            <h3>Overall performance profile</h3>
+            {exam.allowRanking && <span>Class position · {position ?? "—"}</span>}
+          </div>
+          <div className="academic-progress-overall">
+            <div className="academic-progress-overall-score">
+              <span>Overall score</span>
+              <strong>{row.overall ? `${row.overall.percentage.toFixed(1)}%` : "Incomplete"}</strong>
+              <span>{row.overall ? `${row.overall.totalMarks.toFixed(1)} / ${row.overall.maxMarks.toFixed(1)} marks` : "Published marks are incomplete"}</span>
+            </div>
+            <div className="academic-progress-grade">
+              <span>Grade</span>
+              <strong>{overallGrade?.grade ?? "—"}</strong>
+            </div>
+          </div>
+          {row.overall && (
+            <div className="academic-progress-meter" role="progressbar" aria-label="Overall exam score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, row.overall.percentage))}>
+              <span style={{ width: `${Math.max(0, Math.min(100, row.overall.percentage))}%` }} />
+            </div>
+          )}
+          <div className="academic-progress-strengths">
+            <h4>Subject performance profile</h4>
+            {strongestSubjects.map(({ assessment, percentage, grade }) => (
+              <div className="academic-progress-subject-score" key={assessment.id}>
+                <span className="academic-progress-subject-name">{assessment.name}</span>
+                <span className="academic-progress-subject-track" aria-hidden="true">
+                  <span style={{ width: `${Math.max(0, Math.min(100, percentage))}%` }} />
+                </span>
+                <strong>{percentage.toFixed(0)}%</strong>
+                <span className="academic-progress-subject-grade">{grade}</span>
+              </div>
+            ))}
+            {!strongestSubjects.length && <p className="academic-progress-empty">No published subject scores.</p>}
+          </div>
+        </div>
       </section>
-      <section className="rounded-lg border border-slate-200 p-3 text-xs">
-        <h3 className="font-bold">Comments</h3>
-        <p className="mt-1"><b>Class teacher:</b> {classRemark || overallGrade?.performanceRemark || "—"}</p>
-        <p className="mt-1"><b>Headteacher:</b> {principalRemark || "—"}</p>
+
+      {bands.length > 0 && (
+        <section className="academic-progress-grade-guide">
+          <h3>Grade guide</h3>
+          <div>
+            {bands.map((band) => (
+              <article key={`${band.grade}-${band.minPercent}`}>
+                <strong>{band.grade}</strong>
+                <span>{band.minPercent}–{band.maxPercent}%</span>
+                <small>{band.description}</small>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="academic-progress-assessment">
+        <h3>Detailed assessment</h3>
+        <div className="academic-progress-table-wrap">
+          <table className="print-report-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>{showPercentages ? "Score (%)" : "Marks"}</th>
+                {!showPercentages && <th>Score (%)</th>}
+                <th>Grade</th>
+              </tr>
+            </thead>
+            <tbody>{exam.assessments.map((assessment) => {
+              const mark = row.marks.get(assessment.id);
+              const percentage = typeof mark === "number" ? mark / Number(assessment.maxMarks) * 100 : null;
+              const band = percentage === null ? null : gradeForPercentage(percentage, bands);
+              return (
+                <tr key={assessment.id}>
+                  <td>{assessment.name}</td>
+                  <td>{showPercentages ? percentage === null ? "—" : `${percentage.toFixed(2)}%` : `${formatMarks(mark)} / ${assessment.maxMarks}`}</td>
+                  {!showPercentages && <td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td>}
+                  <td>{band?.grade ?? "—"}{band?.description ? <span className="academic-progress-grade-description">{band.description}</span> : null}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className={`academic-progress-comments${showFeeBalance ? " academic-progress-comments-with-fees" : ""}`}>
+        <article>
+          <h3>Teacher&apos;s feedback</h3>
+          <p>{classRemark || overallGrade?.performanceRemark || "No teacher comment recorded."}</p>
+        </article>
+        <article>
+          <h3>Performance description</h3>
+          <p>{overallGrade?.description || "Review the subject results above for this examination."}</p>
+        </article>
+        {showFeeBalance && (
+          <article>
+            <h3>Outstanding fee balance</h3>
+            <strong>{currency} {(feeBalanceMinor / 100).toFixed(2)}</strong>
+            <p>Includes overdue fines and payments net of reversals.</p>
+          </article>
+        )}
+        <article>
+          <h3>Headteacher&apos;s remarks</h3>
+          <p>{principalRemark || "No headteacher comment recorded."}</p>
+        </article>
       </section>
       <ReportSignatureStrip signatures={signatures} />
     </article>
+  );
+}
+
+function ReportField({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="academic-progress-field">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </p>
   );
 }
 
@@ -920,6 +1017,7 @@ export default async function ExaminationReportPage({
                       currency={examDetails.schoolCurrency}
                       feeBalanceMinor={feeBalanceByStudent.get(activeResult.studentId) ?? 0}
                       showFeeBalance={showFeeBalance}
+                      reportDate={todayInTimezone(examDetails.schoolTimezone)}
                       last
                     />
                   ) : (
@@ -942,6 +1040,7 @@ export default async function ExaminationReportPage({
                         currency={examDetails.schoolCurrency}
                         feeBalanceMinor={feeBalanceByStudent.get(row.studentId) ?? 0}
                         showFeeBalance={showFeeBalance}
+                        reportDate={todayInTimezone(examDetails.schoolTimezone)}
                         last={index === completeRows.length - 1}
                       />
                     ))
