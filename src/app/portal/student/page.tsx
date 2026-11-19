@@ -57,7 +57,6 @@ import {
 } from "@/lib/fees-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { FamilyPortalShell } from "../family-portal-shell";
-import { StudentPasswordForm } from "./student-password-form";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +83,6 @@ export default async function StudentPortalPage({
     "fees",
     "receipts",
     "profile",
-    "security",
     "library",
     "attendance",
   ].includes(requestedSection) ? requestedSection : "overview";
@@ -729,14 +727,12 @@ export default async function StudentPortalPage({
         <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-7">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">Student portal</p>
           <h1 className="mt-2 text-2xl font-bold capitalize text-slate-950 sm:text-3xl">
-            {activeSection === "overview" ? `Welcome, ${context.user.name}` : activeSection === "fees" ? "Invoices and fees" : activeSection === "receipts" ? "Payment receipts" : activeSection === "timetable" ? "Class timetable" : activeSection === "results" ? "Exam results" : activeSection === "profile" ? "My profile" : activeSection === "security" ? "Account security" : activeSection === "library" ? "Library" : activeSection === "attendance" ? "Attendance" : "My learning"}
+            {activeSection === "overview" ? `Welcome, ${context.user.name}` : activeSection === "fees" ? "Invoices and fees" : activeSection === "receipts" ? "Payment receipts" : activeSection === "timetable" ? "Class timetable" : activeSection === "results" ? "Exam results" : activeSection === "profile" ? "My profile" : activeSection === "library" ? "Library" : activeSection === "attendance" ? "Attendance" : "My learning"}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             {activeSection === "overview"
               ? "A clear overview of your learning, results, attendance, and school services."
-              : activeSection === "security"
-                ? "Update your password to keep your student account secure."
-                : activeSection === "profile"
+              : activeSection === "profile"
                 ? "Your student profile is read-only. Contact the school office to request a correction."
                 : "View your official school records and information."}
           </p>
@@ -1336,11 +1332,6 @@ export default async function StudentPortalPage({
                   </article>
                 ))}
               </div>
-            </section>
-
-            <section id="security" className={`space-y-4 ${activeSection !== "security" ? "hidden" : ""}`}>
-              <SectionHeading title="Account security" description="Change the password you use to sign in to the student portal." />
-              <StudentPasswordForm />
             </section>
 
             <section id="library" className={`space-y-4 ${activeSection !== "library" ? "hidden" : ""}`}>

@@ -5,17 +5,17 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { requireSchoolMember } from "@/lib/access-control";
 
-export type StudentPasswordState = { error?: string; success?: boolean; message?: string };
+export type AccountPasswordState = { error?: string; success?: boolean; message?: string };
 
 function readPassword(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
 }
 
-export async function changeStudentPassword(
-  _previousState: StudentPasswordState,
+export async function changeAccountPassword(
+  _previousState: AccountPasswordState,
   formData: FormData,
-): Promise<StudentPasswordState> {
+): Promise<AccountPasswordState> {
   await requireSchoolMember();
   const currentPassword = readPassword(formData, "currentPassword");
   const newPassword = readPassword(formData, "newPassword");
@@ -37,6 +37,6 @@ export async function changeStudentPassword(
     return { error: "The current password is incorrect, or this account cannot change its password. Check it and try again." };
   }
 
-  revalidatePath("/portal/student");
+  revalidatePath("/account/security");
   return { success: true, message: "Your password has been changed." };
 }

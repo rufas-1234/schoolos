@@ -7,6 +7,7 @@ import {
   rolePermissions,
   roles,
   students,
+  staffMembers,
   userRoles,
   userStudentLinks,
 } from "@/db/schema";
@@ -39,7 +40,7 @@ export async function getSignedInWorkspacePath(): Promise<string> {
       eq(userStudentLinks.userId, context.user.id),
       eq(userStudentLinks.accessType, "parent"),
     ));
-  const [studentRecord, parentRecord] = await Promise.all([
+  const [studentRecord, parentRecord, staffRecord] = await Promise.all([
     db.select({ id: students.id }).from(students)
       .where(and(
         eq(students.schoolId, context.schoolId),
@@ -64,9 +65,17 @@ export async function getSignedInWorkspacePath(): Promise<string> {
           : eq(students.guardianEmail, context.user.email),
       ))
       .limit(1),
+    db.select({ id: staffMembers.id }).from(staffMembers)
+      .where(and(
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.linkedUserId, context.user.id),
+        eq(staffMembers.status, "active"),
+      ))
+      .limit(1),
   ]);
   return getWorkspaceHomePath(permissionKeys, {
     student: studentRecord.length > 0,
     parent: parentRecord.length > 0,
+    staff: staffRecord.length > 0,
   });
 }

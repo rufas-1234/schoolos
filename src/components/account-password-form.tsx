@@ -1,17 +1,17 @@
 "use client";
 
 import { useActionState } from "react";
-import { changeStudentPassword, type StudentPasswordState } from "./security-actions";
+import { changeAccountPassword, type AccountPasswordState } from "@/app/account/actions";
 
-const initialState: StudentPasswordState = {};
+const initialState: AccountPasswordState = {};
 
-export function StudentPasswordForm() {
-  const [state, formAction, pending] = useActionState(changeStudentPassword, initialState);
+export function AccountPasswordForm() {
+  const [state, formAction, pending] = useActionState(changeAccountPassword, initialState);
 
   return (
     <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div>
-        <h3 className="font-semibold text-slate-950">Change your password</h3>
+        <h2 className="font-semibold text-slate-950">Change your password</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
           Enter your current password, then choose a private password of at least 12 characters.
         </p>

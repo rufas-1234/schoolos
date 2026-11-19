@@ -14,6 +14,7 @@ import {
   ChevronDown,
   GraduationCap,
   LayoutDashboard,
+  KeyRound,
   LogOut,
   Menu,
   PackageOpen,
@@ -781,6 +782,14 @@ export function AdminShell({
                       School profile
                     </Link>
                   )}
+                  <Link
+                    href="/account/security"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                  >
+                    <KeyRound size={16} />
+                    Account security
+                  </Link>
                   <button
                     onClick={signOut}
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"

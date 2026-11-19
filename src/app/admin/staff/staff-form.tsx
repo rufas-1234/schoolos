@@ -168,7 +168,7 @@ export function StaffForm({
 
       <section role="tabpanel" aria-label={activeTab} className="grid gap-4 sm:grid-cols-2">
         <div hidden={activeTab !== "Basic Information"} className="contents">
-            <input type="hidden" name="loginAccessEnabled" value={loginAccessEnabled ? "true" : "false"} />
+            <input type="hidden" name="loginAccessEnabled" value={record && loginAccessEnabled ? "true" : "false"} />
             <Field label="Staff number"><input name="employeeCode" defaultValue={record?.employeeCode ?? ""} maxLength={40} className={inputClass} /></Field>
             <Field label="Staff role">
               <select name="personnelRole" defaultValue={record?.personnelRole ?? ""} className={inputClass}>
@@ -205,6 +205,14 @@ export function StaffForm({
             <Field label="Email" required={loginAccessEnabled} forceVisible={loginAccessEnabled}>
               <input name="email" type="email" maxLength={320} defaultValue={record?.email ?? ""} className={inputClass} />
             </Field>
+            {!record ? (
+              <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-900">A staff login is created automatically</p>
+                <p className="mt-1 leading-6">
+                  The staff number is the username. If it is blank, a staff number is generated. The initial password is staff@ followed by that number; staff can change it under Account security.
+                </p>
+              </div>
+            ) : (
             <div className="sm:col-span-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <label className="flex items-start gap-3 text-sm font-medium text-slate-800">
                 <input
@@ -222,7 +230,7 @@ export function StaffForm({
                 <span>
                   Enable login access for this staff member
                   <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">
-                    They sign in with the staff email above. New accounts need a password; matching existing accounts are reused.
+                    Login access can be disabled or re-enabled here. Staff sign in with their staff number or linked email.
                   </span>
                 </span>
               </label>
@@ -255,6 +263,7 @@ export function StaffForm({
                 </div>
               )}
             </div>
+            )}
             <Field label="Gender">
               <select name="gender" defaultValue={record?.gender ?? ""} className={inputClass}>
                 <option value="">Select gender</option>
@@ -375,7 +384,7 @@ export function StaffForm({
       <div className="admin-dialog-form-actions flex items-center justify-between border-t border-slate-100 pt-4">
         {state.success && (
           <p role="status" className="text-sm font-medium text-emerald-700">
-            Staff profile saved.{loginAccessEnabled ? " Assign the school role under User Roles before the staff member signs in." : ""}
+            {state.message ?? `Staff profile saved.${loginAccessEnabled ? " Assign the school role under User Roles before the staff member signs in." : ""}`}
           </p>
         )}
         {!state.success && <span />}

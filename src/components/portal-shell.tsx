@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { GraduationCap, LogOut, Menu, X, type LucideIcon } from "lucide-react";
+import { GraduationCap, KeyRound, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 import { schoolLogoSource } from "@/lib/school-logo";
@@ -61,7 +61,8 @@ export function PortalShell({
   }
 
   function renderNavigation(mobile = false) {
-    return navigation.map(({ href, label, icon: Icon }) => {
+    return <>
+      {navigation.map(({ href, label, icon: Icon }) => {
       const target = navHref(href);
       const [targetPath, targetQuery] = href.split("?");
       const targetSection = new URLSearchParams(targetQuery ?? "").get("section");
@@ -89,7 +90,25 @@ export function PortalShell({
           {label}
         </Link>
       );
-    });
+      })}
+      <Link
+        href="/account/security"
+        onClick={() => {
+          setActiveAnchor("");
+          if (mobile) setMobileMenuOpen(false);
+        }}
+        aria-current={pathname === "/account/security" ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+          pathname === "/account/security"
+            ? "bg-white text-violet-800 shadow-sm"
+            : "text-slate-700 hover:bg-white/80 hover:text-slate-950",
+        )}
+      >
+        <KeyRound size={18} aria-hidden="true" />
+        Account security
+      </Link>
+    </>;
   }
 
   return (

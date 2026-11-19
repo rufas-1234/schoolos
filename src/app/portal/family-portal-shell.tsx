@@ -7,7 +7,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   ReceiptText,
-  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import { PortalShell } from "@/components/portal-shell";
@@ -20,7 +19,6 @@ const studentNavigation = [
   { href: "/portal/student?section=fees", label: "Invoices and fees", icon: CreditCard },
   { href: "/portal/student?section=receipts", label: "Payment receipts", icon: ReceiptText },
   { href: "/portal/student?section=profile", label: "My profile", icon: UsersRound },
-  { href: "/portal/student?section=security", label: "Account security", icon: ShieldCheck },
   { href: "/portal/student?section=library", label: "Library", icon: BookOpenCheck },
   { href: "/portal/student?section=attendance", label: "Attendance", icon: CalendarDays },
 ];

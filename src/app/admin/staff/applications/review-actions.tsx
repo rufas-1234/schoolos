@@ -33,7 +33,11 @@ function ReviewDecisionForm({
         </button>
       </form>
       {state.error && <p role="alert" className="max-w-56 text-xs text-red-700">{state.error}</p>}
-      {state.success && <p role="status" className="text-xs text-slate-600">Application {decision === "approve" ? "approved" : "rejected"}.</p>}
+      {state.success && (
+        <p role="status" className="max-w-72 break-words text-xs text-slate-600">
+          {state.message ?? `Application ${decision === "approve" ? "approved" : "rejected"}.`}
+        </p>
+      )}
     </div>
   );
 }
