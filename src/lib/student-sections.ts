@@ -25,6 +25,11 @@ export const studentSections = [
     matchQuery: { key: "action", value: null },
   },
   {
+    id: "ids",
+    label: "Student ID Cards",
+    href: "/admin/students/ids",
+  },
+  {
     id: "multi-class",
     label: "Multi Class Student",
     href: "/admin/students/multi-class",

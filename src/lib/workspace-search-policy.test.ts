@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFuzzySearchNgrams, rankWorkspaceSearchResults } from "./workspace-search-policy";
+import { getFuzzySearchNgrams, rankWorkspaceSearchResults, studentIdWorkspaceResult } from "./workspace-search-policy";
 
 const results = [
   { id: "attendance", title: "Student Attendance Report", description: "Daily attendance by class and date", href: "/attendance", category: "Pages" },
@@ -26,5 +26,15 @@ describe("workspace search policy", () => {
 
   it("does not return unrelated results for a weak match", () => {
     expect(rankWorkspaceSearchResults("zzzzqx", results)).toEqual([]);
+  });
+
+  it("links a matched student search result to that student's ID filter", () => {
+    expect(studentIdWorkspaceResult({ publicId: "student-public-id", firstName: "Radhika", lastName: "Shriwastav", admissionNumber: "S-104" }))
+      .toMatchObject({
+        id: "student-id-student-public-id",
+        href: "/admin/students/ids?search=S-104",
+        category: "Students",
+        searchTerms: expect.arrayContaining(["Radhika Shriwastav", "S-104", "ID card"]),
+      });
   });
 });

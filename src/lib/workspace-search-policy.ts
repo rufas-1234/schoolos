@@ -7,6 +7,23 @@ export type RankedWorkspaceSearchResult = {
   searchTerms?: string[];
 };
 
+export function studentIdWorkspaceResult(student: {
+  publicId: string;
+  firstName: string;
+  lastName: string;
+  admissionNumber: string | null;
+}): Omit<RankedWorkspaceSearchResult, "category"> & { category: "Students" } {
+  const studentName = `${student.firstName} ${student.lastName}`;
+  return {
+    id: `student-id-${student.publicId}`,
+    title: `Print student ID: ${studentName}`,
+    description: `Student ID card: ${student.admissionNumber ?? "Student record"}`,
+    href: `/admin/students/ids?search=${encodeURIComponent(student.admissionNumber || studentName)}`,
+    category: "Students",
+    searchTerms: [studentName, student.admissionNumber ?? "", "ID card", "student ID", "print ID"],
+  };
+}
+
 function normalize(value: string): string {
   return value.toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ");
 }

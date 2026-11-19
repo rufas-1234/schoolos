@@ -42,7 +42,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { academicSections } from "@/lib/academic-sections";
 import { studentSections } from "@/lib/student-sections";
-import { getFuzzySearchNgrams, rankWorkspaceSearchResults } from "@/lib/workspace-search-policy";
+import { getFuzzySearchNgrams, rankWorkspaceSearchResults, studentIdWorkspaceResult } from "@/lib/workspace-search-policy";
 
 const querySchema = z.string().trim().min(2).max(120);
 const workspacePermissions = [
@@ -1015,6 +1015,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       href: `/admin/students?profile=${encodeURIComponent(student.publicId)}`,
       category: "Students",
     });
+  }
+  for (const student of studentRows) {
+    results.push(studentIdWorkspaceResult(student));
   }
   for (const record of behaviorRows) {
     const studentName = `${record.firstName} ${record.lastName}`;
