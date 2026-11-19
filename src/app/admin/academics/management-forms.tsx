@@ -976,6 +976,7 @@ export function EnrollmentOperationForm({
   const [branchId, setBranchId] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [rosterSearch, setRosterSearch] = useState("");
+  const [showStudentList, setShowStudentList] = useState(false);
   const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState(
     () => new Set(enrollments.map((enrollment) => String(enrollment.id))),
   );
@@ -989,8 +990,8 @@ export function EnrollmentOperationForm({
       ? enrollments.filter((enrollment) => enrollment.label.toLocaleLowerCase().includes(query))
       : enrollments;
   }, [enrollments, rosterSearch]);
-  const allVisibleSelected = filteredEnrollments.length > 0 &&
-    filteredEnrollments.every((enrollment) => selectedEnrollmentIds.has(String(enrollment.id)));
+  const allStudentsSelected = enrollments.length > 0 &&
+    enrollments.every((enrollment) => selectedEnrollmentIds.has(String(enrollment.id)));
   const availableSections = sections.filter(
     (section) =>
       String(section.academicYearId) === yearId &&
@@ -1004,59 +1005,71 @@ export function EnrollmentOperationForm({
       {allowBulkSelection ? (
         <fieldset className="space-y-3 rounded-xl border border-slate-200 p-4">
           <legend className="px-1 text-sm font-medium text-slate-700">Select students to process <RequiredMark /></legend>
+          {Array.from(selectedEnrollmentIds, (enrollmentId) => (
+            <input key={enrollmentId} type="hidden" name="enrollmentIds" value={enrollmentId} />
+          ))}
           <p className="text-xs text-slate-500">
             Everyone starts selected. Uncheck students who should not be promoted, such as students who have failed and need to repeat.
           </p>
-          <input
-            type="search"
-            value={rosterSearch}
-            onChange={(event) => setRosterSearch(event.target.value)}
-            placeholder="Search students..."
-            aria-label="Search current student enrollments"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
-          />
           <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <input
               type="checkbox"
-              checked={allVisibleSelected}
+              checked={allStudentsSelected}
               onChange={(event) => setSelectedEnrollmentIds((current) => {
-                const next = new Set(current);
-                for (const enrollment of filteredEnrollments) {
-                  if (event.target.checked) next.add(String(enrollment.id));
-                  else next.delete(String(enrollment.id));
-                }
-                return next;
+                return event.target.checked
+                  ? new Set(enrollments.map((enrollment) => String(enrollment.id)))
+                  : new Set<string>();
               })}
               className="size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
             />
-            Select all {filteredEnrollments.length} shown
+            Select all {enrollments.length} students
           </label>
-          <div className="max-h-64 space-y-1 overflow-y-auto border-y border-slate-100 py-2">
-            {filteredEnrollments.map((enrollment) => (
-              <label key={enrollment.id} className="flex items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <input
-                  type="checkbox"
-                  name="enrollmentIds"
-                  value={enrollment.id}
-                  checked={selectedEnrollmentIds.has(String(enrollment.id))}
-                  onChange={(event) => setSelectedEnrollmentIds((current) => {
-                    const next = new Set(current);
-                    if (event.target.checked) next.add(String(enrollment.id));
-                    else next.delete(String(enrollment.id));
-                    return next;
-                  })}
-                  className="mt-0.5 size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
-                />
-                <span>{enrollment.label}</span>
-              </label>
-            ))}
-            {filteredEnrollments.length === 0 && (
-              <p className="px-2 py-3 text-sm text-slate-500">No students match this search.</p>
-            )}
-          </div>
           <p aria-live="polite" className="text-xs font-medium text-slate-600">
             {selectedEnrollmentIds.size} of {enrollments.length} students selected
           </p>
+          <button
+            type="button"
+            aria-expanded={showStudentList}
+            aria-controls="enrollment-student-list"
+            onClick={() => setShowStudentList((shown) => !shown)}
+            className="text-sm font-medium text-violet-700 underline decoration-violet-300 underline-offset-4 hover:text-violet-900"
+          >
+            {showStudentList ? "Hide student list" : "Review or exclude students"}
+          </button>
+          {showStudentList && (
+            <div id="enrollment-student-list" className="space-y-3">
+              <input
+                type="search"
+                value={rosterSearch}
+                onChange={(event) => setRosterSearch(event.target.value)}
+                placeholder="Search students..."
+                aria-label="Search current student enrollments"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
+              />
+              <div className="max-h-64 space-y-1 overflow-y-auto border-y border-slate-100 py-2">
+                {filteredEnrollments.map((enrollment) => (
+                  <label key={enrollment.id} className="flex items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      value={enrollment.id}
+                      checked={selectedEnrollmentIds.has(String(enrollment.id))}
+                      onChange={(event) => setSelectedEnrollmentIds((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(String(enrollment.id));
+                        else next.delete(String(enrollment.id));
+                        return next;
+                      })}
+                      className="mt-0.5 size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
+                    />
+                    <span>{enrollment.label}</span>
+                  </label>
+                ))}
+                {filteredEnrollments.length === 0 && (
+                  <p className="px-2 py-3 text-sm text-slate-500">No students match this search.</p>
+                )}
+              </div>
+            </div>
+          )}
         </fieldset>
       ) : (
         <SelectField label="Current enrollment" name="enrollmentId" options={enrollments} />
