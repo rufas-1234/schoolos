@@ -399,6 +399,8 @@ export function AdminShell({
           ? activeLibrarySection?.label ?? "Library"
         : pathname.startsWith("/admin/dormitories")
           ? activeDormitorySection?.label ?? "Dormitories"
+        : pathname === "/admin/account-security"
+          ? "Account security"
         : pathname === "/admin/exam-analytics"
           ? "Exam Analytics"
       : visibleNavigation.find(
@@ -783,7 +785,7 @@ export function AdminShell({
                     </Link>
                   )}
                   <Link
-                    href="/account/security"
+                    href="/admin/account-security"
                     onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
                   >

@@ -91,7 +91,7 @@ export function PortalShell({
         </Link>
       );
       })}
-      <Link
+      {!navigation.some((item) => item.href === "/account/security") && <Link
         href="/account/security"
         onClick={() => {
           setActiveAnchor("");
@@ -107,7 +107,7 @@ export function PortalShell({
       >
         <KeyRound size={18} aria-hidden="true" />
         Account security
-      </Link>
+      </Link>}
     </>;
   }
 

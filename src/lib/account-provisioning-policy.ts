@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizeAdmissionIdentifier } from "./login-identifier-policy";
+import { getPasswordStrengthError, minimumPasswordLength } from "./password-policy";
 
 export const schoolAccountInputSchema = z.object({
   personType: z.enum(["staff", "student", "parent"]),
@@ -8,7 +9,10 @@ export const schoolAccountInputSchema = z.object({
     (value) => value === "" ? undefined : value,
     z.enum(["email", "phone"]).optional(),
   ),
-  password: z.string().min(12).max(128),
+  password: z.string().min(minimumPasswordLength).max(128).refine(
+    (password) => getPasswordStrengthError(password) === null,
+    "Choose a strong password with uppercase, lowercase, a number, and a symbol.",
+  ),
   passwordConfirmation: z.string().max(128),
   roleIds: z.array(z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()))
     .min(1)

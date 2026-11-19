@@ -38,7 +38,7 @@ describe("staff directory policies", () => {
   it("allows blank password fields for existing accounts and validates supplied passwords", () => {
     expect(getStaffLoginPasswordError("", "")).toBeNull();
     expect(getStaffLoginPasswordError("short", "short")).toContain("at least");
-    const password = "strong-staff-password";
+    const password = "StrongStaff9!";
     expect(password.length).toBeGreaterThanOrEqual(staffLoginPasswordMinLength);
     expect(getStaffLoginPasswordError(password, "different-password")).toBe("The passwords do not match.");
     expect(getStaffLoginPasswordError(password, password)).toBeNull();

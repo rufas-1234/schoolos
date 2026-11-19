@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { requireSchoolMember } from "@/lib/access-control";
+import { getPasswordStrengthError } from "@/lib/password-policy";
 
 export type AccountPasswordState = { error?: string; success?: boolean; message?: string };
 
@@ -22,9 +23,8 @@ export async function changeAccountPassword(
   const passwordConfirmation = readPassword(formData, "passwordConfirmation");
 
   if (!currentPassword || !newPassword) return { error: "Enter your current password and a new password." };
-  if (newPassword.length < 12 || newPassword.length > 128) {
-    return { error: "Your new password must be between 12 and 128 characters." };
-  }
+  const passwordStrengthError = getPasswordStrengthError(newPassword);
+  if (passwordStrengthError) return { error: passwordStrengthError };
   if (newPassword !== passwordConfirmation) return { error: "The new passwords do not match." };
   if (newPassword === currentPassword) return { error: "Choose a password different from your current password." };
 

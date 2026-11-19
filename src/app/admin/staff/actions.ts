@@ -410,7 +410,7 @@ async function applyStaffLoginAccess(
   if (!userId) {
     if (!email) throw new StaffLoginError("Enter an email before creating a staff login this way.");
     if (!staff.accountPassword) {
-      throw new StaffLoginError("A password of at least 12 characters is required for a new login account.");
+      throw new StaffLoginError("Enter a strong password with at least 6 characters, including uppercase, lowercase, a number, and a symbol.");
     }
     userId = randomUUID();
     const password = await hashPassword(staff.accountPassword);
@@ -621,7 +621,7 @@ async function ensureStaffAccount(
     .for("update")
     .limit(1);
   if (!credential) {
-    const password = await hashPassword(`staff@${staff.employeeCode}`);
+    const password = await hashPassword(`Staff@${staff.employeeCode}1`);
     await tx.insert(authAccount).values({
       id: randomUUID(), accountId: userId, providerId: "credential", userId, password,
     });
@@ -1160,7 +1160,7 @@ export async function createStaffMember(
     ? `Staff number: ${employeeCode}.`
     : `Generated staff number: ${employeeCode}.`;
   const passwordText = accountOutcome.generatedPassword
-    ? `Initial password: staff@${employeeCode}. Ask the staff member to change it from Account security.`
+    ? `Initial password: Staff@${employeeCode}1. Ask the staff member to change it from Account security.`
     : accountOutcome.manuallySetPassword
       ? "Use the password set during staff setup."
       : "The existing account password was kept.";

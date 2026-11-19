@@ -209,7 +209,7 @@ export function StaffForm({
               <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-900">A staff login is created automatically</p>
                 <p className="mt-1 leading-6">
-                  The staff number is the username. If it is blank, a staff number is generated. The initial password is staff@ followed by that number; staff can change it under Account security.
+                  The staff number is the username. If it is blank, a staff number is generated. The initial password is Staff@ followed by that number and 1; staff can change it under Account security.
                 </p>
               </div>
             ) : (
@@ -243,10 +243,13 @@ export function StaffForm({
                       name="accountPassword"
                       type="password"
                       autoComplete="new-password"
-                      minLength={12}
+                      minLength={6}
                       maxLength={128}
                       className={inputClass}
                     />
+                    <span className="block text-xs font-normal text-slate-500">
+                      At least 6 characters with uppercase, lowercase, a number, and a symbol.
+                    </span>
                   </label>
                   <label className="space-y-1.5 text-sm font-medium text-slate-700">
                     <span>Confirm password</span>
@@ -255,7 +258,7 @@ export function StaffForm({
                       name="accountPasswordConfirmation"
                       type="password"
                       autoComplete="new-password"
-                      minLength={12}
+                      minLength={6}
                       maxLength={128}
                       className={inputClass}
                     />

@@ -181,12 +181,12 @@ export function AccountProvisionForm({
           name="password"
           type="password"
           autoComplete="new-password"
-          minLength={12}
+          minLength={6}
           maxLength={128}
           required
           className={fieldClass}
         />
-        <span className="block text-xs font-normal text-slate-500">Use at least 12 characters. Passwords are stored as secure hashes.</span>
+        <span className="block text-xs font-normal text-slate-500">Use at least 6 characters with uppercase, lowercase, a number, and a symbol.</span>
       </label>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Confirm password
@@ -194,7 +194,7 @@ export function AccountProvisionForm({
           name="passwordConfirmation"
           type="password"
           autoComplete="new-password"
-          minLength={12}
+          minLength={6}
           maxLength={128}
           required
           className={fieldClass}

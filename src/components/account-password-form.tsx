@@ -13,7 +13,7 @@ export function AccountPasswordForm() {
       <div>
         <h2 className="font-semibold text-slate-950">Change your password</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Enter your current password, then choose a private password of at least 12 characters.
+          Choose at least 6 characters with an uppercase letter, a lowercase letter, a number, and a symbol. Common and repetitive passwords are rejected.
         </p>
       </div>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
@@ -33,7 +33,7 @@ export function AccountPasswordForm() {
             type="password"
             name="newPassword"
             autoComplete="new-password"
-            minLength={12}
+            minLength={6}
             maxLength={128}
             required
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
@@ -45,7 +45,7 @@ export function AccountPasswordForm() {
             type="password"
             name="passwordConfirmation"
             autoComplete="new-password"
-            minLength={12}
+            minLength={6}
             maxLength={128}
             required
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"

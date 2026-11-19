@@ -909,7 +909,7 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
         if (existingEmail) return "account-conflict";
 
         const userId = randomUUID();
-        const password = `student@${student.admissionNumber}`;
+        const password = `Student@${student.admissionNumber}1`;
         await tx.insert(user).values({
           id: userId,
           name: `${student.firstName} ${student.lastName}`,
