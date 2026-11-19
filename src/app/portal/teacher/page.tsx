@@ -25,6 +25,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isAttendanceStatus } from "@/lib/attendance-policy";
+import { matchesTeacherExamAssessment } from "@/lib/teacher-portal-policy";
 import { PrintButton } from "@/components/print-button";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { TeacherPortalShell } from "./teacher-portal-shell";
@@ -56,6 +57,8 @@ export default async function TeacherPortalPage({
     q?: string | string[];
     status?: string | string[];
     examTitle?: string | string[];
+    branchId?: string | string[];
+    classLevelId?: string | string[];
     classSectionId?: string | string[];
     attendanceDate?: string | string[];
   }>;
@@ -74,6 +77,14 @@ export default async function TeacherPortalPage({
     : "";
   const requestedExamTitle = typeof params.examTitle === "string" ? params.examTitle : "";
   const assessmentTitleFilter = /^\d+$/.test(requestedExamTitle) ? requestedExamTitle : "";
+  const requestedBranchId = typeof params.branchId === "string" ? params.branchId : "";
+  const assessmentBranchFilter = /^\d+$/.test(requestedBranchId) && Number.isSafeInteger(Number(requestedBranchId))
+    ? Number(requestedBranchId)
+    : null;
+  const requestedClassLevelId = typeof params.classLevelId === "string" ? params.classLevelId : "";
+  const assessmentClassFilter = /^\d+$/.test(requestedClassLevelId) && Number.isSafeInteger(Number(requestedClassLevelId))
+    ? Number(requestedClassLevelId)
+    : null;
   const requestedSectionId = typeof params.classSectionId === "string" && /^\d+$/.test(params.classSectionId)
     ? Number(params.classSectionId)
     : null;
@@ -208,6 +219,9 @@ export default async function TeacherPortalPage({
         examStatus: examinations.status,
         assessmentStatus: examSubjects.status,
         examDate: examSubjects.examDate,
+        branchId: classLevels.branchId,
+        branchName: schoolBranches.name,
+        classLevelId: classLevels.id,
         className: classLevels.name,
         subjectName: subjects.name,
         yearName: academicYears.name,
@@ -249,6 +263,10 @@ export default async function TeacherPortalPage({
           eq(classLevels.id, examClasses.classLevelId),
           eq(classLevels.schoolId, context.schoolId),
           eq(classLevels.status, "active"),
+        ))
+        .innerJoin(schoolBranches, and(
+          eq(schoolBranches.id, classLevels.branchId),
+          eq(schoolBranches.schoolId, context.schoolId),
         ))
         .innerJoin(subjects, and(
           eq(subjects.id, classSubjects.subjectId),
@@ -485,11 +503,22 @@ export default async function TeacherPortalPage({
     `${assignment.branchName} ${assignment.yearName} ${assignment.className} ${assignment.sectionName} ${assignment.subjectName} ${assignment.subjectCode}`
       .toLocaleLowerCase().includes(normalizedSearch),
   );
+  const assessmentBranches = [...new Map(assessments.map((assessment) => [
+    assessment.branchId,
+    assessment.branchName,
+  ])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const assessmentClasses = [...new Map(assessments.map((assessment) => [
+    assessment.classLevelId,
+    { id: assessment.classLevelId, label: `${assessment.branchName} · ${assessment.className}` },
+  ])).values()].sort((a, b) => a.label.localeCompare(b.label));
   const filteredAssessments = assessments.filter((assessment) =>
-    (!assessmentStatusFilter || assessment.examStatus === assessmentStatusFilter) &&
-    (!assessmentTitleFilter || String(assessment.examId) === assessmentTitleFilter) &&
-    `${assessment.examName} ${assessment.examTypeName ?? ""} ${assessment.yearName} ${assessment.className} ${assessment.subjectName} ${assessment.assessmentStatus}`
-      .toLocaleLowerCase().includes(normalizedSearch),
+    matchesTeacherExamAssessment(assessment, {
+      status: assessmentStatusFilter,
+      examTitleId: assessmentTitleFilter,
+      branchId: assessmentBranchFilter,
+      classLevelId: assessmentClassFilter,
+      search: normalizedSearch,
+    }),
   ).sort((a, b) =>
     a.examName.localeCompare(b.examName) ||
     a.examDate.localeCompare(b.examDate) ||
@@ -642,7 +671,7 @@ export default async function TeacherPortalPage({
             </section>}
 
             {activeSection === "assessments" && <section id="assessments" className="space-y-4">
-              <SectionHeading title="Examination work" description="Assessments are limited to your assigned subjects. Search the exam, class, subject, or status." />
+              <SectionHeading title="Examination work" description="Assessments are limited to your assigned subjects. Filter by exam title, status, branch, or class, or search the exam and subject." />
               <SectionFilter
                 section="assessments"
                 search={search}
@@ -650,6 +679,10 @@ export default async function TeacherPortalPage({
                 showStatus
                 examTitle={assessmentTitleFilter}
                 examTitles={assessmentTitles}
+                branchId={assessmentBranchFilter === null ? "" : String(assessmentBranchFilter)}
+                branches={assessmentBranches}
+                classLevelId={assessmentClassFilter === null ? "" : String(assessmentClassFilter)}
+                classes={assessmentClasses}
               />
               {filteredAssessments.length ? (
                 <>
@@ -659,7 +692,7 @@ export default async function TeacherPortalPage({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <h3 className="break-words font-bold text-slate-950">{assessment.examName}</h3>
-                            <p className="mt-1 text-xs text-slate-500">{assessment.yearName} · {assessment.examDate}</p>
+                            <p className="mt-1 text-xs text-slate-500">{assessment.branchName} · {assessment.yearName} · {assessment.examDate}</p>
                           </div>
                           <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                             {assessment.examStatus === "published" ? "Published" : assessment.assessmentStatus.replaceAll("_", " ")}
@@ -686,6 +719,7 @@ export default async function TeacherPortalPage({
                         <tr>
                           <th className="px-4 py-3 font-semibold">Examination</th>
                           <th className="px-4 py-3 font-semibold">Exam type</th>
+                          <th className="px-4 py-3 font-semibold">Branch</th>
                           <th className="px-4 py-3 font-semibold">Class</th>
                           <th className="px-4 py-3 font-semibold">Subject</th>
                           <th className="px-4 py-3 font-semibold">Assessment date</th>
@@ -700,6 +734,7 @@ export default async function TeacherPortalPage({
                               {assessment.examName}<span className="mt-1 block text-xs font-normal text-slate-500">{assessment.yearName}</span>
                             </td>
                             <td className="px-4 py-3 text-slate-700">{assessment.examTypeName ?? "Not set"}</td>
+                            <td className="px-4 py-3 text-slate-700">{assessment.branchName}</td>
                             <td className="px-4 py-3 text-slate-700">{assessment.className}</td>
                             <td className="px-4 py-3 text-slate-700">{assessment.subjectName}</td>
                             <td className="px-4 py-3 text-slate-700">{assessment.examDate}</td>
@@ -863,6 +898,10 @@ function SectionFilter({
   showStatus = false,
   examTitle = "",
   examTitles = [],
+  branchId = "",
+  branches = [],
+  classLevelId = "",
+  classes = [],
 }: {
   section: string;
   search: string;
@@ -870,9 +909,14 @@ function SectionFilter({
   showStatus?: boolean;
   examTitle?: string;
   examTitles?: [number, string][];
+  branchId?: string;
+  branches?: [number, string][];
+  classLevelId?: string;
+  classes?: { id: number; label: string }[];
 }) {
+  const showAssessmentFilters = showStatus && examTitles.length > 0;
   return (
-    <SmartFilterForm method="get" action="/portal/teacher" className={`print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showStatus && examTitles.length ? "sm:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)_minmax(10rem,auto)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
+    <SmartFilterForm method="get" action="/portal/teacher" className={`print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:items-end ${showAssessmentFilters ? "sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" : "sm:grid-cols-[minmax(0,1fr)_auto_auto]"}`}>
       <input type="hidden" name="section" value={section} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Search
@@ -911,11 +955,37 @@ function SectionFilter({
           </select>
         </label>
       )}
+      {showAssessmentFilters && (
+        <>
+          <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+            Branch
+            <select
+              name="branchId"
+              defaultValue={branchId}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
+            >
+              <option value="">All branches</option>
+              {branches.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+          <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+            Class
+            <select
+              name="classLevelId"
+              defaultValue={classLevelId}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
+            >
+              <option value="">All classes</option>
+              {classes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+          </label>
+        </>
+      )}
       <div className="flex gap-2">
         <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">
           Search
         </button>
-        {(search || status || examTitle) && (
+        {(search || status || examTitle || branchId || classLevelId) && (
           <Link href={`/portal/teacher?section=${section}`} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Clear
           </Link>
