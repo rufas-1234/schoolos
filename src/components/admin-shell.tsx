@@ -178,9 +178,16 @@ const navigation: NavigationItem[] = [
     permission: "inventory.manage",
     permissionAlternatives: ["accounts.manage"],
     children: [
-      { id: "inventory", label: "Inventory", href: "/admin/inventory", matchPath: "/admin/inventory", matchQuery: { key: "section", value: null }, permission: "inventory.manage" },
-      { id: "accounts", label: "Accounts", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" }, permission: "accounts.manage" },
-      { id: "assets", label: "Assets", href: "/admin/inventory?section=assets", matchPath: "/admin/inventory", matchQuery: { key: "section", value: "assets" }, permission: "inventory.manage" },
+      { id: "inventory-setup", label: "Inventory setup", href: "/admin/inventory?view=setup", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "setup" }, permission: "inventory.manage" },
+      { id: "stock-register", label: "Stock register", href: "/admin/inventory?view=register", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "register" }, permission: "inventory.manage" },
+      { id: "stock-movements", label: "Stock movement & history", href: "/admin/inventory?view=movements", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "movements" }, permission: "inventory.manage" },
+      { id: "accounts-chart", label: "Chart of accounts", href: "/admin/accounts?section=chart", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "chart" }, permission: "accounts.manage" },
+      { id: "accounts-profit", label: "Profit & loss", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" }, permission: "accounts.manage" },
+      { id: "accounts-bank", label: "Bank accounts", href: "/admin/accounts?section=bank", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "bank" }, permission: "accounts.manage" },
+      { id: "accounts-transfers", label: "Fund transfers", href: "/admin/accounts?section=transfers", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "transfers" }, permission: "accounts.manage" },
+      { id: "assets", label: "Assets", href: "/admin/inventory?view=assets", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "assets" }, permission: "inventory.manage" },
+      { id: "asset-maintenance", label: "Asset maintenance", href: "/admin/inventory?view=maintenance", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "maintenance" }, permission: "inventory.manage" },
+      { id: "accounts-income", label: "Income", href: "/admin/accounts?section=income", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "income" }, permission: "accounts.manage" },
       { id: "expenses", label: "Expenses", href: "/admin/accounts?section=expenses", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "expenses" }, permission: "accounts.manage" },
       { id: "inventory-reports", label: "Reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports", permission: "inventory.manage", permissionAlternatives: ["accounts.manage"] },
     ],
@@ -278,16 +285,14 @@ export function AdminShell({
         ? "/admin/examinations"
       : permissions.includes("staff.manage")
         ? "/admin/hr"
+      : permissions.includes("accounts.manage") || permissions.includes("fees.manage") || permissions.includes("payments.record")
+        ? "/portal/finance"
       : permissions.includes("dormitories.manage")
         ? "/portal/dormitories"
       : permissions.includes("library.manage")
         ? "/portal/library"
       : permissions.includes("inventory.manage")
         ? "/admin/inventory"
-      : permissions.includes("accounts.manage")
-        ? "/admin/accounts?section=profit"
-      : permissions.includes("fees.manage") || permissions.includes("payments.record")
-        ? "/admin/fees/collection"
       : permissions.includes("students.view")
         ? "/admin/students"
         : "/unauthorized";
@@ -326,17 +331,12 @@ export function AdminShell({
     .find((item) => item.label === "Inventory")
     ?.children?.find((section) => {
       const sectionPath = section.matchPath ?? section.href?.split("?")[0];
-      const sectionValue = section.matchQuery
-        ? searchParams.get(section.matchQuery.key)
-        : null;
-      const currentAccountsSection = searchParams.get("section");
-      return sectionPath === pathname &&
-        (!section.matchQuery || sectionValue === section.matchQuery.value ||
-          (section.id === "accounts" && (
-            sectionValue === null ||
-            (pathname === "/admin/accounts" &&
-              ["profit", "income", "chart", "bank", "transfers"].includes(currentAccountsSection ?? "profit"))
-          )));
+      const queryMatches = !section.matchQuery ||
+        searchParams.get(section.matchQuery.key) === section.matchQuery.value ||
+        (section.id === "accounts-profit" && searchParams.get("section") === null) ||
+        (section.id === "assets" && searchParams.get("section") === "assets") ||
+        (section.id === "stock-register" && searchParams.get("view") === null);
+      return sectionPath === pathname && queryMatches;
     });
   const activeFeesSection = navigation
     .find((item) => item.label === "Fees")
@@ -539,8 +539,12 @@ export function AdminShell({
                     searchParams.get(section.matchQuery.key) === section.matchQuery.value)) ||
                 (section.id === "inventory-reports" && pathname === "/admin/accounts" &&
                   searchParams.get("section") === "reports") ||
-                (section.id === "accounts" && pathname === "/admin/accounts" &&
-                  ["profit", "income", "chart", "bank", "transfers"].includes(searchParams.get("section") ?? "profit"))
+                (section.id === "assets" && pathname === "/admin/inventory" &&
+                  searchParams.get("section") === "assets") ||
+                (section.id === "stock-register" && pathname === "/admin/inventory" &&
+                  searchParams.get("view") === null) ||
+                (section.id === "accounts-profit" && pathname === "/admin/accounts" &&
+                  (searchParams.get("section") === null || searchParams.get("section") === "profit"))
               );
             });
             return (

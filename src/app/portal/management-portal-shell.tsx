@@ -5,6 +5,7 @@ import {
   BookMarked,
   BookOpenCheck,
   ClipboardList,
+  CircleDollarSign,
   LayoutDashboard,
   ReceiptText,
   UsersRound,
@@ -28,28 +29,64 @@ const dormitoryNavigation = [
   { href: "/admin/dormitories/reports", label: "Reports", icon: BookOpenCheck },
 ];
 
+const financeOverview = { href: "/portal/finance", label: "Overview", icon: LayoutDashboard };
+
+function financeNavigation(permissions: readonly string[]) {
+  const canManageFees = permissions.includes("fees.manage") || permissions.includes("payments.record");
+  const canManageAccounts = permissions.includes("accounts.manage");
+  return [
+    financeOverview,
+    ...(canManageFees
+      ? [
+        { href: "/admin/fees/collection", label: "Fee collection", icon: CircleDollarSign },
+        { href: "/admin/fees/reports", label: "Fee reports", icon: ReceiptText },
+      ]
+      : []),
+    ...(canManageAccounts
+      ? [
+        { href: "/admin/accounts?section=profit", label: "Profit & loss", icon: BookOpenCheck },
+        { href: "/admin/accounts?section=income", label: "Other income", icon: ReceiptText },
+        { href: "/admin/accounts?section=expenses", label: "Expenses", icon: ClipboardList },
+        { href: "/admin/accounts?section=bank", label: "Bank accounts", icon: CircleDollarSign },
+        { href: "/admin/accounts?section=reports", label: "Accounts reports", icon: BookMarked },
+      ]
+      : []),
+  ];
+}
+
 export function ManagementPortalShell({
   children,
   schoolName,
   schoolLogoUrl,
   userName,
   portalType,
+  permissions = [],
 }: {
   children: React.ReactNode;
   schoolName: string;
   schoolLogoUrl: string | null;
   userName: string;
-  portalType: "library" | "dormitory";
+  portalType: "library" | "dormitory" | "finance";
+  permissions?: readonly string[];
 }) {
-  const isLibrary = portalType === "library";
+  const portalLabel = {
+    library: "Library Portal",
+    dormitory: "Dormitory Portal",
+    finance: "Finance Portal",
+  }[portalType];
+  const navigation = portalType === "library"
+    ? libraryNavigation
+    : portalType === "dormitory"
+      ? dormitoryNavigation
+      : financeNavigation(permissions);
 
   return (
     <PortalShell
       schoolName={schoolName}
       schoolLogoUrl={schoolLogoUrl}
       userName={userName}
-      portalLabel={isLibrary ? "Library Portal" : "Dormitory Portal"}
-      navigation={isLibrary ? libraryNavigation : dormitoryNavigation}
+      portalLabel={portalLabel}
+      navigation={navigation}
     >
       {children}
     </PortalShell>

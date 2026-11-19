@@ -218,7 +218,7 @@ export function InventoryForms({
   supplierRecords,
   locationRecords,
 }: {
-  section: "inventory" | "assets";
+  section: "setup" | "movements" | "assets" | "maintenance";
   categories: InventoryOption[];
   suppliers: InventoryOption[];
   locations: InventoryOption[];
@@ -230,7 +230,7 @@ export function InventoryForms({
 }) {
   return (
     <div className="space-y-5">
-      {section === "inventory" && <section>
+      {section === "setup" && <section>
         <h2 className="mb-3 text-lg font-bold text-slate-900">Inventory setup</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <ActionForm action={createInventoryCategory} title="Add category">
@@ -281,7 +281,7 @@ export function InventoryForms({
         </div>
       </section>}
 
-      {section === "inventory" && <section>
+      {section === "movements" && <section>
         <h2 className="mb-3 text-lg font-bold text-slate-900">Stock movement</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <ActionForm action={recordInventoryMovement} title="Receive, issue, or adjust stock">
@@ -305,7 +305,7 @@ export function InventoryForms({
       </section>}
 
       {section === "assets" && <section>
-        <h2 className="mb-3 text-lg font-bold text-slate-900">Assets and maintenance</h2>
+        <h2 className="mb-3 text-lg font-bold text-slate-900">Asset setup</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <ActionForm action={createInventoryAsset} title="Register school asset">
             <TextField label="Asset tag" name="assetTag" />
@@ -316,6 +316,12 @@ export function InventoryForms({
             <TextField label="Acquisition cost" name="acquisitionCost" type="number" />
             <DescriptionField />
           </ActionForm>
+        </div>
+      </section>}
+
+      {section === "maintenance" && <section>
+        <h2 className="mb-3 text-lg font-bold text-slate-900">Record asset maintenance</h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <ActionForm action={recordAssetMaintenance} title="Log asset maintenance">
             <SelectField label="Asset" name="assetId" options={assets} />
             <TextField label="Maintenance date" name="maintenanceDate" type="date" />

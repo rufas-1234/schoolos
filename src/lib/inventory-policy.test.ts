@@ -6,9 +6,16 @@ import {
   parseCostMinorUnits,
   parseQuantityMilliUnits,
   parseSignedQuantityMilliUnits,
+  resolveInventoryView,
 } from "./inventory-policy";
 
 describe("inventory stock policy", () => {
+  it("resolves inventory views and keeps legacy asset links working", () => {
+    expect(resolveInventoryView("movements")).toBe("movements");
+    expect(resolveInventoryView(undefined, "assets")).toBe("assets");
+    expect(resolveInventoryView("unknown", undefined)).toBe("register");
+  });
+
   it("parses quantities and costs without floating point arithmetic", () => {
     expect(parseQuantityMilliUnits("12.35")).toBe(BigInt(12350));
     expect(parseCostMinorUnits("17.40")).toBe(BigInt(1740));

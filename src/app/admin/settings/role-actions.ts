@@ -24,7 +24,10 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolAccountInputSchema } from "@/lib/account-provisioning-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
-import { normalizePhoneIdentifier } from "@/lib/login-identifier-policy";
+import {
+  normalizePhoneIdentifier,
+  shouldSkipConflictingLoginIdentifier,
+} from "@/lib/login-identifier-policy";
 
 export type RoleActionState = { error?: string; success?: boolean; message?: string };
 
@@ -73,6 +76,7 @@ export async function createSchoolAccount(
   }
 
   const passwordHash = await hashPassword(parsed.data.password);
+  let phoneIdentifierUnavailable = false;
   try {
     const outcome = await db.transaction(async (tx) => {
       let name = "";
@@ -174,14 +178,37 @@ export async function createSchoolAccount(
       }
 
       if (identifier) {
-        const [existingIdentifier] = await tx.select({ id: userLoginIdentifiers.id })
+        const [existingIdentifier] = await tx.select({
+          id: userLoginIdentifiers.id,
+          userId: userLoginIdentifiers.userId,
+          kind: userLoginIdentifiers.kind,
+        })
           .from(userLoginIdentifiers)
           .where(and(
             eq(userLoginIdentifiers.schoolId, context.schoolId),
             eq(userLoginIdentifiers.identifier, identifier),
           ))
           .limit(1);
-        if (existingIdentifier) return "identifier-in-use";
+        if (existingIdentifier) {
+          if (parsed.data.personType === "student" && existingIdentifier.kind === "student_admission") {
+            const [existingStudentLink] = await tx.select({ studentId: userStudentLinks.studentId })
+              .from(userStudentLinks)
+              .where(and(
+                eq(userStudentLinks.schoolId, context.schoolId),
+                eq(userStudentLinks.userId, existingIdentifier.userId),
+                eq(userStudentLinks.studentId, parsed.data.recordId),
+                eq(userStudentLinks.accessType, "student"),
+              ))
+              .limit(1);
+            if (existingStudentLink) return "student-account-exists";
+          }
+          if (shouldSkipConflictingLoginIdentifier(parsed.data.personType, existingIdentifier.kind)) {
+            identifier = null;
+            phoneIdentifierUnavailable = true;
+          } else {
+            return "identifier-in-use";
+          }
+        }
       }
       const [existingEmail] = await tx.select({ id: user.id })
         .from(user)
@@ -270,7 +297,19 @@ export async function createSchoolAccount(
     if (outcome === "admission-required") return { error: "Add an admission number to the student profile before creating its login." };
     if (outcome === "parent-contact-required") return { error: "The selected parent login method is not available on this student profile." };
     if (outcome === "invalid-phone") return { error: "The profile phone number must include 7–15 digits to be used for login." };
-    if (outcome === "identifier-in-use") return { error: "That login identifier is already assigned to an account in this school." };
+    if (outcome === "student-account-exists") {
+      revalidatePath("/admin/users");
+      revalidatePath("/admin/users/roles");
+      return {
+        success: true,
+        message: "This student already has a login account linked. No duplicate account was created.",
+      };
+    }
+    if (outcome === "identifier-in-use") {
+      return parsed.data.personType === "student"
+        ? { error: "That admission number is already used by another login in this school. Check the existing account or correct the student record." }
+        : { error: "That login identifier is already assigned to an account in this school." };
+    }
     if (outcome === "email-in-use") return { error: "An account already uses this email. Assign roles from the existing account instead." };
   } catch (error) {
     if (isDuplicateEntryError(error)) {
@@ -284,7 +323,12 @@ export async function createSchoolAccount(
   revalidatePath("/admin/staff");
   revalidatePath("/portal/student");
   revalidatePath("/portal/parent");
-  return { success: true };
+  return phoneIdentifierUnavailable
+    ? {
+      success: true,
+      message: "Account created and linked successfully. The phone number is already used by another login, so this staff account must sign in with its profile email.",
+    }
+    : { success: true };
 }
 
 export async function createSchoolRole(

@@ -11,6 +11,7 @@ import {
   schools,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveInventoryView } from "@/lib/inventory-policy";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
@@ -37,11 +38,13 @@ function formatDate(value: Date | string): string {
 
 type SearchParams = {
   section?: string | string[];
+  view?: string | string[];
   search?: string | string[];
   categoryId?: string | string[];
   supplierId?: string | string[];
   locationId?: string | string[];
   status?: string | string[];
+  movementType?: string | string[];
   itemPage?: string | string[];
   lowStockPage?: string | string[];
   assetPage?: string | string[];
@@ -63,11 +66,15 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const query = await searchParams;
   const pageSize = parsePageSize(query.pageSize);
   const requestedSection = first(query.section);
-  const section = requestedSection === "assets" ? "assets" : "inventory";
+  const requestedView = first(query.view);
+  const section = resolveInventoryView(requestedView, requestedSection);
   const search = first(query.search)?.trim().slice(0, 120) ?? "";
   const selectedCategory = first(query.categoryId) ?? "";
   const selectedSupplier = first(query.supplierId) ?? "";
   const selectedLocation = first(query.locationId) ?? "";
+  const requestedMovementType = first(query.movementType);
+  const movementType = requestedMovementType === "received" || requestedMovementType === "issued" ||
+    requestedMovementType === "adjustment" ? requestedMovementType : "all";
   const requestedItemPage = requestedPage(first(query.itemPage));
   const requestedLowStockPage = requestedPage(first(query.lowStockPage));
   const requestedAssetPage = requestedPage(first(query.assetPage));
@@ -219,19 +226,29 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const assetPageCount = Math.max(1, Math.ceil(filteredAssets.length / pageSize));
   const assetPage = Math.min(requestedAssetPage, assetPageCount);
   const visibleAssets = filteredAssets.slice((assetPage - 1) * pageSize, assetPage * pageSize);
-  const movementPageCount = Math.max(1, Math.ceil(movements.length / pageSize));
+  const filteredMovements = movements.filter((movement) =>
+    (!normalizedSearch || `${movement.itemName} ${movement.sku} ${movement.movementType} ${movement.reference ?? ""} ${movement.note ?? ""}`
+      .toLocaleLowerCase().includes(normalizedSearch)) &&
+    (movementType === "all" || movement.movementType === movementType)
+  );
+  const movementPageCount = Math.max(1, Math.ceil(filteredMovements.length / pageSize));
   const movementPage = Math.min(requestedMovementPage, movementPageCount);
-  const visibleMovements = movements.slice((movementPage - 1) * pageSize, movementPage * pageSize);
-  const maintenancePageCount = Math.max(1, Math.ceil(maintenance.length / pageSize));
+  const visibleMovements = filteredMovements.slice((movementPage - 1) * pageSize, movementPage * pageSize);
+  const filteredMaintenance = maintenance.filter((record) =>
+    !normalizedSearch || `${record.assetTag} ${record.assetName} ${record.description} ${record.performedBy ?? ""}`
+      .toLocaleLowerCase().includes(normalizedSearch)
+  );
+  const maintenancePageCount = Math.max(1, Math.ceil(filteredMaintenance.length / pageSize));
   const maintenancePage = Math.min(requestedMaintenancePage, maintenancePageCount);
-  const visibleMaintenance = maintenance.slice((maintenancePage - 1) * pageSize, maintenancePage * pageSize);
+  const visibleMaintenance = filteredMaintenance.slice((maintenancePage - 1) * pageSize, maintenancePage * pageSize);
   const pageHref = (parameter: string, page: number) => {
-    const params = new URLSearchParams({ section });
+    const params = new URLSearchParams({ view: section });
     if (search) params.set("search", search);
     if (selectedCategory) params.set("categoryId", selectedCategory);
     if (selectedSupplier) params.set("supplierId", selectedSupplier);
     if (selectedLocation) params.set("locationId", selectedLocation);
     if (assetStatus !== "all") params.set("status", assetStatus);
+    if (movementType !== "all") params.set("movementType", movementType);
     params.set("pageSize", String(pageSize));
     params.set(parameter, String(page));
     return `/admin/inventory?${params.toString()}`;
@@ -250,17 +267,27 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     <main className="space-y-6">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <p className="text-sm font-semibold text-violet-700">Operations · Inventory module</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-950">{section === "assets" ? "School assets" : "Inventory"}</h1>
+        <h1 className="mt-1 text-3xl font-bold text-slate-950">{{
+          setup: "Inventory setup",
+          register: "Stock register",
+          movements: "Stock movement",
+          assets: "School assets",
+          maintenance: "Asset maintenance",
+        }[section]}</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-600">
-          {section === "assets"
-            ? "Register school property, track locations and lifecycle status, and keep maintenance records together."
-            : "Manage stock categories, suppliers, quantities, receipts, issues, adjustments, and reorder levels."}
+          {{
+            setup: "Create and maintain categories, suppliers, locations, and stock items.",
+            register: "Review current quantities, costs, and reorder levels for each stock item.",
+            movements: "Record stock receipts, issues, or adjustments and review movement history.",
+            assets: "Register school property, track locations and lifecycle status, and keep maintenance records together.",
+            maintenance: "Record and search maintenance performed on registered school assets.",
+          }[section]}
         </p>
       </header>
       <InventoryModuleNav active={section} permissions={context.grantedPermissions} />
       {hasDemoRows && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY items and assets are included in these counts and values as workflow examples; they are not real stock or school property.</p>}
 
-      {section === "inventory" ? (
+      {section !== "assets" && section !== "maintenance" ? (
         <section aria-label="Inventory overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric label="Active items" value={String(items.filter((item) => item.status === "active").length)} />
           <Metric label="Low stock" value={String(lowStock.length)} tone={lowStock.length ? "amber" : "normal"} />
@@ -276,7 +303,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </section>
       )}
 
-      {section === "inventory" && lowStock.length > 0 && (
+      {section === "register" && lowStock.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="font-bold text-amber-950">Low-stock notification</h2>
           <p className="mt-1 text-sm text-amber-900">Items at or below their configured reorder level need attention.</p>
@@ -293,14 +320,26 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       )}
 
       <SmartFilterForm method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <input type="hidden" name="section" value={section} />
-        <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Quick search {section === "assets" ? "assets" : "items"}
+        <input type="hidden" name="view" value={section} />
+        <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">Quick search {{
+          setup: "setup records",
+          register: "stock items",
+          movements: "stock movements",
+          assets: "assets",
+          maintenance: "maintenance records",
+        }[section]}
           <input type="search" name="search" maxLength={120} defaultValue={search}
-          placeholder={section === "assets" ? "Type an asset name, tag, or location..." : "Type an item name, SKU, category, or supplier..."}
+          placeholder={{
+            setup: "Category, supplier, or location...",
+            register: "Item name, SKU, category, or supplier...",
+            movements: "Item, SKU, movement, reference, or note...",
+            assets: "Asset name, tag, or location...",
+            maintenance: "Asset tag, asset name, work, or provider...",
+          }[section]}
             className="mt-1.5 block h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3" />
-        <span className="mt-1 block text-xs font-normal text-slate-500">The register updates as you type.</span>
+        <span className="mt-1 block text-xs font-normal text-slate-500">Search updates as you type.</span>
         </label>
-        {section === "inventory" ? (
+        {section === "register" ? (
           <>
             <SearchableSelect label="Category" name="categoryId" defaultValue={selectedCategory}
               options={[{ value: "", label: "All categories" }, ...categories.map((category) => ({ value: String(category.id), label: category.name }))]}
@@ -309,27 +348,38 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               options={[{ value: "", label: "All suppliers" }, ...suppliers.map((supplier) => ({ value: String(supplier.id), label: supplier.name }))]}
               placeholder="Search suppliers..." />
           </>
-        ) : (
+        ) : section === "assets" ? (
           <label className="text-sm font-medium text-slate-700">Asset status
             <select name="status" defaultValue={assetStatus} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
               <option value="all">All statuses</option><option value="active">Active</option>
               <option value="maintenance">Under maintenance</option><option value="retired">Retired</option>
             </select>
           </label>
-        )}
-        <SearchableSelect label="Location" name="locationId" defaultValue={selectedLocation}
+        ) : section === "movements" ? (
+          <label className="text-sm font-medium text-slate-700">Movement type
+            <select name="movementType" defaultValue={movementType} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
+              <option value="all">All movement types</option><option value="received">Received</option>
+              <option value="issued">Issued</option><option value="adjustment">Adjustment</option>
+            </select>
+          </label>
+        ) : null}
+        {(section === "register" || section === "assets") && <SearchableSelect label="Location" name="locationId" defaultValue={selectedLocation}
           options={[{ value: "", label: "All locations" }, ...locations.map((location) => ({ value: String(location.id), label: location.name }))]}
-          placeholder="Search locations..." />
+          placeholder="Search locations..." />}
         <div className="flex items-center gap-2">
           <button className="h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
-          <a href={`/admin/inventory${section === "assets" ? "?section=assets" : ""}`} className="h-10 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
+          <a href={`/admin/inventory?view=${section}`} className="h-10 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
         </div>
       </SmartFilterForm>
 
-      <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions}
-        categoryRecords={categories} supplierRecords={suppliers} locationRecords={locations} />
+      {(section === "setup" || section === "movements" || section === "assets" || section === "maintenance") && (
+        <InventoryForms section={section} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} items={itemOptions} assets={assetOptions}
+          categoryRecords={categories.filter((record) => !normalizedSearch || `${record.name} ${record.description ?? ""}`.toLocaleLowerCase().includes(normalizedSearch))}
+          supplierRecords={suppliers.filter((record) => !normalizedSearch || `${record.name} ${record.contactName ?? ""} ${record.email ?? ""} ${record.phone ?? ""}`.toLocaleLowerCase().includes(normalizedSearch))}
+          locationRecords={locations.filter((record) => !normalizedSearch || `${record.name} ${record.description ?? ""}`.toLocaleLowerCase().includes(normalizedSearch))} />
+      )}
 
-      {section === "inventory" && <>
+      {section === "register" && <>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5">
           <h2 className="text-lg font-bold text-slate-900">Stock register</h2>
@@ -425,7 +475,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </section>
       </>}
 
-      {section === "inventory" && <>
+      {section === "movements" && <>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Stock movements</h2></div>
         <div className="overflow-x-auto">
@@ -453,16 +503,16 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   </td>
                 </tr>
               ))}
-              {!movements.length && <EmptyRow columns={5} text="No stock movements have been recorded." />}
+              {!filteredMovements.length && <EmptyRow columns={5} text={movements.length ? "No movements match these filters." : "No stock movements have been recorded."} />}
             </tbody>
           </table>
         </div>
-        <TablePagination ariaLabel="Stock movements" currentPage={movementPage} pageSize={pageSize} totalRows={movements.length}
+        <TablePagination ariaLabel="Stock movements" currentPage={movementPage} pageSize={pageSize} totalRows={filteredMovements.length}
           hrefForPage={(page) => pageHref("movementPage", page)} />
         </section>
       </>}
 
-      {section === "assets" && <>
+      {section === "maintenance" && <>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5"><h2 className="text-lg font-bold text-slate-900">Asset maintenance log</h2></div>
         <div className="overflow-x-auto">
@@ -490,11 +540,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   </td>
                 </tr>
               ))}
-              {!maintenance.length && <EmptyRow columns={5} text="No maintenance has been logged." />}
+              {!filteredMaintenance.length && <EmptyRow columns={5} text={maintenance.length ? "No maintenance records match this search." : "No maintenance has been logged."} />}
             </tbody>
           </table>
         </div>
-        <TablePagination ariaLabel="Asset maintenance records" currentPage={maintenancePage} pageSize={pageSize} totalRows={maintenance.length}
+        <TablePagination ariaLabel="Asset maintenance records" currentPage={maintenancePage} pageSize={pageSize} totalRows={filteredMaintenance.length}
           hrefForPage={(page) => pageHref("maintenancePage", page)} />
         </section>
       </>}

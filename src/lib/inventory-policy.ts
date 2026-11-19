@@ -1,4 +1,11 @@
 export type StockMovementKind = "received" | "issued" | "adjustment";
+export type InventoryView = "setup" | "register" | "movements" | "assets" | "maintenance";
+
+export function resolveInventoryView(view: string | undefined, legacySection?: string): InventoryView {
+  if (view === "setup" || view === "register" || view === "movements" ||
+    view === "assets" || view === "maintenance") return view;
+  return legacySection === "assets" ? "assets" : "register";
+}
 
 export function parseQuantityMilliUnits(value: string): bigint | null {
   const match = /^(0|[1-9]\d{0,8})(?:\.(\d{1,3}))?$/.exec(value.trim());

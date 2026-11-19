@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeAdmissionIdentifier } from "./login-identifier-policy";
 
 export const schoolAccountInputSchema = z.object({
   personType: z.enum(["staff", "student", "parent"]),
@@ -19,4 +20,15 @@ export const schoolAccountInputSchema = z.object({
 
 export function getStudentRoleId(roles: { id: number; name: string }[]): number | null {
   return roles.find((role) => role.name.trim().toLowerCase() === "student")?.id ?? null;
+}
+
+export function getStudentsEligibleForAccount<T extends { admissionNumber: string | null }>(
+  students: T[],
+  assignedIdentifiers: string[],
+): T[] {
+  const assigned = new Set(assignedIdentifiers.map(normalizeAdmissionIdentifier).filter(Boolean));
+  return students.filter((student) => {
+    const identifier = normalizeAdmissionIdentifier(student.admissionNumber ?? "");
+    return identifier !== "" && !assigned.has(identifier);
+  });
 }

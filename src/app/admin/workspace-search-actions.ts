@@ -179,6 +179,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("payroll", "Payroll records", "Staff payroll and pay history", "/admin/hr/payroll", ["salary", "pay"]);
     addPage("hr-settings", "HR settings", "Configure staff fields and HR settings", "/admin/hr/settings", ["staff settings", "human resources settings"]);
   }
+  if (canManageFees || canManageAccounts) {
+    addPage("finance-portal", "Finance portal", "Financial overview, fee collection, and accounts shortcuts", "/portal/finance", ["finance", "finance workspace", "accounts portal", "bursar"]);
+  }
   if (canManageFees) {
     if (permissions.has("fees.manage")) {
       addPage("fee-setup", "Fee setup", "Configure fee groups, types, discounts, and structures", "/admin/fees", ["fees setup", "fee structure", "fee types", "discounts"]);

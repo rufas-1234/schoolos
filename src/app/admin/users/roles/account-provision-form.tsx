@@ -201,7 +201,7 @@ export function AccountProvisionForm({
         />
       </label>
       {state.error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{state.error}</p>}
-      {state.success && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Account created and linked successfully.</p>}
+      {state.success && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{state.message ?? "Account created and linked successfully."}</p>}
       <button
         disabled={pending || roles.length === 0 || profiles.length === 0}
         className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"

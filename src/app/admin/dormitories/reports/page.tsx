@@ -163,7 +163,7 @@ export default async function DormitoryReportsPage({
       </div>
       <div className="flex flex-wrap gap-2">
         <Link href="/admin/dormitories?section=overview" className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Dormitory overview</Link>
-        <PrintButton label="Print report" pageOrientation="landscape" />
+        <PrintButton targetId="dormitory-report" label="Print report" pageOrientation="landscape" />
       </div>
     </header>
 
@@ -202,7 +202,7 @@ export default async function DormitoryReportsPage({
       </div>
     </SmartFilterForm>
 
-    <section className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 print:rounded-none print:border-0 print:p-0">
+    <section id="dormitory-report" className="print-report-content dormitory-print-report space-y-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 print:rounded-none print:border-0 print:p-0">
       <header className="print-report-heading">
         <p className="print-report-kicker">Dormitory management · Reports</p>
         <h2>{title}</h2>

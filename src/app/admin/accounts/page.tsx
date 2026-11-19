@@ -45,10 +45,10 @@ const destinationBankAccount = alias(schoolBankAccounts, "destination_account");
 const sections: Array<{ id: Section; label: string }> = [
   { id: "chart", label: "Chart of accounts" },
   { id: "profit", label: "Profit & Loss" },
-  { id: "income", label: "Income" },
-  { id: "expenses", label: "Expenses" },
   { id: "bank", label: "Bank accounts" },
   { id: "transfers", label: "Fund transfers" },
+  { id: "income", label: "Income" },
+  { id: "expenses", label: "Expenses" },
   { id: "reports", label: "Reports" },
 ];
 
@@ -389,12 +389,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       </header>
 
       <InventoryModuleNav
-        active={section === "expenses" ? "expenses" : section === "reports" ? "reports" : "accounts"}
+        active={section}
         permissions={context.grantedPermissions}
+        reportsHref="/admin/accounts?section=reports"
       />
 
-      {section !== "expenses" && section !== "reports" && <nav aria-label="Accounts sections" className="flex flex-wrap gap-2">
-        {sections.filter((item) => item.id !== "expenses" && item.id !== "reports").map((item) => (
+      {section !== "reports" && <nav aria-label="Accounts sections" className="flex flex-wrap gap-2">
+        {sections.filter((item) => item.id !== "reports").map((item) => (
           <a key={item.id} href={`/admin/accounts?section=${item.id}${item.id === "profit" ? `&from=${from}&to=${to}` : ""}`}
             aria-current={section === item.id ? "page" : undefined}
             className={`rounded-xl px-4 py-2 text-sm font-semibold ${section === item.id ? "bg-violet-700 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>

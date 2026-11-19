@@ -1183,6 +1183,24 @@ h6 {
     font-size: 8pt;
   }
 
+  .dormitory-print-report,
+  .dormitory-print-report .overflow-x-auto {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .dormitory-print-report table {
+    table-layout: fixed !important;
+  }
+
+  .dormitory-print-report th,
+  .dormitory-print-report td {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
   .print-report-content th,
   .print-report-content td,
   .print-report-table th,

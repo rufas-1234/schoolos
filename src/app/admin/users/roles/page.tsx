@@ -15,6 +15,7 @@ import {
   userRoles,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { getStudentsEligibleForAccount } from "@/lib/account-provisioning-policy";
 import {
   AccountRoleDirectory,
   CaretakerRolesSetupForm,
@@ -131,17 +132,16 @@ export default async function UserRolesPage({
     }).from(userLoginIdentifiers)
       .where(eq(userLoginIdentifiers.schoolId, context.schoolId)),
   ]);
-  const existingStudentIdentifiers = new Set(loginIdentifiers
-    .filter((item) => item.kind === "student_admission")
-    .map((item) => item.identifier));
   const identifiersByUser = new Map<string, string[]>();
   for (const item of loginIdentifiers) {
     const identifiers = identifiersByUser.get(item.userId) ?? [];
     identifiers.push(item.identifier);
     identifiersByUser.set(item.userId, identifiers);
   }
-  const studentAccountOptions = studentProfiles
-    .filter((student) => student.admissionNumber && !existingStudentIdentifiers.has(student.admissionNumber.trim().toLocaleUpperCase()))
+  const studentAccountOptions = getStudentsEligibleForAccount(
+    studentProfiles,
+    loginIdentifiers.map((item) => item.identifier),
+  )
     .map((student) => ({
       id: student.id,
       name: `${student.firstName} ${student.lastName}`,

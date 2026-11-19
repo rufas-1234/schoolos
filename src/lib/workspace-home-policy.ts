@@ -11,8 +11,8 @@ export function getWorkspaceHomePath(
     return "/admin/examinations";
   }
   if (granted.has("staff.manage")) return "/admin/hr";
-  if (granted.has("fees.manage") || granted.has("payments.record")) {
-    return "/admin/fees/collection";
+  if (granted.has("accounts.manage") || granted.has("fees.manage") || granted.has("payments.record")) {
+    return "/portal/finance";
   }
   if (granted.has("dormitories.manage")) return "/portal/dormitories";
   if (granted.has("library.manage")) return "/portal/library";

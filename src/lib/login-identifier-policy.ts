@@ -7,3 +7,10 @@ export function normalizeAdmissionIdentifier(value: string) {
   const normalized = value.trim().toLocaleUpperCase();
   return normalized.length > 0 && normalized.length <= 40 ? normalized : "";
 }
+
+export function shouldSkipConflictingLoginIdentifier(
+  personType: "staff" | "student" | "parent",
+  identifierKind: string,
+): boolean {
+  return personType === "staff" && identifierKind === "staff_phone";
+}
