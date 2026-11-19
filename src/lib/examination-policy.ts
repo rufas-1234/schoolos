@@ -26,6 +26,18 @@ export function canViewExamSubject(
     grantedPermissions.includes("results.publish");
 }
 
+export function canReviewExamSubject(
+  grantedPermissions: readonly string[],
+  isAssignedClassTeacher: boolean,
+): boolean {
+  return grantedPermissions.includes("results.publish") ||
+    grantedPermissions.includes("results.enter") && isAssignedClassTeacher;
+}
+
+export function canPublishExamClass(grantedPermissions: readonly string[]): boolean {
+  return grantedPermissions.includes("results.publish");
+}
+
 export function examAssessmentResultState(input: {
   attendanceStatus: string | null;
   isCompulsory: boolean;

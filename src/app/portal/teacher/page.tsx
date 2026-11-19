@@ -30,7 +30,7 @@ import { PrintButton } from "@/components/print-button";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { TeacherPortalShell } from "./teacher-portal-shell";
 import { TeacherClassAttendance } from "./teacher-class-attendance";
-import { PublishExamClassForm } from "@/app/admin/examinations/examination-forms";
+import { ReviewSubjectForm } from "@/app/admin/examinations/examination-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -344,16 +344,28 @@ export default async function TeacherPortalPage({
   const classTeacherSubjectStatuses = classTeacherExamClassIds.length
     ? await db.select({
       examClassId: examSubjects.examClassId,
+      examSubjectId: examSubjects.id,
+      subjectName: subjects.name,
       status: examSubjects.status,
-    }).from(examSubjects).where(and(
-      eq(examSubjects.schoolId, context.schoolId),
-      inArray(examSubjects.examClassId, classTeacherExamClassIds),
-    ))
+    }).from(examSubjects)
+      .innerJoin(classSubjects, and(
+        eq(classSubjects.id, examSubjects.classSubjectId),
+        eq(classSubjects.schoolId, context.schoolId),
+      ))
+      .innerJoin(subjects, and(
+        eq(subjects.id, classSubjects.subjectId),
+        eq(subjects.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(examSubjects.schoolId, context.schoolId),
+        inArray(examSubjects.examClassId, classTeacherExamClassIds),
+      ))
     : [];
-  const classTeacherProgress = new Map<number, { total: number; approved: number; published: number }>();
+  const classTeacherProgress = new Map<number, { total: number; submitted: number; approved: number; published: number }>();
   for (const subject of classTeacherSubjectStatuses) {
-    const progress = classTeacherProgress.get(subject.examClassId) ?? { total: 0, approved: 0, published: 0 };
+    const progress = classTeacherProgress.get(subject.examClassId) ?? { total: 0, submitted: 0, approved: 0, published: 0 };
     progress.total += 1;
+    if (subject.status === "submitted") progress.submitted += 1;
     if (subject.status === "approved") progress.approved += 1;
     if (subject.status === "published") progress.published += 1;
     classTeacherProgress.set(subject.examClassId, progress);
@@ -761,20 +773,31 @@ export default async function TeacherPortalPage({
               )}
               {classTeacherExamRows.length > 0 && (
                 <section className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/60 p-4 sm:p-5">
-                  <SectionHeading title="Class results to publish" description="As the assigned class teacher, review approved subject marks and publish results for your class only." />
+                  <SectionHeading title="Class results to review" description="As the assigned class teacher, approve or return submitted results for every subject in your class. Publishing is reserved for users with Results publish permission." />
                   <div className="grid gap-3 lg:grid-cols-2">
                     {classTeacherExamRows.map((examClass) => {
-                      const progress = classTeacherProgress.get(examClass.examClassId) ?? { total: 0, approved: 0, published: 0 };
+                      const progress = classTeacherProgress.get(examClass.examClassId) ?? { total: 0, submitted: 0, approved: 0, published: 0 };
                       const published = progress.total > 0 && progress.published === progress.total;
-                      const ready = progress.total > 0 && progress.approved === progress.total;
+                      const submittedSubjects = classTeacherSubjectStatuses.filter((subject) =>
+                        subject.examClassId === examClass.examClassId && subject.status === "submitted",
+                      );
                       return (
                         <article key={examClass.examClassId} className="rounded-xl border border-slate-200 bg-white p-4">
                           <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">{examClass.yearName} · {examClass.className}</p>
                           <h3 className="mt-1 font-bold text-slate-950">{examClass.examName}</h3>
                           <p className="mt-1 text-sm text-slate-600">
-                            {published ? "Published — marks are locked." : `${progress.approved} of ${progress.total} subjects approved.`}
+                            {published ? "Published — marks are locked." : `${progress.submitted} subjects await review · ${progress.approved} of ${progress.total} approved.`}
                           </p>
-                          {!published && <div className="mt-3"><PublishExamClassForm examClassId={examClass.examClassId} disabled={!ready} /></div>}
+                          {!published && submittedSubjects.length > 0 && (
+                            <div className="mt-3 space-y-3">
+                              {submittedSubjects.map((subject) => (
+                                <div key={subject.examSubjectId} className="rounded-lg border border-slate-200 p-3">
+                                  <p className="text-sm font-semibold text-slate-900">{subject.subjectName}</p>
+                                  <ReviewSubjectForm examSubjectId={subject.examSubjectId} />
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           <Link href={`/admin/examinations/${examClass.examId}`} className="mt-3 inline-block text-sm font-semibold text-violet-700">Review class assessment details →</Link>
                         </article>
                       );

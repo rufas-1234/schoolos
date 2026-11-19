@@ -36,6 +36,8 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate, isValidDateRange } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import {
+  canPublishExamClass,
+  canReviewExamSubject,
   calculateComponentTotal,
   completeSubmittedMarkIds,
   missingExamMarkEnrollmentIds,
@@ -1678,7 +1680,7 @@ export async function reviewExamSubject(
   _previousState: ExaminationActionState,
   formData: FormData,
 ): Promise<ExaminationActionState> {
-  const context = await requireSchoolPermission("results.publish");
+  const context = await requireSchoolPermission(["results.publish", "results.enter"]);
   const parsed = z.object({
     examSubjectId: idField,
     decision: z.enum(["approve", "return"]),
@@ -1701,6 +1703,7 @@ export async function reviewExamSubject(
       examinationStatus: examinations.status,
       maxMarks: examSubjects.maxMarks,
       isCompulsory: classSubjects.isCompulsory,
+      classTeacherId: examClasses.classTeacherId,
       classLevelId: examClasses.classLevelId,
       academicYearId: examinations.academicYearId,
     }).from(examSubjects)
@@ -1720,6 +1723,25 @@ export async function reviewExamSubject(
       .for("update")
       .limit(1);
     if (!record || record.status !== "submitted" || record.examinationStatus !== "open") return "locked" as const;
+    if (!canReviewExamSubject(context.grantedPermissions, false)) {
+      if (record.classTeacherId === null) return "forbidden" as const;
+      const [appointedClassTeacher] = await tx.select({ id: teachers.id }).from(teachers)
+        .innerJoin(staffMembers, and(
+          eq(staffMembers.id, teachers.staffMemberId!),
+          eq(staffMembers.schoolId, context.schoolId),
+          eq(staffMembers.linkedUserId, context.user.id),
+          eq(staffMembers.status, "active"),
+        ))
+        .where(and(
+          eq(teachers.id, record.classTeacherId),
+          eq(teachers.schoolId, context.schoolId),
+          eq(teachers.status, "active"),
+        ))
+        .limit(1);
+      if (!appointedClassTeacher || !canReviewExamSubject(context.grantedPermissions, true)) {
+        return "forbidden" as const;
+      }
+    }
     const roster = await tx.select({ id: studentEnrollments.id })
       .from(studentEnrollments)
       .innerJoin(classSections, and(
@@ -1789,9 +1811,11 @@ export async function reviewExamSubject(
     return record.examinationId;
   });
   if (outcome === "locked") return { error: "Only submitted assessment results in an open examination can be reviewed." };
+  if (outcome === "forbidden") return { error: "Only the assigned class teacher or a results publisher can review this assessment." };
   if (outcome === "no-enrollments") return { error: "There are no enrolled students on this exam roster." };
   if (outcome === "invalid-marks") return { error: "This assessment has incomplete or invalid marks and cannot be approved." };
   revalidatePath(`/admin/examinations/${outcome}`);
+  revalidatePath("/portal/teacher");
   return { success: true };
 }
 
@@ -1903,7 +1927,7 @@ export async function assignExamClassTeacher(
     eq(classSections.classLevelId, examClass.classLevelId),
     eq(classSections.classTeacherId, parsed.data.teacherId),
   )).limit(1);
-  if (!appointedTeacher) return { error: "The publishing teacher must already be appointed as a class teacher for this class and academic year." };
+  if (!appointedTeacher) return { error: "The review teacher must already be appointed to this class for the selected academic year." };
   await db.update(examClasses).set({ classTeacherId: parsed.data.teacherId })
     .where(and(eq(examClasses.id, examClass.id), eq(examClasses.schoolId, context.schoolId)));
   revalidatePath(`/admin/examinations/${examClass.examId}`);
@@ -1915,7 +1939,10 @@ export async function publishExamination(
   _previousState: ExaminationActionState,
   formData: FormData,
 ): Promise<ExaminationActionState> {
-  const context = await requireSchoolPermission("results.enter");
+  const context = await requireSchoolPermission("results.publish");
+  if (!canPublishExamClass(context.grantedPermissions)) {
+    return { error: "Only users with Results publish permission can publish examination results." };
+  }
   const examClassId = idField.safeParse(value(formData, "examClassId"));
   if (!examClassId.success) return { error: "Choose a valid class." };
   const outcome = await db.transaction(async (tx) => {
@@ -1926,7 +1953,6 @@ export async function publishExamination(
       academicYearId: examinations.academicYearId,
       classId: examClasses.id,
       classPublicId: examClasses.publicId,
-      classTeacherId: examClasses.classTeacherId,
       classLevelId: examClasses.classLevelId,
     }).from(examClasses).innerJoin(examinations, and(
       eq(examinations.id, examClasses.examinationId),
@@ -1936,20 +1962,6 @@ export async function publishExamination(
       eq(examClasses.schoolId, context.schoolId),
     )).for("update").limit(1);
     if (!exam || exam.status !== "open") return "locked" as const;
-    if (exam.classTeacherId === null) return "unassigned" as const;
-    const [appointedTeacher] = await tx.select({ id: teachers.id }).from(teachers)
-      .innerJoin(staffMembers, and(
-        eq(staffMembers.id, teachers.staffMemberId!),
-        eq(staffMembers.schoolId, context.schoolId),
-        eq(staffMembers.linkedUserId, context.user.id),
-        eq(staffMembers.status, "active"),
-      ))
-      .where(and(
-        eq(teachers.id, exam.classTeacherId),
-        eq(teachers.schoolId, context.schoolId),
-        eq(teachers.status, "active"),
-      )).limit(1);
-    if (!appointedTeacher) return "forbidden" as const;
     const subjectsToPublish = await tx.select({
       id: examSubjects.id,
       status: examSubjects.status,
@@ -2073,8 +2085,6 @@ export async function publishExamination(
     return exam.id;
   });
   if (outcome === "locked") return { error: "This examination is already published or unavailable." };
-  if (outcome === "unassigned") return { error: "Assign a class teacher before publishing this class's results." };
-  if (outcome === "forbidden") return { error: "Only the assigned class teacher can publish this class's results." };
   if (outcome === "incomplete") return { error: "Every subject must be submitted and approved before this class can publish." };
   if (outcome === "invalid-attendance") return { error: "Complete attendance for every enrolled student and correct any invalid attendance codes before publishing." };
   if (outcome === "invalid-marks") return { error: "Incomplete or out-of-range marks prevent publication. Review present or late students." };

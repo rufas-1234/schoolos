@@ -72,6 +72,7 @@ export default async function SubjectMarksPage({
     scaleId: examGradingScales.id,
     scaleName: examGradingScales.name,
     classLevelId: examClasses.classLevelId,
+    classTeacherId: examClasses.classTeacherId,
     schoolName: schools.name,
     schoolLogoUrl: schools.logoUrl,
     schoolAddress: schools.address,
@@ -95,6 +96,7 @@ export default async function SubjectMarksPage({
   const canConfigure = context.grantedPermissions.includes("examinations.create");
   const canReview = context.grantedPermissions.includes("results.publish");
   let assignedTeacher = false;
+  let assignedClassTeacher = false;
   if (context.grantedPermissions.includes("results.enter")) {
     const assignment = await db.select({ id: examSubjects.id }).from(examSubjects)
       .innerJoin(classSubjects, and(
@@ -115,10 +117,24 @@ export default async function SubjectMarksPage({
       .where(and(eq(examSubjects.id, subject.id), eq(examSubjects.schoolId, context.schoolId)))
       .limit(1);
     assignedTeacher = assignment.length > 0;
-    if (!canViewExamSubject(context.grantedPermissions, assignedTeacher)) notFound();
-  } else if (!canViewExamSubject(context.grantedPermissions, false)) {
-    notFound();
+    if (subject.classTeacherId !== null) {
+      const [classTeacher] = await db.select({ id: teachers.id }).from(teachers)
+        .innerJoin(staffMembers, and(
+          eq(staffMembers.id, teachers.staffMemberId!),
+          eq(staffMembers.schoolId, context.schoolId),
+          eq(staffMembers.linkedUserId, context.user.id),
+          eq(staffMembers.status, "active"),
+        ))
+        .where(and(
+          eq(teachers.id, subject.classTeacherId),
+          eq(teachers.schoolId, context.schoolId),
+          eq(teachers.status, "active"),
+        ))
+        .limit(1);
+      assignedClassTeacher = Boolean(classTeacher);
+    }
   }
+  if (!canViewExamSubject(context.grantedPermissions, assignedTeacher || assignedClassTeacher)) notFound();
   const roster = await db.select({
     markId: examMarks.id,
     enrollmentId: studentEnrollments.id,

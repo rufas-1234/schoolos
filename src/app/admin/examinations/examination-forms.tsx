@@ -781,7 +781,7 @@ export function AssignExamClassTeacherForm({
     <form action={action} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-3">
       <input type="hidden" name="examClassId" value={examClassId} />
       <label className="min-w-60 flex-1 text-xs font-medium text-slate-600">
-        Class teacher responsible for publishing
+        Class teacher responsible for reviewing results
         <select name="teacherId" defaultValue={classTeacherId ? String(classTeacherId) : ""} required className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900">
           <option value="">Select class teacher</option>
           {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
@@ -805,7 +805,7 @@ export function PublishExamClassForm({
     <form action={action} className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
       <input type="hidden" name="examClassId" value={examClassId} />
       <p className="text-sm font-semibold text-emerald-950">Publish this class&apos;s results</p>
-      <p className="mt-1 text-xs text-emerald-900">Only the assigned class teacher can publish. Attendance must be recorded for every enrolled student before publication, but it does not block marks entry or submission. Results stay locked after publication.</p>
+      <p className="mt-1 text-xs text-emerald-900">Only users with Results publish permission can publish. Attendance must be recorded for every enrolled student before publication, but it does not block marks entry or submission. Results stay locked after publication.</p>
       <button disabled={disabled || pending} className="mt-3 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
         {pending ? "Publishing..." : "Publish class results"}
       </button>

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   canPreviewDraftTestReport,
+  canPublishExamClass,
+  canReviewExamSubject,
   canViewExamSubject,
   buildExamProgressPeriods,
   calculateComponentTotal,
@@ -31,6 +33,15 @@ describe("examination policy", () => {
     expect(canViewExamSubject(["results.enter"], false)).toBe(false);
     expect(canViewExamSubject(["examinations.create"], false)).toBe(true);
     expect(canViewExamSubject(["results.publish"], false)).toBe(true);
+  });
+
+  it("allows class teachers to review their class but reserves publishing for results publishers", () => {
+    expect(canReviewExamSubject(["results.enter"], true)).toBe(true);
+    expect(canReviewExamSubject(["results.enter"], false)).toBe(false);
+    expect(canReviewExamSubject(["results.publish"], false)).toBe(true);
+    expect(canReviewExamSubject([], true)).toBe(false);
+    expect(canPublishExamClass(["results.enter"])).toBe(false);
+    expect(canPublishExamClass(["results.publish"])).toBe(true);
   });
 
   it("rejects grade scales with gaps or overlaps", () => {

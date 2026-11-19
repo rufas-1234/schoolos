@@ -21,7 +21,11 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { canViewExamSubject } from "@/lib/examination-policy";
+import {
+  canPublishExamClass,
+  canReviewExamSubject,
+  canViewExamSubject,
+} from "@/lib/examination-policy";
 import {
   AssignExamClassTeacherForm,
   PrincipalRemarkForm,
@@ -243,7 +247,7 @@ export default async function ExaminationDetailPage({
         {[
           { number: "1", title: "Check setup", detail: `${visibleClassCount} classes · ${visibleSubjects.length} subjects`, href: "/admin/examinations?section=setup", done: true },
           { number: "2", title: "Enter marks", detail: `${completeSubjects} of ${visibleSubjects.length} subject rosters complete`, href: "/admin/examinations?section=marks&examId=" + exam.id, done: completeSubjects === visibleSubjects.length && visibleSubjects.length > 0 },
-          { number: "3", title: "Review & publish", detail: `${visibleSubjects.filter((subject) => subject.status === "published").length} of ${visibleSubjects.length} assessments published by their class teachers`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
+          { number: "3", title: "Review & publish", detail: `${visibleSubjects.filter((subject) => subject.status === "published").length} of ${visibleSubjects.length} assessments published by authorized exam users`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
           { number: "4", title: "Generate reports", detail: exam.status === "published" ? canConfigure || canReview ? "A4 marksheets and individual or bulk progress cards are ready" : "Your assigned subject results are ready to view" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? canConfigure || canReview ? `/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRows[0].id}` : `/admin/examinations/report-center/subject-wise-marksheet?examId=${exam.id}` : null, done: exam.status === "published" },
         ].map((step) => (
           step.href ? (
@@ -265,7 +269,7 @@ export default async function ExaminationDetailPage({
       {canReview && exam.status === "open" && (
         <section id="publication-checklist" className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <h2 className="font-bold text-slate-900">Publication checklist</h2>
-          <p className="mt-1 text-sm text-slate-600">{allSubjects.filter((subject) => subject.status === "approved").length} of {allSubjects.length} assessments approved. Each assigned class teacher publishes their own class after every subject is approved and complete.</p>
+          <p className="mt-1 text-sm text-slate-600">{allSubjects.filter((subject) => subject.status === "approved").length} of {allSubjects.length} assessments approved. Assigned class teachers review their class; users with Results publish permission publish results after every subject is approved and complete.</p>
         </section>
       )}
 
@@ -292,6 +296,7 @@ export default async function ExaminationDetailPage({
           const classPublished = subjectRows.every((subject) => subject.status === "published");
           const classApproved = subjectRows.every((subject) => subject.status === "approved");
           const isAssignedClassTeacher = classRow.classTeacherId !== null && myTeacherIds.includes(classRow.classTeacherId);
+          const canReviewClassSubject = canReviewExamSubject(context.grantedPermissions, isAssignedClassTeacher);
           return (
             <article key={classRow.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
@@ -310,7 +315,7 @@ export default async function ExaminationDetailPage({
               </div>
               <div className="grid gap-3 border-b p-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-900">Publishing class teacher</p>
+                  <p className="text-sm font-semibold text-slate-900">Class review teacher</p>
                   <p className="mt-1 text-sm text-slate-600">
                     {classRow.classTeacherFirstName
                       ? `${classRow.classTeacherFirstName} ${classRow.classTeacherLastName}`
@@ -324,7 +329,7 @@ export default async function ExaminationDetailPage({
                         .map((teacher) => ({ id: teacher.id, name: `${teacher.name} ${teacher.lastName}` }))}
                     />
                   )}
-                  {isAssignedClassTeacher && exam.status === "open" && !classPublished && (
+                  {canPublishExamClass(context.grantedPermissions) && exam.status === "open" && !classPublished && (
                     <div className="mt-3">
                       <PublishExamClassForm examClassId={classRow.id} disabled={!classApproved} />
                       {!classApproved && <p className="mt-2 text-xs text-amber-800">All class subjects must be reviewed and approved first.</p>}
@@ -359,7 +364,7 @@ export default async function ExaminationDetailPage({
                         {exam.status === "published" ? "View results & report cards" : "Enter / review marks"}
                       </Link>
                     </div>
-                    {canReview && subject.status === "submitted" && exam.status === "open" && <ReviewSubjectForm examSubjectId={subject.id} />}
+                    {canReviewClassSubject && subject.status === "submitted" && exam.status === "open" && <ReviewSubjectForm examSubjectId={subject.id} />}
                   </div>
                 ))}
               </div>
