@@ -188,12 +188,6 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    href: "/admin/settings",
-    label: "School profile",
-    icon: School,
-    permission: "school.settings.manage",
-  },
-  {
     href: "/admin/inventory",
     label: "Inventory",
     icon: PackageOpen,
@@ -227,6 +221,12 @@ const navigation: NavigationItem[] = [
       { id: "create-account", label: "Create account", href: "/admin/users/roles?section=create-account", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-account" } },
       { id: "individual-access", label: "Individual access", href: "/admin/users/roles?section=individual-access", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "individual-access" } },
     ],
+  },
+  {
+    href: "/admin/settings",
+    label: "School profile",
+    icon: School,
+    permission: "school.settings.manage",
   },
 ];
 
