@@ -17,6 +17,15 @@ export type ExamAttendanceStatus =
 
 export type ExamAssessmentResultState = "scored" | "not-applicable" | "no-result" | "missing";
 
+export function canViewExamSubject(
+  grantedPermissions: readonly string[],
+  isAssignedToSubject: boolean,
+): boolean {
+  return isAssignedToSubject ||
+    grantedPermissions.includes("examinations.create") ||
+    grantedPermissions.includes("results.publish");
+}
+
 export function examAssessmentResultState(input: {
   attendanceStatus: string | null;
   isCompulsory: boolean;

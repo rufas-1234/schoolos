@@ -24,6 +24,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { canViewExamSubject } from "@/lib/examination-policy";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
@@ -391,7 +392,7 @@ export default async function ExaminationsPage({
     ))
     : [];
   const authorizedAssessments = assessmentRows.filter((assessment) =>
-    canConfigure || context.grantedPermissions.includes("results.publish") || assignedSubjectIds?.includes(assessment.id) === true,
+    canViewExamSubject(context.grantedPermissions, assignedSubjectIds?.includes(assessment.id) ?? false),
   );
   const filteredAssessments = authorizedAssessments.filter((assessment) =>
     (!branchFilter || assessment.classBranchId === branchFilter) &&
@@ -634,6 +635,7 @@ export default async function ExaminationsPage({
           <div>
             <h2 className="text-xl font-bold text-slate-950">Marks register</h2>
             <p className="mt-1 text-sm text-slate-500">Filter by branch, exam, class, section, and subject, then open a subject roster for bulk component entry or review.</p>
+            {!isManager && <p className="mt-1 text-sm text-violet-700">Only subjects assigned to you are shown. Ask a school administrator for Examinations setup or Results publish access if your role requires broader exam visibility.</p>}
           </div>
           {assessmentFilterForm("marks")}
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">

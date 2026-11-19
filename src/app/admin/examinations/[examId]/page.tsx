@@ -21,6 +21,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { canViewExamSubject } from "@/lib/examination-policy";
 import {
   AssignExamClassTeacherForm,
   PrincipalRemarkForm,
@@ -142,14 +143,16 @@ export default async function ExaminationDetailPage({
     .leftJoin(teachers, and(eq(teachers.id, classSubjects.teacherId!), eq(teachers.schoolId, context.schoolId)))
     .where(and(eq(examSubjects.schoolId, context.schoolId), eq(examClasses.examinationId, exam.id)))
     .orderBy(asc(classLevels.name), asc(subjects.name));
-  const visibleSubjects = assignedIds ? allSubjects.filter((subject) => assignedIds?.includes(subject.id)) : allSubjects;
-  const progressMarks = allSubjects.length
+  const visibleSubjects = allSubjects.filter((subject) =>
+    canViewExamSubject(context.grantedPermissions, assignedIds === null || assignedIds.includes(subject.id)),
+  );
+  const progressMarks = visibleSubjects.length
     ? await db.select({
       examSubjectId: examMarks.examSubjectId,
       marks: examMarks.marks,
     }).from(examMarks).where(and(
       eq(examMarks.schoolId, context.schoolId),
-      inArray(examMarks.examSubjectId, allSubjects.map((subject) => subject.id)),
+      inArray(examMarks.examSubjectId, visibleSubjects.map((subject) => subject.id)),
     ))
     : [];
   const markProgressBySubject = new Map<number, { entered: number; total: number }>();
@@ -159,10 +162,11 @@ export default async function ExaminationDetailPage({
     if (mark.marks !== null) progress.entered += 1;
     markProgressBySubject.set(mark.examSubjectId, progress);
   }
-  const completeSubjects = allSubjects.filter((subject) => {
+  const completeSubjects = visibleSubjects.filter((subject) => {
     const progress = markProgressBySubject.get(subject.id);
     return !!progress && progress.total > 0 && progress.entered === progress.total;
   }).length;
+  const visibleClassCount = new Set(visibleSubjects.map((subject) => subject.examClassId)).size;
   const canPreviewReports = exam.name.startsWith("TEST DATA - ") && (canConfigure || canReview);
   const reportsReady = exam.status === "published" || canPreviewReports;
   const classRows = await db.select({
@@ -237,10 +241,10 @@ export default async function ExaminationDetailPage({
 
       <section aria-label="Exam workflow" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { number: "1", title: "Check setup", detail: `${classRows.length} classes · ${allSubjects.length} subjects`, href: "/admin/examinations?section=setup", done: true },
-          { number: "2", title: "Enter marks", detail: `${completeSubjects} of ${allSubjects.length} subject rosters complete`, href: "/admin/examinations?section=marks&examId=" + exam.id, done: completeSubjects === allSubjects.length && allSubjects.length > 0 },
-          { number: "3", title: "Review & publish", detail: `${allSubjects.filter((subject) => subject.status === "published").length} of ${allSubjects.length} assessments published by their class teachers`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
-          { number: "4", title: "Generate reports", detail: exam.status === "published" ? "A4 marksheets and individual or bulk progress cards are ready" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? `/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRows[0].id}` : null, done: exam.status === "published" },
+          { number: "1", title: "Check setup", detail: `${visibleClassCount} classes · ${visibleSubjects.length} subjects`, href: "/admin/examinations?section=setup", done: true },
+          { number: "2", title: "Enter marks", detail: `${completeSubjects} of ${visibleSubjects.length} subject rosters complete`, href: "/admin/examinations?section=marks&examId=" + exam.id, done: completeSubjects === visibleSubjects.length && visibleSubjects.length > 0 },
+          { number: "3", title: "Review & publish", detail: `${visibleSubjects.filter((subject) => subject.status === "published").length} of ${visibleSubjects.length} assessments published by their class teachers`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
+          { number: "4", title: "Generate reports", detail: exam.status === "published" ? canConfigure || canReview ? "A4 marksheets and individual or bulk progress cards are ready" : "Your assigned subject results are ready to view" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? canConfigure || canReview ? `/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRows[0].id}` : `/admin/examinations/report-center/subject-wise-marksheet?examId=${exam.id}` : null, done: exam.status === "published" },
         ].map((step) => (
           step.href ? (
             <Link key={step.number} href={step.href} className={`rounded-xl border p-4 ${step.done ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>

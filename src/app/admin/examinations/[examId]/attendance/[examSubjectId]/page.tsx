@@ -17,6 +17,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { canViewExamSubject } from "@/lib/examination-policy";
 import { SaveExamAttendanceForm } from "../../../examination-forms";
 
 export const dynamic = "force-dynamic";
@@ -95,7 +96,7 @@ export default async function ExamAttendancePage({
       .limit(1);
     assignedTeacher = Boolean(assignment);
   }
-  if (!canManage && !assignedTeacher) notFound();
+  if (!canViewExamSubject(context.grantedPermissions, assignedTeacher)) notFound();
   const roster = await db.select({
     enrollmentId: studentEnrollments.id,
     name: students.firstName,

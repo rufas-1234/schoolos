@@ -27,6 +27,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { canViewExamSubject } from "@/lib/examination-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { PrintButton } from "@/components/print-button";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
@@ -114,8 +115,8 @@ export default async function SubjectMarksPage({
       .where(and(eq(examSubjects.id, subject.id), eq(examSubjects.schoolId, context.schoolId)))
       .limit(1);
     assignedTeacher = assignment.length > 0;
-    if (!assignedTeacher && !canConfigure && !canReview) notFound();
-  } else if (!canConfigure && !canReview) {
+    if (!canViewExamSubject(context.grantedPermissions, assignedTeacher)) notFound();
+  } else if (!canViewExamSubject(context.grantedPermissions, false)) {
     notFound();
   }
   const roster = await db.select({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canPreviewDraftTestReport,
+  canViewExamSubject,
   buildExamProgressPeriods,
   calculateComponentTotal,
   calculateAnnualProgress,
@@ -25,6 +26,13 @@ const scale: GradeBand[] = [
 ];
 
 describe("examination policy", () => {
+  it("limits subject-result visibility to assigned teachers unless examination oversight is granted", () => {
+    expect(canViewExamSubject(["results.enter"], true)).toBe(true);
+    expect(canViewExamSubject(["results.enter"], false)).toBe(false);
+    expect(canViewExamSubject(["examinations.create"], false)).toBe(true);
+    expect(canViewExamSubject(["results.publish"], false)).toBe(true);
+  });
+
   it("rejects grade scales with gaps or overlaps", () => {
     expect(validateGradeBands(scale)).toBeNull();
     expect(validateGradeBands([scale[0], { ...scale[1], minPercent: 41 }, scale[2]])).toContain("gaps");

@@ -32,6 +32,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { canViewExamSubject } from "@/lib/examination-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
@@ -597,7 +598,9 @@ export default async function ExaminationReportPage({
   const assignedAssessmentIds = canManage
     ? null
     : new Set(assignedAssessmentRows.map((row) => row.id));
-  const assessments = subjectRows.filter((item) => assignedAssessmentIds === null || assignedAssessmentIds.has(item.id));
+  const assessments = subjectRows.filter((item) =>
+    canViewExamSubject(context.grantedPermissions, assignedAssessmentIds?.has(item.id) ?? false),
+  );
   const selectedSubject = assessments.find((item) => item.id === requestedSubjectId) ?? null;
 
   const resultRows = hasResults && examDetails && examClass && examDetails.status === "published" && assessments.length
