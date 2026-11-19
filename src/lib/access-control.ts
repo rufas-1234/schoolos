@@ -1,9 +1,11 @@
-import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { and, asc, eq } from "drizzle-orm";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { hasPermission, requireSingleSchoolMembership } from "@/lib/access-policy";
+import { hasPermission } from "@/lib/access-policy";
+import { activeSchoolCookieName, isMultiSchoolEnabled, resolveSchoolChoice } from "@/lib/school-context-policy";
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 import {
   permissions,
   roles,
@@ -14,7 +16,7 @@ import {
   userRoles,
 } from "@/db/schema";
 
-export async function requireSchoolMember() {
+export async function getCurrentUserSchoolMemberships() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
 
@@ -47,11 +49,30 @@ export async function requireSchoolMember() {
         eq(schoolMemberships.status, "active"),
       ),
     )
-    .limit(2);
+    .orderBy(asc(schools.name), asc(schools.id));
 
-  const membership = requireSingleSchoolMembership(memberships);
+  return { user: session.user, memberships };
+}
+
+export async function requireSchoolMember() {
+  const { user: signedInUser, memberships } = await getCurrentUserSchoolMemberships();
+  if (!memberships.length) {
+    if (isPlatformAdminEmail(signedInUser.email) && isMultiSchoolEnabled()) redirect("/platform/schools");
+    redirect("/select-school?reason=no-school-access");
+  }
+
+  const cookieStore = await cookies();
+  const selectedSchoolPublicId = cookieStore.get(activeSchoolCookieName)?.value;
+  const membership = resolveSchoolChoice(
+    memberships,
+    selectedSchoolPublicId,
+    isMultiSchoolEnabled(),
+    process.env.DEFAULT_SCHOOL_PUBLIC_ID,
+  );
+  if (!membership) redirect("/select-school");
+
   return {
-    user: session.user,
+    user: signedInUser,
     schoolId: membership.schoolId,
     schoolPublicId: membership.schoolPublicId,
     schoolName: membership.schoolName,
@@ -62,6 +83,8 @@ export async function requireSchoolMember() {
     schoolCurrency: membership.schoolCurrency,
     schoolTimezone: membership.schoolTimezone,
     membershipId: membership.membershipId,
+    schoolChoices: memberships.map(({ schoolPublicId, schoolName }) => ({ schoolPublicId, schoolName })),
+    multiSchoolEnabled: isMultiSchoolEnabled(),
   };
 }
 

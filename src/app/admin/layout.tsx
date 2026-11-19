@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin-shell";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       userName={context.user.name}
       roleNames={context.roleNames}
       permissions={context.grantedPermissions}
+      activeSchoolPublicId={context.schoolPublicId}
+      schoolChoices={context.schoolChoices}
+      multiSchoolEnabled={context.multiSchoolEnabled}
+      isPlatformAdmin={isPlatformAdminEmail(context.user.email)}
     >
       {children}
     </AdminShell>

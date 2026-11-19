@@ -1,9 +1,12 @@
 import { GraduationCap, ShieldCheck } from "lucide-react";
 import { Suspense } from "react";
+import Link from "next/link";
 import { LoginForm } from "./login-form";
+import { isMultiSchoolEnabled } from "@/lib/school-context-policy";
 
 export default function LoginPage() {
   const configured = Boolean(process.env.DATABASE_URL);
+  const canSignUp = configured && isMultiSchoolEnabled();
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-[#f7f7fa] px-3 py-8 sm:px-4 sm:py-10">
@@ -57,11 +60,17 @@ export default function LoginPage() {
           <Suspense fallback={<div className="mt-8 h-56 animate-pulse rounded-xl bg-slate-50" />}>
             <LoginForm />
           </Suspense>
-          <p className="mt-8 text-center text-xs leading-5 text-slate-400">
-            Access is provisioned by your school administrator.
-            <br />
-            New accounts cannot be created from this page.
-          </p>
+          {canSignUp && (
+            <div className="mt-7 border-t border-slate-100 pt-6 text-center">
+              <p className="text-sm text-slate-500">New to SchoolOS?</p>
+              <Link
+                href="/signup"
+                className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-5 text-sm font-semibold text-violet-800 transition hover:border-violet-300 hover:bg-violet-100"
+              >
+                Create a school workspace
+              </Link>
+            </div>
+          )}
         </section>
       </div>
     </main>

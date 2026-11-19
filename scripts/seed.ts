@@ -16,65 +16,12 @@ import {
   user,
   userRoles,
 } from "../src/db/schema";
-
-const permissionCatalog = [
-  ["dashboard.view", "View the school dashboard"],
-  ["school.settings.manage", "Manage school profile and settings"],
-  ["academics.manage", "Manage academic setup, attendance, and enrollment without deleting records"],
-  ["academics.delete", "Delete academic setup and records"],
-  ["users.manage", "Manage school user accounts"],
-  ["roles.manage", "Manage roles and permission assignments"],
-  ["students.view", "View student records"],
-  ["students.create", "Create student records"],
-  ["students.update", "Update student records"],
-  ["students.delete", "Archive student records"],
-  ["students.promote", "Promote or transfer students"],
-  ["attendance.mark", "Mark attendance"],
-  ["attendance.approve", "Approve attendance corrections"],
-  ["examinations.create", "Configure examinations and assessments"],
-  ["examinations.delete", "Delete examinations"],
-  ["results.enter", "Enter marks for assigned assessments"],
-  ["results.publish", "Approve and publish results"],
-  ["fees.manage", "Manage fee structures"],
-  ["inventory.manage", "Manage school inventory and assets"],
-  ["library.manage", "Manage library books and lending"],
-  ["dormitories.manage", "Manage dormitories, rooms, and student assignments"],
-  ["accounts.manage", "Manage school accounts, income, expenses, and reports"],
-  ["fees.balance.view", "View outstanding student fee balances"],
-  ["payments.record", "Record school payments"],
-  ["reports.export", "Export school reports"],
-  ["staff.manage", "Manage staff records"],
-] as const;
-
-const initialRoles = [
-  "School administrator",
-  "Principal",
-  "Deputy principal",
-  "Registrar",
-  "Accountant",
-  "Teacher",
-  "Parent / guardian",
-  "Student",
-  "Librarian",
-  "Transport manager",
-  "Hostel administrator",
-  "Human resources officer",
-] as const;
-
-const defaultChartAccounts = [
-  ["1000", "Cash on hand", "asset", "Cash held by the school"],
-  ["1010", "Bank account clearing", "asset", "Control account for school bank accounts"],
-  ["2000", "Accounts payable", "liability", "Amounts owed to suppliers and service providers"],
-  ["3000", "Accumulated school funds", "equity", "Opening and retained school funds"],
-  ["4000", "School fee income", "income", "Tuition and other student fee receipts"],
-  ["4100", "Other income", "income", "Donations, grants, and miscellaneous income"],
-  ["5000", "Staff expenses", "expense", "Salaries, allowances, and staff-related costs"],
-  ["5100", "School supplies", "expense", "Teaching, office, and classroom supplies"],
-  ["5200", "Utilities", "expense", "Electricity, water, internet, and other utilities"],
-  ["5300", "Transport costs", "expense", "School transport and travel costs"],
-  ["5400", "Repairs and maintenance", "expense", "School facility, equipment, and asset maintenance"],
-  ["5500", "Other operating expenses", "expense", "Other approved operating costs"],
-] as const;
+import {
+  defaultChartAccounts,
+  initialSchoolRoles as initialRoles,
+  schoolAdminPermissionKeys,
+  schoolPermissionCatalog as permissionCatalog,
+} from "../src/lib/school-defaults";
 
 async function seed() {
   if (process.env.NODE_ENV === "production") {
@@ -225,31 +172,7 @@ async function seed() {
       await tx.insert(userRoles).values({ membershipId, roleId: adminRole.id });
     }
 
-    const adminPermissions = [
-      "dashboard.view",
-      "school.settings.manage",
-      "academics.manage",
-      "academics.delete",
-      "users.manage",
-      "roles.manage",
-      "students.view",
-      "students.create",
-      "students.update",
-      "students.delete",
-      "staff.manage",
-      "fees.manage",
-      "fees.balance.view",
-      "payments.record",
-      "accounts.manage",
-      "inventory.manage",
-      "library.manage",
-      "dormitories.manage",
-      "reports.export",
-      "examinations.create",
-      "examinations.delete",
-      "results.enter",
-      "results.publish",
-    ];
+    const adminPermissions = schoolAdminPermissionKeys;
     const rolePermissionIds = new Set(
       (
         await tx

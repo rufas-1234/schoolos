@@ -1,6 +1,7 @@
 "use server";
 
 import { and, eq, inArray, or } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { db } from "@/db";
 import {
   permissions,
@@ -11,10 +12,27 @@ import {
   userRoles,
   userStudentLinks,
 } from "@/db/schema";
-import { requireSchoolMember } from "@/lib/access-control";
+import { getCurrentUserSchoolMemberships, requireSchoolMember } from "@/lib/access-control";
 import { getWorkspaceHomePath } from "@/lib/workspace-home-policy";
+import { activeSchoolCookieName, isMultiSchoolEnabled, resolveSchoolChoice } from "@/lib/school-context-policy";
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 
 export async function getSignedInWorkspacePath(): Promise<string> {
+  const { user: signedInUser, memberships } = await getCurrentUserSchoolMemberships();
+  if (!memberships.length) {
+    return isPlatformAdminEmail(signedInUser.email) && isMultiSchoolEnabled()
+      ? "/platform/schools"
+      : "/select-school?reason=no-school-access";
+  }
+  const selectedSchoolPublicId = (await cookies()).get(activeSchoolCookieName)?.value;
+  const selectedMembership = resolveSchoolChoice(
+    memberships,
+    selectedSchoolPublicId,
+    isMultiSchoolEnabled(),
+    process.env.DEFAULT_SCHOOL_PUBLIC_ID,
+  );
+  if (!selectedMembership) return "/select-school";
+
   const context = await requireSchoolMember();
   const granted = await db.select({ key: permissions.key })
     .from(userRoles)

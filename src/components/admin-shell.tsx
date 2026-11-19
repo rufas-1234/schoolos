@@ -31,6 +31,7 @@ import { studentSections } from "@/lib/student-sections";
 import { cn } from "@/lib/utils";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 import { schoolLogoSource } from "@/lib/school-logo";
+import { selectSchool } from "@/app/select-school/actions";
 
 type NavigationChild = {
   id: string;
@@ -250,6 +251,10 @@ export function AdminShell({
   userName,
   roleNames,
   permissions,
+  activeSchoolPublicId,
+  schoolChoices,
+  multiSchoolEnabled,
+  isPlatformAdmin,
 }: {
   children: ReactNode;
   schoolName: string;
@@ -260,6 +265,10 @@ export function AdminShell({
   userName: string;
   roleNames: string[];
   permissions: string[];
+  activeSchoolPublicId: string;
+  schoolChoices: { schoolPublicId: string; schoolName: string }[];
+  multiSchoolEnabled: boolean;
+  isPlatformAdmin: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -792,7 +801,39 @@ export function AdminShell({
                 <ChevronDown size={16} className="hidden text-violet-900/70 sm:block" />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl">
+                <div className="absolute right-0 top-12 z-30 w-64 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl">
+                  {multiSchoolEnabled && schoolChoices.length > 1 && (
+                    <div className="border-b border-slate-100 px-3 py-2">
+                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">School workspace</p>
+                      {schoolChoices.map((choice) => (
+                        <form action={selectSchool} key={choice.schoolPublicId}>
+                          <input type="hidden" name="schoolPublicId" value={choice.schoolPublicId} />
+                          <button
+                            type="submit"
+                            className={cn(
+                              "w-full truncate rounded-lg px-2.5 py-2 text-left text-sm",
+                              choice.schoolPublicId === activeSchoolPublicId
+                                ? "bg-violet-50 font-semibold text-violet-800"
+                                : "text-slate-600 hover:bg-slate-50",
+                            )}
+                          >
+                            {choice.schoolName}
+                            {choice.schoolPublicId === activeSchoolPublicId && <span className="float-right">Current</span>}
+                          </button>
+                        </form>
+                      ))}
+                    </div>
+                  )}
+                  {isPlatformAdmin && multiSchoolEnabled && (
+                    <Link
+                      href="/platform/schools"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                      <School size={16} />
+                      Platform schools
+                    </Link>
+                  )}
                   {permissions.includes("school.settings.manage") && (
                     <Link
                       href="/admin/settings"
