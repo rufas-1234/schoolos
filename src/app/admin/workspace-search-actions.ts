@@ -31,6 +31,7 @@ import {
   studentFeeInvoices,
   studentDormitoryAssignments,
   students,
+  studentBehaviorRecords,
   subjects,
   teachers,
   schoolMemberships,
@@ -260,6 +261,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const applicationEmail = sql<string>`JSON_UNQUOTE(JSON_EXTRACT(${staffApplications.applicationData}, '$.email'))`;
   const [
     userRows,
+    behaviorRows,
     studentRows,
     inventoryItemRows,
     inventoryAssetRows,
@@ -288,6 +290,32 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         ))
         .orderBy(asc(user.name))
         .limit(20)
+      : Promise.resolve([]),
+    canViewStudents && permissions.has("students.update")
+      ? db.select({
+        publicId: studentBehaviorRecords.publicId,
+        incidentDate: studentBehaviorRecords.incidentDate,
+        category: studentBehaviorRecords.category,
+        severity: studentBehaviorRecords.severity,
+        details: studentBehaviorRecords.details,
+        actionTaken: studentBehaviorRecords.actionTaken,
+        studentPublicId: students.publicId,
+        firstName: students.firstName,
+        lastName: students.lastName,
+        admissionNumber: students.admissionNumber,
+      }).from(studentBehaviorRecords)
+        .innerJoin(students, and(eq(studentBehaviorRecords.studentId, students.id), eq(students.schoolId, context.schoolId)))
+        .where(and(
+          eq(studentBehaviorRecords.schoolId, context.schoolId),
+          or(
+            tokenMatch(students.firstName), tokenMatch(students.lastName),
+            tokenMatch(students.admissionNumber), tokenMatch(studentBehaviorRecords.category),
+            tokenMatch(studentBehaviorRecords.severity), tokenMatch(studentBehaviorRecords.details),
+            tokenMatch(studentBehaviorRecords.actionTaken), like(studentBehaviorRecords.publicId, pattern),
+          ),
+        ))
+        .orderBy(desc(studentBehaviorRecords.incidentDate), desc(studentBehaviorRecords.id))
+        .limit(30)
       : Promise.resolve([]),
     canViewStudents
       ? db.select({
@@ -951,6 +979,17 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       description: student.admissionNumber ? `Student · Admission no. ${student.admissionNumber}` : "Student profile",
       href: `/admin/students?profile=${encodeURIComponent(student.publicId)}`,
       category: "Students",
+    });
+  }
+  for (const record of behaviorRows) {
+    const studentName = `${record.firstName} ${record.lastName}`;
+    results.push({
+      id: `student-behavior-${record.publicId}`,
+      title: `Behaviour record · ${studentName}`,
+      description: `${record.category.replaceAll("_", " ")} · ${record.severity} · ${record.incidentDate} · ${record.admissionNumber ?? "Student"}`,
+      href: `/admin/students/behavior?search=${encodeURIComponent(query)}`,
+      category: "Students",
+      searchTerms: [studentName, record.admissionNumber ?? "", record.category, record.severity, record.details, record.actionTaken],
     });
   }
   for (const item of inventoryItemRows) {

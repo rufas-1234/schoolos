@@ -19,6 +19,7 @@ import {
   auditLogs,
   schoolMemberships,
   staffMembers,
+  staffApplications,
   studentEnrollments,
   students,
   teachers,
@@ -36,6 +37,7 @@ export default async function DashboardPage() {
     enrollmentResult,
     teachersResult,
     staffResult,
+    pendingStaffResult,
     recentActivity,
   ] = await Promise.all([
     db
@@ -69,6 +71,12 @@ export default async function DashboardPage() {
       .select({ value: count() })
       .from(staffMembers)
       .where(and(eq(staffMembers.schoolId, context.schoolId), eq(staffMembers.status, "active"))),
+    context.grantedPermissions.includes("staff.manage") || context.grantedPermissions.includes("school.settings.manage")
+      ? db.select({ value: count() }).from(staffApplications).where(and(
+        eq(staffApplications.schoolId, context.schoolId),
+        eq(staffApplications.status, "pending"),
+      ))
+      : Promise.resolve([{ value: 0 }]),
     db
       .select({
         action: auditLogs.action,
@@ -88,6 +96,7 @@ export default async function DashboardPage() {
   const enrollmentCount = Number(enrollmentResult[0]?.value ?? 0);
   const teacherCount = Number(teachersResult[0]?.value ?? 0);
   const staffCount = Number(staffResult[0]?.value ?? 0);
+  const pendingStaffCount = Number(pendingStaffResult[0]?.value ?? 0);
   const canManageFees = context.grantedPermissions.includes("fees.manage");
   const canRecordPayments = context.grantedPermissions.includes("payments.record");
   const schoolLogo = schoolLogoSource(context.schoolLogoUrl);
@@ -182,6 +191,28 @@ export default async function DashboardPage() {
           </div>
           <span className="inline-flex items-center gap-2 text-sm font-semibold text-amber-900">
             Review admissions <ArrowUpRight size={16} />
+          </span>
+        </Link>
+      )}
+
+      {pendingStaffCount > 0 && (
+        <Link
+          href="/admin/staff/applications"
+          className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 transition hover:border-sky-300 hover:bg-sky-100/70 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sky-700 shadow-sm">
+              <BriefcaseBusiness size={19} />
+            </span>
+            <span>
+              <span className="block font-semibold text-sky-950">
+                {pendingStaffCount} staff registration{pendingStaffCount === 1 ? " needs" : "s need"} approval
+              </span>
+              <span className="mt-1 block text-sm text-sky-800">Review staff registration details before adding them to the school.</span>
+            </span>
+          </div>
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-sky-900">
+            Review staff registrations <ArrowUpRight size={16} />
           </span>
         </Link>
       )}

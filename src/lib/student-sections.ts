@@ -49,6 +49,12 @@ export const studentSections = [
     href: "/admin/students/groups",
   },
   {
+    id: "behavior",
+    label: "Student Behaviour",
+    href: "/admin/students/behavior",
+    permission: "students.update",
+  },
+  {
     id: "promote",
     label: "Student Promote",
     href: "/admin/students/promote",

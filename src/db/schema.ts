@@ -320,6 +320,34 @@ export const students = mysqlTable(
   ],
 );
 
+export const studentBehaviorRecords = mysqlTable(
+  "student_behavior_records",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    incidentDate: date("incidentDate", { mode: "string" }).notNull(),
+    category: varchar("category", { length: 40 }).notNull(),
+    severity: varchar("severity", { length: 20 }).notNull(),
+    details: varchar("details", { length: 3000 }).notNull(),
+    actionTaken: varchar("actionTaken", { length: 40 }).notNull(),
+    followUpDate: date("followUpDate", { mode: "string" }),
+    recordedBy: varchar("recordedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("student_behavior_records_school_student_date_idx").on(table.schoolId, table.studentId, table.incidentDate),
+    index("student_behavior_records_school_category_date_idx").on(table.schoolId, table.category, table.incidentDate),
+    index("student_behavior_records_school_severity_date_idx").on(table.schoolId, table.severity, table.incidentDate),
+  ],
+);
+
 export const dormitories = mysqlTable(
   "dormitories",
   {

@@ -7,7 +7,7 @@ import { useEffect, useId, useState } from "react";
 import { printCurrentPage } from "@/components/print-button";
 import { LibraryLoanHistory, type LibraryLoanHistoryItem } from "@/components/library-loan-history";
 
-type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams" | "library";
+type ProfileTab = "personal" | "parents" | "documents" | "previous" | "other" | "custom" | "exams" | "library" | "behaviour";
 type ProfileField = {
   label: string;
   value: string | null;
@@ -28,6 +28,7 @@ const tabs: { id: ProfileTab; label: string; emptyMessage?: string }[] = [
   { id: "custom", label: "Custom Field", emptyMessage: "No custom student fields are configured." },
   { id: "exams", label: "Exam Results", emptyMessage: "No published exam results are attached to this student." },
   { id: "library", label: "Library", emptyMessage: "No library borrowing history is recorded." },
+  { id: "behaviour", label: "Behaviour", emptyMessage: "No behaviour records have been recorded for this student." },
 ];
 
 export function StudentProfileDetails({
@@ -37,6 +38,7 @@ export function StudentProfileDetails({
   photoUrl,
   examHistory = [],
   libraryHistory = [],
+  behaviourHistory = [],
 }: {
   fields: ProfileField[];
   studentName: string;
@@ -51,6 +53,16 @@ export function StudentProfileDetails({
     href: string | null;
   }>;
   libraryHistory?: LibraryLoanHistoryItem[];
+  behaviourHistory?: Array<{
+    id: number;
+    incidentDate: string;
+    category: string;
+    severity: string;
+    details: string;
+    actionTaken: string;
+    followUpDate: string | null;
+    recordedByName: string;
+  }>;
 }) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
   const [printing, setPrinting] = useState(false);
@@ -138,6 +150,16 @@ export function StudentProfileDetails({
             ))}</ul>
           </section>
         )}
+        {behaviourHistory.length > 0 && (
+          <section className="student-profile-print-section">
+            <h4>Behaviour history</h4>
+            <ul>{behaviourHistory.map((record) => (
+              <li key={record.id}>
+                {record.incidentDate} Â· {record.category.replaceAll("_", " ")} Â· {record.severity.replaceAll("_", " ")} Â· {record.details} Â· Action: {record.actionTaken.replaceAll("_", " ")}
+              </li>
+            ))}</ul>
+          </section>
+        )}
       </div>
       <div
         role="tablist"
@@ -189,6 +211,39 @@ export function StudentProfileDetails({
           )
         ) : activeTab === "library" ? (
           <LibraryLoanHistory loans={libraryHistory} />
+        ) : activeTab === "behaviour" ? (
+          behaviourHistory.length > 0 ? (
+            <div className="space-y-3">
+              {behaviourHistory.map((record) => (
+                <article key={record.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-semibold capitalize text-slate-900">{record.category.replaceAll("_", " ")}</h4>
+                      <p className="mt-1 text-xs text-slate-500">{record.incidentDate} Â· Recorded by {record.recordedByName}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${record.severity === "positive" ? "bg-emerald-50 text-emerald-800" : record.severity === "serious" ? "bg-rose-50 text-rose-800" : "bg-amber-50 text-amber-800"}`}>
+                      {record.severity}
+                    </span>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{record.details}</p>
+                  <dl className="mt-3 grid gap-3 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Action taken</dt>
+                      <dd className="mt-1 capitalize text-slate-800">{record.actionTaken.replaceAll("_", " ")}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Follow-up date</dt>
+                      <dd className="mt-1 text-slate-800">{record.followUpDate ?? "No follow-up scheduled"}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              {activeTabDetails?.emptyMessage}
+            </p>
+          )
         ) : visibleFields.length > 0 ? (
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             {visibleFields.map((field) => (

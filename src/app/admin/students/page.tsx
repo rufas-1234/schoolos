@@ -21,9 +21,11 @@ import {
   libraryLoans,
   schoolBranches,
   studentCategories,
+  studentBehaviorRecords,
   studentEnrollments,
   studentSettings,
   students,
+  user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { getStudentStatusTransitions } from "@/lib/student-policy";
@@ -193,6 +195,28 @@ export default async function StudentsPage({
     rollNumber: [...rollNumbers].join(", ") || null,
   }));
   const studentIds = records.map((record) => record.id);
+  const behaviourRows = studentIds.length
+    ? await db.select({
+      id: studentBehaviorRecords.id,
+      studentId: studentBehaviorRecords.studentId,
+      incidentDate: studentBehaviorRecords.incidentDate,
+      category: studentBehaviorRecords.category,
+      severity: studentBehaviorRecords.severity,
+      details: studentBehaviorRecords.details,
+      actionTaken: studentBehaviorRecords.actionTaken,
+      followUpDate: studentBehaviorRecords.followUpDate,
+      recordedByName: user.name,
+    }).from(studentBehaviorRecords)
+      .innerJoin(user, eq(studentBehaviorRecords.recordedBy, user.id))
+      .where(and(eq(studentBehaviorRecords.schoolId, context.schoolId), inArray(studentBehaviorRecords.studentId, studentIds)))
+      .orderBy(desc(studentBehaviorRecords.incidentDate), desc(studentBehaviorRecords.id))
+    : [];
+  const behaviourHistoryByStudent = new Map<number, typeof behaviourRows>();
+  for (const record of behaviourRows) {
+    const history = behaviourHistoryByStudent.get(record.studentId) ?? [];
+    history.push(record);
+    behaviourHistoryByStudent.set(record.studentId, history);
+  }
   const libraryHistoryRows = studentIds.length
     ? await db.select({
       id: libraryLoans.id,
@@ -573,6 +597,7 @@ export default async function StudentsPage({
                         : null,
                     }))}
                     libraryHistory={libraryHistoryByStudent.get(record.id) ?? []}
+                    behaviourHistory={behaviourHistoryByStudent.get(record.id) ?? []}
                     fields={[
                       { tab: "personal", label: "Student ID", value: record.publicId },
                       { tab: "personal", label: "Admission number", value: record.admissionNumber },

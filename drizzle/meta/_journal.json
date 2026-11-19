@@ -330,6 +330,13 @@
       "when": 1795066420189,
       "tag": "0046_fee_advance_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1795090000000,
+      "tag": "0047_student_behavior_records",
+      "breakpoints": true
     }
   ]
 }
