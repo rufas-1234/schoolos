@@ -12,7 +12,7 @@ type SectionOption = Option & { academicYearId: number; classLevelId: number };
 type CategoryOption = Option & { branchId: number | null };
 type UploadedFile = { fileName: string; objectKey: string };
 
-const inputClass = "w-full max-w-lg rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100";
+const inputClass = "w-full max-w-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200";
 const textAreaFields = new Set([
   "currentAddress",
   "permanentAddress",
@@ -103,7 +103,7 @@ export function PublicAdmissionForm({
       return (
         <div className="space-y-2 sm:col-span-2" key={fieldName}>
           <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-            <span>{label}{required && <span className="text-rose-700"> *</span>}</span>
+            <span>{label}{required && <span className="text-slate-900"> *</span>}</span>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -120,7 +120,7 @@ export function PublicAdmissionForm({
           {profilePhoto && (
             <div className="flex items-center gap-3 text-xs text-slate-600">
               <span>{profilePhoto.fileName}</span>
-              <button type="button" onClick={() => setProfilePhoto(null)} className="font-semibold text-rose-800">Remove</button>
+              <button type="button" onClick={() => setProfilePhoto(null)} className="font-semibold text-slate-800 underline">Remove</button>
             </div>
           )}
           <p className="text-xs text-slate-500">JPEG, PNG, or WebP; maximum 4 MB.</p>
@@ -131,7 +131,7 @@ export function PublicAdmissionForm({
     return (
       <fieldset key={fieldName} className="space-y-3 sm:col-span-2">
         <legend className="text-sm font-medium text-slate-700">
-          {label}{required && <span className="text-rose-700"> *</span>}
+          {label}{required && <span className="text-slate-900"> *</span>}
         </legend>
         <p className="text-xs text-slate-500">PDF, JPEG, PNG, or WebP; maximum 4 MB per file.</p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -165,7 +165,7 @@ export function PublicAdmissionForm({
                 {uploaded && (
                   <div className="flex items-center justify-between gap-2 text-xs text-slate-600">
                     <span className="truncate">{uploaded.fileName}</span>
-                    <button type="button" onClick={() => setDocuments((current) => ({ ...current, [slot]: null }))} className="shrink-0 font-semibold text-rose-800">Remove</button>
+                    <button type="button" onClick={() => setDocuments((current) => ({ ...current, [slot]: null }))} className="shrink-0 font-semibold text-slate-800 underline">Remove</button>
                   </div>
                 )}
               </div>
@@ -229,7 +229,7 @@ export function PublicAdmissionForm({
       const options = field.name === "gender" ? genderOptions : bloodGroupOptions.map((item) => [item, item]);
       return (
         <label key={field.name} className="block space-y-1.5 text-sm font-medium text-slate-700">
-          <span>{field.label}{required && <span className="text-rose-700"> *</span>}</span>
+          <span>{field.label}{required && <span className="text-slate-900"> *</span>}</span>
           <select name={field.name} required={required} className={inputClass} defaultValue="">
             <option value="">Select {field.label.toLocaleLowerCase()}</option>
             {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -256,7 +256,7 @@ export function PublicAdmissionForm({
     };
     return (
       <label key={field.name} className="block space-y-1.5 text-sm font-medium text-slate-700">
-        <span>{field.label}{required && <span className="text-rose-700"> *</span>}</span>
+        <span>{field.label}{required && <span className="text-slate-900"> *</span>}</span>
         {textAreaFields.has(field.name)
           ? <textarea {...fieldProps} rows={3} />
           : <input {...fieldProps} />}
@@ -266,8 +266,8 @@ export function PublicAdmissionForm({
 
   if (state.success) {
     return (
-      <section role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-950 sm:p-8">
-        <h2 className="text-xl font-bold">Registration received</h2>
+      <section role="status" className="border border-slate-300 bg-white p-6 text-slate-950 sm:p-8">
+        <h2 className="text-xl font-semibold">Registration received</h2>
         <p className="mt-2 text-sm">Your application has been submitted for review. The school will contact you about the next steps.</p>
       </section>
     );
@@ -276,13 +276,13 @@ export function PublicAdmissionForm({
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="schoolPublicId" value={schoolPublicId} />
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-        <h2 className="text-lg font-bold text-slate-950">Student information</h2>
+      <section className="border border-slate-300 bg-white p-5 sm:p-7">
+        <h2 className="text-lg font-semibold text-slate-950">Student information</h2>
         <p className="mt-1 text-sm text-slate-600">Fields marked with * are required by the school.</p>
         <div className="mt-6 space-y-6">
           {groupedFields.map(([group, groupFields]) => (
             <fieldset key={group} className="space-y-4">
-              <legend className="mb-3 w-full border-b border-slate-200 pb-2 text-sm font-bold uppercase tracking-wide text-rose-900">{group}</legend>
+              <legend className="mb-3 w-full border-b border-slate-300 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-800">{group}</legend>
               <div className="grid gap-4 sm:grid-cols-2">
                 {groupFields.map((field) => <div key={field.name}>{renderField(field)}</div>)}
               </div>
@@ -290,14 +290,14 @@ export function PublicAdmissionForm({
           ))}
         </div>
       </section>
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-        {uploadError && <p role="alert" className="text-sm text-rose-700">{uploadError}</p>}
-        {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
+      <section className="space-y-4 border border-slate-300 bg-white p-5 sm:p-7">
+        {uploadError && <p role="alert" className="text-sm text-red-700">{uploadError}</p>}
+        {state.error && <p role="alert" className="text-sm text-red-700">{state.error}</p>}
         <label className="flex items-start gap-3 text-sm text-slate-700">
-          <input type="checkbox" name="consent" required className="mt-1 accent-rose-800" />
+          <input type="checkbox" name="consent" required className="mt-1 accent-slate-800" />
           <span>I confirm that the information provided is accurate and may be used by the school to review this registration.</span>
         </label>
-        <button type="submit" disabled={pending || hasPendingUploads} className="rounded-lg bg-rose-900 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-950 disabled:opacity-60">
+        <button type="submit" disabled={pending || hasPendingUploads} className="border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
           {hasPendingUploads ? "Uploading files..." : pending ? "Submitting..." : "Submit registration"}
         </button>
       </section>

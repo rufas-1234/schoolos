@@ -11,7 +11,7 @@ export async function consumePublicAdmissionRateLimit({
   windowMs,
 }: {
   schoolId: number;
-  operation: "submission" | "upload";
+  operation: "submission" | "upload" | "staff-submission" | "staff-upload";
   clientAddress: string;
   maxRequests: number;
   windowMs: number;

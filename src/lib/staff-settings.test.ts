@@ -3,6 +3,7 @@ import {
   defaultRequiredStaffFields,
   defaultVisibleStaffFields,
   getStaffRequiredFieldError,
+  normalizePublicStaffVisibleFields,
   normalizeRequiredStaffFields,
   normalizeVisibleStaffFields,
 } from "./staff-settings";
@@ -44,5 +45,22 @@ describe("staff settings", () => {
     );
     expect(normalizeVisibleStaffFields(["email", "unknown"])).toEqual(expected);
     expect(normalizeVisibleStaffFields(null)).toEqual(defaultVisibleStaffFields);
+  });
+
+  it("keeps public custom fields paired and never exposes linked school accounts", () => {
+    const fields = normalizePublicStaffVisibleFields(["customFieldValue1", "linkedUserId"]);
+    expect(fields).toContain("customFieldName1");
+    expect(fields).toContain("customFieldValue1");
+    expect(fields).not.toContain("linkedUserId");
+  });
+
+  it("omits payroll and bank details from the public form unless explicitly enabled", () => {
+    const defaults = normalizePublicStaffVisibleFields(null);
+    expect(defaults).not.toContain("basicSalary");
+    expect(defaults).not.toContain("bankAccountNumber");
+    expect(normalizePublicStaffVisibleFields(["basicSalary", "bankAccountNumber"])).toEqual(
+      expect.arrayContaining(["basicSalary", "bankAccountNumber"]),
+    );
+    expect(normalizePublicStaffVisibleFields([], ["basicSalary"])).toContain("basicSalary");
   });
 });

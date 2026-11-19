@@ -77,6 +77,41 @@ export function normalizeVisibleStaffFields(fields: string[] | null | undefined)
     .map((field) => field.name);
 }
 
+export function normalizePublicStaffVisibleFields(
+  fields: string[] | null | undefined,
+  requiredFields?: string[] | null,
+): string[] {
+  const defaultPublicFields = defaultVisibleStaffFields.filter((name) =>
+    ![
+      "epfNumber",
+      "basicSalary",
+      "contractType",
+      "location",
+      "bankAccountName",
+      "bankAccountNumber",
+      "bankName",
+      "bankBranch",
+    ].includes(name),
+  );
+  const visible = new Set(normalizeVisibleStaffFields(fields ?? defaultPublicFields));
+  for (const name of requiredFields ?? []) {
+    if (staffSettingFields.some((field) => field.name === name)) visible.add(name);
+  }
+  visible.delete("linkedUserId");
+  for (const [nameField, valueField] of [
+    ["customFieldName1", "customFieldValue1"],
+    ["customFieldName2", "customFieldValue2"],
+  ]) {
+    if (visible.has(nameField) || visible.has(valueField)) {
+      visible.add(nameField);
+      visible.add(valueField);
+    }
+  }
+  return staffSettingFields
+    .filter((field) => visible.has(field.name))
+    .map((field) => field.name);
+}
+
 export function getStaffRequiredFieldError(
   values: Record<string, string | number | boolean | undefined>,
   requiredFields: string[],

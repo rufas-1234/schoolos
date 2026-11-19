@@ -722,6 +722,33 @@ export const staffSettings = mysqlTable(
   (table) => [uniqueIndex("staff_settings_school_uq").on(table.schoolId)],
 );
 
+export const staffApplications = mysqlTable(
+  "staff_applications",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    applicationData: json("applicationData").$type<Record<string, string>>().notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    reviewedBy: varchar("reviewedBy", { length: 36 }).references(() => user.id),
+    reviewedAt: timestamp("reviewedAt"),
+    staffMemberId: bigint("staffMemberId", { mode: "number", unsigned: true })
+      .references(() => staffMembers.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("staff_applications_school_status_created_idx").on(
+      table.schoolId,
+      table.status,
+      table.createdAt,
+    ),
+    uniqueIndex("staff_applications_school_staff_uq").on(table.schoolId, table.staffMemberId),
+  ],
+);
+
 export const staffDepartments = mysqlTable(
   "staff_departments",
   {

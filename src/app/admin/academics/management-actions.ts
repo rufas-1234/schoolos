@@ -1434,6 +1434,24 @@ export async function recordEnrollmentOperation(
   formData: FormData,
 ): Promise<AcademicActionState> {
   const context = await requireSchoolPermission("students.update");
+  const result = await processEnrollmentOperation(context, formData);
+  if (result.success) {
+    revalidateEnrollmentPages();
+  }
+  return result;
+}
+
+function revalidateEnrollmentPages() {
+  revalidatePath("/admin/academics");
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/students/promote");
+  revalidatePath("/admin/dashboard");
+}
+
+async function processEnrollmentOperation(
+  context: Awaited<ReturnType<typeof requireSchoolPermission>>,
+  formData: FormData,
+): Promise<AcademicActionState> {
   const result = enrollmentOperationSchema.safeParse({
     enrollmentId: readFormValue(formData, "enrollmentId"),
     operation: readFormValue(formData, "operation"),
@@ -1822,9 +1840,75 @@ export async function recordEnrollmentOperation(
     return { error: operationErrors[outcome] ?? "The academic operation could not be completed." };
   }
 
-  revalidatePath("/admin/academics");
-  revalidatePath("/admin/students");
-  revalidatePath("/admin/students/promote");
-  revalidatePath("/admin/dashboard");
   return { success: true };
+}
+
+export async function recordEnrollmentOperationsBulk(
+  _previousState: AcademicActionState,
+  formData: FormData,
+): Promise<AcademicActionState> {
+  const context = await requireSchoolPermission("students.update");
+  const enrollmentIds = z.array(idField).min(1).max(500).safeParse(formData.getAll("enrollmentIds"));
+  if (!enrollmentIds.success || new Set(enrollmentIds.data).size !== enrollmentIds.data.length) {
+    return { error: "Select at least one student and remove any duplicate selections." };
+  }
+
+  const names = await db.select({
+    enrollmentId: studentEnrollments.id,
+    firstName: students.firstName,
+    lastName: students.lastName,
+  }).from(studentEnrollments)
+    .innerJoin(students, and(
+      eq(students.id, studentEnrollments.studentId),
+      eq(students.schoolId, context.schoolId),
+    ))
+    .where(and(
+      eq(studentEnrollments.schoolId, context.schoolId),
+      inArray(studentEnrollments.id, enrollmentIds.data),
+    ));
+  const studentNameByEnrollmentId = new Map(
+    names.map((student) => [student.enrollmentId, `${student.firstName} ${student.lastName}`]),
+  );
+  const results: (AcademicActionState | undefined)[] = new Array(enrollmentIds.data.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= enrollmentIds.data.length) return;
+      const operationData = new FormData();
+      for (const name of ["operation", "targetYearId", "targetSectionId", "eventDate", "reason", "externalInstitution"]) {
+        const value = formData.get(name);
+        if (typeof value === "string") operationData.set(name, value);
+      }
+      operationData.set("enrollmentId", String(enrollmentIds.data[index]));
+      try {
+        results[index] = await processEnrollmentOperation(context, operationData);
+      } catch (error) {
+        console.error("Bulk student enrollment operation failed unexpectedly.", error);
+        results[index] = { error: "The operation failed unexpectedly." };
+      }
+    }
+  };
+  await Promise.all(Array.from(
+    { length: Math.min(8, enrollmentIds.data.length) },
+    () => worker(),
+  ));
+
+  const completed = results.filter((result) => result?.success).length;
+  const failed = results.flatMap((result, index) => result?.success
+    ? []
+    : [{
+      name: studentNameByEnrollmentId.get(enrollmentIds.data[index]) ?? "Student",
+      reason: result?.error ?? "The enrollment could not be found.",
+    }]);
+  if (!completed) {
+    const firstFailures = failed.slice(0, 5).map((item) => `${item.name}: ${item.reason}`).join(" ");
+    return { error: `No students were processed. ${firstFailures}` };
+  }
+
+  revalidateEnrollmentPages();
+  const message = failed.length
+    ? `Processed ${completed} of ${enrollmentIds.data.length} students. Not processed: ${failed.slice(0, 5).map((item) => `${item.name} (${item.reason})`).join("; ")}${failed.length > 5 ? `; and ${failed.length - 5} more.` : "."}`
+    : `Successfully processed all ${completed} selected students.`;
+  return { success: true, message };
 }

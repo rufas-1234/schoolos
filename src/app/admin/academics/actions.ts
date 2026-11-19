@@ -103,7 +103,7 @@ const classSubjectSchema = z.object({
   isCompulsory: z.enum(["true", "false"]).transform((value) => value === "true"),
 });
 
-export type AcademicActionState = { error?: string; success?: boolean };
+export type AcademicActionState = { error?: string; success?: boolean; message?: string };
 
 function readFormValue(formData: FormData, key: string): unknown {
   const value = formData.get(key);

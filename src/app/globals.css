@@ -348,12 +348,12 @@ h6 {
 }
 
 .exam-report-document {
-  --report-brand: #7027b8;
-  --report-accent: #5b21b6;
-  --report-ink: #20202a;
-  --report-muted: #6b6675;
-  --report-border: #ddd2e8;
-  --report-soft: #f4edf9;
+  --report-brand: #3f3a3a;
+  --report-accent: #3f3a3a;
+  --report-ink: #222;
+  --report-muted: #5f5a59;
+  --report-border: #c9c6c4;
+  --report-soft: #f1f0ef;
 }
 
 .exam-report-document .print-report-heading,
@@ -403,18 +403,16 @@ h6 {
 .exam-report-document .print-report-heading h2,
 .exam-report-document .exam-report-heading h1,
 .exam-report-document .exam-report-heading h2 {
-  display: inline-block;
+  display: block;
   margin-top: 0.25rem;
-  border: 1px solid var(--report-brand);
-  background: var(--report-brand);
-  padding: 0.25rem 0.75rem;
-  color: white;
+  border: 0;
+  background: transparent;
+  padding: 0.25rem 0;
+  color: var(--report-ink);
   font-family: var(--font-display), Arial, sans-serif;
   font-size: 1rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
   line-height: 1.25;
-  text-transform: uppercase;
 }
 
 .exam-report-document .exam-report-student-details {
@@ -491,8 +489,8 @@ h6 {
   display: grid;
   gap: 1rem;
   border: 1px solid var(--report-border);
-  border-top: 5px solid var(--report-brand);
-  border-radius: 0.75rem;
+  border-top: 1px solid var(--report-border);
+  border-radius: 0;
   padding: 1.25rem;
   color: var(--report-ink);
   background: #fff;
@@ -547,11 +545,10 @@ h6 {
 
 .academic-progress-title h2 {
   display: inline-block;
-  border-radius: 0.2rem;
-  background: var(--report-brand);
-  padding: 0.35rem 0.8rem;
-  color: white;
-  font-size: 1.05rem;
+  border-bottom: 1px solid var(--report-brand);
+  padding: 0.2rem 0.1rem;
+  color: var(--report-ink);
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.07em;
   line-height: 1.2;
@@ -690,13 +687,8 @@ h6 {
 }
 
 .academic-progress-grade strong {
-  display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--report-brand);
-  color: white;
+  display: block;
+  color: var(--report-ink);
   font-size: 1rem;
 }
 
@@ -823,12 +815,11 @@ h6 {
 }
 
 .academic-progress-assessment th {
-  border: 1px solid var(--report-brand) !important;
-  background: var(--report-brand) !important;
+  border: 1px solid var(--report-border) !important;
+  background: var(--report-soft) !important;
   padding: 0.45rem 0.55rem;
-  color: white !important;
+  color: var(--report-ink) !important;
   font-size: 0.69rem;
-  text-transform: uppercase;
 }
 
 .academic-progress-assessment td {
@@ -1311,6 +1302,11 @@ h6 {
     visibility: hidden !important;
   }
 
+  body.print-target-active:has(.exam-report-document)::before {
+    display: none !important;
+    content: none !important;
+  }
+
   .admin-shell-content {
     padding-left: 0 !important;
   }
@@ -1367,7 +1363,7 @@ h6 {
   .student-report-document {
     color: #111 !important;
     background: white !important;
-    font-family: var(--font-body), Arial, sans-serif !important;
+    font-family: Arial, Helvetica, sans-serif !important;
   }
 
   .exam-report-document *,
@@ -1385,13 +1381,13 @@ h6 {
   .student-report-document h1,
   .student-report-document h2,
   .student-report-document h3 {
-    font-family: var(--font-display), Arial, sans-serif !important;
+    font-family: Arial, Helvetica, sans-serif !important;
     letter-spacing: normal !important;
   }
 
   .exam-report-document .print-report-content,
   .exam-report-document .a4-report-card {
-    border: 0.35mm solid var(--report-border) !important;
+    border: 0 !important;
     background: white !important;
   }
 
@@ -1399,6 +1395,10 @@ h6 {
   .student-report-document {
     background: white !important;
     font-size: 9pt;
+  }
+
+  .exam-report-document .print-report-content {
+    padding: 0 !important;
   }
 
   .exam-report-document .exam-report-heading,
@@ -1409,7 +1409,7 @@ h6 {
     align-items: center;
     justify-content: center;
     min-height: 18mm;
-    border-bottom: 0.35mm solid #526583 !important;
+    border-bottom: 0.35mm solid var(--report-border) !important;
     padding: 2mm 18mm 3mm !important;
     text-align: center;
   }
@@ -1434,21 +1434,20 @@ h6 {
 
   .exam-report-document .exam-report-heading h2,
   .exam-report-document .print-report-heading h2 {
-    border: 1px solid var(--report-brand) !important;
-    background: var(--report-brand) !important;
-    padding: 1mm 3mm !important;
-    color: white !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: var(--report-ink) !important;
     font-family: var(--font-display), Arial, sans-serif !important;
-    font-size: 11pt !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.06em !important;
-    text-transform: uppercase;
+    font-size: 14pt !important;
+    font-weight: 700 !important;
+    letter-spacing: normal !important;
   }
 
   .exam-report-document .print-report-content table,
   .student-report-document table {
     border-collapse: collapse;
-    font-family: var(--font-body), Arial, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
   }
 
   .exam-report-document .print-report-content th,
@@ -1467,8 +1466,8 @@ h6 {
   }
 
   .exam-report-document .a4-report-card {
-    border: 0.35mm solid var(--report-border) !important;
-    padding: 2mm !important;
+    border: 0 !important;
+    padding: 0 !important;
     font-size: 8pt !important;
   }
 
@@ -1536,14 +1535,13 @@ h6 {
 
   .exam-report-document .print-report-heading h1,
   .exam-report-document .print-report-heading h2 {
-    border: 0.3mm solid var(--report-brand) !important;
-    background: var(--report-brand) !important;
-    padding: 1mm 3mm !important;
-    color: white !important;
-    font-size: 11pt !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.06em !important;
-    text-transform: uppercase;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: var(--report-ink) !important;
+    font-size: 14pt !important;
+    font-weight: 700 !important;
+    letter-spacing: normal !important;
   }
 
   .a4-report-card {
@@ -1559,8 +1557,8 @@ h6 {
   }
 
   .a4-report-card > table thead th {
-    background: var(--report-brand) !important;
-    color: white !important;
+    background: var(--report-soft) !important;
+    color: var(--report-ink) !important;
   }
 
   .print-report-heading h2 {
@@ -1665,7 +1663,7 @@ h6 {
 
   .print-report-content tbody tr:nth-child(even),
   .print-report-table tbody tr:nth-child(even) {
-    background: #f8f9ff !important;
+    background: #f6f6f6 !important;
   }
 
   .print-report-content tbody tr,
@@ -1881,7 +1879,7 @@ h6 {
   .exam-report-document .academic-progress-card {
       gap: 2mm !important;
       border: 0.35mm solid var(--report-border) !important;
-      border-top: 1.5mm solid var(--report-brand) !important;
+      border-top: 0.35mm solid var(--report-border) !important;
       border-radius: 0 !important;
       padding: 3mm !important;
       color: var(--report-ink) !important;
@@ -1922,11 +1920,12 @@ h6 {
     }
 
     .exam-report-document .academic-progress-title h2 {
-      border: 0.3mm solid var(--report-brand) !important;
-      background: var(--report-brand) !important;
-      padding: 1mm 2mm !important;
-      color: white !important;
-      font-size: 11pt !important;
+      border: 0 !important;
+      border-bottom: 0.3mm solid var(--report-border) !important;
+      background: transparent !important;
+      padding: 0 0 1mm !important;
+      color: var(--report-ink) !important;
+      font-size: 12pt !important;
     }
 
     .exam-report-document .academic-progress-photo,
@@ -1981,28 +1980,26 @@ h6 {
     }
 
     .exam-report-document .academic-progress-grade strong {
-      background: var(--report-brand) !important;
-      color: white !important;
+      width: auto !important;
+      height: auto !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      color: var(--report-ink) !important;
     }
 
     .exam-report-document .academic-progress-meter,
     .exam-report-document .academic-progress-subject-track {
-      background: var(--report-border) !important;
-    }
-
-    .exam-report-document .academic-progress-meter span,
-    .exam-report-document .academic-progress-subject-track span {
-      background: var(--report-brand) !important;
+      display: none !important;
     }
 
     .exam-report-document .academic-progress-subject-score {
-      grid-template-columns: minmax(0, 1fr) minmax(10mm, 0.8fr) 8mm 5mm !important;
+      grid-template-columns: minmax(0, 1fr) auto auto !important;
       gap: 1mm !important;
       padding: 0.6mm 0 !important;
     }
 
     .exam-report-document .annual-progress-card .academic-progress-subject-score {
-      grid-template-columns: minmax(0, 1fr) minmax(10mm, 0.8fr) 8mm !important;
+      grid-template-columns: minmax(0, 1fr) auto !important;
     }
 
     .exam-report-document .annual-progress-summaries {
@@ -2020,10 +2017,10 @@ h6 {
     }
 
     .exam-report-document .academic-progress-assessment th {
-      border: 0.25mm solid var(--report-brand) !important;
-      background: var(--report-brand) !important;
+      border: 0.25mm solid var(--report-border) !important;
+      background: var(--report-soft) !important;
       padding: 1mm 1.5mm !important;
-      color: white !important;
+      color: var(--report-ink) !important;
     }
 
     .exam-report-document .academic-progress-assessment td {
@@ -2055,6 +2052,41 @@ h6 {
 
   .exam-report-document .academic-progress-card footer {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .exam-report-document .academic-progress-student,
+  .exam-report-document .academic-progress-performance,
+  .exam-report-document .academic-progress-grade-guide article,
+  .exam-report-document .academic-progress-comments article {
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 1mm 0 !important;
+  }
+
+  .exam-report-document .academic-progress-overall {
+    background: transparent !important;
+    padding: 1mm 0 !important;
+  }
+
+  .exam-report-document .academic-progress-school p {
+    letter-spacing: normal !important;
+    text-transform: none !important;
+  }
+
+  .exam-report-document .academic-progress-card {
+    box-shadow: none !important;
+  }
+
+  .exam-report-document .academic-progress-title h2,
+  .exam-report-document .academic-progress-student h3,
+  .exam-report-document .academic-progress-section-title h3,
+  .exam-report-document .academic-progress-grade-guide h3,
+  .exam-report-document .academic-progress-assessment h3,
+  .exam-report-document .academic-progress-comments h3 {
+    font-size: 9pt !important;
+    font-weight: 700 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
   }
 
   .student-profile-print-section h4 {

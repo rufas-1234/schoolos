@@ -90,17 +90,26 @@ export default async function StaffReportsPage({
       .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db.select({
       staffId: staffAttendance.staffId,
+      attendanceDate: staffAttendance.attendanceDate,
       status: staffAttendance.status,
+      note: staffAttendance.note,
+      firstName: staffMembers.firstName,
+      lastName: staffMembers.lastName,
+      employeeCode: staffMembers.employeeCode,
+      department: staffMembers.department,
+      jobTitle: staffMembers.jobTitle,
     }).from(staffAttendance)
       .innerJoin(staffMembers, and(
         eq(staffAttendance.staffId, staffMembers.id),
         eq(staffMembers.schoolId, context.schoolId),
       ))
-      .where(and(...markConditions)),
+      .where(and(...markConditions))
+      .orderBy(asc(staffAttendance.attendanceDate), asc(staffMembers.lastName), asc(staffMembers.firstName)),
   ]);
 
   const zeroTotals = (): AttendanceTotals => ({ present: 0, absent: 0, late: 0, excused: 0 });
   const totalsByStaff = new Map<number, AttendanceTotals>();
+  const totalsByDate = new Map<string, AttendanceTotals>();
   const overall = zeroTotals();
   for (const mark of marks) {
     if (!staffAttendanceStatuses.includes(mark.status as (typeof staffAttendanceStatuses)[number])) continue;
@@ -109,6 +118,9 @@ export default async function StaffReportsPage({
     totals[status]++;
     overall[status]++;
     totalsByStaff.set(mark.staffId, totals);
+    const dateTotals = totalsByDate.get(mark.attendanceDate) ?? zeroTotals();
+    dateTotals[status]++;
+    totalsByDate.set(mark.attendanceDate, dateTotals);
   }
   const markedCount = staff.reduce((total, member) => {
     const counts = totalsByStaff.get(member.id);
@@ -234,6 +246,68 @@ export default async function StaffReportsPage({
               </table>
             </div>
           )}
+        </section>
+
+        <section className="print-report-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="font-semibold text-slate-900">Attendance summary by day</h2>
+            <p className="mt-1 text-sm text-slate-500">Each date shows the staff marks saved for that day.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="print-report-table w-full min-w-[38rem] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 font-semibold">Attendance date</th>
+                  {staffAttendanceStatuses.map((status) => <th key={status} className="px-4 py-3 font-semibold capitalize">{status}</th>)}
+                  <th className="px-4 py-3 font-semibold">Total marks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[...totalsByDate.entries()].map(([date, totals]) => (
+                  <tr key={date}>
+                    <td className="px-5 py-3 font-medium text-slate-800">{date}</td>
+                    {staffAttendanceStatuses.map((status) => <td key={status} className="px-4 py-3 text-slate-600">{totals[status]}</td>)}
+                    <td className="px-4 py-3 font-medium text-slate-800">{Object.values(totals).reduce((sum, total) => sum + total, 0)}</td>
+                  </tr>
+                ))}
+                {totalsByDate.size === 0 && <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">No attendance marks were recorded for these filters.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="print-report-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="font-semibold text-slate-900">Daily attendance record details</h2>
+            <p className="mt-1 text-sm text-slate-500">{marks.length} saved attendance marks, listed by date.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="print-report-table w-full min-w-[52rem] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Date</th>
+                  <th className="px-4 py-3 font-semibold">Staff member</th>
+                  <th className="px-4 py-3 font-semibold">Employee ID</th>
+                  <th className="px-4 py-3 font-semibold">Position / department</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {marks.map((mark, index) => (
+                  <tr key={`${mark.attendanceDate}-${mark.staffId}-${index}`}>
+                    <td className="px-4 py-3">{mark.attendanceDate}</td>
+                    <td className="px-4 py-3 font-medium">{mark.firstName} {mark.lastName}</td>
+                    <td className="px-4 py-3">{mark.employeeCode ?? "—"}</td>
+                    <td className="px-4 py-3">{[mark.jobTitle, mark.department].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="px-4 py-3 capitalize">{mark.status}</td>
+                    <td className="px-4 py-3">{mark.note ?? "—"}</td>
+                  </tr>
+                ))}
+                {marks.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">No attendance marks were recorded for these filters.</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </section>
       </section>
     </div>

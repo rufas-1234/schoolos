@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   AdminActionDialog,
@@ -28,6 +28,7 @@ import {
   deleteClassRoutine,
   placeStudent,
   recordEnrollmentOperation,
+  recordEnrollmentOperationsBulk,
   setSchoolBranchStatus,
   setAcademicYearStatus,
   setClassLevelStatus,
@@ -961,17 +962,35 @@ export function EnrollmentOperationForm({
   enrollments,
   years,
   sections,
+  allowBulkSelection = false,
 }: {
   branches: Option[];
   enrollments: Option[];
   years: Option[];
   sections: (Option & { branchId: number; academicYearId: number })[];
+  allowBulkSelection?: boolean;
 }) {
   const [operation, setOperation] = useState("promote");
   const needsDestination = operation !== "transfer_out" && operation !== "graduate";
   const [yearId, setYearId] = useState("");
   const [branchId, setBranchId] = useState("");
   const [sectionId, setSectionId] = useState("");
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState(
+    () => new Set(enrollments.map((enrollment) => String(enrollment.id))),
+  );
+  const [state, formAction, pending] = useActionState<AcademicActionState, FormData>(
+    allowBulkSelection ? recordEnrollmentOperationsBulk : recordEnrollmentOperation,
+    {},
+  );
+  const filteredEnrollments = useMemo(() => {
+    const query = rosterSearch.trim().toLocaleLowerCase();
+    return query
+      ? enrollments.filter((enrollment) => enrollment.label.toLocaleLowerCase().includes(query))
+      : enrollments;
+  }, [enrollments, rosterSearch]);
+  const allVisibleSelected = filteredEnrollments.length > 0 &&
+    filteredEnrollments.every((enrollment) => selectedEnrollmentIds.has(String(enrollment.id)));
   const availableSections = sections.filter(
     (section) =>
       String(section.academicYearId) === yearId &&
@@ -979,12 +998,69 @@ export function EnrollmentOperationForm({
   );
 
   return (
-    <ActionForm
-      title="Record promotion, repetition, transfer, or graduation"
-      action={recordEnrollmentOperation}
-      submitLabel="Record academic operation"
-    >
-      <SelectField label="Current enrollment" name="enrollmentId" options={enrollments} />
+    <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-slate-900">Record promotion, repetition, transfer, or graduation</h2>
+      <p className="text-xs text-slate-500"><RequiredMark /> Required fields</p>
+      {allowBulkSelection ? (
+        <fieldset className="space-y-3 rounded-xl border border-slate-200 p-4">
+          <legend className="px-1 text-sm font-medium text-slate-700">Select students to process <RequiredMark /></legend>
+          <p className="text-xs text-slate-500">
+            Everyone starts selected. Uncheck students who should not be promoted, such as students who have failed and need to repeat.
+          </p>
+          <input
+            type="search"
+            value={rosterSearch}
+            onChange={(event) => setRosterSearch(event.target.value)}
+            placeholder="Search students..."
+            aria-label="Search current student enrollments"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
+          />
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={(event) => setSelectedEnrollmentIds((current) => {
+                const next = new Set(current);
+                for (const enrollment of filteredEnrollments) {
+                  if (event.target.checked) next.add(String(enrollment.id));
+                  else next.delete(String(enrollment.id));
+                }
+                return next;
+              })}
+              className="size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
+            />
+            Select all {filteredEnrollments.length} shown
+          </label>
+          <div className="max-h-64 space-y-1 overflow-y-auto border-y border-slate-100 py-2">
+            {filteredEnrollments.map((enrollment) => (
+              <label key={enrollment.id} className="flex items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  name="enrollmentIds"
+                  value={enrollment.id}
+                  checked={selectedEnrollmentIds.has(String(enrollment.id))}
+                  onChange={(event) => setSelectedEnrollmentIds((current) => {
+                    const next = new Set(current);
+                    if (event.target.checked) next.add(String(enrollment.id));
+                    else next.delete(String(enrollment.id));
+                    return next;
+                  })}
+                  className="mt-0.5 size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
+                />
+                <span>{enrollment.label}</span>
+              </label>
+            ))}
+            {filteredEnrollments.length === 0 && (
+              <p className="px-2 py-3 text-sm text-slate-500">No students match this search.</p>
+            )}
+          </div>
+          <p aria-live="polite" className="text-xs font-medium text-slate-600">
+            {selectedEnrollmentIds.size} of {enrollments.length} students selected
+          </p>
+        </fieldset>
+      ) : (
+        <SelectField label="Current enrollment" name="enrollmentId" options={enrollments} />
+      )}
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Operation <RequiredMark />
         <select
@@ -1065,7 +1141,15 @@ export function EnrollmentOperationForm({
       <p className="text-xs text-slate-500">
         In-school transfers can move a student to any class or section in the same year, including a lower class. Promotion or placement and repetition create a new enrollment for a later year, and can also target a different class. The destination section must belong to the selected year.
       </p>
-    </ActionForm>
+      {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
+      {state.success && <p role="status" className="text-sm text-emerald-700">{state.message ?? "Saved successfully."}</p>}
+      <div className="admin-dialog-form-actions flex justify-end">
+        <button type="submit" disabled={pending || (allowBulkSelection && selectedEnrollmentIds.size === 0)}
+          className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400">
+          {pending ? "Processing..." : allowBulkSelection ? `Process ${selectedEnrollmentIds.size} selected students` : "Record academic operation"}
+        </button>
+      </div>
+    </form>
   );
 }
 

@@ -91,14 +91,14 @@ export default async function PublicAdmissionPage({
   const schoolLogo = schoolLogoSource(school.logoUrl);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+    <main className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-5xl space-y-5">
+        <header className="border border-slate-300 bg-white p-5 sm:p-7">
           <div className="flex items-center gap-4">
             {schoolLogo && <Image src={schoolLogo} unoptimized width={72} height={72} alt={`${school.name} logo`} className="h-16 w-16 shrink-0 object-contain" />}
             <div className="min-w-0">
-              <p className="text-sm font-bold uppercase tracking-wide text-rose-900">{school.name}</p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Online student registration</h1>
+              <p className="text-sm font-semibold uppercase tracking-wide text-slate-700">{school.name}</p>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">Online student registration</h1>
               <p className="mt-2 text-sm text-slate-600">
                 {[school.address, school.phone, school.email].filter(Boolean).join(" · ")}
               </p>
@@ -117,7 +117,7 @@ export default async function PublicAdmissionPage({
             categories={categories}
           />
         ) : (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
+          <section className="border border-slate-300 bg-white p-6 text-sm text-slate-700">
             Online registration is not available yet. Please contact the school for help.
           </section>
         )}

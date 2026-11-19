@@ -59,12 +59,14 @@ const navigation: NavigationItem[] = [
     icon: CalendarDays,
     permission: "academics.manage",
     permissionAlternatives: ["school.settings.manage"],
-    children: academicSections.map((section) => ({
-      id: section.id,
-      label: section.label,
-      href: `/admin/academics?section=${section.id}`,
-      matchQuery: { key: "section", value: section.id },
-    })),
+    children: [
+      ...academicSections.map((section) => ({
+        id: section.id,
+        label: section.label,
+        href: `/admin/academics?section=${section.id}`,
+        matchQuery: { key: "section", value: section.id },
+      })),
+    ],
   },
   {
     href: "/admin/students",
@@ -72,7 +74,17 @@ const navigation: NavigationItem[] = [
     icon: Users,
     permission: "students.view",
     permissionAlternatives: ["students.update"],
-    children: studentSections,
+    children: [
+      ...studentSections,
+      {
+        id: "attendance-reports",
+        label: "Student attendance reports",
+        href: "/admin/academics/attendance-reports",
+        matchPath: "/admin/academics/attendance-reports",
+        permission: "students.view",
+        permissionAlternatives: ["students.update", "academics.manage", "school.settings.manage"],
+      },
+    ],
   },
   {
     href: "/admin/examinations",
@@ -132,6 +144,7 @@ const navigation: NavigationItem[] = [
       { id: "departments", label: "Departments", href: "/admin/hr/departments", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "designations", label: "Designations", href: "/admin/hr/designations", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "staff", label: "Staff directory", href: "/admin/staff", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "staff-applications", label: "Staff applications", href: "/admin/staff/applications", matchPath: "/admin/staff/applications", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "attendance", label: "Staff attendance records", href: "/admin/hr/attendance", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "leave", label: "Leave management", href: "/admin/hr/leave", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
@@ -319,7 +332,9 @@ export function AdminShell({
   });
   const activeHrSection = navigation
     .find((item) => item.href === "/admin/hr")
-    ?.children?.find((section) => section.href === pathname);
+    ?.children?.find((section) =>
+      (section.matchPath ?? section.href?.split("?")[0]) === pathname,
+    );
   const activeUserSection = navigation
     .find((item) => item.href === "/admin/users")
     ?.children?.find((section) => {
@@ -355,9 +370,13 @@ export function AdminShell({
     .find((item) => item.href === "/admin/dormitories")
     ?.children?.find((section) => section.matchQuery && searchParams.get(section.matchQuery.key) === section.matchQuery.value);
   const pageLabel = pathname.startsWith("/admin/academics")
-    ? activeSection?.label ?? "Academics"
+    ? pathname.startsWith("/admin/academics/attendance-reports")
+      ? "Student attendance reports"
+      : activeSection?.label ?? "Academics"
     : pathname.startsWith("/admin/students")
       ? activeStudentSection?.label ?? "Student Info"
+      : pathname.startsWith("/admin/staff")
+        ? pathname.startsWith("/admin/staff/applications") ? "Staff applications" : "Staff directory"
       : pathname.startsWith("/admin/hr")
         ? activeHrSection?.label ?? "Human resources"
         : pathname.startsWith("/admin/users") || pathname === "/admin/settings/roles"

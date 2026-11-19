@@ -2,8 +2,9 @@
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, count, eq, isNull, ne, or } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -13,8 +14,10 @@ import {
   classSubjects,
   schoolBranches,
   schoolMemberships,
+  schools,
   staffDepartments,
   staffDesignations,
+  staffApplications,
   staffMembers,
   staffSettings,
   teachers,
@@ -27,10 +30,13 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { normalizePhoneIdentifier } from "@/lib/login-identifier-policy";
+import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
 import {
   defaultRequiredStaffFields,
   getStaffRequiredFieldError,
+  normalizePublicStaffVisibleFields,
   normalizeRequiredStaffFields,
+  staffSettingFields,
 } from "@/lib/staff-settings";
 import {
   canTransitionStaffStatus,
@@ -293,21 +299,22 @@ function readFormValue(formData: FormData, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+const staffFormFieldNames = [
+  "branchId", "firstName", "lastName", "employeeCode", "personnelRole", "jobTitle", "department",
+  "email", "loginAccessEnabled", "accountPassword", "accountPasswordConfirmation",
+  "phone", "dateOfBirth", "fatherName", "motherName", "gender", "maritalStatus",
+  "address", "permanentAddress", "emergencyContactName", "emergencyContactPhone", "drivingLicense", "showAsExpert",
+  "qualification", "experience", "epfNumber", "basicSalary", "contractType", "location",
+  "bankAccountName", "bankAccountNumber", "bankName", "bankBranch", "facebookUrl", "twitterUrl",
+  "linkedinUrl", "instagramUrl", "profilePhotoFileName", "profilePhotoObjectKey",
+  "resumeFileName", "resumeObjectKey", "joiningLetterFileName", "joiningLetterObjectKey",
+  "otherDocumentFileName", "otherDocumentObjectKey", "customFieldName1", "customFieldValue1",
+  "customFieldName2", "customFieldValue2", "linkedUserId", "employmentType", "startDate",
+] as const;
+
 function parseStaffForm(formData: FormData) {
-  const fieldNames = [
-    "branchId", "firstName", "lastName", "employeeCode", "personnelRole", "jobTitle", "department",
-    "email", "loginAccessEnabled", "accountPassword", "accountPasswordConfirmation",
-    "phone", "dateOfBirth", "fatherName", "motherName", "gender", "maritalStatus",
-    "address", "permanentAddress", "emergencyContactName", "emergencyContactPhone", "drivingLicense", "showAsExpert",
-    "qualification", "experience", "epfNumber", "basicSalary", "contractType", "location",
-    "bankAccountName", "bankAccountNumber", "bankName", "bankBranch", "facebookUrl", "twitterUrl",
-    "linkedinUrl", "instagramUrl", "profilePhotoFileName", "profilePhotoObjectKey",
-    "resumeFileName", "resumeObjectKey", "joiningLetterFileName", "joiningLetterObjectKey",
-    "otherDocumentFileName", "otherDocumentObjectKey", "customFieldName1", "customFieldValue1",
-    "customFieldName2", "customFieldValue2", "linkedUserId", "employmentType", "startDate",
-  ] as const;
   return staffSchema.safeParse(Object.fromEntries(
-    fieldNames.map((name) => [name, readFormValue(formData, name)]),
+    staffFormFieldNames.map((name) => [name, readFormValue(formData, name)]),
   ));
 }
 
@@ -621,6 +628,118 @@ async function validateStaffExtras(
   return null;
 }
 
+export async function createPublicStaffApplication(
+  _previousState: StaffActionState,
+  formData: FormData,
+): Promise<StaffActionState> {
+  const schoolPublicId = z.string().uuid().safeParse(formData.get("schoolPublicId"));
+  if (!schoolPublicId.success) return { error: "This registration link is invalid." };
+  if (formData.get("consent") !== "on") return { error: "Please confirm that the information is accurate." };
+
+  const [school] = await db.select({ id: schools.id, publicId: schools.publicId })
+    .from(schools).where(eq(schools.publicId, schoolPublicId.data)).limit(1);
+  if (!school) return { error: "This registration link is no longer available." };
+
+  const [settings] = await db.select({
+    visibleFields: staffSettings.visibleFields,
+    requiredFields: staffSettings.requiredFields,
+  }).from(staffSettings).where(eq(staffSettings.schoolId, school.id)).limit(1);
+  const visibleFields = normalizePublicStaffVisibleFields(
+    settings?.visibleFields,
+    settings?.requiredFields,
+  );
+  const requiredFields = normalizeRequiredStaffFields(settings?.requiredFields)
+    .filter((name) => name !== "linkedUserId");
+  for (const field of staffSettingFields) {
+    if (visibleFields.includes(field.name)) continue;
+    if (field.name === "profilePhotoFileName") {
+      formData.set("profilePhotoFileName", "");
+      formData.set("profilePhotoObjectKey", "");
+    } else if (field.name === "resumeFileName") {
+      formData.set("resumeFileName", "");
+      formData.set("resumeObjectKey", "");
+    } else if (field.name === "joiningLetterFileName") {
+      formData.set("joiningLetterFileName", "");
+      formData.set("joiningLetterObjectKey", "");
+    } else if (field.name === "otherDocumentFileName") {
+      formData.set("otherDocumentFileName", "");
+      formData.set("otherDocumentObjectKey", "");
+    } else {
+      formData.set(field.name, "");
+    }
+  }
+  formData.set("linkedUserId", "");
+  formData.set("loginAccessEnabled", "false");
+  formData.set("accountPassword", "");
+  formData.set("accountPasswordConfirmation", "");
+  if (!visibleFields.includes("showAsExpert")) formData.set("showAsExpert", "no");
+  if (!visibleFields.includes("employmentType")) formData.set("employmentType", "full_time");
+
+  const parsed = parseStaffForm(formData);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { error: issue ? `${String(issue.path.at(-1) ?? "Staff details")}: ${issue.message}` : "Please review the staff details and try again." };
+  }
+  const staff = parsed.data;
+  const requiredError = getStaffRequiredFieldError(staff, requiredFields);
+  if (requiredError) return { error: requiredError };
+  const extrasError = await validateStaffExtras(staff, school.id, school.publicId);
+  if (extrasError) return { error: extrasError };
+  const fileReferences = [
+    { fileName: staff.profilePhotoFileName, objectKey: staff.profilePhotoObjectKey, photo: true },
+    { fileName: staff.resumeFileName, objectKey: staff.resumeObjectKey, photo: false },
+    { fileName: staff.joiningLetterFileName, objectKey: staff.joiningLetterObjectKey, photo: false },
+    { fileName: staff.otherDocumentFileName, objectKey: staff.otherDocumentObjectKey, photo: false },
+  ].filter((file) => file.objectKey);
+  if (fileReferences.length) {
+    const uploaded = await db.select({
+      storageKey: uploadedFiles.storageKey,
+      fileName: uploadedFiles.fileName,
+      contentType: uploadedFiles.contentType,
+    }).from(uploadedFiles).where(and(
+      eq(uploadedFiles.schoolId, school.id),
+      inArray(uploadedFiles.storageKey, fileReferences.map((file) => file.objectKey)),
+    ));
+    if (uploaded.length !== fileReferences.length || fileReferences.some((file) => {
+      const saved = uploaded.find((candidate) => candidate.storageKey === file.objectKey);
+      return !saved || saved.fileName !== file.fileName ||
+        (file.photo
+          ? !["image/jpeg", "image/png", "image/webp"].includes(saved.contentType)
+          : !["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(saved.contentType));
+    })) {
+      return { error: "One or more uploaded files are invalid. Upload them again and retry." };
+    }
+  }
+
+  const requestHeaders = await headers();
+  const clientAddress = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || requestHeaders.get("x-real-ip")?.trim()
+    || "";
+  const allowed = await consumePublicAdmissionRateLimit({
+    schoolId: school.id,
+    operation: "staff-submission",
+    clientAddress,
+    maxRequests: 5,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!allowed) return { error: "Too many registration attempts. Please wait before submitting again." };
+
+  const applicationData = Object.fromEntries(
+    staffFormFieldNames.map((name) => [name, readFormValue(formData, name)]),
+  );
+  try {
+    await db.insert(staffApplications).values({
+      publicId: randomUUID(),
+      schoolId: school.id,
+      applicationData,
+    });
+  } catch (error) {
+    console.error("Public staff application could not be saved.", error);
+    return { error: "Your application could not be saved. Please try again later." };
+  }
+  return { success: true };
+}
+
 export async function createStaffMember(
   _previousState: StaffActionState,
   formData: FormData,
@@ -634,6 +753,31 @@ export async function createStaffMember(
   }
 
   const staff = result.data;
+  const applicationValue = formData.get("staffApplicationPublicId");
+  let applicationPublicId: string | null = null;
+  if (applicationValue !== null) {
+    const parsedApplicationId = z.string().uuid().safeParse(applicationValue);
+    if (!parsedApplicationId.success) return { error: "This staff application is invalid." };
+    const [application] = await db.select({
+      applicationData: staffApplications.applicationData,
+      status: staffApplications.status,
+      reviewedBy: staffApplications.reviewedBy,
+    }).from(staffApplications).where(and(
+      eq(staffApplications.publicId, parsedApplicationId.data),
+      eq(staffApplications.schoolId, context.schoolId),
+    )).limit(1);
+    if (application?.status !== "processing" || application.reviewedBy !== context.user.id ||
+      staffFormFieldNames.some((name) => readFormValue(formData, name) !== application.applicationData[name])) {
+      return { error: "This staff application is not ready for approval." };
+    }
+    applicationPublicId = parsedApplicationId.data;
+    const [alreadyCreated] = await db.select({ id: staffMembers.id }).from(staffMembers)
+      .where(and(
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.publicId, applicationPublicId),
+      )).limit(1);
+    if (alreadyCreated) return { success: true };
+  }
   const [settings] = await db.select({ requiredFields: staffSettings.requiredFields })
     .from(staffSettings).where(eq(staffSettings.schoolId, context.schoolId)).limit(1);
   const requiredError = getStaffRequiredFieldError(
@@ -646,7 +790,7 @@ export async function createStaffMember(
   if (staff.linkedUserId && !(await isSchoolMember(staff.linkedUserId, context.schoolId))) {
     return { error: "Select an active account belonging to this school." };
   }
-  const publicId = randomUUID();
+  const publicId = applicationPublicId ?? randomUUID();
   try {
     await db.transaction(async (tx) => {
       const loginResult = await applyStaffLoginAccess(
@@ -798,6 +942,136 @@ export async function createStaffMember(
   revalidatePath("/admin/hr/reports");
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin/academics");
+  return { success: true };
+}
+
+export async function reviewPublicStaffApplication(
+  _previousState: StaffActionState,
+  formData: FormData,
+): Promise<StaffActionState> {
+  const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationPublicId"));
+  const decision = z.enum(["approve", "reject"]).safeParse(formData.get("decision"));
+  if (!applicationId.success || !decision.success) {
+    return { error: "Choose a valid staff application and review decision." };
+  }
+
+  if (decision.data === "reject") {
+    const updated = await db.transaction(async (tx) => {
+      const [application] = await tx.select({ id: staffApplications.id })
+        .from(staffApplications).where(and(
+          eq(staffApplications.publicId, applicationId.data),
+          eq(staffApplications.schoolId, context.schoolId),
+          eq(staffApplications.status, "pending"),
+        )).for("update").limit(1);
+      if (!application) return false;
+      await tx.update(staffApplications).set({
+        status: "rejected",
+        reviewedBy: context.user.id,
+        reviewedAt: new Date(),
+      }).where(eq(staffApplications.id, application.id));
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: "staff.application.rejected",
+        resourceType: "staff_application",
+        resourcePublicId: applicationId.data,
+        changedFields: ["status", "reviewedBy", "reviewedAt"],
+      });
+      return true;
+    });
+    if (!updated) return { error: "This application has already been reviewed." };
+    revalidatePath("/admin/staff/applications");
+    return { success: true };
+  }
+
+  const application = await db.transaction(async (tx) => {
+    const staleProcessingCutoff = new Date(Date.now() - 15 * 60 * 1000);
+    const [pendingApplication] = await tx.select({
+      id: staffApplications.id,
+      applicationData: staffApplications.applicationData,
+    }).from(staffApplications).where(and(
+      eq(staffApplications.publicId, applicationId.data),
+      eq(staffApplications.schoolId, context.schoolId),
+      or(
+        eq(staffApplications.status, "pending"),
+        and(
+          eq(staffApplications.status, "processing"),
+          lt(staffApplications.reviewedAt, staleProcessingCutoff),
+        ),
+      ),
+    )).for("update").limit(1);
+    if (!pendingApplication) return null;
+    await tx.update(staffApplications).set({
+      status: "processing",
+      reviewedBy: context.user.id,
+      reviewedAt: new Date(),
+    }).where(eq(staffApplications.id, pendingApplication.id));
+    return pendingApplication;
+  });
+  if (!application) return { error: "This application has already been reviewed." };
+
+  const staffFormData = new FormData();
+  for (const [name, value] of Object.entries(application.applicationData)) {
+    staffFormData.set(name, value);
+  }
+  staffFormData.set("staffApplicationPublicId", applicationId.data);
+  let created: StaffActionState;
+  try {
+    created = await createStaffMember({}, staffFormData);
+  } catch (error) {
+    await db.update(staffApplications).set({
+      status: "pending",
+      reviewedBy: null,
+      reviewedAt: null,
+    }).where(and(
+      eq(staffApplications.publicId, applicationId.data),
+      eq(staffApplications.schoolId, context.schoolId),
+      eq(staffApplications.status, "processing"),
+    ));
+    throw error;
+  }
+  if (!created.success) {
+    await db.update(staffApplications).set({
+      status: "pending",
+      reviewedBy: null,
+      reviewedAt: null,
+    }).where(and(
+      eq(staffApplications.publicId, applicationId.data),
+      eq(staffApplications.schoolId, context.schoolId),
+      eq(staffApplications.status, "processing"),
+    ));
+    return { error: created.error ?? "The application could not be approved." };
+  }
+
+  const [staff] = await db.select({ id: staffMembers.id }).from(staffMembers)
+    .where(and(
+      eq(staffMembers.schoolId, context.schoolId),
+      eq(staffMembers.publicId, applicationId.data),
+    )).limit(1);
+  if (!staff) throw new Error("Approved staff record could not be loaded.");
+  await db.transaction(async (tx) => {
+    await tx.update(staffApplications).set({
+      status: "approved",
+      staffMemberId: staff.id,
+      reviewedBy: context.user.id,
+      reviewedAt: new Date(),
+    }).where(and(
+      eq(staffApplications.publicId, applicationId.data),
+      eq(staffApplications.schoolId, context.schoolId),
+      eq(staffApplications.status, "processing"),
+    ));
+    await tx.insert(auditLogs).values({
+      schoolId: context.schoolId,
+      actorUserId: context.user.id,
+      action: "staff.application.approved",
+      resourceType: "staff_application",
+      resourcePublicId: applicationId.data,
+      changedFields: ["status", "reviewedBy", "reviewedAt", "staffMemberId"],
+    });
+  });
+  revalidatePath("/admin/staff/applications");
+  revalidatePath("/admin/staff");
   return { success: true };
 }
 

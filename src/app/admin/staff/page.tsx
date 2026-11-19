@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { BriefcaseBusiness } from "lucide-react";
+import Link from "next/link";
 import {
   AdminConfirmSubmitButton,
   AdminActionDialog,
@@ -210,6 +211,25 @@ export default async function StaffDirectoryPage({
           Manage teaching and non-teaching staff for {context.schoolName}. Staff records are private to this school.
         </p>
       </div>
+
+      <section className="print:hidden flex flex-col gap-4 border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">Online staff registration</h2>
+          <p className="mt-1 break-all font-mono text-xs text-slate-600">
+            /staff-registration/{context.schoolPublicId}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link href={`/staff-registration/${context.schoolPublicId}`} target="_blank" rel="noreferrer"
+            className="inline-flex items-center justify-center border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            Preview form
+          </Link>
+          <Link href="/admin/staff/applications"
+            className="inline-flex items-center justify-center border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+            Review applications
+          </Link>
+        </div>
+      </section>
 
       <section className="print:hidden grid gap-3 sm:grid-cols-3">
         <SummaryCard label="All staff" value={totalCount} />

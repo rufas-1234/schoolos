@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -33,6 +33,7 @@ import {
   subjects,
   teachers,
   schoolMemberships,
+  staffApplications,
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -137,6 +138,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       );
     }
   }
+  if (canViewStudents || canManageAcademics) {
+    addPage("student-attendance-reports", "Student attendance reports", "Review student attendance records day by day", "/admin/academics/attendance-reports", ["student attendance", "daily attendance report", "attendance history"]);
+  }
   if (canManageStudents) {
     for (const section of studentSections) {
       if (
@@ -173,6 +177,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (canManageStaff) {
     addPage("staff-list", "Staff directory", "Search staff profiles and assignments", "/admin/staff", ["staff", "employees", "personnel", "lists"]);
+    addPage("staff-applications", "Staff applications", "Review public staff registrations", "/admin/staff/applications", ["staff registration", "applicants", "employment application"]);
     addPage("hr-overview", "HR overview", "Human resources staff summary", "/admin/hr", ["human resources", "staff summary"]);
     addPage("hr-departments", "Departments", "Manage staff departments", "/admin/hr/departments", ["department"]);
     addPage("hr-designations", "Designations", "Manage staff job designations", "/admin/hr/designations", ["designation", "job title"]);
@@ -244,6 +249,13 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const queryTokens = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const tokenMatch = (column: Parameters<typeof like>[0]) =>
     and(...queryTokens.map((token) => like(sql`lower(${column})`, patternFor(token))));
+  const applicationFirstName = sql<string>`JSON_UNQUOTE(JSON_EXTRACT(${staffApplications.applicationData}, '$.firstName'))`;
+  const applicationLastName = sql<string>`JSON_UNQUOTE(JSON_EXTRACT(${staffApplications.applicationData}, '$.lastName'))`;
+  const applicationFullName = sql<string>`concat(${applicationFirstName}, ' ', ${applicationLastName})`;
+  const applicationEmployeeCode = sql<string>`JSON_UNQUOTE(JSON_EXTRACT(${staffApplications.applicationData}, '$.employeeCode'))`;
+  const applicationJobTitle = sql<string>`JSON_UNQUOTE(JSON_EXTRACT(${staffApplications.applicationData}, '$.jobTitle'))`;
+  const applicationDepartment = sql<string>`JSON_UNQUOTE(JSON_EXTRACT(${staffApplications.applicationData}, '$.department'))`;
+  const applicationEmail = sql<string>`JSON_UNQUOTE(JSON_EXTRACT(${staffApplications.applicationData}, '$.email'))`;
   const [
     userRows,
     studentRows,
@@ -254,6 +266,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     paymentRows,
     accountTransactionRows,
     staffRows,
+    staffApplicationRows,
     academicRows,
     examRows,
     libraryRows,
@@ -491,6 +504,35 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           ),
         ))
         .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName))
+        .limit(30)
+      : Promise.resolve([]),
+    canManageStaff
+      ? db.select({
+        publicId: staffApplications.publicId,
+        applicationData: staffApplications.applicationData,
+        status: staffApplications.status,
+      }).from(staffApplications)
+        .where(and(
+          eq(staffApplications.schoolId, context.schoolId),
+          or(
+            tokenMatch(applicationFirstName),
+            tokenMatch(applicationLastName),
+            tokenMatch(applicationEmployeeCode),
+            tokenMatch(applicationJobTitle),
+            tokenMatch(applicationDepartment),
+            tokenMatch(applicationEmail),
+            fuzzyTextMatch(queryTokens,
+              applicationFirstName,
+              applicationLastName,
+              applicationFullName,
+              applicationEmployeeCode,
+              applicationJobTitle,
+              applicationDepartment,
+              applicationEmail,
+            ),
+          ),
+        ))
+        .orderBy(desc(staffApplications.createdAt))
         .limit(30)
       : Promise.resolve([]),
     canManageAcademics
@@ -939,6 +981,17 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       title: `${staff.firstName} ${staff.lastName}`,
       description: [staff.jobTitle, staff.department, staff.employeeCode].filter(Boolean).join(" · "),
       href: `/admin/staff?profile=${encodeURIComponent(staff.publicId)}`,
+      category: "Staff",
+    });
+  }
+  for (const application of staffApplicationRows) {
+    const data = application.applicationData;
+    const applicantName = [data.firstName, data.lastName].filter(Boolean).join(" ");
+    results.push({
+      id: `staff-application-${application.publicId}`,
+      title: applicantName || "Staff applicant",
+      description: `Staff application · ${data.jobTitle || data.personnelRole || "Position not specified"} · ${application.status}`,
+      href: `/admin/staff/applications?search=${encodeURIComponent(applicantName || query)}`,
       category: "Staff",
     });
   }
