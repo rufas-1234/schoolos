@@ -54,7 +54,7 @@ export function SearchableSelect({
 
   function choose(option: SearchableSelectOption) {
     setSelectedValue(option.value);
-    setQuery(option.value ? option.label : "");
+    setQuery("");
     setOpen(false);
     setShowAllOptions(false);
     setActiveIndex(-1);
@@ -99,7 +99,7 @@ export function SearchableSelect({
         type="text"
         role="combobox"
         autoComplete="off"
-        value={query}
+        value={!open && selectedOption ? selectedOption.label : query}
         required={required}
         disabled={disabled}
         pattern={required ? (selectedValue ? escapePattern(options.find((option) => option.value === selectedValue)?.label ?? "") : "(?!)") : undefined}
@@ -108,11 +108,11 @@ export function SearchableSelect({
         aria-controls={open ? listId : undefined}
         aria-activedescendant={activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined}
         placeholder={placeholder}
-        onFocus={(event) => {
+        onFocus={() => {
           if (disabled) return;
           setOpen(true);
-          setShowAllOptions(true);
-          if (selectedValue) event.currentTarget.select();
+          setShowAllOptions(!query);
+          if (selectedValue) setQuery("");
         }}
         onBlur={() => setOpen(false)}
         onKeyDown={handleKeyDown}
