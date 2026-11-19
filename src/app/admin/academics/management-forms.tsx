@@ -999,11 +999,11 @@ export function EnrollmentOperationForm({
   );
 
   return (
-    <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-900">Record promotion, repetition, transfer, or graduation</h2>
+    <form action={formAction} className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+      <h2 className="text-base font-semibold leading-6 text-slate-900">Record promotion, repetition, transfer, or graduation</h2>
       <p className="text-xs text-slate-500"><RequiredMark /> Required fields</p>
       {allowBulkSelection ? (
-        <fieldset className="space-y-3 rounded-xl border border-slate-200 p-4">
+        <fieldset className="min-w-0 space-y-3 rounded-xl border border-slate-200 p-3 sm:p-4">
           <legend className="px-1 text-sm font-medium text-slate-700">Select students to process <RequiredMark /></legend>
           {Array.from(selectedEnrollmentIds, (enrollmentId) => (
             <input key={enrollmentId} type="hidden" name="enrollmentIds" value={enrollmentId} />
@@ -1011,18 +1011,18 @@ export function EnrollmentOperationForm({
           <p className="text-xs text-slate-500">
             Everyone starts selected. Uncheck students who should not be promoted, such as students who have failed and need to repeat.
           </p>
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <label className="flex min-w-0 items-start gap-2 text-sm font-semibold leading-5 text-slate-700">
             <input
               type="checkbox"
               checked={allStudentsSelected}
-              onChange={(event) => setSelectedEnrollmentIds((current) => {
+              onChange={(event) => setSelectedEnrollmentIds(() => {
                 return event.target.checked
                   ? new Set(enrollments.map((enrollment) => String(enrollment.id)))
                   : new Set<string>();
               })}
               className="size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
             />
-            Select all {enrollments.length} students
+            <span>Select all {enrollments.length} students</span>
           </label>
           <p aria-live="polite" className="text-xs font-medium text-slate-600">
             {selectedEnrollmentIds.size} of {enrollments.length} students selected
@@ -1046,9 +1046,9 @@ export function EnrollmentOperationForm({
                 aria-label="Search current student enrollments"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
               />
-              <div className="max-h-64 space-y-1 overflow-y-auto border-y border-slate-100 py-2">
+              <div className="max-h-64 min-w-0 space-y-1 overflow-x-hidden overflow-y-auto border-y border-slate-100 py-2">
                 {filteredEnrollments.map((enrollment) => (
-                  <label key={enrollment.id} className="flex items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  <label key={enrollment.id} className="flex min-w-0 items-start gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50">
                     <input
                       type="checkbox"
                       value={enrollment.id}
@@ -1061,7 +1061,7 @@ export function EnrollmentOperationForm({
                       })}
                       className="mt-0.5 size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
                     />
-                    <span>{enrollment.label}</span>
+                    <span className="min-w-0 break-words">{enrollment.label}</span>
                   </label>
                 ))}
                 {filteredEnrollments.length === 0 && (
@@ -1158,7 +1158,7 @@ export function EnrollmentOperationForm({
       {state.success && <p role="status" className="text-sm text-emerald-700">{state.message ?? "Saved successfully."}</p>}
       <div className="admin-dialog-form-actions flex justify-end">
         <button type="submit" disabled={pending || (allowBulkSelection && selectedEnrollmentIds.size === 0)}
-          className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400">
+          className="inline-flex w-full items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-center text-sm font-semibold leading-5 text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400 sm:w-auto">
           {pending ? "Processing..." : allowBulkSelection ? `Process ${selectedEnrollmentIds.size} selected students` : "Record academic operation"}
         </button>
       </div>

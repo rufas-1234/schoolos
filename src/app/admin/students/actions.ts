@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -8,6 +9,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import {
   academicYears,
+  account as authAccount,
   auditLogs,
   classLevels,
   classSections,
@@ -17,12 +19,19 @@ import {
   studentEnrollments,
   studentSettings,
   students,
+  roles,
+  schoolMemberships,
+  user,
+  userLoginIdentifiers,
+  userRoles,
+  userStudentLinks,
   uploadedFiles,
   type StudentAdditionalDetails,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { normalizeAdmissionIdentifier } from "@/lib/login-identifier-policy";
 import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
 import { canTransitionStudentStatus, studentStatuses } from "@/lib/student-policy";
 import {
@@ -845,6 +854,9 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
         id: students.id,
         publicId: students.publicId,
         status: students.status,
+        admissionNumber: students.admissionNumber,
+        firstName: students.firstName,
+        lastName: students.lastName,
       })
       .from(students)
       .where(
@@ -861,12 +873,91 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
       return "invalid-transition";
     }
 
-    await tx
-      .update(students)
-      .set({ status: result.data.nextStatus })
-      .where(and(eq(students.id, student.id), eq(students.schoolId, context.schoolId)));
-
     if (result.data.nextStatus === "admitted") {
+      const admissionIdentifier = normalizeAdmissionIdentifier(student.admissionNumber ?? "");
+      if (!admissionIdentifier) return "admission-required";
+
+      const [existingIdentifier] = await tx.select({
+        userId: userLoginIdentifiers.userId,
+        kind: userLoginIdentifiers.kind,
+      })
+        .from(userLoginIdentifiers)
+        .where(and(
+          eq(userLoginIdentifiers.schoolId, context.schoolId),
+          eq(userLoginIdentifiers.identifier, admissionIdentifier),
+        ))
+        .limit(1);
+
+      if (existingIdentifier) {
+        if (existingIdentifier.kind !== "student_admission") return "account-conflict";
+        const [existingLink] = await tx.select({ studentId: userStudentLinks.studentId })
+          .from(userStudentLinks)
+          .where(and(
+            eq(userStudentLinks.schoolId, context.schoolId),
+            eq(userStudentLinks.userId, existingIdentifier.userId),
+            eq(userStudentLinks.studentId, student.id),
+            eq(userStudentLinks.accessType, "student"),
+          ))
+          .limit(1);
+        if (!existingLink) return "account-conflict";
+      } else {
+        const email = `student-${context.schoolId}-${student.id}@accounts.schoolos.invalid`;
+        const [existingEmail] = await tx.select({ id: user.id })
+          .from(user)
+          .where(eq(user.email, email))
+          .limit(1);
+        if (existingEmail) return "account-conflict";
+
+        const userId = randomUUID();
+        const password = `student@${student.admissionNumber}`;
+        await tx.insert(user).values({
+          id: userId,
+          name: `${student.firstName} ${student.lastName}`,
+          email,
+          emailVerified: false,
+          isActive: true,
+        });
+        await tx.insert(authAccount).values({
+          id: randomUUID(),
+          accountId: userId,
+          providerId: "credential",
+          userId,
+          password: await hashPassword(password),
+        });
+        await tx.insert(schoolMemberships).values({
+          schoolId: context.schoolId,
+          userId,
+          status: "active",
+        });
+        const [membership] = await tx.select({ id: schoolMemberships.id })
+          .from(schoolMemberships)
+          .where(and(
+            eq(schoolMemberships.schoolId, context.schoolId),
+            eq(schoolMemberships.userId, userId),
+          ))
+          .limit(1);
+        if (!membership) throw new Error("The student account membership could not be loaded.");
+        const [studentRole] = await tx.select({ id: roles.id })
+          .from(roles)
+          .where(and(eq(roles.schoolId, context.schoolId), eq(roles.name, "Student")))
+          .limit(1);
+        if (studentRole) {
+          await tx.insert(userRoles).values({ membershipId: membership.id, roleId: studentRole.id });
+        }
+        await tx.insert(userLoginIdentifiers).values({
+          schoolId: context.schoolId,
+          userId,
+          kind: "student_admission",
+          identifier: admissionIdentifier,
+        });
+        await tx.insert(userStudentLinks).values({
+          schoolId: context.schoolId,
+          userId,
+          studentId: student.id,
+          accessType: "student",
+        });
+      }
+
       await tx
         .update(studentEnrollments)
         .set({ status: "enrolled" })
@@ -901,6 +992,11 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
         );
     }
 
+    await tx
+      .update(students)
+      .set({ status: result.data.nextStatus })
+      .where(and(eq(students.id, student.id), eq(students.schoolId, context.schoolId)));
+
     await tx.insert(auditLogs).values({
       schoolId: context.schoolId,
       actorUserId: context.user.id,
@@ -915,6 +1011,12 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
   if (outcome === "not-found") throw new Error("Student record was not found in this school.");
   if (outcome === "invalid-transition") {
     throw new Error("This student status cannot be changed through that transition.");
+  }
+  if (outcome === "admission-required") {
+    throw new Error("Add an admission number before approving this student so their portal account can be created.");
+  }
+  if (outcome === "account-conflict") {
+    throw new Error("A login account or admission number is already linked to another profile. Resolve the conflict before approving this student.");
   }
 
   revalidateStudentPages();
