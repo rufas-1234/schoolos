@@ -31,6 +31,7 @@ import {
   examAssessmentResultState,
   hasCompleteExamResult,
 } from "@/lib/examination-policy";
+import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 
@@ -64,6 +65,7 @@ type StudentProgress = {
   name: string;
   admissionNumber: string | null;
   sectionName: string;
+  classTeacherId: number | null;
   rollNumber: string | null;
   subjects: SubjectProgress[];
   examAverages: Map<string, number | null>;
@@ -88,6 +90,7 @@ function buildProgressRows(input: {
     lastName: string;
     admissionNumber: string | null;
     sectionName: string;
+    classTeacherId: number | null;
     rollNumber: string | null;
   }>;
   exams: ProgressExam[];
@@ -228,6 +231,7 @@ function buildProgressRows(input: {
       name: `${student.firstName} ${student.lastName}`,
       admissionNumber: student.admissionNumber,
       sectionName: student.sectionName,
+      classTeacherId: student.classTeacherId,
       rollNumber: student.rollNumber,
       subjects: subjectRows,
       examAverages,
@@ -248,6 +252,7 @@ function StudentProgressCard({
   yearName,
   className,
   signatures,
+  teacherSignatures,
   last,
 }: {
   student: StudentProgress;
@@ -260,6 +265,7 @@ function StudentProgressCard({
   yearName: string;
   className: string;
   signatures: Array<{ role: string; updatedAt: Date }>;
+  teacherSignatures: Awaited<ReturnType<typeof getExamTeacherSignatures>>;
   last: boolean;
 }) {
   const logo = schoolLogoSource(schoolLogoUrl);
@@ -395,7 +401,7 @@ function StudentProgressCard({
           <p>{changeLabel(student.change)} from first to last published exam.</p>
         </article>
       </section>
-      <ReportSignatureStrip signatures={signatures} />
+      <ReportSignatureStrip signatures={signatures} teacherSignatures={teacherSignatures} />
     </article>
   );
 }
@@ -444,7 +450,10 @@ export default async function AnnualProgressCardPage({
     }).from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
     db.select({ role: examReportSignatures.role, updatedAt: examReportSignatures.updatedAt })
       .from(examReportSignatures)
-      .where(eq(examReportSignatures.schoolId, context.schoolId)),
+      .where(and(
+        eq(examReportSignatures.schoolId, context.schoolId),
+        eq(examReportSignatures.role, "headteacher"),
+      )),
   ]);
   const requestedYearId = validId(first(query.academicYearId));
   const selectedYear = years.find((year) => year.id === requestedYearId) ??
@@ -462,6 +471,7 @@ export default async function AnnualProgressCardPage({
       className: classLevels.name,
       branchName: schoolBranches.name,
       principalRemark: examClasses.principalRemark,
+      classTeacherId: examClasses.classTeacherId,
     }).from(examClasses)
       .innerJoin(examinations, and(
         eq(examinations.id, examClasses.examinationId),
@@ -499,6 +509,7 @@ export default async function AnnualProgressCardPage({
       examClassId: examSubjects.examClassId,
       subjectId: subjects.id,
       subjectName: subjects.name,
+      teacherId: classSubjects.teacherId,
       maxMarks: examSubjects.maxMarks,
       weight: examSubjects.weight,
       isCompulsory: classSubjects.isCompulsory,
@@ -553,6 +564,7 @@ export default async function AnnualProgressCardPage({
       lastName: students.lastName,
       admissionNumber: students.admissionNumber,
       sectionName: classSections.name,
+      classTeacherId: classSections.classTeacherId,
       rollNumber: studentEnrollments.rollNumber,
     }).from(studentEnrollments)
       .innerJoin(classSections, and(
@@ -584,6 +596,11 @@ export default async function AnnualProgressCardPage({
       ? `/api/admin/students/${row.studentPublicId}/photo`
       : null,
   }));
+  const teacherSignatures = await getExamTeacherSignatures(context.schoolId, [
+    ...rawRoster.map((row) => ({ teacherId: row.classTeacherId, role: "Class teacher" as const })),
+    ...assessments.map((assessment) => ({ teacherId: assessment.teacherId, role: "Subject teacher" as const })),
+    ...selectedClassRows.map((row) => ({ teacherId: row.classTeacherId, role: "Class teacher" as const })),
+  ]);
   const [markRows, attendanceRows] = assessments.length && rawRoster.length
     ? await Promise.all([
       db.select({
@@ -688,6 +705,10 @@ export default async function AnnualProgressCardPage({
               yearName={selectedYear.name}
               className={selectedClass.label}
               signatures={signatures}
+              teacherSignatures={teacherSignatures.filter((signature) =>
+                signature.role === "Subject teacher" ||
+                signature.teacherId === student.classTeacherId,
+              )}
               last={index === visibleProgress.length - 1}
             />
           ))}

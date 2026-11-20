@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 const maxFileSize = 4 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-const allowedRoles = new Set(["headteacher", "class-teacher", "subject-teacher"]);
+const allowedRoles = new Set(["headteacher"]);
 
 function signatureNotFound() {
   return Response.json({ error: "Signature not found." }, {
@@ -88,6 +88,11 @@ export async function POST(
   const result = await signatureContext(params);
   if (!result) return Response.json({ error: "Choose a valid exam report signature role." }, { status: 404 });
   const { context, role } = result;
+  if (!context.grantedPermissions.some((permission) =>
+    ["examinations.create", "results.publish", "school.settings.manage"].includes(permission),
+  )) {
+    return Response.json({ error: "Only examination managers can update the headteacher signature." }, { status: 403 });
+  }
   const formData = await request.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {

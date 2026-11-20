@@ -30,6 +30,8 @@ import {
 import { PrintButton } from "@/components/print-button";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
+import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
+import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import {
   calculateWeightedAverage,
   canPreviewDraftTestReport,
@@ -156,8 +158,10 @@ export default async function ReportCardPage({
     updatedAt: examReportSignatures.updatedAt,
   })
     .from(examReportSignatures)
-    .where(eq(examReportSignatures.schoolId, context.schoolId));
-  const signatureVersions = new Map(signatureRows.map((row) => [row.role, row.updatedAt.getTime()]));
+    .where(and(
+      eq(examReportSignatures.schoolId, context.schoolId),
+      eq(examReportSignatures.role, "headteacher"),
+    ));
   const canViewFeeBalance = context.grantedPermissions.includes("fees.balance.view") ||
     context.grantedPermissions.includes("payments.record") ||
     context.grantedPermissions.includes("fees.manage");
@@ -232,6 +236,7 @@ export default async function ReportCardPage({
     maxMarks: examSubjects.maxMarks,
     weight: examSubjects.weight,
     isCompulsory: classSubjects.isCompulsory,
+    teacherId: classSubjects.teacherId,
   }).from(examSubjects)
     .innerJoin(classSubjects, and(
       eq(classSubjects.id, examSubjects.classSubjectId),
@@ -247,6 +252,10 @@ export default async function ReportCardPage({
       draftPreview ? eq(examSubjects.status, "draft") : eq(examSubjects.status, "published"),
     ))
     .orderBy(asc(subjects.name));
+  const teacherSignatures = await getExamTeacherSignatures(context.schoolId, [
+    { teacherId: record.classTeacherId, role: "Class teacher" },
+    ...assessments.map((assessment) => ({ teacherId: assessment.teacherId, role: "Subject teacher" as const })),
+  ]);
   const assessmentIds = assessments.map((assessment) => assessment.id);
   const [markRows, attendanceRows] = assessmentIds.length
     ? await Promise.all([
@@ -472,19 +481,7 @@ export default async function ReportCardPage({
           <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classTeacherFeedback ?? "—"}</p></div>
           <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{headteacherFeedback ?? "—"}</p></div>
         </section>
-        <section className="grid grid-cols-3 gap-3 pt-4 text-center text-xs">
-          {([
-            ["headteacher", "Headteacher"],
-            ["class-teacher", "Class teacher"],
-            ["subject-teacher", "Subject teacher"],
-          ] as const).map(([role, label]) => (
-            <div key={role} className="flex min-h-16 flex-col justify-end pt-1">
-              {signatureVersions.has(role) && <Image src={`/api/admin/examinations/signatures/${role}?v=${signatureVersions.get(role)}`} unoptimized width={180} height={56}
-                alt={`${label} signature`} className="mx-auto mb-1 max-h-10 w-auto max-w-full object-contain" />}
-              <div className="border-t border-slate-500 pt-1">{label} signature</div>
-            </div>
-          ))}
-        </section>
+        <ReportSignatureStrip signatures={signatureRows} teacherSignatures={teacherSignatures} />
         <footer className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-slate-500">
           <span>{record.schoolName}</span>
           <span>{record.examinationName} · {record.yearName}</span>

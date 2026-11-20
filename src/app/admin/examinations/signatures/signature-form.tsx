@@ -4,12 +4,10 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export type SignatureRole = "headteacher" | "class-teacher" | "subject-teacher";
+export type SignatureRole = "headteacher";
 
 const roleLabels: Record<SignatureRole, string> = {
   headteacher: "Headteacher",
-  "class-teacher": "Class teacher",
-  "subject-teacher": "Subject teacher",
 };
 
 export function SignatureForm({
@@ -28,7 +26,8 @@ export function SignatureForm({
     event.preventDefault();
     setMessage("");
     setError("");
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     setPending(true);
     try {
       const response = await fetch(`/api/admin/examinations/signatures/${role}`, {
@@ -41,7 +40,7 @@ export function SignatureForm({
         return;
       }
       setMessage(`${roleLabels[role]} signature uploaded.`);
-      event.currentTarget.reset();
+      form.reset();
       router.refresh();
     } catch {
       setError("The signature could not be uploaded. Check your connection and try again.");

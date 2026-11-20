@@ -2190,6 +2190,23 @@ export const examReportSignatures = mysqlTable(
   ],
 );
 
+export const examTeacherSignatures = mysqlTable(
+  "exam_teacher_signatures",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    teacherId: bigint("teacherId", { mode: "number", unsigned: true }).notNull().references(() => teachers.id),
+    storageKey: varchar("storageKey", { length: 500 }).notNull(),
+    fileName: varchar("fileName", { length: 160 }).notNull(),
+    contentType: varchar("contentType", { length: 100 }).notNull(),
+    uploadedBy: varchar("uploadedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("exam_teacher_signatures_school_teacher_created_idx").on(table.schoolId, table.teacherId, table.createdAt),
+  ],
+);
+
 export const libraryBooks = mysqlTable(
   "library_books",
   {

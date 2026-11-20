@@ -28,6 +28,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { canEnterExamMarks, canViewExamSubject } from "@/lib/examination-policy";
+import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { PrintButton } from "@/components/print-button";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
@@ -69,6 +70,7 @@ export default async function SubjectMarksPage({
     maxMarks: examSubjects.maxMarks,
     weight: examSubjects.weight,
     isCompulsory: classSubjects.isCompulsory,
+    teacherId: classSubjects.teacherId,
     status: examSubjects.status,
     examStatus: examinations.status,
     examPublicId: examinations.publicId,
@@ -311,7 +313,14 @@ export default async function SubjectMarksPage({
     updatedAt: examReportSignatures.updatedAt,
   })
     .from(examReportSignatures)
-    .where(eq(examReportSignatures.schoolId, context.schoolId));
+    .where(and(
+      eq(examReportSignatures.schoolId, context.schoolId),
+      eq(examReportSignatures.role, "headteacher"),
+    ));
+  const teacherSignatures = await getExamTeacherSignatures(context.schoolId, [
+    ...roster.map((row) => ({ teacherId: row.classTeacherId, role: "Class teacher" as const })),
+    { teacherId: subject.teacherId, role: "Subject teacher" },
+  ]);
   const schoolLogo = schoolLogoSource(subject.schoolLogoUrl);
   return (
     <main className="exam-report-document mx-auto max-w-6xl space-y-6 p-6">
@@ -367,7 +376,7 @@ export default async function SubjectMarksPage({
             ))}</tbody>
           </table>
         </div>
-        <ReportSignatureStrip signatures={signatureRows} />
+        <ReportSignatureStrip signatures={signatureRows} teacherSignatures={teacherSignatures} />
       </section>
 
       <section id="exam-mark-list" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5">

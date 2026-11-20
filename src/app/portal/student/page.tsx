@@ -29,6 +29,7 @@ import {
   feeTypes,
   dormitories,
   dormitoryRooms,
+  examReportSignatures,
   libraryBooks,
   libraryLoans,
   studentAttendance,
@@ -43,6 +44,7 @@ import {
 } from "@/db/schema";
 import { PrintButton } from "@/components/print-button";
 import { StudentProfilePrintout } from "@/components/student-profile-printout";
+import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { requireSchoolMember } from "@/lib/access-control";
 import {
@@ -63,6 +65,7 @@ import {
   examRemarkVariantIndex,
   resolveExamReportRemark,
 } from "@/lib/exam-report-remarks";
+import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { FamilyPortalShell } from "../family-portal-shell";
 
@@ -199,6 +202,7 @@ export default async function StudentPortalPage({
         yearName: academicYears.name,
         className: classLevels.name,
         sectionName: classSections.name,
+        classTeacherId: classSections.classTeacherId,
         rollNumber: studentEnrollments.rollNumber,
         admissionNumber: students.admissionNumber,
         termName: academicTerms.name,
@@ -207,6 +211,7 @@ export default async function StudentPortalPage({
         gradingScaleId: examGradingScales.id,
         subjectName: subjects.name,
         subjectCode: subjects.code,
+        subjectTeacherId: classSubjects.teacherId,
         marks: examMarks.marks,
         teacherRemark: examMarks.teacherRemark,
         maxMarks: examSubjects.maxMarks,
@@ -458,6 +463,7 @@ export default async function StudentPortalPage({
     termName: string | null;
     examClassId: number;
     principalRemark: string | null;
+    classTeacherId: number | null;
     gradingScaleId: number;
     rows: typeof resultRows;
   }>();
@@ -478,6 +484,7 @@ export default async function StudentPortalPage({
       termName: row.termName,
       examClassId: row.examClassId,
       principalRemark: row.principalRemark,
+      classTeacherId: row.classTeacherId,
       gradingScaleId: row.gradingScaleId,
       rows: [row],
     });
@@ -561,6 +568,19 @@ export default async function StudentPortalPage({
       }),
     };
   });
+  const [signatureRows, reportTeacherSignatures] = await Promise.all([
+    db.select({
+      role: examReportSignatures.role,
+      updatedAt: examReportSignatures.updatedAt,
+    }).from(examReportSignatures).where(and(
+      eq(examReportSignatures.schoolId, context.schoolId),
+      eq(examReportSignatures.role, "headteacher"),
+    )),
+    getExamTeacherSignatures(context.schoolId, completeReports.flatMap((report) => [
+      { teacherId: report.classTeacherId, role: "Class teacher" as const },
+      ...report.rows.map((row) => ({ teacherId: row.subjectTeacherId, role: "Subject teacher" as const })),
+    ])),
+  ]);
   const annualProgressByStudentYear = new Map<string, {
     studentId: number;
     yearName: string;
@@ -1135,13 +1155,13 @@ export default async function StudentPortalPage({
                           <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{report.classTeacherRemark || "—"}</p></div>
                           <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{report.principalRemark || "—"}</p></div>
                         </section>
-                        <section className="grid grid-cols-1 gap-3 pt-4 text-center text-xs min-[400px]:grid-cols-3 print:grid-cols-3">
-                          {(["Headteacher", "Class teacher", "Subject teacher"] as const).map((label) => (
-                            <div key={label} className="flex min-h-16 flex-col justify-end pt-1">
-                              <div className="border-t border-slate-500 pt-1">{label} signature</div>
-                            </div>
-                          ))}
-                        </section>
+                        <ReportSignatureStrip
+                          signatures={signatureRows}
+                          teacherSignatures={reportTeacherSignatures.filter((signature) =>
+                            signature.role === "Subject teacher" ||
+                            signature.teacherId === report.classTeacherId,
+                          )}
+                        />
                         <footer className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-slate-500">
                           <span>{context.schoolName}</span><span>{report.examName} · {report.yearName}</span>
                         </footer>

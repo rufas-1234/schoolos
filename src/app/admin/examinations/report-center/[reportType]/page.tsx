@@ -52,6 +52,8 @@ import {
   examRemarkVariantIndex,
   resolveExamReportRemark,
 } from "@/lib/exam-report-remarks";
+import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
+import type { ExamTeacherSignature } from "@/lib/exam-report-signatures";
 
 export const dynamic = "force-dynamic";
 type ProgressAssessment = { id: number; name: string; maxMarks: string; weight: string; isCompulsory: boolean };
@@ -174,6 +176,7 @@ function ProgressCard({
   classRemark,
   principalRemark,
   showPercentages,
+  teacherSignatures,
   schoolName,
   schoolLogoUrl,
   schoolAddress,
@@ -208,6 +211,7 @@ function ProgressCard({
   classRemark: string | null;
   principalRemark: string | null;
   showPercentages: boolean;
+  teacherSignatures: ExamTeacherSignature[];
   schoolName: string;
   schoolLogoUrl: string | null;
   schoolAddress: string | null;
@@ -382,7 +386,7 @@ function ProgressCard({
           <p>{headteacherFeedback || "No headteacher comment recorded."}</p>
         </article>
       </section>
-      <ReportSignatureStrip signatures={signatures} />
+      <ReportSignatureStrip signatures={signatures} teacherSignatures={teacherSignatures} />
     </article>
   );
 }
@@ -412,7 +416,10 @@ export default async function ExaminationReportPage({
     role: examReportSignatures.role,
     updatedAt: examReportSignatures.updatedAt,
   }).from(examReportSignatures)
-    .where(eq(examReportSignatures.schoolId, context.schoolId));
+    .where(and(
+      eq(examReportSignatures.schoolId, context.schoolId),
+      eq(examReportSignatures.role, "headteacher"),
+    ));
   const definition = reportDefinitions[reportType];
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");
@@ -566,6 +573,7 @@ export default async function ExaminationReportPage({
       status: examSubjects.status,
       classSubjectId: classSubjects.id,
       isCompulsory: classSubjects.isCompulsory,
+      teacherId: classSubjects.teacherId,
     }).from(examSubjects)
       .innerJoin(classSubjects, and(
         eq(classSubjects.id, examSubjects.classSubjectId),
@@ -624,6 +632,7 @@ export default async function ExaminationReportPage({
       rollNumber: studentEnrollments.rollNumber,
       sectionName: classSections.name,
       sectionId: classSections.id,
+      classTeacherId: classSections.classTeacherId,
     }).from(studentEnrollments)
       .innerJoin(classSections, and(
         eq(classSections.id, studentEnrollments.classSectionId),
@@ -643,6 +652,15 @@ export default async function ExaminationReportPage({
       ))
       .orderBy(asc(classSections.name), asc(students.lastName), asc(students.firstName))
     : [];
+  const reportTeacherSignatures = await getExamTeacherSignatures(context.schoolId, [
+    ...resultRows.map((row) => ({ teacherId: row.classTeacherId, role: "Class teacher" as const })),
+    ...assessments.map((assessment) => ({ teacherId: assessment.teacherId, role: "Subject teacher" as const })),
+  ]);
+  const teacherSignaturesForStudent = (row: (typeof resultRows)[number]) =>
+    reportTeacherSignatures.filter((signature) =>
+     signature.role === "Subject teacher" ||
+     signature.teacherId === row.classTeacherId,
+    );
   const sectionSummary = [...new Set(resultRows.map((row) => row.sectionName))].join(", ");
   const canViewPhotos = context.grantedPermissions.includes("students.view");
   const [markRows, attendanceRows, gradeRows, remarksRows] = resultRows.length && assessments.length
@@ -731,6 +749,7 @@ export default async function ExaminationReportPage({
       admissionNumber: row.admissionNumber,
       rollNumber: row.rollNumber,
       sectionName: row.sectionName,
+      classTeacherId: row.classTeacherId,
       className: examClass?.className ?? "",
       marks,
       assessmentStates,
@@ -966,7 +985,7 @@ export default async function ExaminationReportPage({
                     <tbody>{routineRows.map((item) => <tr key={item.id}><td>{item.examDate}</td><td>{item.name} <span className="text-xs text-slate-500">{item.code}</span></td><td>{examDetails.name}</td><td>{item.maxMarks}</td><td>{item.weight}</td></tr>)}</tbody>
                   </table>
                   {routineRows.length === 0 && <p className="text-sm text-slate-600">No scheduled subjects are configured for this class.</p>}
-                  <ReportSignatureStrip signatures={configuredSignatures} />
+                  <ReportSignatureStrip signatures={configuredSignatures} teacherSignatures={reportTeacherSignatures} />
                 </>
               ) : <p className="text-sm text-slate-600">Select an examination and class to create the routine.</p>}
             </section>
@@ -1008,7 +1027,7 @@ export default async function ExaminationReportPage({
                       </tr>
                     ))}</tbody>
                   </table>
-                  <ReportSignatureStrip signatures={configuredSignatures} />
+                  <ReportSignatureStrip signatures={configuredSignatures} teacherSignatures={reportTeacherSignatures} />
                 </section>
               )}
 
@@ -1038,7 +1057,7 @@ export default async function ExaminationReportPage({
                         })}</tbody>
                         <tfoot><tr><td>Overall</td><td>{activeResult.overall ? `${activeResult.overall.totalMarks.toFixed(2)} / ${activeResult.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{activeResult.overall ? `${activeResult.overall.percentage.toFixed(2)}%` : "—"}</td><td>{activeResult.grade?.grade ?? "—"}</td><td>{activeResult.grade?.performanceRemark ?? ""}</td></tr></tfoot>
                       </table>
-                      <ReportSignatureStrip signatures={configuredSignatures} />
+                      <ReportSignatureStrip signatures={configuredSignatures} teacherSignatures={activeResult ? teacherSignaturesForStudent(resultRows.find((row) => row.enrollmentId === activeResult.enrollmentId)!) : reportTeacherSignatures} />
                     </>
                   ) : <p className="text-sm text-slate-600">Select a student to generate their marksheet.</p>}
                 </section>
@@ -1064,7 +1083,7 @@ export default async function ExaminationReportPage({
                           return <tr key={row.enrollmentId}><td>{row.rollNumber ?? "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td><td>{marksLabel}</td><td>{percentage === null ? "—" : `${percentage.toFixed(2)}%`}</td><td>{band?.grade ?? "—"}</td></tr>;
                         })}</tbody>
                       </table>
-                      <ReportSignatureStrip signatures={configuredSignatures} />
+                      <ReportSignatureStrip signatures={configuredSignatures} teacherSignatures={reportTeacherSignatures.filter((signature) => signature.role === "Class teacher" || signature.teacherId === selectedSubject.teacherId)} />
                     </>
                   ) : <p className="text-sm text-slate-600">Select a subject to generate its marksheet.</p>}
                 </section>
@@ -1086,7 +1105,7 @@ export default async function ExaminationReportPage({
                       })}<td>{row.overall ? `${row.overall.totalMarks.toFixed(2)} / ${row.overall.maxMarks.toFixed(2)}` : "Incomplete"}</td><td>{row.overall ? `${row.overall.percentage.toFixed(2)}%` : "—"}</td><td>{row.grade?.grade ?? "—"}</td></tr>)}</tbody>
                     </table>
                   </div>
-                  <ReportSignatureStrip signatures={configuredSignatures} />
+                  <ReportSignatureStrip signatures={configuredSignatures} teacherSignatures={reportTeacherSignatures} />
                 </section>
               )}
 
@@ -1108,6 +1127,7 @@ export default async function ExaminationReportPage({
                       schoolPhone={examDetails.schoolPhone}
                       schoolEmail={examDetails.schoolEmail}
                       signatures={configuredSignatures}
+                      teacherSignatures={teacherSignaturesForStudent(resultRows.find((row) => row.enrollmentId === activeResult.enrollmentId)!)}
                       currency={examDetails.schoolCurrency}
                       feeBalanceMinor={feeBalanceByStudent.get(activeResult.studentId) ?? 0}
                       showFeeBalance={showFeeBalance}
@@ -1132,6 +1152,7 @@ export default async function ExaminationReportPage({
                         schoolPhone={examDetails.schoolPhone}
                         schoolEmail={examDetails.schoolEmail}
                         signatures={configuredSignatures}
+                        teacherSignatures={teacherSignaturesForStudent(resultRows.find((resultRow) => resultRow.enrollmentId === row.enrollmentId)!)}
                         currency={examDetails.schoolCurrency}
                         feeBalanceMinor={feeBalanceByStudent.get(row.studentId) ?? 0}
                         showFeeBalance={showFeeBalance}
@@ -1168,7 +1189,7 @@ export default async function ExaminationReportPage({
                       </table>
                     </div>
                   ) : <p className="text-sm text-slate-600">No earlier published results are available for this class.</p>}
-                  <ReportSignatureStrip signatures={configuredSignatures} />
+                  <ReportSignatureStrip signatures={configuredSignatures} teacherSignatures={reportTeacherSignatures} />
                 </section>
               )}
             </>

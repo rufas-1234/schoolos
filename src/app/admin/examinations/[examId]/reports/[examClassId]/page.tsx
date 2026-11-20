@@ -26,6 +26,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
+import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
   calculateWeightedAverage,
@@ -124,6 +125,7 @@ export default async function ClassMarksheetReportPage({
     weight: examSubjects.weight,
     status: examSubjects.status,
     isCompulsory: classSubjects.isCompulsory,
+    teacherId: classSubjects.teacherId,
   }).from(examSubjects)
     .innerJoin(classSubjects, and(
       eq(classSubjects.id, examSubjects.classSubjectId),
@@ -151,6 +153,7 @@ export default async function ClassMarksheetReportPage({
     admissionNumber: students.admissionNumber,
     rollNumber: studentEnrollments.rollNumber,
     sectionName: classSections.name,
+    classTeacherId: classSections.classTeacherId,
   }).from(studentEnrollments)
     .innerJoin(classSections, and(
       eq(classSections.id, studentEnrollments.classSectionId),
@@ -273,7 +276,14 @@ export default async function ClassMarksheetReportPage({
     updatedAt: examReportSignatures.updatedAt,
   })
     .from(examReportSignatures)
-    .where(eq(examReportSignatures.schoolId, context.schoolId));
+    .where(and(
+      eq(examReportSignatures.schoolId, context.schoolId),
+      eq(examReportSignatures.role, "headteacher"),
+    ));
+  const teacherSignatures = await getExamTeacherSignatures(context.schoolId, [
+    ...roster.map((student) => ({ teacherId: student.classTeacherId, role: "Class teacher" as const })),
+    ...assessmentRows.map((assessment) => ({ teacherId: assessment.teacherId, role: "Subject teacher" as const })),
+  ]);
 
   return (
     <main className="exam-report-document print-report-page mx-auto max-w-7xl space-y-5 p-6 print:max-w-none print:p-0">
@@ -333,7 +343,7 @@ export default async function ClassMarksheetReportPage({
             ))}</tbody>
           </table>
         </div>
-        <ReportSignatureStrip signatures={signatureRows} />
+        <ReportSignatureStrip signatures={signatureRows} teacherSignatures={teacherSignatures} />
       </section>
 
       <section id="class-marksheet-report" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-6 print:rounded-none print:border-0 print:p-0">
@@ -411,7 +421,7 @@ export default async function ClassMarksheetReportPage({
           </table>
         </div>
         <footer className="flex justify-between border-t pt-3 text-xs text-slate-500"><span>{exam.schoolName} · {exam.examTypeName ?? "Examination"}</span><span>{exam.name} · {exam.className} · {sectionSummary}</span></footer>
-        <ReportSignatureStrip signatures={signatureRows} />
+        <ReportSignatureStrip signatures={signatureRows} teacherSignatures={teacherSignatures} />
       </section>
     </main>
   );
