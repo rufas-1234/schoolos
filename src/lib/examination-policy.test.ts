@@ -10,6 +10,7 @@ import {
   calculateAnnualProgress,
   calculateWeightedAverage,
   completeSubmittedMarkIds,
+  examMarkEntryInputPattern,
   examAssessmentResultState,
   hasCompleteExamResult,
   gradeForPercentage,
@@ -171,6 +172,14 @@ describe("examination policy", () => {
     expect(parseExamMarkEntry("Y")).toEqual({ kind: "status", status: "y" });
     expect(parseExamMarkEntry("-1")).toBeNull();
     expect(parseExamMarkEntry("absent")).toBeNull();
+  });
+
+  it("allows valid numeric marks through the browser input pattern", () => {
+    const pattern = new RegExp(`^(?:${examMarkEntryInputPattern})$`, "v");
+    expect(pattern.test("87")).toBe(true);
+    expect(pattern.test("87.5")).toBe(true);
+    expect(pattern.test(" x ")).toBe(true);
+    expect(pattern.test("87a")).toBe(false);
   });
 
   it("accepts complete component marks for only the submitted students", () => {

@@ -21,6 +21,8 @@ export type ExamMarkEntry =
   | { kind: "score"; marks: number | null }
   | { kind: "status"; status: "x" | "y" };
 
+export const examMarkEntryInputPattern = String.raw`\s*(?:[0-9]{1,6}(?:\.[0-9]{1,2})?|[xXyY])\s*`;
+
 export function parseExamMarkEntry(value: string): ExamMarkEntry | null {
   const normalized = value.trim().toLocaleLowerCase();
   if (normalized === "") return { kind: "score", marks: null };

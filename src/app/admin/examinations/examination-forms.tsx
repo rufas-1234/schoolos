@@ -28,7 +28,7 @@ import {
   type ExaminationActionState,
 } from "./actions";
 import { GRADING_SCALE_PRESETS } from "@/lib/grading-scale-presets";
-import type { GradeBand } from "@/lib/examination-policy";
+import { examMarkEntryInputPattern, type GradeBand } from "@/lib/examination-policy";
 
 function Feedback({ state }: { state: ExaminationActionState }) {
   if (!state.error && !state.success) return null;
@@ -640,7 +640,7 @@ export function SaveMarksForm({
                 <td className="p-3">{student.attendanceStatus === "x" ? "X · Absent" : student.attendanceStatus === "y" ? "Y · Nullified (malpractice)" : student.attendanceStatus ?? "Not recorded"}</td>
                 {student.components.map((component) => {
                   const name = `component_${student.markId}_${component.id}`;
-                  return <td key={component.id} className="p-3"><input aria-label={`${component.title} marks or X/Y status for ${student.name}`} type="text" pattern="\\s*(?:[0-9]{1,6}(?:\\.[0-9]{1,2})?|[xXyY])\\s*" name={name} maxLength={10} placeholder="Mark / X / Y" value={values[name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} className="w-28 rounded-lg border p-2" /></td>;
+                  return <td key={component.id} className="p-3"><input aria-label={`${component.title} marks or X/Y status for ${student.name}`} type="text" pattern={examMarkEntryInputPattern} name={name} maxLength={10} placeholder="Mark / X / Y" value={values[name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} className="w-28 rounded-lg border p-2" /></td>;
                 })}
                 <td className="p-3"><input aria-label={`Optional teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} value={values[`remark_${student.enrollmentId}`] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [`remark_${student.enrollmentId}`]: event.target.value }))} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
               </tr>
