@@ -3,7 +3,9 @@ import { AdminDataTable } from "@/components/admin-data-table";
 import { db } from "@/db";
 import { schools } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/platform-access";
+import { getSchoolDisplayStatus } from "@/lib/school-lifecycle-policy";
 import { CreateSchoolForm } from "./create-school-form";
+import { SchoolManagementControls } from "./school-management-controls";
 import { PlatformSignOutButton } from "./sign-out-button";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +16,11 @@ export default async function PlatformSchoolsPage() {
     name: schools.name,
     email: schools.email,
     phone: schools.phone,
+    address: schools.address,
     publicId: schools.publicId,
     createdAt: schools.createdAt,
+    status: schools.status,
+    archivedAt: schools.archivedAt,
   }).from(schools).orderBy(asc(schools.name), asc(schools.id));
 
   return (
@@ -26,7 +31,7 @@ export default async function PlatformSchoolsPage() {
             <p className="text-sm font-semibold uppercase tracking-widest text-violet-700">SchoolOS platform</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">School workspaces</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Only configured platform admins can create schools. Each school has separate users, roles, and data.
+              Public signups wait for approval here. Manage school details and disable access without deleting tenant data.
             </p>
           </div>
           <PlatformSignOutButton />
@@ -38,18 +43,41 @@ export default async function PlatformSchoolsPage() {
             columns={[
               { key: "name", label: "School" },
               { key: "contact", label: "Contact" },
+              { key: "status", label: "Status" },
               { key: "publicId", label: "Workspace ID" },
               { key: "createdAt", label: "Created" },
             ]}
+            filters={[{
+              key: "status",
+              label: "Status",
+              options: [
+                { value: "pending", label: "Pending review" },
+                { value: "active", label: "Approved" },
+                { value: "rejected", label: "Rejected" },
+                { value: "archived", label: "Archived" },
+              ],
+            }]}
             rows={schoolList.map((school) => ({
               id: school.publicId,
-              searchableText: `${school.name} ${school.email ?? ""} ${school.phone ?? ""} ${school.publicId}`,
+              searchableText: `${school.name} ${school.email ?? ""} ${school.phone ?? ""} ${school.publicId} ${getSchoolDisplayStatus(school.status, school.archivedAt)}`,
               values: {
                 name: school.name,
                 contact: school.email || school.phone || "No contact details",
+                status: getSchoolDisplayStatus(school.status, school.archivedAt),
                 publicId: school.publicId,
                 createdAt: new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(school.createdAt),
               },
+              actions: (
+                <SchoolManagementControls
+                  schoolPublicId={school.publicId}
+                  name={school.name}
+                  email={school.email}
+                  phone={school.phone}
+                  address={school.address}
+                  status={school.status}
+                  archived={school.archivedAt !== null}
+                />
+              ),
             }))}
             emptyMessage="No school workspaces have been created yet."
             mobileCardView

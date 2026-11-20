@@ -1,7 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { schoolMemberships, user, userLoginIdentifiers } from "@/db/schema";
+import { schoolMemberships, schools, user, userLoginIdentifiers } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import {
   normalizeAdmissionIdentifier,
   normalizePhoneIdentifier,
@@ -47,6 +48,11 @@ export async function POST(request: Request) {
         eq(schoolMemberships.userId, user.id),
         eq(schoolMemberships.schoolId, userLoginIdentifiers.schoolId),
         eq(schoolMemberships.status, "active"),
+      ))
+      .innerJoin(schools, and(
+        eq(schools.id, userLoginIdentifiers.schoolId),
+        eq(schools.status, schoolWorkspaceStatuses.active),
+        isNull(schools.archivedAt),
       ))
       .where(and(
         inArray(userLoginIdentifiers.identifier, candidates),

@@ -11,6 +11,9 @@ export function CreateSchoolForm() {
   return (
     <form action={action} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-slate-900">Provision a school</h2>
+      <p className="text-sm leading-5 text-slate-600">
+        Schools created here are activated immediately. Public signup applications require approval.
+      </p>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         School name
         <input name="schoolName" required minLength={2} maxLength={255} className={fieldClass} />

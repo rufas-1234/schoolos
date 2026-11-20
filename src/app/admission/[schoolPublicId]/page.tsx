@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { normalizeStudentFieldSettings, studentSettingFields } from "@/lib/student-settings";
 import { schoolLogoSource } from "@/lib/school-logo";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import { PublicAdmissionForm } from "./public-admission-form";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,11 @@ export default async function PublicAdmissionPage({
     address: schools.address,
     phone: schools.phone,
     email: schools.email,
-  }).from(schools).where(eq(schools.publicId, schoolPublicId)).limit(1);
+  }).from(schools).where(and(
+    eq(schools.publicId, schoolPublicId),
+    eq(schools.status, schoolWorkspaceStatuses.active),
+    isNull(schools.archivedAt),
+  )).limit(1);
   if (!school) notFound();
 
   const [savedSettings, branches, years] = await Promise.all([

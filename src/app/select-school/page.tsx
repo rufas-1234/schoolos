@@ -1,8 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { schoolMemberships, schools } from "@/db/schema";
 import { getCurrentUserSchoolMemberships } from "@/lib/access-control";
 import { activeSchoolCookieName, isMultiSchoolEnabled, resolveSchoolChoice } from "@/lib/school-context-policy";
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import { getSignedInWorkspacePath } from "@/app/login/actions";
 import { selectSchool } from "./actions";
 
@@ -14,13 +18,37 @@ export default async function SelectSchoolPage({
   const { user, memberships } = await getCurrentUserSchoolMemberships();
   if (!memberships.length) {
     if (isPlatformAdminEmail(user.email) && isMultiSchoolEnabled()) redirect("/platform/schools");
+    const applicationStatuses = [schoolWorkspaceStatuses.pending, schoolWorkspaceStatuses.rejected];
+    const applications = await db.select({
+      name: schools.name,
+      status: schools.status,
+    }).from(schoolMemberships)
+      .innerJoin(schools, eq(schoolMemberships.schoolId, schools.id))
+      .where(and(
+        eq(schoolMemberships.userId, user.id),
+        eq(schoolMemberships.status, "active"),
+        inArray(schools.status, applicationStatuses),
+        isNull(schools.archivedAt),
+      ));
+    const hasPendingApplication = applications.some(
+      (application) => application.status === schoolWorkspaceStatuses.pending,
+    );
     const { reason } = await searchParams;
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-5 py-12">
         <h1 className="text-2xl font-bold text-slate-900">No school access</h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          This account does not have an active school membership. Ask a school administrator to grant access.
+          {hasPendingApplication
+            ? "Your school application is awaiting platform review. Access will be enabled after approval."
+            : applications.length
+              ? "Your school application was rejected. Contact the platform administrator if you believe this is a mistake."
+              : "This account does not have an active school membership. Ask a school administrator to grant access."}
         </p>
+        {applications.map((application) => (
+          <p key={application.name} className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {application.name}: {application.status === schoolWorkspaceStatuses.pending ? "Pending review" : "Rejected"}
+          </p>
+        ))}
         {reason === "invalid-selection" && <p role="alert" className="mt-4 text-sm text-rose-700">That school is not available to this account.</p>}
       </main>
     );

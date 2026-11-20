@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -31,6 +31,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import { normalizeAdmissionIdentifier } from "@/lib/login-identifier-policy";
 import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
 import { canTransitionStudentStatus, studentStatuses } from "@/lib/student-policy";
@@ -516,7 +517,11 @@ export async function createPublicStudentAdmissionApplication(
   const [school] = await db.select({
     id: schools.id,
     publicId: schools.publicId,
-  }).from(schools).where(eq(schools.publicId, schoolPublicId.data)).limit(1);
+  }).from(schools).where(and(
+    eq(schools.publicId, schoolPublicId.data),
+    eq(schools.status, schoolWorkspaceStatuses.active),
+    isNull(schools.archivedAt),
+  )).limit(1);
   if (!school) return { error: "This registration link is no longer available." };
 
   const [savedSettings] = await db.select({ fields: studentSettings.fields })

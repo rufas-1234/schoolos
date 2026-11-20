@@ -31,6 +31,7 @@ import type { StaffDocuments } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import { normalizeAdmissionIdentifier, normalizePhoneIdentifier } from "@/lib/login-identifier-policy";
 import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
 import {
@@ -838,7 +839,11 @@ export async function createPublicStaffApplication(
   if (formData.get("consent") !== "on") return { error: "Please confirm that the information is accurate." };
 
   const [school] = await db.select({ id: schools.id, publicId: schools.publicId })
-    .from(schools).where(eq(schools.publicId, schoolPublicId.data)).limit(1);
+    .from(schools).where(and(
+      eq(schools.publicId, schoolPublicId.data),
+      eq(schools.status, schoolWorkspaceStatuses.active),
+      isNull(schools.archivedAt),
+    )).limit(1);
   if (!school) return { error: "This registration link is no longer available." };
 
   const [settings] = await db.select({

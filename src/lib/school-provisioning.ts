@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import { schoolWorkspaceStatuses, type SchoolWorkspaceStatus } from "@/lib/school-lifecycle-policy";
 import {
   auditLogs,
   chartOfAccounts,
@@ -28,6 +29,7 @@ export async function provisionSchoolWorkspace(
     address,
     administratorUserId,
     actorUserId,
+    status = schoolWorkspaceStatuses.active,
   }: {
     name: string;
     email: string | null;
@@ -35,6 +37,7 @@ export async function provisionSchoolWorkspace(
     address: string | null;
     administratorUserId: string;
     actorUserId: string;
+    status?: SchoolWorkspaceStatus;
   },
 ) {
   const [existingSchool] = await tx.select({ id: schools.id })
@@ -42,7 +45,17 @@ export async function provisionSchoolWorkspace(
   if (existingSchool) throw new SchoolNameConflictError("A school with this name already exists.");
 
   const schoolPublicId = randomUUID();
-  await tx.insert(schools).values({ publicId: schoolPublicId, name, email, phone, address });
+  const isApproved = status === schoolWorkspaceStatuses.active;
+  await tx.insert(schools).values({
+    publicId: schoolPublicId,
+    name,
+    email,
+    phone,
+    address,
+    status,
+    approvedAt: isApproved ? new Date() : null,
+    approvedBy: isApproved ? actorUserId : null,
+  });
   const [school] = await tx.select({ id: schools.id }).from(schools)
     .where(eq(schools.publicId, schoolPublicId)).limit(1);
   if (!school) throw new Error("The new school record could not be loaded.");

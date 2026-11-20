@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { hasPermission } from "@/lib/access-policy";
 import { activeSchoolCookieName, isMultiSchoolEnabled, resolveSchoolChoice } from "@/lib/school-context-policy";
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import {
   permissions,
   roles,
@@ -47,6 +48,8 @@ export async function getCurrentUserSchoolMemberships() {
       and(
         eq(schoolMemberships.userId, session.user.id),
         eq(schoolMemberships.status, "active"),
+        eq(schools.status, schoolWorkspaceStatuses.active),
+        isNull(schools.archivedAt),
       ),
     )
     .orderBy(asc(schools.name), asc(schools.id));

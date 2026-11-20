@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
+import { schoolWorkspaceStatuses } from "../lib/school-lifecycle-policy";
 
 const id = () => bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey();
 const createdAt = () => timestamp("createdAt").notNull().defaultNow();
@@ -97,6 +98,11 @@ export const schools = mysqlTable("schools", {
   logoUrl: varchar("logoUrl", { length: 2048 }),
   currency: varchar("currency", { length: 3 }).notNull().default("USD"),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
+  status: varchar("status", { length: 20 }).notNull().default(schoolWorkspaceStatuses.active),
+  approvedAt: timestamp("approvedAt"),
+  approvedBy: varchar("approvedBy", { length: 36 }).references(() => user.id),
+  archivedAt: timestamp("archivedAt"),
+  archivedBy: varchar("archivedBy", { length: 36 }).references(() => user.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

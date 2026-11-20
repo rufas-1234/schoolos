@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -10,6 +10,7 @@ import {
   staffSettings,
 } from "@/db/schema";
 import { schoolLogoSource } from "@/lib/school-logo";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import {
   defaultRequiredStaffFields,
   normalizePublicStaffVisibleFields,
@@ -34,7 +35,11 @@ export default async function PublicStaffRegistrationPage({
     address: schools.address,
     phone: schools.phone,
     email: schools.email,
-  }).from(schools).where(eq(schools.publicId, schoolPublicId)).limit(1);
+  }).from(schools).where(and(
+    eq(schools.publicId, schoolPublicId),
+    eq(schools.status, schoolWorkspaceStatuses.active),
+    isNull(schools.archivedAt),
+  )).limit(1);
   if (!school) notFound();
 
   const [savedSettings, branches, departments, designations] = await Promise.all([

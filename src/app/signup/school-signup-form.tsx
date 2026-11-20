@@ -12,7 +12,7 @@ export function SchoolSignupForm() {
   if (state.success) {
     return (
       <div role="status" className="mt-7 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-        <h2 className="font-semibold text-emerald-950">School workspace created</h2>
+        <h2 className="font-semibold text-emerald-950">School application submitted</h2>
         <p className="mt-2 text-sm leading-6 text-emerald-900">{state.success}</p>
         <Link
           href="/login"
@@ -79,7 +79,7 @@ export function SchoolSignupForm() {
         {pending ? "Creating your school…" : "Create school workspace"}
       </button>
       <p className="text-center text-xs leading-5 text-slate-500">
-        Email verification is not enabled yet.
+        A platform administrator must approve the school before its workspace can be accessed.
       </p>
     </form>
   );

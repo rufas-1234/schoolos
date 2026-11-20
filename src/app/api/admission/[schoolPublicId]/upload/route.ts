@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { schools, uploadedFiles } from "@/db/schema";
 import { matchesFileSignature } from "@/lib/file-signature";
 import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
 import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
+import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 
 const maxFileSize = 4 * 1024 * 1024;
 const allowedDocumentTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -24,7 +25,11 @@ export async function POST(
   const [school] = await db.select({
     id: schools.id,
     publicId: schools.publicId,
-  }).from(schools).where(eq(schools.publicId, schoolPublicId)).limit(1);
+  }).from(schools).where(and(
+    eq(schools.publicId, schoolPublicId),
+    eq(schools.status, schoolWorkspaceStatuses.active),
+    isNull(schools.archivedAt),
+  )).limit(1);
   if (!school) return Response.json({ error: "This registration link is no longer available." }, { status: 404 });
 
   const address = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
