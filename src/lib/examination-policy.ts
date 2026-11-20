@@ -26,6 +26,16 @@ export function canViewExamSubject(
     grantedPermissions.includes("results.publish");
 }
 
+export function canEnterExamMarks(
+  grantedPermissions: readonly string[],
+  isAssignedToSubject: boolean,
+): boolean {
+  return grantedPermissions.includes("results.enter") &&
+    (isAssignedToSubject ||
+      grantedPermissions.includes("examinations.create") ||
+      grantedPermissions.includes("results.publish"));
+}
+
 export function canReviewExamSubject(
   grantedPermissions: readonly string[],
   isAssignedClassTeacher: boolean,

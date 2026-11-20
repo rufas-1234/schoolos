@@ -36,6 +36,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate, isValidDateRange } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import {
+  canEnterExamMarks,
   canPublishExamClass,
   canReviewExamSubject,
   calculateComponentTotal,
@@ -1074,8 +1075,11 @@ export async function syncExamMarksRoster(examSubjectId: number): Promise<{
   if (!record || record.status !== "draft" || record.examStatus !== "open") {
     return { error: "Only an open draft assessment roster can be synchronized." };
   }
-  if (!(await assignedSubject(record.id, context.schoolId, context.user.id))) {
-    return { error: "You can only synchronize the roster for your assigned subjects." };
+  if (!canEnterExamMarks(
+    context.grantedPermissions,
+    Boolean(await assignedSubject(record.id, context.schoolId, context.user.id)),
+  )) {
+    return { error: "You can only synchronize or edit marks for your assigned subjects unless your role has examination management or results publishing access." };
   }
 
   const result = await db.transaction(async (tx) => {
@@ -1225,7 +1229,9 @@ export async function saveExamMarks(
     return { error: "Marks can only be edited while this subject is in draft and the examination is open." };
   }
   const assignment = await assignedSubject(record.id, context.schoolId, context.user.id);
-  if (!assignment) return { error: "You can only enter marks for your assigned subjects." };
+  if (!canEnterExamMarks(context.grantedPermissions, Boolean(assignment))) {
+    return { error: "You can only enter marks for your assigned subjects unless your role has examination management or results publishing access." };
+  }
   const currentMarks = await db.select({
     id: examMarks.id,
     enrollmentId: examMarks.enrollmentId,
@@ -1568,8 +1574,11 @@ export async function submitExamSubject(
   const context = await requireSchoolPermission("results.enter");
   const subjectId = idField.safeParse(value(formData, "examSubjectId"));
   if (!subjectId.success) return { error: "Choose a valid exam subject." };
-  if (!(await assignedSubject(subjectId.data, context.schoolId, context.user.id))) {
-    return { error: "You can only submit marks for your assigned subjects." };
+  if (!canEnterExamMarks(
+    context.grantedPermissions,
+    Boolean(await assignedSubject(subjectId.data, context.schoolId, context.user.id)),
+  )) {
+    return { error: "You can only submit marks for your assigned subjects unless your role has examination management or results publishing access." };
   }
   const outcome = await db.transaction(async (tx) => {
     const [record] = await tx.select({

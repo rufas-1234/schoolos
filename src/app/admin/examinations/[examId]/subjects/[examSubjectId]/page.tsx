@@ -27,7 +27,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { canViewExamSubject } from "@/lib/examination-policy";
+import { canEnterExamMarks, canViewExamSubject } from "@/lib/examination-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { PrintButton } from "@/components/print-button";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
@@ -272,7 +272,8 @@ export default async function SubjectMarksPage({
       ))
       .orderBy(asc(examMarkAudits.createdAt))
     : [];
-  const editable = subject.examStatus === "open" && subject.status === "draft" && assignedTeacher;
+  const canEnterMarks = canEnterExamMarks(context.grantedPermissions, assignedTeacher);
+  const editable = subject.examStatus === "open" && subject.status === "draft" && canEnterMarks;
   const studentRows = roster.map((row) => ({
     markId: row.markId,
     enrollmentId: row.enrollmentId,
@@ -405,7 +406,7 @@ export default async function SubjectMarksPage({
         </section>
       )}
 
-      {subject.examStatus === "open" && subject.status === "draft" && assignedTeacher && roster.length > 0 && (
+      {subject.examStatus === "open" && subject.status === "draft" && canEnterMarks && roster.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-bold text-slate-900">Submit for approval</h2>
           <p className="mt-1 text-sm text-slate-600">Submit a complete marks roster for review. Attendance is recorded separately and does not determine who appears on this marks sheet. After submission, you cannot edit marks unless a reviewer returns the assessment for correction. Published results cannot be changed through a teacher correction request.</p>

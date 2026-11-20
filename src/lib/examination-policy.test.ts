@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canPreviewDraftTestReport,
   canPublishExamClass,
+  canEnterExamMarks,
   canReviewExamSubject,
   canViewExamSubject,
   buildExamProgressPeriods,
@@ -33,6 +34,14 @@ describe("examination policy", () => {
     expect(canViewExamSubject(["results.enter"], false)).toBe(false);
     expect(canViewExamSubject(["examinations.create"], false)).toBe(true);
     expect(canViewExamSubject(["results.publish"], false)).toBe(true);
+  });
+
+  it("allows results managers to enter and submit marks for unassigned subjects", () => {
+    expect(canEnterExamMarks(["results.enter"], true)).toBe(true);
+    expect(canEnterExamMarks(["results.enter"], false)).toBe(false);
+    expect(canEnterExamMarks(["results.enter", "examinations.create"], false)).toBe(true);
+    expect(canEnterExamMarks(["results.enter", "results.publish"], false)).toBe(true);
+    expect(canEnterExamMarks(["results.publish"], false)).toBe(false);
   });
 
   it("allows class teachers to review their class but reserves publishing for results publishers", () => {
