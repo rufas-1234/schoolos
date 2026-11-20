@@ -11,6 +11,175 @@
   --report-muted: #64748b;
   --report-border: #cbd5e1;
   --report-soft: #eef2ff;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  color-scheme: dark;
+}
+
+.dark body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.dark .admin-shell-root,
+.dark .portal-shell-root {
+  background-color: var(--background);
+}
+
+.dark .admin-shell-content,
+.dark .admin-shell-main {
+  background-color: var(--background);
+}
+
+.dark .admin-shell-sidebar {
+  border-color: #3b3150;
+  background-color: #1d1a29;
+}
+
+.dark .admin-shell-topbar {
+  border-color: #3b3150;
+  background-color: #211d2e;
+  color: #e9d5ff;
+}
+
+.dark .admin-shell-sidebar [class*="text-violet-"],
+.dark .admin-shell-topbar [class*="text-violet-"] {
+  color: #e9d5ff;
+}
+
+.dark .admin-shell-sidebar [class*="border-violet-"],
+.dark .admin-shell-topbar [class*="border-violet-"] {
+  border-color: #514466;
+}
+
+.dark .portal-shell-content > header {
+  border-color: #334155;
+  background-color: #111827;
+  color: #f8fafc;
+}
+
+.dark .portal-shell-content > header [class*="text-slate-"] {
+  color: #cbd5e1;
+}
+
+.dark .portal-shell-root > aside {
+  border-color: #334155;
+  background-color: #1f2937;
+}
+
+.dark .portal-shell-root > aside [class*="text-slate-"] {
+  color: #e2e8f0;
+}
+
+.dark .portal-shell-root > aside [class*="text-violet-"],
+.dark .portal-shell-content > header [class*="text-violet-"] {
+  color: #ddd6fe;
+}
+
+.dark .portal-shell-root > aside [class*="border-slate-"] {
+  border-color: #334155;
+}
+
+.dark .portal-shell-root > aside [class~="bg-white"] {
+  background-color: #334155;
+}
+
+.dark .portal-shell-root > aside [class~="bg-white/80"],
+.dark .portal-shell-root > aside [class~="bg-white/50"],
+.dark .portal-shell-root > aside [class~="bg-slate-50"] {
+  background-color: #334155;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *) {
+  color-scheme: dark;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-white"] {
+  background-color: #1e293b;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-white/75"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-white/80"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-white/85"] {
+  background-color: rgb(30 41 59 / 85%);
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-white/50"] {
+  background-color: rgb(51 65 85 / 50%);
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-slate-50"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-slate-50/70"] {
+  background-color: #111827;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-slate-100"] {
+  background-color: #1f2937;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-violet-50"] {
+  background-color: #312e4e;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-black"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-950"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-900"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-800"] {
+  color: #f1f5f9;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-700"] {
+  color: #e2e8f0;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-600"] {
+  color: #cbd5e1;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-500"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-400"] {
+  color: #94a3b8;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-slate-300"] {
+  color: #cbd5e1;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="border-slate-100"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="border-slate-200"],
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="border-slate-300"] {
+  border-color: #334155;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="divide-slate-100"] > :not(:last-child) {
+  border-color: #334155;
 }
 
 @theme inline {

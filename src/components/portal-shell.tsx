@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { GraduationCap, KeyRound, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { cn } from "@/lib/utils";
 
@@ -112,7 +113,7 @@ export function PortalShell({
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900 md:grid md:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="portal-shell-root min-h-dvh bg-slate-50 text-slate-900 md:grid md:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="hidden h-dvh flex-col border-r border-slate-200 bg-slate-100 px-5 py-6 md:sticky md:top-0 md:flex">
         <Link href={navHref(navigation[0]?.href ?? "/")} className="mb-9 flex items-center gap-3 px-1">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white text-violet-800 shadow-sm">
@@ -144,7 +145,7 @@ export function PortalShell({
         </div>
       </aside>
 
-      <div className="min-w-0">
+      <div className="portal-shell-content min-w-0">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white text-slate-950 print:hidden">
           <div className="flex min-h-[4.5rem] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
@@ -173,6 +174,7 @@ export function PortalShell({
               </div>
             )}
             <div className="flex items-center gap-3">
+              <ThemeToggle />
               <span className="hidden max-w-56 truncate text-sm font-medium text-slate-700 sm:inline">
                 {userName}
               </span>

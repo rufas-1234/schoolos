@@ -30,6 +30,7 @@ import { academicSections } from "@/lib/academic-sections";
 import { studentSections } from "@/lib/student-sections";
 import { cn } from "@/lib/utils";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { selectSchool } from "@/app/select-school/actions";
 
@@ -711,7 +712,7 @@ export function AdminShell({
   );
 
   return (
-    <div className="min-h-dvh bg-[#f7f7fa]">
+    <div className="admin-shell-root min-h-dvh bg-[#f7f7fa]">
       <header className="admin-print-header" aria-label={`${schoolName} letterhead`}>
         <div className="admin-print-crest" aria-hidden="true">
           {schoolLogo
@@ -783,6 +784,7 @@ export function AdminShell({
           <WorkspaceQuickSearch />
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <div className="mx-1 hidden h-8 w-px bg-violet-900/15 sm:block" />
             <div className="relative">
               <button

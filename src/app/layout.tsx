@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import Script from "next/script";
 import { Inter, Open_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -28,8 +29,23 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`h-full antialiased ${bodyFont.variable} ${displayFont.variable}`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`h-full antialiased ${bodyFont.variable} ${displayFont.variable}`}
+    >
+      <body className="min-h-full flex flex-col">
+        <Script id="schoolos-theme-init" strategy="beforeInteractive">
+          {`try {
+  if (window.localStorage.getItem("schoolos-theme") === "dark") {
+    document.documentElement.classList.add("dark");
+  }
+} catch (error) {
+  console.error("Could not load the saved theme preference.", error);
+}`}
+        </Script>
+        {children}
+      </body>
     </html>
   );
 }
