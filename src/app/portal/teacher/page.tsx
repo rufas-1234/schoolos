@@ -357,6 +357,7 @@ export default async function TeacherPortalPage({
       examId: examinations.id,
       examName: examinations.name,
       examStatus: examinations.status,
+      startDate: examinations.startDate,
       yearName: academicYears.name,
       className: classLevels.name,
     }).from(examClasses)
