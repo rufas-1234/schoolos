@@ -3,6 +3,7 @@ import {
   canPreviewDraftTestReport,
   canPublishExamClass,
   canEnterExamMarks,
+  canEditExamAttendance,
   canReviewExamSubject,
   canViewExamSubject,
   buildExamProgressPeriods,
@@ -32,6 +33,29 @@ const scale: GradeBand[] = [
 ];
 
 describe("examination policy", () => {
+  it("only lets platform admins edit attendance on approved assessments while the exam is open", () => {
+    expect(canEditExamAttendance({
+      examStatus: "open",
+      assessmentStatus: "draft",
+      isPlatformAdmin: false,
+    })).toBe(true);
+    expect(canEditExamAttendance({
+      examStatus: "open",
+      assessmentStatus: "approved",
+      isPlatformAdmin: false,
+    })).toBe(false);
+    expect(canEditExamAttendance({
+      examStatus: "open",
+      assessmentStatus: "approved",
+      isPlatformAdmin: true,
+    })).toBe(true);
+    expect(canEditExamAttendance({
+      examStatus: "closed",
+      assessmentStatus: "approved",
+      isPlatformAdmin: true,
+    })).toBe(false);
+  });
+
   it("limits subject-result visibility to assigned teachers unless examination oversight is granted", () => {
     expect(canViewExamSubject(["results.enter"], true)).toBe(true);
     expect(canViewExamSubject(["results.enter"], false)).toBe(false);

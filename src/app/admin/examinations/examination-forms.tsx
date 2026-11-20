@@ -411,10 +411,12 @@ export function SaveExamAttendanceForm({
   students,
   isCompulsory,
   editable,
+  approvedAssessment = false,
 }: {
   examSubjectId: number;
   isCompulsory: boolean;
   editable: boolean;
+  approvedAssessment?: boolean;
   students: Array<{
     enrollmentId: number;
     name: string;
@@ -432,10 +434,11 @@ export function SaveExamAttendanceForm({
   const visibleCount = students.filter((student) =>
     `${student.name} ${student.admissionNumber ?? ""}`.toLocaleLowerCase().includes(normalizedSearch),
   ).length;
-  if (!editable) return <p className="text-sm text-slate-600">Attendance can only be changed while this assessment is a draft and the examination is open.</p>;
+  if (!editable) return <p className="text-sm text-slate-600">Attendance can be changed while this assessment is a draft and the examination is open. Only system superadmins can change attendance on approved results while the examination is open.</p>;
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
+      {approvedAssessment && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Superadmin attendance correction: saving changes attendance only and does not reopen or edit the approved marks.</p>}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <label className="block w-full max-w-md space-y-1.5 text-sm font-medium text-slate-700">
           Quick search students

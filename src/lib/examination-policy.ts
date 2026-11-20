@@ -23,6 +23,16 @@ export type ExamMarkEntry =
 
 export const examMarkEntryInputPattern = String.raw`\s*(?:[0-9]{1,6}(?:\.[0-9]{1,2})?|[xXyY])\s*`;
 
+export function canEditExamAttendance(input: {
+  examStatus: string;
+  assessmentStatus: string;
+  isPlatformAdmin: boolean;
+}): boolean {
+  return input.examStatus === "open" &&
+    (input.assessmentStatus === "draft" ||
+      input.assessmentStatus === "approved" && input.isPlatformAdmin);
+}
+
 export function parseExamMarkEntry(value: string): ExamMarkEntry | null {
   const normalized = value.trim().toLocaleLowerCase();
   if (normalized === "") return { kind: "score", marks: null };

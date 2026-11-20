@@ -17,7 +17,8 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { canViewExamSubject } from "@/lib/examination-policy";
+import { canEditExamAttendance, canViewExamSubject } from "@/lib/examination-policy";
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 import { SaveExamAttendanceForm } from "../../../examination-forms";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +98,7 @@ export default async function ExamAttendancePage({
     assignedTeacher = Boolean(assignment);
   }
   if (!canViewExamSubject(context.grantedPermissions, assignedTeacher)) notFound();
+  const isPlatformAdmin = context.multiSchoolEnabled && isPlatformAdminEmail(context.user.email);
   const roster = await db.select({
     enrollmentId: studentEnrollments.id,
     name: students.firstName,
@@ -147,7 +149,12 @@ export default async function ExamAttendancePage({
           examSubjectId={record.id}
           isCompulsory={record.isCompulsory}
           students={rosterStudents}
-          editable={record.examStatus === "open" && record.subjectStatus === "draft" && (canManage || assignedTeacher)}
+          editable={canEditExamAttendance({
+            examStatus: record.examStatus,
+            assessmentStatus: record.subjectStatus,
+            isPlatformAdmin,
+          }) && (isPlatformAdmin || canManage || assignedTeacher)}
+          approvedAssessment={record.subjectStatus === "approved"}
         />
       </section>
     </main>
