@@ -86,6 +86,7 @@ export default async function ExaminationsPage({
   } as const;
   const canConfigure = context.grantedPermissions.includes("examinations.create");
   const canDeleteExaminations = context.grantedPermissions.includes("examinations.delete");
+  const canPublish = context.grantedPermissions.includes("results.publish");
   const today = new Date().toISOString().slice(0, 10);
   const [years, terms, branches, classes, scales, examTypesList] = await Promise.all([
     canConfigure
@@ -144,7 +145,18 @@ export default async function ExaminationsPage({
         .leftJoin(schoolBranches, and(eq(schoolBranches.id, examTypes.branchId!), eq(schoolBranches.schoolId, context.schoolId)))
         .where(eq(examTypes.schoolId, context.schoolId)).orderBy(asc(examTypes.name))
   ]);
-  const isManager = canConfigure || context.grantedPermissions.includes("results.publish");
+  const isManager = canConfigure || canPublish;
+  const userTeacherIds = !isManager
+    ? (await db.select({ id: teachers.id }).from(teachers)
+      .innerJoin(staffMembers, and(
+        eq(staffMembers.id, teachers.staffMemberId!),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.linkedUserId, context.user.id),
+        eq(staffMembers.status, "active"),
+      ))
+      .where(and(eq(teachers.schoolId, context.schoolId), eq(teachers.status, "active"))))
+      .map((teacher) => teacher.id)
+    : [];
   let exams: Array<{
     id: number;
     name: string;
@@ -212,7 +224,26 @@ export default async function ExaminationsPage({
         eq(staffMembers.linkedUserId, context.user.id),
       ))
       .where(eq(staffMembers.status, "active"));
-    const ids = [...new Set(assignments.map((entry) => entry.examId))];
+    const classTeacherAssignments = userTeacherIds.length
+      ? await db.selectDistinct({ examId: examinations.id }).from(classSections)
+        .innerJoin(examClasses, and(
+          eq(examClasses.classLevelId, classSections.classLevelId),
+          eq(examClasses.schoolId, context.schoolId),
+        ))
+        .innerJoin(examinations, and(
+          eq(examinations.id, examClasses.examinationId),
+          eq(examinations.academicYearId, classSections.academicYearId),
+          eq(examinations.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(classSections.schoolId, context.schoolId),
+          inArray(classSections.classTeacherId, userTeacherIds),
+        ))
+      : [];
+    const ids = [...new Set([
+      ...assignments.map((entry) => entry.examId),
+      ...classTeacherAssignments.map((entry) => entry.examId),
+    ])];
     exams = ids.length
       ? await db.select({
         id: examinations.id,
@@ -310,10 +341,10 @@ export default async function ExaminationsPage({
     bands: gradeBands.filter((band) => band.scaleId === scale.id),
   }));
   const examIds = exams.map((exam) => exam.id);
-  const assignedSubjectIds = canConfigure || context.grantedPermissions.includes("results.publish")
-    ? null
-    : examIds.length
-      ? (await db.select({ id: examSubjects.id }).from(examSubjects)
+  let assignedSubjectIds: number[] | null = null;
+  if (!isManager) {
+    const assignedSubjects = examIds.length
+      ? await db.select({ id: examSubjects.id }).from(examSubjects)
         .innerJoin(examClasses, and(
           eq(examClasses.id, examSubjects.examClassId),
           eq(examClasses.schoolId, context.schoolId),
@@ -336,8 +367,34 @@ export default async function ExaminationsPage({
         .where(and(
           eq(examSubjects.schoolId, context.schoolId),
           inArray(examClasses.examinationId, examIds),
-        ))).map((subject) => subject.id)
+        ))
       : [];
+    const classTeacherSubjects = examIds.length && userTeacherIds.length
+      ? await db.selectDistinct({ id: examSubjects.id }).from(examSubjects)
+        .innerJoin(examClasses, and(
+          eq(examClasses.id, examSubjects.examClassId),
+          eq(examClasses.schoolId, context.schoolId),
+        ))
+        .innerJoin(examinations, and(
+          eq(examinations.id, examClasses.examinationId),
+          eq(examinations.schoolId, context.schoolId),
+        ))
+        .innerJoin(classSections, and(
+          eq(classSections.classLevelId, examClasses.classLevelId),
+          eq(classSections.academicYearId, examinations.academicYearId),
+          eq(classSections.schoolId, context.schoolId),
+          inArray(classSections.classTeacherId, userTeacherIds),
+        ))
+        .where(and(
+          eq(examSubjects.schoolId, context.schoolId),
+          inArray(examClasses.examinationId, examIds),
+        ))
+      : [];
+    assignedSubjectIds = [...new Set([
+      ...assignedSubjects.map((subject) => subject.id),
+      ...classTeacherSubjects.map((subject) => subject.id),
+    ])];
+  }
   const assessmentRows = examIds.length
     ? await db.select({
       id: examSubjects.id,

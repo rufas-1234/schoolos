@@ -117,6 +117,7 @@ export default async function SubjectMarksPage({
       .where(and(eq(examSubjects.id, subject.id), eq(examSubjects.schoolId, context.schoolId)))
       .limit(1);
     assignedTeacher = assignment.length > 0;
+    let manuallyAssignedClassTeacher = false;
     if (subject.classTeacherId !== null) {
       const [classTeacher] = await db.select({ id: teachers.id }).from(teachers)
         .innerJoin(staffMembers, and(
@@ -131,8 +132,27 @@ export default async function SubjectMarksPage({
           eq(teachers.status, "active"),
         ))
         .limit(1);
-      assignedClassTeacher = Boolean(classTeacher);
+      manuallyAssignedClassTeacher = Boolean(classTeacher);
     }
+    const [sectionClassTeacher] = await db.select({ id: classSections.id }).from(classSections)
+      .innerJoin(teachers, and(
+        eq(teachers.id, classSections.classTeacherId!),
+        eq(teachers.schoolId, context.schoolId),
+        eq(teachers.status, "active"),
+      ))
+      .innerJoin(staffMembers, and(
+        eq(staffMembers.id, teachers.staffMemberId!),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.linkedUserId, context.user.id),
+        eq(staffMembers.status, "active"),
+      ))
+      .where(and(
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.classLevelId, subject.classLevelId),
+        eq(classSections.academicYearId, subject.yearId),
+      ))
+      .limit(1);
+    assignedClassTeacher = manuallyAssignedClassTeacher || Boolean(sectionClassTeacher);
   }
   if (!canViewExamSubject(context.grantedPermissions, assignedTeacher || assignedClassTeacher)) notFound();
   const roster = await db.select({

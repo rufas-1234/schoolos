@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 import { BookOpenCheck, CalendarDays, ClipboardCheck, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import {
@@ -351,7 +351,7 @@ export default async function TeacherPortalPage({
   });
 
   const classTeacherExamRows = teacherIds.length && (showOverview || activeSection === "assessments")
-    ? await db.select({
+    ? await db.selectDistinct({
       examClassId: examClasses.id,
       classTeacherId: examClasses.classTeacherId,
       examId: examinations.id,
@@ -375,9 +375,18 @@ export default async function TeacherPortalPage({
         eq(classLevels.schoolId, context.schoolId),
         eq(classLevels.status, "active"),
       ))
+      .leftJoin(classSections, and(
+        eq(classSections.classLevelId, examClasses.classLevelId),
+        eq(classSections.academicYearId, examinations.academicYearId),
+        eq(classSections.schoolId, context.schoolId),
+        inArray(classSections.classTeacherId, teacherIds),
+      ))
       .where(and(
         eq(examClasses.schoolId, context.schoolId),
-        inArray(examClasses.classTeacherId, teacherIds),
+        or(
+          inArray(examClasses.classTeacherId, teacherIds),
+          isNotNull(classSections.id),
+        ),
       ))
       .orderBy(asc(examinations.startDate), asc(classLevels.name))
     : [];

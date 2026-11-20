@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   academicYears,
@@ -85,6 +85,31 @@ export default async function ExaminationDetailPage({
       .where(and(eq(teachers.schoolId, context.schoolId), eq(teachers.status, "active")))
     : [];
   const myTeacherIds = myTeacherRows.map((teacher) => teacher.id);
+  const classTeacherSubjects = myTeacherIds.length
+    ? await db.selectDistinct({
+      id: examSubjects.id,
+      classLevelId: examClasses.classLevelId,
+    }).from(examSubjects)
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+      ))
+      .leftJoin(classSections, and(
+        eq(classSections.classLevelId, examClasses.classLevelId),
+        eq(classSections.academicYearId, exam.academicYearId),
+        eq(classSections.schoolId, context.schoolId),
+        inArray(classSections.classTeacherId, myTeacherIds),
+      ))
+      .where(and(
+        eq(examClasses.examinationId, exam.id),
+        or(
+          inArray(examClasses.classTeacherId, myTeacherIds),
+          isNotNull(classSections.id),
+        ),
+        eq(examSubjects.schoolId, context.schoolId),
+      ))
+    : [];
+  const myClassTeacherClassLevelIds = new Set(classTeacherSubjects.map((subject) => subject.classLevelId));
   let assignedIds: number[] | null = null;
   if (!canConfigure && !canReview) {
     const assigned = await db.select({ id: examSubjects.id }).from(examSubjects)
@@ -105,19 +130,7 @@ export default async function ExaminationDetailPage({
         eq(staffMembers.status, "active"),
       ))
       .where(and(eq(examClasses.examinationId, exam.id), eq(examClasses.schoolId, context.schoolId)));
-    const appointedClassSubjects = myTeacherIds.length
-      ? await db.select({ id: examSubjects.id }).from(examSubjects)
-        .innerJoin(examClasses, and(
-          eq(examClasses.id, examSubjects.examClassId),
-          eq(examClasses.schoolId, context.schoolId),
-        ))
-        .where(and(
-          eq(examClasses.examinationId, exam.id),
-          inArray(examClasses.classTeacherId, myTeacherIds),
-          eq(examSubjects.schoolId, context.schoolId),
-        ))
-      : [];
-    assignedIds = [...new Set([...assigned.map((row) => row.id), ...appointedClassSubjects.map((row) => row.id)])];
+    assignedIds = [...new Set([...assigned.map((row) => row.id), ...classTeacherSubjects.map((row) => row.id)])];
     if (!assignedIds.length) notFound();
   }
   const allSubjects = await db.select({
@@ -295,7 +308,8 @@ export default async function ExaminationDetailPage({
           if (!subjectRows.length) return null;
           const classPublished = subjectRows.every((subject) => subject.status === "published");
           const classApproved = subjectRows.every((subject) => subject.status === "approved");
-          const isAssignedClassTeacher = classRow.classTeacherId !== null && myTeacherIds.includes(classRow.classTeacherId);
+          const isAssignedClassTeacher = classRow.classTeacherId !== null && myTeacherIds.includes(classRow.classTeacherId)
+            || myClassTeacherClassLevelIds.has(classRow.classLevelId);
           const canReviewClassSubject = canReviewExamSubject(context.grantedPermissions, isAssignedClassTeacher);
           return (
             <article key={classRow.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">

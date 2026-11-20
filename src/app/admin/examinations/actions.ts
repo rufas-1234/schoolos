@@ -1724,21 +1724,45 @@ export async function reviewExamSubject(
       .limit(1);
     if (!record || record.status !== "submitted" || record.examinationStatus !== "open") return "locked" as const;
     if (!canReviewExamSubject(context.grantedPermissions, false)) {
-      if (record.classTeacherId === null) return "forbidden" as const;
-      const [appointedClassTeacher] = await tx.select({ id: teachers.id }).from(teachers)
-        .innerJoin(staffMembers, and(
-          eq(staffMembers.id, teachers.staffMemberId!),
-          eq(staffMembers.schoolId, context.schoolId),
-          eq(staffMembers.linkedUserId, context.user.id),
-          eq(staffMembers.status, "active"),
-        ))
-        .where(and(
-          eq(teachers.id, record.classTeacherId),
-          eq(teachers.schoolId, context.schoolId),
-          eq(teachers.status, "active"),
-        ))
-        .limit(1);
-      if (!appointedClassTeacher || !canReviewExamSubject(context.grantedPermissions, true)) {
+      let isAssignedClassTeacher = false;
+      if (record.classTeacherId !== null) {
+        const [appointedClassTeacher] = await tx.select({ id: teachers.id }).from(teachers)
+          .innerJoin(staffMembers, and(
+            eq(staffMembers.id, teachers.staffMemberId!),
+            eq(staffMembers.schoolId, context.schoolId),
+            eq(staffMembers.linkedUserId, context.user.id),
+            eq(staffMembers.status, "active"),
+          ))
+          .where(and(
+            eq(teachers.id, record.classTeacherId),
+            eq(teachers.schoolId, context.schoolId),
+            eq(teachers.status, "active"),
+          ))
+          .limit(1);
+        isAssignedClassTeacher = Boolean(appointedClassTeacher);
+      }
+      if (!isAssignedClassTeacher) {
+        const [sectionClassTeacher] = await tx.select({ id: classSections.id }).from(classSections)
+          .innerJoin(teachers, and(
+            eq(teachers.id, classSections.classTeacherId!),
+            eq(teachers.schoolId, context.schoolId),
+            eq(teachers.status, "active"),
+          ))
+          .innerJoin(staffMembers, and(
+            eq(staffMembers.id, teachers.staffMemberId!),
+            eq(staffMembers.schoolId, context.schoolId),
+            eq(staffMembers.linkedUserId, context.user.id),
+            eq(staffMembers.status, "active"),
+          ))
+          .where(and(
+            eq(classSections.schoolId, context.schoolId),
+            eq(classSections.classLevelId, record.classLevelId),
+            eq(classSections.academicYearId, record.academicYearId),
+          ))
+          .limit(1);
+        isAssignedClassTeacher = Boolean(sectionClassTeacher);
+      }
+      if (!canReviewExamSubject(context.grantedPermissions, isAssignedClassTeacher)) {
         return "forbidden" as const;
       }
     }
