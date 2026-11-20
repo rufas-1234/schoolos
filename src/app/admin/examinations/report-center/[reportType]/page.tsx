@@ -48,6 +48,10 @@ import {
   calculateOutstandingInvoiceBalance,
   parseMoneyToMinorUnits,
 } from "@/lib/fees-policy";
+import {
+  examRemarkVariantIndex,
+  resolveExamReportRemark,
+} from "@/lib/exam-report-remarks";
 
 export const dynamic = "force-dynamic";
 type ProgressAssessment = { id: number; name: string; maxMarks: string; weight: string; isCompulsory: boolean };
@@ -166,6 +170,7 @@ function ProgressCard({
   exam,
   bands,
   position,
+  remarkVariantIndex,
   classRemark,
   principalRemark,
   showPercentages,
@@ -199,6 +204,7 @@ function ProgressCard({
   exam: { name: string; yearName: string; termName: string | null; allowRanking: boolean; assessments: ProgressAssessment[] };
   bands: GradeBand[];
   position: number | null;
+  remarkVariantIndex: number;
   classRemark: string | null;
   principalRemark: string | null;
   showPercentages: boolean;
@@ -215,6 +221,8 @@ function ProgressCard({
   last: boolean;
 }) {
   const overallGrade = row.overall ? gradeForPercentage(row.overall.percentage, bands) : null;
+  const teacherFeedback = resolveExamReportRemark(classRemark, overallGrade, "classTeacher", remarkVariantIndex);
+  const headteacherFeedback = resolveExamReportRemark(principalRemark, overallGrade, "headteacher", remarkVariantIndex);
   const strongestSubjects = exam.assessments
     .flatMap((assessment) => {
       const mark = row.marks.get(assessment.id);
@@ -356,7 +364,7 @@ function ProgressCard({
       <section className={`academic-progress-comments${showFeeBalance ? " academic-progress-comments-with-fees" : ""}`}>
         <article>
           <h3>Teacher&apos;s feedback</h3>
-          <p>{classRemark || overallGrade?.performanceRemark || "No teacher comment recorded."}</p>
+          <p>{teacherFeedback || "No teacher comment recorded."}</p>
         </article>
         <article>
           <h3>Performance description</h3>
@@ -371,7 +379,7 @@ function ProgressCard({
         )}
         <article>
           <h3>Headteacher&apos;s remarks</h3>
-          <p>{principalRemark || "No headteacher comment recorded."}</p>
+          <p>{headteacherFeedback || "No headteacher comment recorded."}</p>
         </article>
       </section>
       <ReportSignatureStrip signatures={signatures} />
@@ -994,8 +1002,8 @@ export default async function ExaminationReportPage({
                         <td>{row.overall?.percentage.toFixed(2)}%</td>
                         <td>{row.grade?.grade ?? "—"} {row.grade?.description}</td>
                         <td className="exam-report-comment">
-                          <p><b>Class teacher:</b> {row.classRemark || row.grade?.performanceRemark || "—"}</p>
-                          <p className="mt-1"><b>Headteacher:</b> {examClass.principalRemark || "—"}</p>
+                          <p><b>Class teacher:</b> {resolveExamReportRemark(row.classRemark, row.grade, "classTeacher", examRemarkVariantIndex(row.enrollmentId)) ?? "—"}</p>
+                          <p className="mt-1"><b>Headteacher:</b> {resolveExamReportRemark(examClass.principalRemark, row.grade, "headteacher", examRemarkVariantIndex(row.enrollmentId)) ?? "—"}</p>
                         </td>
                       </tr>
                     ))}</tbody>
@@ -1090,6 +1098,7 @@ export default async function ExaminationReportPage({
                       exam={{ name: examDetails.name, yearName: examDetails.yearName, termName: examDetails.termName, allowRanking: examDetails.allowRanking, assessments }}
                       bands={bands}
                       position={ranking.get(activeResult.enrollmentId) ?? null}
+                      remarkVariantIndex={examRemarkVariantIndex(activeResult.enrollmentId)}
                       classRemark={activeResult.classRemark}
                       principalRemark={examClass.principalRemark}
                       showPercentages={reportType === "progress-card-100-percent"}
@@ -1113,6 +1122,7 @@ export default async function ExaminationReportPage({
                         exam={{ name: examDetails.name, yearName: examDetails.yearName, termName: examDetails.termName, allowRanking: examDetails.allowRanking, assessments }}
                         bands={bands}
                         position={ranking.get(row.enrollmentId) ?? null}
+                        remarkVariantIndex={examRemarkVariantIndex(row.enrollmentId)}
                         classRemark={row.classRemark}
                         principalRemark={examClass.principalRemark}
                         showPercentages={reportType === "progress-card-100-percent"}

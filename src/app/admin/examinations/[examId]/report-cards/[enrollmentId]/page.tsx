@@ -43,6 +43,10 @@ import {
   calculateOutstandingInvoiceBalance,
   parseMoneyToMinorUnits,
 } from "@/lib/fees-policy";
+import {
+  examRemarkVariantIndex,
+  resolveExamReportRemark,
+} from "@/lib/exam-report-remarks";
 
 export const dynamic = "force-dynamic";
 
@@ -384,6 +388,9 @@ export default async function ReportCardPage({
     eq(examStudentRemarks.examClassId, record.examClassId),
     eq(examStudentRemarks.enrollmentId, record.enrollmentId),
   )).limit(1);
+  const remarkVariantIndex = examRemarkVariantIndex(record.enrollmentId);
+  const classTeacherFeedback = resolveExamReportRemark(classRemark?.remark, overallGrade, "classTeacher", remarkVariantIndex);
+  const headteacherFeedback = resolveExamReportRemark(record.principalRemark, overallGrade, "headteacher", remarkVariantIndex);
   const photo = record.profilePhoto?.profilePhoto;
   const photoAllowed = context.grantedPermissions.includes("students.view");
   const photoUrl = photoAllowed && photo?.objectKey && photo.fileName
@@ -462,8 +469,8 @@ export default async function ReportCardPage({
           </table>
         </section>
         <section className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classRemark?.remark || overallGrade?.performanceRemark || "—"}</p></div>
-          <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{record.principalRemark ?? "—"}</p></div>
+          <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classTeacherFeedback ?? "—"}</p></div>
+          <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{headteacherFeedback ?? "—"}</p></div>
         </section>
         <section className="grid grid-cols-3 gap-3 pt-4 text-center text-xs">
           {([

@@ -59,6 +59,10 @@ import {
   formatFeeReportDate,
   parseMoneyToMinorUnits,
 } from "@/lib/fees-policy";
+import {
+  examRemarkVariantIndex,
+  resolveExamReportRemark,
+} from "@/lib/exam-report-remarks";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { FamilyPortalShell } from "../family-portal-shell";
 
@@ -530,10 +534,23 @@ export default async function StudentPortalPage({
   ]));
   const reports = completeReports.map((report) => {
     const bands = gradesByScale.get(report.gradingScaleId) ?? [];
+    const grade = gradeForPercentage(report.score.percentage, bands);
+    const remarkVariantIndex = examRemarkVariantIndex(report.enrollmentId);
     return {
       ...report,
-      grade: gradeForPercentage(report.score.percentage, bands),
-      classTeacherRemark: remarksByReport.get(`${report.examClassId}:${report.enrollmentId}`) ?? null,
+      grade,
+      classTeacherRemark: resolveExamReportRemark(
+        remarksByReport.get(`${report.examClassId}:${report.enrollmentId}`) ?? null,
+        grade,
+        "classTeacher",
+        remarkVariantIndex,
+      ),
+      principalRemark: resolveExamReportRemark(
+        report.principalRemark,
+        grade,
+        "headteacher",
+        remarkVariantIndex,
+      ),
       rows: report.rows.map((row) => {
         const percentage = Number(row.marks) / Number(row.maxMarks) * 100;
         return {
@@ -1115,7 +1132,7 @@ export default async function StudentPortalPage({
                           </div>
                         </section>
                         <section className="grid gap-4 sm:grid-cols-2">
-                          <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{report.classTeacherRemark || report.grade?.performanceRemark || "—"}</p></div>
+                          <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{report.classTeacherRemark || "—"}</p></div>
                           <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{report.principalRemark || "—"}</p></div>
                         </section>
                         <section className="grid grid-cols-1 gap-3 pt-4 text-center text-xs min-[400px]:grid-cols-3 print:grid-cols-3">
