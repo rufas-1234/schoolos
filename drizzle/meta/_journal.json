@@ -344,6 +344,13 @@
       "when": 1795093600000,
       "tag": "0048_student_behavior_options",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "5",
+      "when": 1795135745105,
+      "tag": "0049_school_leadership_result_permissions",
+      "breakpoints": true
     }
   ]
 }

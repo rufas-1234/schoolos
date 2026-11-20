@@ -85,6 +85,8 @@ export const schoolAdminPermissionKeys = [
 
 export const defaultRolePermissionKeys: Readonly<Record<string, readonly string[]>> = {
   "School administrator": schoolAdminPermissionKeys,
+  Principal: ["results.enter", "results.publish"],
+  "Deputy principal": ["results.enter", "results.publish"],
   Accountant: ["fees.manage", "payments.record", "reports.export", "accounts.manage", "inventory.manage"],
   Teacher: ["results.enter"],
   Librarian: ["library.manage"],
