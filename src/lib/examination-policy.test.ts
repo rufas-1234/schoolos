@@ -37,22 +37,22 @@ describe("examination policy", () => {
     expect(canEditExamAttendance({
       examStatus: "open",
       assessmentStatus: "draft",
-      isPlatformAdmin: false,
+      isSuperAdmin: false,
     })).toBe(true);
     expect(canEditExamAttendance({
       examStatus: "open",
       assessmentStatus: "approved",
-      isPlatformAdmin: false,
+      isSuperAdmin: false,
     })).toBe(false);
     expect(canEditExamAttendance({
       examStatus: "open",
       assessmentStatus: "approved",
-      isPlatformAdmin: true,
+      isSuperAdmin: true,
     })).toBe(true);
     expect(canEditExamAttendance({
       examStatus: "closed",
       assessmentStatus: "approved",
-      isPlatformAdmin: true,
+      isSuperAdmin: true,
     })).toBe(false);
   });
 

@@ -28,7 +28,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { canEnterExamMarks, canViewExamSubject } from "@/lib/examination-policy";
-import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
+import { isSystemSuperAdmin } from "@/lib/platform-admin-policy";
 import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { PrintButton } from "@/components/print-button";
@@ -104,7 +104,7 @@ export default async function SubjectMarksPage({
   if (!subject) notFound();
   const canConfigure = context.grantedPermissions.includes("examinations.create");
   const canReview = context.grantedPermissions.includes("results.publish");
-  const isPlatformAdmin = context.multiSchoolEnabled && isPlatformAdminEmail(context.user.email);
+  const isSuperAdmin = isSystemSuperAdmin(context.user.email, context.roleNames);
   let assignedTeacher = false;
   let assignedClassTeacher = false;
   if (context.grantedPermissions.includes("results.enter")) {
@@ -336,7 +336,7 @@ export default async function SubjectMarksPage({
         <PrintButton label="Print marks-only sheet" targetId="exam-marks-only-sheet" pageOrientation="landscape" pageSize="A4" />
       </header>
 
-      {subject.examStatus === "open" && subject.status === "approved" && isPlatformAdmin && (
+      {subject.examStatus === "open" && subject.status === "approved" && isSuperAdmin && (
         <ReopenApprovedSubjectForm examSubjectId={subject.id} />
       )}
 

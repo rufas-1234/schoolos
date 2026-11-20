@@ -26,11 +26,11 @@ export const examMarkEntryInputPattern = String.raw`\s*(?:[0-9]{1,6}(?:\.[0-9]{1
 export function canEditExamAttendance(input: {
   examStatus: string;
   assessmentStatus: string;
-  isPlatformAdmin: boolean;
+  isSuperAdmin: boolean;
 }): boolean {
   return input.examStatus === "open" &&
     (input.assessmentStatus === "draft" ||
-      input.assessmentStatus === "approved" && input.isPlatformAdmin);
+      input.assessmentStatus === "approved" && input.isSuperAdmin);
 }
 
 export function parseExamMarkEntry(value: string): ExamMarkEntry | null {

@@ -8,3 +8,23 @@ export function isPlatformAdminEmail(email: string | null | undefined) {
   );
   return allowedEmails.has(email.trim().toLowerCase());
 }
+
+export function isSystemSuperAdmin(
+  email: string | null | undefined,
+  roleNames: readonly string[],
+) {
+  if (isPlatformAdminEmail(email)) return true;
+  return roleNames.some((roleName) => {
+    const normalizedRoleName = roleName.toLowerCase().replace(/[^a-z]/g, "");
+    return [
+      "superadmin",
+      "superadministrator",
+      "systemadmin",
+      "systemadministrator",
+      "systemsuperadmin",
+      "systemsuperadministrator",
+      "platformadmin",
+      "platformadministrator",
+    ].includes(normalizedRoleName);
+  });
+}

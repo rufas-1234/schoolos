@@ -32,10 +32,10 @@ import {
   students,
   teachers,
 } from "@/db/schema";
-import { requireSchoolMember, requireSchoolPermission } from "@/lib/access-control";
+import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate, isValidDateRange } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
-import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
+import { isSystemSuperAdmin } from "@/lib/platform-admin-policy";
 import {
   canEditExamAttendance,
   canEnterExamMarks,
@@ -1495,7 +1495,7 @@ export async function saveExamAttendance(
   formData: FormData,
 ): Promise<ExaminationActionState> {
   const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
-  const isPlatformAdmin = context.multiSchoolEnabled && isPlatformAdminEmail(context.user.email);
+  const isSuperAdmin = isSystemSuperAdmin(context.user.email, context.roleNames);
   const subjectId = idField.safeParse(value(formData, "examSubjectId"));
   if (!subjectId.success) return { error: "Choose a valid exam subject." };
   const [subject] = await db.select({
@@ -1526,7 +1526,7 @@ export async function saveExamAttendance(
   if (!subject || !canEditExamAttendance({
     examStatus: subject.examStatus,
     assessmentStatus: subject.status,
-    isPlatformAdmin,
+    isSuperAdmin,
   })) {
     return { error: "Attendance can be changed on draft assessments while the examination is open. Only system superadmins can change attendance on approved results." };
   }
@@ -1536,7 +1536,7 @@ export async function saveExamAttendance(
     !(await assignedSubject(subject.id, context.schoolId, context.user.id))) {
     return { error: "You can only mark attendance for your assigned subjects." };
   }
-  if (subject.status === "approved" && !isPlatformAdmin) {
+  if (subject.status === "approved" && !isSuperAdmin) {
     return { error: "Only a system superadmin can change attendance on approved results." };
   }
   const roster = await db.select({ enrollmentId: studentEnrollments.id }).from(studentEnrollments)
@@ -1592,7 +1592,7 @@ export async function saveExamAttendance(
     if (!locked || !canEditExamAttendance({
       examStatus: locked.examStatus,
       assessmentStatus: locked.status,
-      isPlatformAdmin,
+      isSuperAdmin,
     })) return false;
     for (const [enrollmentId, attendance] of statuses) {
       await tx.insert(examAttendance).values({
@@ -1918,8 +1918,8 @@ export async function reopenApprovedExamSubject(
   _previousState: ExaminationActionState,
   formData: FormData,
 ): Promise<ExaminationActionState> {
-  const context = await requireSchoolMember();
-  if (!context.multiSchoolEnabled || !isPlatformAdminEmail(context.user.email)) {
+  const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
+  if (!isSystemSuperAdmin(context.user.email, context.roleNames)) {
     return { error: "Only a system superadmin can reopen an approved assessment." };
   }
   const parsed = z.object({
