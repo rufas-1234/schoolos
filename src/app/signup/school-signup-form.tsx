@@ -27,37 +27,29 @@ export function SchoolSignupForm() {
   return (
     <form action={action} className="mt-7 space-y-5">
       <section className="space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-violet-800">School details</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Contact details are optional and can be updated later.</p>
-        </div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-violet-800">School details</h2>
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           School name
           <input name="schoolName" required minLength={2} maxLength={255} autoComplete="organization" className={fieldClass} />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-            School email
+            School email (optional)
             <input name="schoolEmail" type="email" maxLength={320} autoComplete="email" className={fieldClass} />
           </label>
           <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-            School phone
+            School phone (optional)
             <input name="schoolPhone" type="tel" maxLength={40} autoComplete="tel" className={fieldClass} />
           </label>
         </div>
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          School address
+          School address (optional)
           <textarea name="schoolAddress" rows={2} maxLength={1000} autoComplete="street-address" className={`${fieldClass} h-auto py-3`} />
         </label>
       </section>
 
       <section className="space-y-4 border-t border-slate-100 pt-5">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-violet-800">First school administrator</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Existing users can enter their current password to connect this school to the same SchoolOS account.
-          </p>
-        </div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-violet-800">Administrator details</h2>
         <label className="block space-y-1.5 text-sm font-medium text-slate-700">
           Administrator name
           <input name="adminName" required minLength={2} maxLength={255} autoComplete="name" className={fieldClass} />
@@ -76,9 +68,6 @@ export function SchoolSignupForm() {
             <input name="passwordConfirmation" type="password" required maxLength={128} autoComplete="new-password" className={fieldClass} />
           </label>
         </div>
-        <p className="text-xs leading-5 text-slate-500">
-          New accounts need a strong password of at least 12 characters. Existing accounts should use their current password in both fields.
-        </p>
       </section>
 
       {state.error && <p role="alert" className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{state.error}</p>}
@@ -90,7 +79,7 @@ export function SchoolSignupForm() {
         {pending ? "Creating your school…" : "Create school workspace"}
       </button>
       <p className="text-center text-xs leading-5 text-slate-500">
-        Use an email address you control. Email verification is not currently enabled.
+        Email verification is not enabled yet.
       </p>
     </form>
   );

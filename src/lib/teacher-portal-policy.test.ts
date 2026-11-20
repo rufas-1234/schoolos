@@ -7,41 +7,41 @@ const assessment = {
   examTypeName: "Cambridge",
   examStatus: "open",
   yearName: "2026",
-  branchId: 3,
-  branchName: "North Campus",
   classLevelId: 12,
   className: "Year 8",
+  sectionIds: [28],
+  sectionNames: ["Section A"],
   subjectName: "Biology",
   assessmentStatus: "draft",
 };
 
 describe("teacher examination filters", () => {
-  it("combines exam title, status, branch, and class filters", () => {
+  it("combines exam title, status, section, and class filters", () => {
     const filters = {
       examTitleId: "7",
       status: "open" as const,
-      branchId: 3,
+      sectionId: 28,
       classLevelId: 12,
       search: "",
     };
 
     expect(matchesTeacherExamAssessment(assessment, filters)).toBe(true);
-    expect(matchesTeacherExamAssessment(assessment, { ...filters, branchId: 4 })).toBe(false);
+    expect(matchesTeacherExamAssessment(assessment, { ...filters, sectionId: 29 })).toBe(false);
     expect(matchesTeacherExamAssessment(assessment, { ...filters, classLevelId: 13 })).toBe(false);
     expect(matchesTeacherExamAssessment(assessment, { ...filters, status: "published" })).toBe(false);
     expect(matchesTeacherExamAssessment(assessment, { ...filters, examTitleId: "8" })).toBe(false);
   });
 
-  it("includes the branch and class in case-insensitive text search", () => {
+  it("includes the section and class in case-insensitive text search", () => {
     const filters = {
       examTitleId: "",
       status: "" as const,
-      branchId: null,
+      sectionId: null,
       classLevelId: null,
-      search: "north campus year 8",
+      search: "year 8 section a",
     };
 
     expect(matchesTeacherExamAssessment(assessment, filters)).toBe(true);
-    expect(matchesTeacherExamAssessment(assessment, { ...filters, search: "west campus" })).toBe(false);
+    expect(matchesTeacherExamAssessment(assessment, { ...filters, search: "section b" })).toBe(false);
   });
 });

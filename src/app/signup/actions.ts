@@ -128,6 +128,6 @@ export async function signupSchool(
   });
   revalidatePath("/login");
   return {
-    success: `Your school workspace is ready. Sign in with ${email} to continue.`,
+    success: `Sign in with ${email} to continue.`,
   };
 }

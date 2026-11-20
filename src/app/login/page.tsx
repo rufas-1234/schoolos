@@ -44,11 +44,7 @@ export default function LoginPage() {
             </span>
             <span className="text-lg font-bold text-slate-900">SchoolOS</span>
           </div>
-          <p className="text-sm font-semibold text-violet-700">Welcome back</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Sign in to your account</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            Use the administrator account configured for your school.
-          </p>
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Sign in</h2>
 
           {!configured && (
             <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">

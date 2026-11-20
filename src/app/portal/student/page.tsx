@@ -909,11 +909,11 @@ export default async function StudentPortalPage({
             </section>
 
             <section id="results" className={`space-y-4 ${activeSection !== "results" ? "hidden" : ""}`}>
-              <SectionHeading title="Published results" description="Printable report-style summaries are available after every subject result is published." />
+              <SectionHeading title="Published results" description="Available after all subjects are published." />
               <section className="space-y-4">
                 <SectionHeading
                   title="Annual progress report cards"
-                  description="Review your published results across every exam in each academic year. Only your linked student records are shown."
+                  description="Published results across years, for linked students only."
                 />
                 {visibleAnnualProgressReports.length ? (
                   <div className="space-y-5">
@@ -1127,7 +1127,7 @@ export default async function StudentPortalPage({
 
             <section id="fees" className={`space-y-4 ${activeSection !== "fees" ? "hidden" : ""}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <SectionHeading title="Fee invoices" description="Invoices and balances use the school’s official fee records, including discounts, payments, reversals, and overdue fines." />
+                <SectionHeading title="Fee invoices" description="Your invoices and outstanding balances." />
                 <p className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
                   Total outstanding: {formatMoney(totalBalanceMinor)}
                 </p>
@@ -1409,7 +1409,7 @@ export default async function StudentPortalPage({
             </section>
 
             <section id="library" className={`space-y-4 ${activeSection !== "library" ? "hidden" : ""}`}>
-              <SectionHeading title="Library" description="Check borrowed items and search the school’s available catalogue. The unfiltered list shows the first 50 titles." />
+              <SectionHeading title="Library" description="Search the catalogue; the first 50 titles are shown." />
               <FilterForm name="library" value={query.library ?? ""} placeholder="Search books, authors, or loan status" />
               <div className="grid gap-4 xl:grid-cols-2">
                 <div className="space-y-3">

@@ -652,7 +652,7 @@ export default async function FeeReportsPage({
 
         <ReportTable
           title="Invoice totals by fee type"
-          description="Totals for invoices issued or due in the selected date range. Configured fee types with no matching invoices remain visible with zero totals."
+          description="Invoice totals for the selected date range. Fee types without invoices show zero."
           empty="No invoices match the selected filters."
           headings={["Fee type", "Invoices", "Amount due", "Amount paid", "Balance"]}
           hasRows={feeTypeSummary.length > 0}
@@ -673,7 +673,7 @@ export default async function FeeReportsPage({
         </ReportTable>
         <ReportTable
           title="Invoice payment status report"
-          description={`Invoices issued or due ${from} through ${to}${requestedStatus ? ` with ${requestedStatus === "paid" ? "full payment" : requestedStatus === "partial" ? "partial payment" : "no payment"}` : " across all payment statuses"}; balance includes applicable late fines.`}
+          description={`Invoices issued or due ${from} to ${to}${requestedStatus ? ` (${requestedStatus === "paid" ? "paid" : requestedStatus === "partial" ? "partially paid" : "unpaid"})` : ""}. Balances include late fines.`}
           empty={`No ${requestedStatus ? `${requestedStatus} ` : ""}invoices were issued or are due in this date range.`}
           headings={["Student", "Class / section", "Fee type", "Due date", "Paid", "Balance", "Status"]}
           hasRows={filteredInvoices.length > 0}

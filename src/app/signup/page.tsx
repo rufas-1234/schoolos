@@ -19,15 +19,12 @@ export default function SignupPage() {
             <span className="text-lg font-bold tracking-tight">SchoolOS</span>
           </div>
           <div className="relative max-w-md">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-violet-200">One connected school</p>
-            <h1 className="text-4xl font-semibold leading-tight tracking-tight">Bring your school team together.</h1>
-            <p className="mt-5 max-w-sm text-base leading-7 text-violet-100/80">
-              Create a secure workspace for your school&apos;s administration, academics, and community.
-            </p>
+            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-violet-200">School workspace</p>
+            <h1 className="text-4xl font-semibold leading-tight tracking-tight">Manage your school in one place.</h1>
           </div>
           <div className="relative flex items-center gap-2 text-sm text-violet-100/80">
             <ShieldCheck size={17} />
-            Your school workspace is isolated from other schools
+            Private to your school
           </div>
         </section>
 
@@ -39,11 +36,7 @@ export default function SignupPage() {
             </span>
             <Link href="/login" className="text-sm font-semibold text-violet-700 hover:text-violet-900">Sign in</Link>
           </div>
-          <p className="text-sm font-semibold text-violet-700">Get started</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Create your school workspace</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            Your administrator account will own the new school workspace.
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Create your school workspace</h1>
 
           {!enabled ? (
             <div role="alert" className="mt-7 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">

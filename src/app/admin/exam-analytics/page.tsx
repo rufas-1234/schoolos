@@ -630,7 +630,7 @@ export default async function ExamAnalyticsPage({
           {selectedClass && (
             <AnalyticsPanel
               title={requestedStudentId ? "Student and class performance trend" : "Class performance trend"}
-              description={`Complete published results across ${selectedExam?.yearName}; this trend uses the same class and ${selectedSubjectIdentity ? "subject" : "all published subjects"} for a fair percentage comparison.`}
+              description={`Complete published results for ${selectedExam?.yearName}; same class and ${selectedSubjectIdentity ? "subject" : "subjects"} across exams.`}
             >
               {performanceTrend.length ? (
                 <div className="overflow-x-auto">
@@ -678,7 +678,7 @@ export default async function ExamAnalyticsPage({
             ) : <p className="text-sm text-slate-500">No published subject marks match these filters.</p>}
           </AnalyticsPanel>
 
-          <AnalyticsPanel title={requestedStudentId ? "Student result detail" : "Student performance report"} description="Subject grades use the selected examination grading scale. Subject positions use competition ranking when enabled and reflect the selected class / section cohort. Missing marks remain visible as incomplete.">
+          <AnalyticsPanel title={requestedStudentId ? "Student result detail" : "Student performance report"} description="Grades use the selected scale; ranks use competition ranking, and missing marks stay incomplete.">
             {results.length ? (
               <div className="overflow-x-auto">
                 <table className="print-report-table w-full min-w-[780px] border-collapse text-left text-sm">
