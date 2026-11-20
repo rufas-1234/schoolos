@@ -446,8 +446,8 @@ export default async function ReportCardPage({
                 <td className="p-3 font-medium">{item.subjectName} <span className="text-xs text-slate-500">{item.subjectCode}</span></td>
                 <td className="p-3">{item.resultState === "scored" ? `${item.marks} / ${item.maxMarks}`
                   : item.attendanceStatus === "not_applicable" ? "Not taking"
-                  : item.attendanceStatus === "x" ? `X · No Result${item.attendanceNote ? ` · ${item.attendanceNote}` : ""}`
-                  : item.attendanceStatus === "y" ? `Y · School-defined${item.attendanceNote ? ` · ${item.attendanceNote}` : ""}`
+                  : item.attendanceStatus === "x" ? `X · Absent${item.attendanceNote ? ` · ${item.attendanceNote}` : ""}`
+                  : item.attendanceStatus === "y" ? `Y · Nullified (malpractice)${item.attendanceNote ? ` · ${item.attendanceNote}` : ""}`
                   : item.attendanceStatus === "absent" ? "Absent"
                   : item.attendanceStatus === "excused" ? "Excused"
                   : "Missing mark"}</td>

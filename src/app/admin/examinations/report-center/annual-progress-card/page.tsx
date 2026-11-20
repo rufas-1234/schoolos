@@ -360,8 +360,8 @@ function StudentProgressCard({
                         {score
                           ? `${score.totalMarks.toFixed(1)} / ${score.maxMarks.toFixed(1)} · ${percentageLabel(score.percentage)}`
                           : status === "not_applicable" ? "Not taking"
-                          : status === "x" ? "X · No Result"
-                          : status === "y" ? "Y · School-defined"
+                          : status === "x" ? "X · Absent"
+                          : status === "y" ? "Y · Nullified (malpractice)"
                           : status === "absent" ? "Absent"
                           : status === "excused" ? "Excused"
                           : status === "present" || status === "late" ? "Missing mark"

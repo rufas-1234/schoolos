@@ -472,7 +472,7 @@ export function SaveExamAttendanceForm({
             >
               <td className="p-3 font-medium">{student.name}</td>
               <td className="p-3">{student.admissionNumber ?? "—"}</td>
-              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} value={statuses[student.enrollmentId] ?? ""} onChange={(event) => setStatuses((current) => ({ ...current, [student.enrollmentId]: event.target.value }))} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option>{!isCompulsory && <option value="not_applicable">Not taking optional subject</option>}<option value="x">X — No result</option><option value="y">Y — School-defined irregularity</option></select></td>
+              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} value={statuses[student.enrollmentId] ?? ""} onChange={(event) => setStatuses((current) => ({ ...current, [student.enrollmentId]: event.target.value }))} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option>{!isCompulsory && <option value="not_applicable">Not taking optional subject</option>}<option value="x">X — Absent</option><option value="y">Y — Nullified (malpractice)</option></select></td>
               <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} required={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y"} placeholder={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y" ? "Required: record the reason" : ""} defaultValue={student.note ?? ""} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
             </tr>
           ))}</tbody>
@@ -538,7 +538,9 @@ export function SaveMarksForm({
     Object.fromEntries(students.flatMap((student) => [
       ...student.components.map((component) => [
         `component_${student.markId}_${component.id}`,
-        component.marks ?? "",
+        student.attendanceStatus === "x" || student.attendanceStatus === "y"
+          ? student.attendanceStatus
+          : component.marks ?? "",
       ]),
       [`remark_${student.enrollmentId}`, student.teacherRemark ?? ""],
     ])),
@@ -602,7 +604,7 @@ export function SaveMarksForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
-      <p className="text-sm text-slate-600">All enrolled students are listed; attendance doesn&apos;t block marks. Totals use components (max {maxMarks}); remarks are optional.</p>
+      <p className="text-sm text-slate-600">Attendance doesn&apos;t block marks. Enter marks or X (absent) / Y (malpractice); codes clear scores. Use one code across components (max {maxMarks}).</p>
       <label className="block max-w-lg text-sm font-medium text-slate-700">
         Search students
         <input
@@ -635,10 +637,10 @@ export function SaveMarksForm({
               <tr key={student.enrollmentId} className="border-t">
                 <td className="p-3 font-medium">{student.name}</td>
                 <td className="p-3">{student.admissionNumber ?? "—"}</td>
-                <td className="p-3">{student.attendanceStatus ?? "Not recorded"}</td>
+                <td className="p-3">{student.attendanceStatus === "x" ? "X · Absent" : student.attendanceStatus === "y" ? "Y · Nullified (malpractice)" : student.attendanceStatus ?? "Not recorded"}</td>
                 {student.components.map((component) => {
                   const name = `component_${student.markId}_${component.id}`;
-                  return <td key={component.id} className="p-3"><input aria-label={`${component.title} marks for ${student.name}`} type="number" name={name} min="0" max={component.maxMarks} step="0.01" value={values[name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} className="w-28 rounded-lg border p-2" /></td>;
+                  return <td key={component.id} className="p-3"><input aria-label={`${component.title} marks or X/Y status for ${student.name}`} type="text" pattern="\\s*(?:[0-9]{1,6}(?:\\.[0-9]{1,2})?|[xXyY])\\s*" name={name} maxLength={10} placeholder="Mark / X / Y" value={values[name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} className="w-28 rounded-lg border p-2" /></td>;
                 })}
                 <td className="p-3"><input aria-label={`Optional teacher remark for ${student.name}`} name={`remark_${student.enrollmentId}`} maxLength={1000} value={values[`remark_${student.enrollmentId}`] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [`remark_${student.enrollmentId}`]: event.target.value }))} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
               </tr>

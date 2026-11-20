@@ -16,6 +16,7 @@ import {
   missingExamMarkEnrollmentIds,
   missingExamRosterEnrollmentIds,
   parseExamComponents,
+  parseExamMarkEntry,
   rankScores,
   validateGradeBands,
   type GradeBand,
@@ -160,6 +161,15 @@ describe("examination policy", () => {
       { marks: null, maxMarks: 50 },
     ])).toBeNull();
     expect(calculateComponentTotal([{ marks: 51, maxMarks: 50 }])).toBeNull();
+  });
+
+  it("accepts X/Y result codes in mark cells without treating them as numeric marks", () => {
+    expect(parseExamMarkEntry("")).toEqual({ kind: "score", marks: null });
+    expect(parseExamMarkEntry("72.5")).toEqual({ kind: "score", marks: 72.5 });
+    expect(parseExamMarkEntry(" x ")).toEqual({ kind: "status", status: "x" });
+    expect(parseExamMarkEntry("Y")).toEqual({ kind: "status", status: "y" });
+    expect(parseExamMarkEntry("-1")).toBeNull();
+    expect(parseExamMarkEntry("absent")).toBeNull();
   });
 
   it("accepts complete component marks for only the submitted students", () => {

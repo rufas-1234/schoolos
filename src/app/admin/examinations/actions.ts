@@ -43,6 +43,7 @@ import {
   completeSubmittedMarkIds,
   missingExamMarkEnrollmentIds,
   missingExamRosterEnrollmentIds,
+  parseExamMarkEntry,
   parseExamComponents,
   validateGradeBands,
   type GradeBand,
@@ -1217,6 +1218,7 @@ export async function saveExamMarks(
   if (!examSubjectId.success) return { error: "Choose a valid exam subject." };
   const [record] = await db.select({
     id: examSubjects.id,
+    publicId: examSubjects.publicId,
     status: examSubjects.status,
     maxMarks: examSubjects.maxMarks,
     examinationId: examinations.id,
@@ -1266,12 +1268,13 @@ export async function saveExamMarks(
     markId: number;
     enrollmentId: number;
     marks: number | null;
+    resultCode: "x" | "y" | null;
     remark: string | null;
     components: Array<{ id: number; componentId: number; marks: number | null }>;
   }> = [];
   const markById = new Map(currentMarks.map((mark) => [String(mark.id), mark]));
   const seenComponentKeys = new Set<string>();
-  const submittedComponentMarks = new Map<string, number | null>();
+  const submittedComponentEntries = new Map<string, NonNullable<ReturnType<typeof parseExamMarkEntry>>>();
   for (const [fieldName, raw] of formData.entries()) {
     const match = /^component_(\d+)_(\d+)$/.exec(fieldName);
     if (!match || typeof raw !== "string") continue;
@@ -1284,13 +1287,12 @@ export async function saveExamMarks(
       return { error: "The submitted components do not match this assessment roster." };
     }
     seenComponentKeys.add(componentKey);
-    const parsedMark = raw.trim() === "" ? null : numericField.safeParse(raw.trim());
-    if (parsedMark !== null && !parsedMark.success) return { error: "Marks must be valid non-negative numbers." };
-    const marks = parsedMark === null ? null : parsedMark.data;
-    if (marks !== null && (marks < 0 || marks > Number(existingComponent.maxMarks))) {
+    const entry = parseExamMarkEntry(raw);
+    if (!entry) return { error: "Enter a non-negative mark, X for absent, or Y for exam malpractice." };
+    if (entry.kind === "score" && entry.marks !== null && entry.marks > Number(existingComponent.maxMarks)) {
       return { error: `Marks for ${existingComponent.title} must be between 0 and ${existingComponent.maxMarks}.` };
     }
-    submittedComponentMarks.set(componentKey, marks);
+    submittedComponentEntries.set(componentKey, entry);
   }
   const submittedMarkIds = completeSubmittedMarkIds(
     seenComponentKeys,
@@ -1308,18 +1310,30 @@ export async function saveExamMarks(
     const components = componentDefinitions.map((component) => {
       const current = componentRowByKey.get(`${mark.id}:${component.id}`);
       const componentKey = `${mark.id}:${component.id}`;
-      if (!current || !submittedComponentMarks.has(componentKey)) return null;
+      const entry = submittedComponentEntries.get(componentKey);
+      if (!current || !entry) return null;
       return {
         id: current.id,
         componentId: component.id,
         maxMarks: Number(component.maxMarks),
-        marks: submittedComponentMarks.get(componentKey) ?? null,
+        entry,
+        marks: entry.kind === "score" ? entry.marks : null,
       };
     });
     if (components.some((component) => component === null)) {
       return { error: "A component value or roster entry is invalid. Reload this assessment and try again." };
     }
     const componentUpdates = components.filter((component) => component !== null);
+    const resultCodes = new Set(componentUpdates.flatMap((component) =>
+      component.entry.kind === "status" ? [component.entry.status] : [],
+    ));
+    if (resultCodes.size > 1) return { error: "Use the same X or Y code across every component for a student." };
+    const resultCode = resultCodes.values().next().value ?? null;
+    if (resultCode && componentUpdates.some((component) =>
+      component.entry.kind === "score" && component.entry.marks !== null,
+    )) {
+      return { error: "A student cannot have both a result code and numeric marks. Clear the other component boxes." };
+    }
     const total = calculateComponentTotal(componentUpdates.map((component) => ({
       marks: component.marks,
       maxMarks: component.maxMarks,
@@ -1330,9 +1344,10 @@ export async function saveExamMarks(
     updates.push({
       markId: mark.id,
       enrollmentId: mark.enrollmentId,
-      marks: total?.marks ?? null,
+      marks: resultCode ? null : total?.marks ?? null,
+      resultCode,
       remark: remark || null,
-      components: componentUpdates,
+      components: componentUpdates.map(({ id, componentId, marks }) => ({ id, componentId, marks })),
     });
   }
   if (updates.length !== submittedMarkIds.length) return { error: "A student or component value is invalid. Reload this assessment and try again." };
@@ -1431,6 +1446,37 @@ export async function saveExamMarks(
           actorUserId: context.user.id,
         });
       }
+      if (update.resultCode) {
+        const note = update.resultCode === "x"
+          ? "Absent (X entered in marks register)."
+          : "Exam malpractice (Y entered in marks register).";
+        await tx.insert(examAttendance).values({
+          publicId: randomUUID(),
+          schoolId: context.schoolId,
+          examSubjectId: record.id,
+          enrollmentId: update.enrollmentId,
+          status: update.resultCode,
+          note,
+          updatedBy: context.user.id,
+        }).onDuplicateKeyUpdate({
+          set: {
+            status: update.resultCode,
+            note,
+            updatedBy: context.user.id,
+            updatedAt: new Date(),
+          },
+        });
+      }
+    }
+    if (updates.some((update) => update.resultCode !== null)) {
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: "examination.attendance.saved",
+        resourceType: "exam_subject",
+        resourcePublicId: record.publicId,
+        changedFields: ["attendance"],
+      });
     }
     return "saved" as const;
   });
@@ -1438,6 +1484,7 @@ export async function saveExamMarks(
   if (saveOutcome === "roster-changed") return { error: "The assessment roster changed while you were editing. Reload before continuing." };
   if (saveOutcome === "invalid-mark") return { error: "A mark exceeds the current assessment maximum." };
   revalidatePath(`/admin/examinations/${record.examinationId}`);
+  revalidatePath(`/admin/examinations/${record.examinationId}/subjects/${record.id}`);
   return { success: true };
 }
 
@@ -1510,7 +1557,7 @@ export async function saveExamAttendance(
       return { error: "Only an optional subject can be marked not applicable." };
     }
     if ((result.data === "x" || result.data === "y") && !rawNote) {
-      return { error: "Record a reason for every X or Y irregularity code." };
+      return { error: "Add a note for every X absence or Y malpractice code." };
     }
     statuses.set(enrollment.enrollmentId, { status: result.data, note: rawNote || null });
   }

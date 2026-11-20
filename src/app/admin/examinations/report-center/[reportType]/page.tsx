@@ -89,8 +89,8 @@ function formatMarks(value: number | null | undefined): string {
 
 function assessmentStatusLabel(status: string | undefined, state: string | undefined): string {
   if (status === "not_applicable") return "Not taking";
-  if (status === "x") return "X · No Result";
-  if (status === "y") return "Y · School-defined";
+  if (status === "x") return "X · Absent";
+  if (status === "y") return "Y · Nullified (malpractice)";
   if (status === "absent") return "Absent";
   if (status === "excused") return "Excused";
   if (state === "missing") return "Missing mark";

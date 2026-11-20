@@ -320,8 +320,8 @@ export default async function ClassMarksheetReportPage({
                   const status = result.attendanceStatuses.get(assessment.id);
                   const state = result.assessmentStates.get(assessment.id);
                   const display = state === "scored" && typeof mark === "number" ? String(mark)
-                    : status === "x" ? "X · No Result"
-                    : status === "y" ? "Y · School-defined"
+                    : status === "x" ? "X · Absent"
+                    : status === "y" ? "Y · Nullified (malpractice)"
                     : status === "not_applicable" ? "Not taking"
                     : status === "absent" ? "Absent"
                     : status === "excused" ? "Excused"
@@ -391,8 +391,8 @@ export default async function ClassMarksheetReportPage({
                     const grade = percentage === null ? null : gradeForPercentage(percentage, bands);
                     const status = result.attendanceStatuses.get(assessment.id);
                     const display = state === "scored" && typeof mark === "number" ? String(mark)
-                      : status === "x" ? "X · No Result"
-                      : status === "y" ? "Y · School-defined"
+                      : status === "x" ? "X · Absent"
+                      : status === "y" ? "Y · Nullified (malpractice)"
                       : status === "not_applicable" ? "Not taking"
                       : status === "absent" ? "Absent"
                       : status === "excused" ? "Excused"

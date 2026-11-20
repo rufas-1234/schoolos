@@ -41,6 +41,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function examAttendanceLabel(status: string | null): string {
+  if (status === "x") return "X · Absent";
+  if (status === "y") return "Y · Nullified (malpractice)";
+  return status ?? "Not recorded";
+}
+
 export default async function SubjectMarksPage({
   params,
 }: {
@@ -352,7 +358,7 @@ export default async function SubjectMarksPage({
               <tr key={row.markId}>
                 <td className="p-2">{row.firstName} {row.lastName}</td>
                 <td className="p-2">{row.admissionNumber ?? "—"}</td>
-                <td className="p-2">{row.attendanceStatus ?? "Not recorded"}</td>
+                <td className="p-2">{examAttendanceLabel(row.attendanceStatus)}</td>
                 {(componentsByMark.get(row.markId) ?? []).map((component) => (
                   <td key={component.componentId} className="p-2">{component.marks ?? "—"}</td>
                 ))}
@@ -383,7 +389,7 @@ export default async function SubjectMarksPage({
               <tbody>{roster.map((row) => {
                 const percentage = row.marks === null ? null : Number(row.marks) / Number(subject.maxMarks) * 100;
                 const grade = percentage === null ? null : gradeBands.find((band) => percentage >= Number(band.minPercent) && (percentage < Number(band.maxPercent) || Number(band.maxPercent) === 100));
-                return <tr key={row.markId} className="border-t"><td className="p-3">{row.firstName} {row.lastName}</td><td className="p-3">{row.admissionNumber ?? "—"}</td><td className="p-3">{row.attendanceStatus ?? "Not recorded"}</td>{(componentsByMark.get(row.markId) ?? []).map((component) => <td key={component.componentId} className="p-3">{component.marks ?? "Not entered"}</td>)}<td className="p-3">{row.marks ?? "Incomplete"}</td><td className="p-3">{grade?.grade ?? "—"}</td><td className="p-3">{row.teacherRemark ?? "—"}</td></tr>;
+                return <tr key={row.markId} className="border-t"><td className="p-3">{row.firstName} {row.lastName}</td><td className="p-3">{row.admissionNumber ?? "—"}</td><td className="p-3">{examAttendanceLabel(row.attendanceStatus)}</td>{(componentsByMark.get(row.markId) ?? []).map((component) => <td key={component.componentId} className="p-3">{component.marks ?? "Not entered"}</td>)}<td className="p-3">{row.marks ?? "Incomplete"}</td><td className="p-3">{grade?.grade ?? "—"}</td><td className="p-3">{row.teacherRemark ?? "—"}</td></tr>;
               })}</tbody>
             </table>
           </div>
@@ -393,12 +399,12 @@ export default async function SubjectMarksPage({
 
       {specialStatusRows.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-          <h2 className="font-bold text-amber-950">No-score statuses</h2>
-          <p className="mt-1 text-sm text-amber-900">X = Cambridge “No result”; Y = school-defined irregularity. Neither receives a mark or grade.</p>
+          <h2 className="font-bold text-amber-950">Absent or nullified results</h2>
+          <p className="mt-1 text-sm text-amber-900">X = absent; Y = nullified for exam malpractice. Neither receives a mark or grade.</p>
           <ul className="mt-3 space-y-2 text-sm text-amber-950">
             {specialStatusRows.map((row) => (
               <li key={`${row.status}-${row.name}-${row.lastName}-${row.admissionNumber}`} className="rounded-lg border border-amber-200 bg-white p-3">
-                <span className="font-semibold">{row.name} {row.lastName}</span> · {row.admissionNumber ?? "No admission number"} · {row.status === "not_applicable" ? "Not taking optional subject" : row.status.toUpperCase()}
+                <span className="font-semibold">{row.name} {row.lastName}</span> · {row.admissionNumber ?? "No admission number"} · {row.status === "not_applicable" ? "Not taking optional subject" : examAttendanceLabel(row.status)}
                 {row.note && <span className="block text-xs text-slate-600">Note: {row.note}</span>}
               </li>
             ))}

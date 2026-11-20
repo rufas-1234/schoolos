@@ -17,6 +17,19 @@ export type ExamAttendanceStatus =
 
 export type ExamAssessmentResultState = "scored" | "not-applicable" | "no-result" | "missing";
 
+export type ExamMarkEntry =
+  | { kind: "score"; marks: number | null }
+  | { kind: "status"; status: "x" | "y" };
+
+export function parseExamMarkEntry(value: string): ExamMarkEntry | null {
+  const normalized = value.trim().toLocaleLowerCase();
+  if (normalized === "") return { kind: "score", marks: null };
+  if (normalized === "x" || normalized === "y") return { kind: "status", status: normalized };
+  if (!/^\d{1,6}(\.\d{1,2})?$/.test(normalized)) return null;
+  const marks = Number(normalized);
+  return Number.isFinite(marks) ? { kind: "score", marks } : null;
+}
+
 export function canViewExamSubject(
   grantedPermissions: readonly string[],
   isAssignedToSubject: boolean,
