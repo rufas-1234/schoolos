@@ -94,6 +94,15 @@ export function hasCompleteExamResult(states: Iterable<ExamAssessmentResultState
   return true;
 }
 
+export function hasCompleteExamAttendance(
+  rosterEnrollmentIds: number[],
+  recordedEnrollmentIds: number[],
+): boolean {
+  if (rosterEnrollmentIds.length === 0) return false;
+  const recorded = new Set(recordedEnrollmentIds);
+  return rosterEnrollmentIds.every((enrollmentId) => recorded.has(enrollmentId));
+}
+
 export type ExamComponent = { title: string; maxMarks: number };
 
 export function missingExamRosterEnrollmentIds(

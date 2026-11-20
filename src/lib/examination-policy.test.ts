@@ -14,6 +14,7 @@ import {
   examMarkEntryInputPattern,
   examAssessmentResultState,
   hasCompleteExamResult,
+  hasCompleteExamAttendance,
   gradeForPercentage,
   missingExamMarkEnrollmentIds,
   missingExamRosterEnrollmentIds,
@@ -147,6 +148,13 @@ describe("examination policy", () => {
     expect(hasCompleteExamResult(["scored", "not-applicable"])).toBe(true);
     expect(hasCompleteExamResult(["scored", "no-result"])).toBe(false);
     expect(hasCompleteExamResult(["scored", "missing"])).toBe(false);
+  });
+
+  it("requires attendance for every roster entry before marks can be saved, including X/Y attendance codes", () => {
+    expect(hasCompleteExamAttendance([1, 2, 3], [1, 2])).toBe(false);
+    expect(hasCompleteExamAttendance([1, 2, 3], [1, 2, 3])).toBe(true);
+    expect(hasCompleteExamAttendance([1, 2], [1, 1])).toBe(false);
+    expect(hasCompleteExamAttendance([], [])).toBe(false);
   });
 
   it("calculates annual averages from available periods and compares the first and last results", () => {

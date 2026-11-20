@@ -8,6 +8,7 @@ import {
   classSections,
   classSubjects,
   examClasses,
+  examAttendance,
   examMarkCorrections,
   examMarks,
   examSubjects,
@@ -25,6 +26,7 @@ import {
   canPublishExamClass,
   canReviewExamSubject,
   canViewExamSubject,
+  hasCompleteExamAttendance,
 } from "@/lib/examination-policy";
 import {
   AssignExamClassTeacherForm,
@@ -166,22 +168,44 @@ export default async function ExaminationDetailPage({
   const progressMarks = visibleSubjects.length
     ? await db.select({
       examSubjectId: examMarks.examSubjectId,
+      enrollmentId: examMarks.enrollmentId,
       marks: examMarks.marks,
     }).from(examMarks).where(and(
       eq(examMarks.schoolId, context.schoolId),
       inArray(examMarks.examSubjectId, visibleSubjects.map((subject) => subject.id)),
     ))
     : [];
-  const markProgressBySubject = new Map<number, { entered: number; total: number }>();
+  const markProgressBySubject = new Map<number, { entered: number; total: number; roster: Set<number> }>();
   for (const mark of progressMarks) {
-    const progress = markProgressBySubject.get(mark.examSubjectId) ?? { entered: 0, total: 0 };
+    const progress = markProgressBySubject.get(mark.examSubjectId) ?? { entered: 0, total: 0, roster: new Set<number>() };
     progress.total += 1;
+    progress.roster.add(mark.enrollmentId);
     if (mark.marks !== null) progress.entered += 1;
     markProgressBySubject.set(mark.examSubjectId, progress);
   }
   const completeSubjects = visibleSubjects.filter((subject) => {
     const progress = markProgressBySubject.get(subject.id);
     return !!progress && progress.total > 0 && progress.entered === progress.total;
+  }).length;
+  const attendanceProgress = visibleSubjects.length
+    ? await db.select({
+      examSubjectId: examAttendance.examSubjectId,
+      enrollmentId: examAttendance.enrollmentId,
+    }).from(examAttendance).where(and(
+      eq(examAttendance.schoolId, context.schoolId),
+      inArray(examAttendance.examSubjectId, visibleSubjects.map((subject) => subject.id)),
+    ))
+    : [];
+  const attendanceBySubject = new Map<number, Set<number>>();
+  for (const attendance of attendanceProgress) {
+    const recorded = attendanceBySubject.get(attendance.examSubjectId) ?? new Set<number>();
+    recorded.add(attendance.enrollmentId);
+    attendanceBySubject.set(attendance.examSubjectId, recorded);
+  }
+  const completeAttendanceSubjects = visibleSubjects.filter((subject) => {
+    const roster = markProgressBySubject.get(subject.id)?.roster;
+    const recorded = attendanceBySubject.get(subject.id);
+    return !!roster && hasCompleteExamAttendance([...roster], [...(recorded ?? [])]);
   }).length;
   const visibleClassCount = new Set(visibleSubjects.map((subject) => subject.examClassId)).size;
   const canPreviewReports = exam.name.startsWith("TEST DATA - ") && (canConfigure || canReview);
@@ -256,12 +280,13 @@ export default async function ExaminationDetailPage({
         </div>
       </header>
 
-      <section aria-label="Exam workflow" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Exam workflow" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
           { number: "1", title: "Check setup", detail: `${visibleClassCount} classes · ${visibleSubjects.length} subjects`, href: "/admin/examinations?section=setup", done: true },
-          { number: "2", title: "Enter marks", detail: `${completeSubjects} of ${visibleSubjects.length} subject rosters complete`, href: "/admin/examinations?section=marks&examId=" + exam.id, done: completeSubjects === visibleSubjects.length && visibleSubjects.length > 0 },
-          { number: "3", title: "Review & publish", detail: `${visibleSubjects.filter((subject) => subject.status === "published").length} of ${visibleSubjects.length} assessments published by authorized exam users`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
-          { number: "4", title: "Generate reports", detail: exam.status === "published" ? canConfigure || canReview ? "A4 marksheets and individual or bulk progress cards are ready" : "Your assigned subject results are ready to view" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? canConfigure || canReview ? `/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRows[0].id}` : `/admin/examinations/report-center/subject-wise-marksheet?examId=${exam.id}` : null, done: exam.status === "published" },
+          { number: "2", title: "Record attendance", detail: `${completeAttendanceSubjects} of ${visibleSubjects.length} subject rosters complete`, href: `/admin/examinations?section=attendance&examId=${exam.id}`, done: completeAttendanceSubjects === visibleSubjects.length && visibleSubjects.length > 0 },
+          { number: "3", title: "Enter marks", detail: `${completeSubjects} of ${visibleSubjects.length} subject rosters complete`, href: `/admin/examinations?section=marks&examId=${exam.id}`, done: completeAttendanceSubjects === visibleSubjects.length && completeSubjects === visibleSubjects.length && visibleSubjects.length > 0 },
+          { number: "4", title: "Review & publish", detail: `${visibleSubjects.filter((subject) => subject.status === "published").length} of ${visibleSubjects.length} assessments published by authorized exam users`, href: canReview ? "#publication-checklist" : `/admin/examinations?section=marks&examId=${exam.id}`, done: exam.status === "published" },
+          { number: "5", title: "Generate reports", detail: exam.status === "published" ? canConfigure || canReview ? "A4 marksheets and individual or bulk progress cards are ready" : "Your assigned subject results are ready to view" : canPreviewReports ? "Print a clearly marked test preview" : "Reports unlock after results are published", href: reportsReady && classRows[0] ? canConfigure || canReview ? `/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRows[0].id}` : `/admin/examinations/report-center/subject-wise-marksheet?examId=${exam.id}` : null, done: exam.status === "published" },
         ].map((step) => (
           step.href ? (
             <Link key={step.number} href={step.href} className={`rounded-xl border p-4 ${step.done ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>

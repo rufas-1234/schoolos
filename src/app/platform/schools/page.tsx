@@ -1,4 +1,5 @@
 import { asc } from "drizzle-orm";
+import Link from "next/link";
 import { AdminDataTable } from "@/components/admin-data-table";
 import { db } from "@/db";
 import { schools } from "@/db/schema";
@@ -34,7 +35,12 @@ export default async function PlatformSchoolsPage() {
               Public signups wait for approval here. Manage school details and disable access without deleting tenant data.
             </p>
           </div>
-          <PlatformSignOutButton />
+          <div className="flex items-center gap-3">
+            <Link href="/platform/accounts" className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-800">
+              Account recovery
+            </Link>
+            <PlatformSignOutButton />
+          </div>
         </header>
 
         <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1.3fr)_minmax(340px,0.9fr)]">

@@ -112,6 +112,10 @@ export function StaffForm({
       submittedValues.current = null;
       return;
     }
+    if (state.error) {
+      if (accountPasswordRef.current) accountPasswordRef.current.value = "";
+      if (accountPasswordConfirmationRef.current) accountPasswordConfirmationRef.current.value = "";
+    }
     if (!state.error || !submittedValues.current || !formRef.current) return;
     for (const [name, values] of submittedValues.current) {
       if (name === "accountPassword" || name === "accountPasswordConfirmation") continue;
@@ -202,9 +206,14 @@ export function StaffForm({
             <Field label="Last name"><input name="lastName" required minLength={2} maxLength={120} defaultValue={record?.lastName ?? ""} className={inputClass} /></Field>
             <Field label="Father's name"><input name="fatherName" maxLength={160} defaultValue={record?.fatherName ?? ""} className={inputClass} /></Field>
             <Field label="Mother's name"><input name="motherName" maxLength={160} defaultValue={record?.motherName ?? ""} className={inputClass} /></Field>
-            <Field label="Email" required={loginAccessEnabled} forceVisible={loginAccessEnabled}>
+            <Field label="Email" required={loginAccessEnabled} forceVisible={loginAccessEnabled || Boolean(record)}>
               <input name="email" type="email" maxLength={320} defaultValue={record?.email ?? ""} className={inputClass} />
             </Field>
+            {record && (
+              <p className="sm:col-span-2 text-xs leading-5 text-slate-500">
+                Changing this email also updates the linked staff login. Passwords are set manually here; no email is sent.
+              </p>
+            )}
             {!record ? (
               <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-900">A staff login is created automatically</p>

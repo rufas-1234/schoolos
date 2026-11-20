@@ -115,8 +115,19 @@ export function StudentForm({
   const fieldConfig = (name: keyof StudentFieldSettings) => settings[name];
 
   useEffect(() => {
+    if (state.success || state.error) {
+      for (const name of ["accountPassword", "accountPasswordConfirmation"]) {
+        const field = formRef.current?.elements.namedItem(name);
+        if (field instanceof HTMLInputElement) field.value = "";
+      }
+      if (state.success) {
+        submittedValues.current = null;
+        return;
+      }
+    }
     if (!state.error || !submittedValues.current || !formRef.current) return;
     for (const [name, values] of submittedValues.current) {
+      if (name === "accountPassword" || name === "accountPasswordConfirmation") continue;
       const field = formRef.current.elements.namedItem(name);
       if (field instanceof RadioNodeList) {
         field.value = values[0] ?? "";
@@ -164,7 +175,7 @@ export function StudentForm({
         const formData = new FormData(event.currentTarget);
         const snapshot = new Map<string, string[]>();
         for (const [name, value] of formData.entries()) {
-          if (typeof value !== "string") continue;
+          if (typeof value !== "string" || name === "accountPassword" || name === "accountPasswordConfirmation") continue;
           snapshot.set(name, [...(snapshot.get(name) ?? []), value]);
         }
         submittedValues.current = snapshot;
@@ -389,7 +400,16 @@ export function StudentForm({
               ))}
             </select>
           </label>
-          <Field label="Student email" name="email" type="email" required={fieldConfig("email").required} visible={fieldConfig("email").enabled} defaultValue={record?.email ?? ""} />
+          <Field label="Student email" name="email" type="email" required={!record && fieldConfig("email").required} visible={Boolean(record) || fieldConfig("email").enabled} defaultValue={record?.email ?? ""} />
+          {record && (
+            <>
+              <p className="sm:col-span-2 text-xs leading-5 text-slate-500">
+                Changing this email also updates the linked student login. Set a temporary password below if needed; no email is sent.
+              </p>
+              <Field label="Set or reset student login password (leave blank to keep it)" name="accountPassword" type="password" minLength={6} maxLength={128} autoComplete="new-password" />
+              <Field label="Confirm student login password" name="accountPasswordConfirmation" type="password" minLength={6} maxLength={128} autoComplete="new-password" />
+            </>
+          )}
           <Field label="Student phone" name="phone" required={fieldConfig("phone").required} visible={fieldConfig("phone").enabled} defaultValue={record?.phone ?? ""} />
           <Field
             label="Current address"
@@ -630,6 +650,9 @@ function Field({
   min,
   max,
   step,
+  minLength,
+  maxLength,
+  autoComplete,
 }: {
   label: string;
   name: string;
@@ -640,6 +663,9 @@ function Field({
   min?: string;
   max?: string;
   step?: string;
+  minLength?: number;
+  maxLength?: number;
+  autoComplete?: string;
 }) {
   return (
     <label hidden={!visible} className="space-y-1.5 text-sm font-medium text-slate-700">
@@ -652,7 +678,9 @@ function Field({
         min={min}
         max={max}
         step={step}
-        maxLength={type === "date" || type === "number" ? undefined : 1000}
+        minLength={minLength}
+        autoComplete={autoComplete}
+        maxLength={maxLength ?? (type === "date" || type === "number" ? undefined : 1000)}
         className={inputClass}
       />
     </label>

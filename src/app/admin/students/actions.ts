@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -15,6 +15,7 @@ import {
   classSections,
   schoolBranches,
   schools,
+  session,
   studentCategories,
   studentEnrollments,
   studentSettings,
@@ -31,6 +32,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { getStaffLoginPasswordError } from "@/lib/staff-policy";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import { normalizeAdmissionIdentifier } from "@/lib/login-identifier-policy";
 import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
@@ -736,6 +738,10 @@ export async function updateStudent(
   }
 
   const details = result.data;
+  const accountPassword = readFormValue(formData, "accountPassword");
+  const accountPasswordConfirmation = readFormValue(formData, "accountPasswordConfirmation");
+  const passwordError = getStaffLoginPasswordError(accountPassword, accountPasswordConfirmation);
+  if (passwordError) return { error: passwordError };
   if (!hasValidDocumentScope(details.additionalDetails, context.schoolPublicId)) {
     return { error: "The uploaded documents do not belong to this school." };
   }
@@ -753,7 +759,6 @@ export async function updateStudent(
       .limit(1);
     if (!student) return "student-not-found";
     if (student.branchId !== null && student.branchId !== details.branchId) return "branch-mismatch";
-
     const [branch] = await tx
       .select({ id: schoolBranches.id })
       .from(schoolBranches)
@@ -778,6 +783,77 @@ export async function updateStudent(
         )
         .limit(1);
       if (!category) return "category-not-found";
+    }
+
+    const linkedStudentUsers = await tx.select({
+      userId: userStudentLinks.userId,
+      email: user.email,
+    })
+      .from(userStudentLinks)
+      .innerJoin(user, eq(user.id, userStudentLinks.userId))
+      .where(and(
+        eq(userStudentLinks.schoolId, context.schoolId),
+        eq(userStudentLinks.studentId, student.id),
+        eq(userStudentLinks.accessType, "student"),
+      ))
+      .for("update");
+    if (accountPassword && linkedStudentUsers.length === 0) return "student-login-not-found";
+    const passwordHash = accountPassword ? await hashPassword(accountPassword) : null;
+    const loginEmail = details.email.trim().toLowerCase();
+    for (const linkedAccount of linkedStudentUsers) {
+      const emailChanged = Boolean(loginEmail && linkedAccount.email.toLowerCase() !== loginEmail);
+      if (!emailChanged && !passwordHash) continue;
+      const [otherActiveMembership] = await tx.select({ id: schoolMemberships.id })
+        .from(schoolMemberships)
+        .where(and(
+          eq(schoolMemberships.userId, linkedAccount.userId),
+          eq(schoolMemberships.status, "active"),
+          ne(schoolMemberships.schoolId, context.schoolId),
+        ))
+        .limit(1);
+      if (otherActiveMembership) return "student-login-shared";
+    }
+    for (const linkedAccount of linkedStudentUsers) {
+      const emailChanged = Boolean(loginEmail && linkedAccount.email.toLowerCase() !== loginEmail);
+      if (emailChanged) {
+        await tx.update(user).set({ email: loginEmail }).where(eq(user.id, linkedAccount.userId));
+      }
+      if (passwordHash) {
+        const [credentialAccount] = await tx.select({ id: authAccount.id })
+          .from(authAccount)
+          .where(and(
+            eq(authAccount.userId, linkedAccount.userId),
+            eq(authAccount.providerId, "credential"),
+          ))
+          .for("update")
+          .limit(1);
+        if (credentialAccount) {
+          await tx.update(authAccount).set({ password: passwordHash })
+            .where(eq(authAccount.id, credentialAccount.id));
+        } else {
+          await tx.insert(authAccount).values({
+            id: randomUUID(),
+            accountId: linkedAccount.userId,
+            providerId: "credential",
+            userId: linkedAccount.userId,
+            password: passwordHash,
+          });
+        }
+      }
+      if (emailChanged || passwordHash) {
+        await tx.delete(session).where(eq(session.userId, linkedAccount.userId));
+        await tx.insert(auditLogs).values({
+          schoolId: context.schoolId,
+          actorUserId: context.user.id,
+          action: "student.login.credentials_reset",
+          resourceType: "student",
+          resourcePublicId: publicId.data,
+          changedFields: [
+            ...(emailChanged ? ["credential.email"] : []),
+            ...(passwordHash ? ["credential.password"] : []),
+          ],
+        });
+      }
     }
 
     await tx
@@ -828,6 +904,8 @@ export async function updateStudent(
     return { error: "Student record could not be saved. No changes were made; check the details and try again." };
   }
   if (outcome === "student-not-found") return { error: "Student record was not found in this school." };
+  if (outcome === "student-login-not-found") return { error: "This student has no student login account to reset. Create or link a student login first." };
+  if (outcome === "student-login-shared") return { error: "This student login is active in another school. Only a platform admin can change its credentials." };
   if (outcome === "branch-mismatch") {
     return { error: "An assigned student cannot be moved to another branch by editing the profile." };
   }
@@ -837,6 +915,7 @@ export async function updateStudent(
   }
   revalidateStudentPages();
   revalidatePath("/admin/dashboard");
+  revalidatePath("/admin/users");
   return { success: true };
 }
 

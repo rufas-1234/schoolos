@@ -607,7 +607,7 @@ export function SaveMarksForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
-      <p className="text-sm text-slate-600">Attendance doesn&apos;t block marks. Enter marks or X (absent) / Y (malpractice); codes clear scores. Use one code across components (max {maxMarks}).</p>
+      <p className="text-sm text-slate-600">Attendance is required before marks can be saved. Enter marks or X (absent) / Y (malpractice); codes clear scores. Use one code across components (max {maxMarks}).</p>
       <label className="block max-w-lg text-sm font-medium text-slate-700">
         Search students
         <input

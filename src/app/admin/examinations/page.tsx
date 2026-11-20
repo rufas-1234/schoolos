@@ -701,7 +701,23 @@ export default async function ExaminationsPage({
               <tbody>{visibleAssessments.map((row) => {
                 const entered = markRows.filter((mark) => mark.examSubjectId === row.id && mark.marks !== null).length;
                 const rosterCount = markRows.filter((mark) => mark.examSubjectId === row.id).length;
-                return <tr key={row.id} className="border-t"><td className="p-3">{row.examDate}</td><td className="p-3">{row.branchName ?? "All branches"}</td><td className="p-3">{row.examName}</td><td className="p-3">{row.className}</td><td className="p-3">{row.subjectName} <span className="text-xs text-slate-500">{row.subjectCode}</span></td><td className="p-3">{row.maxMarks}</td><td className="p-3">{entered}/{rosterCount}</td><td className="p-3">{row.status}</td><td className="p-3"><Link className="font-semibold text-violet-700" href={`/admin/examinations/${row.examId}/subjects/${row.id}`}>{row.status === "draft" ? "Add / edit marks" : "View marks"}</Link></td></tr>;
+                const attendanceRoster = attendanceRosterBySubjectId.get(row.id) ?? [];
+                const attendanceIds = new Set(attendanceRows
+                  .filter((attendance) => attendance.examSubjectId === row.id)
+                  .map((attendance) => attendance.enrollmentId));
+                const hasRoster = attendanceRoster.length > 0;
+                const attendanceComplete = hasRoster &&
+                  attendanceRoster.every((enrollment) => attendanceIds.has(enrollment.enrollmentId));
+                const needsAttendance = hasRoster && !attendanceComplete;
+                const actionHref = needsAttendance && row.status === "draft"
+                  ? `/admin/examinations/${row.examId}/attendance/${row.id}`
+                  : `/admin/examinations/${row.examId}/subjects/${row.id}`;
+                const actionLabel = needsAttendance && row.status === "draft"
+                  ? "Take attendance"
+                  : hasRoster && row.status === "draft"
+                    ? "Add / edit marks"
+                    : hasRoster ? "View marks" : "View roster";
+                return <tr key={row.id} className="border-t"><td className="p-3">{row.examDate}</td><td className="p-3">{row.branchName ?? "All branches"}</td><td className="p-3">{row.examName}</td><td className="p-3">{row.className}</td><td className="p-3">{row.subjectName} <span className="text-xs text-slate-500">{row.subjectCode}</span></td><td className="p-3">{row.maxMarks}</td><td className="p-3">{entered}/{rosterCount}</td><td className="p-3">{!hasRoster ? "No roster" : attendanceComplete ? row.status : "Attendance required"}</td><td className="p-3"><Link className="font-semibold text-violet-700" href={actionHref}>{actionLabel}</Link></td></tr>;
               })}</tbody>
             </table>
           </div>

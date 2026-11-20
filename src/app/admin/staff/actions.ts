@@ -15,6 +15,7 @@ import {
   schoolBranches,
   schoolMemberships,
   schools,
+  session,
   staffDepartments,
   staffDesignations,
   staffApplications,
@@ -341,7 +342,8 @@ function staffCustomFields(staff: z.infer<typeof staffSchema>) {
 
 type StaffLoginResult = {
   linkedUserId: string | null;
-  action: "staff.login_access.enabled" | "staff.login_access.disabled" | null;
+  action: "staff.login_access.enabled" | "staff.login_access.disabled" | "staff.login_access.credentials_reset" | null;
+  emailChanged: boolean;
   passwordChanged: boolean;
 };
 
@@ -354,10 +356,33 @@ async function applyStaffLoginAccess(
 ): Promise<StaffLoginResult> {
   const submittedLinkedUserId = staff.linkedUserId || null;
   if (!staff.loginAccessEnabled) {
+    let emailChanged = false;
     if (previousLinkedUserId) {
       if (previousLinkedUserId === actorUserId) {
         throw new StaffLoginError("You cannot disable your own school access from the staff profile.");
       }
+      const [linkedUser] = await tx.select({ email: user.email }).from(user)
+        .where(eq(user.id, previousLinkedUserId))
+        .for("update")
+        .limit(1);
+      if (!linkedUser) throw new StaffLoginError("The linked school account could not be found.");
+      const email = staff.email.trim().toLowerCase();
+      emailChanged = Boolean(email && linkedUser.email.toLowerCase() !== email);
+      if (emailChanged) {
+        const [otherActiveMembership] = await tx.select({ id: schoolMemberships.id })
+          .from(schoolMemberships)
+          .where(and(
+            eq(schoolMemberships.userId, previousLinkedUserId),
+            eq(schoolMemberships.status, "active"),
+            ne(schoolMemberships.schoolId, schoolId),
+          ))
+          .limit(1);
+        if (otherActiveMembership) {
+          throw new StaffLoginError("This account belongs to another school; only a platform admin can change its email.");
+        }
+      }
+      if (emailChanged) await tx.update(user).set({ email }).where(eq(user.id, previousLinkedUserId));
+      await tx.delete(session).where(eq(session.userId, previousLinkedUserId));
       await tx.update(schoolMemberships)
         .set({ status: "inactive" })
         .where(and(
@@ -368,7 +393,12 @@ async function applyStaffLoginAccess(
     }
     return {
       linkedUserId: submittedLinkedUserId,
-      action: previousLinkedUserId ? "staff.login_access.disabled" : null,
+      action: emailChanged
+        ? "staff.login_access.credentials_reset"
+        : previousLinkedUserId
+          ? "staff.login_access.disabled"
+          : null,
+      emailChanged,
       passwordChanged: false,
     };
   }
@@ -399,14 +429,12 @@ async function applyStaffLoginAccess(
       .limit(1);
   }
 
-  if (accountUser && email && accountUser.email.toLowerCase() !== email) {
-    throw new StaffLoginError("The linked account email must match the staff email.");
-  }
   if (accountUser && !accountUser.isActive) {
     throw new StaffLoginError("This SchoolOS account is inactive. Reactivate it before enabling login access.");
   }
 
   let userId = accountUser?.id;
+  const emailChanged = Boolean(accountUser && email && accountUser.email.toLowerCase() !== email);
   let passwordChanged = false;
   if (!userId) {
     if (!email) throw new StaffLoginError("Enter an email before creating a staff login this way.");
@@ -458,6 +486,13 @@ async function applyStaffLoginAccess(
     } else if (!credentialAccount) {
       throw new StaffLoginError("This account has no password login yet. Set a password to enable sign-in with its email.");
     }
+  }
+
+  if (accountUser && emailChanged) {
+    await tx.update(user).set({ email }).where(eq(user.id, userId!));
+  }
+  if (emailChanged || passwordChanged) {
+    await tx.delete(session).where(eq(session.userId, userId!));
   }
 
   const [otherActiveMembership] = await tx.select({ id: schoolMemberships.id })
@@ -541,7 +576,8 @@ async function applyStaffLoginAccess(
 
   return {
     linkedUserId: userId,
-    action: "staff.login_access.enabled",
+    action: emailChanged || passwordChanged ? "staff.login_access.credentials_reset" : "staff.login_access.enabled",
+    emailChanged,
     passwordChanged,
   };
 }
@@ -759,6 +795,7 @@ async function logStaffLoginAccess(
     changedFields: [
       "linkedUserId",
       "schoolMembership.status",
+      ...(loginResult.emailChanged ? ["credential.email"] : []),
       ...(loginResult.passwordChanged ? ["credential.password"] : []),
     ],
   });

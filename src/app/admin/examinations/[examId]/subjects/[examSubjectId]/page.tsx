@@ -283,7 +283,8 @@ export default async function SubjectMarksPage({
       .orderBy(asc(examMarkAudits.createdAt))
     : [];
   const canEnterMarks = canEnterExamMarks(context.grantedPermissions, assignedTeacher);
-  const editable = subject.examStatus === "open" && subject.status === "draft" && canEnterMarks;
+  const attendanceComplete = roster.length > 0 && roster.every((row) => row.attendanceStatus !== null);
+  const editable = subject.examStatus === "open" && subject.status === "draft" && canEnterMarks && attendanceComplete;
   const studentRows = roster.map((row) => ({
     markId: row.markId,
     enrollmentId: row.enrollmentId,
@@ -386,6 +387,14 @@ export default async function SubjectMarksPage({
           <h2 className="text-xl font-bold">{subject.className} · {subject.subjectName} — marks roster</h2>
           <p className="text-sm text-slate-600">{roster.length} enrolled students · {subject.examSystem === "multi" ? "component marks are summed" : "single component"} · max {subject.maxMarks} marks · assessment weight {subject.weight}</p>
         </div>
+        {subject.examStatus === "open" && subject.status === "draft" && canEnterMarks && roster.length > 0 && !attendanceComplete && (
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            Record attendance for every student before entering marks. X (absent) and Y (malpractice) attendance statuses remain available.{" "}
+            <Link href={`/admin/examinations/${examId}/attendance/${subject.id}`} className="font-semibold underline">
+              Go to exam attendance
+            </Link>
+          </div>
+        )}
         {editable && <SaveMarksForm
           examSubjectId={subject.id}
           maxMarks={subject.maxMarks}

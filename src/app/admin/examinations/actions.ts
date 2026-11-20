@@ -43,6 +43,7 @@ import {
   canReviewExamSubject,
   calculateComponentTotal,
   completeSubmittedMarkIds,
+  hasCompleteExamAttendance,
   missingExamMarkEnrollmentIds,
   missingExamRosterEnrollmentIds,
   parseExamMarkEntry,
@@ -1245,6 +1246,21 @@ export async function saveExamMarks(
       eq(examMarks.schoolId, context.schoolId),
       eq(examMarks.examSubjectId, record.id),
     ));
+  if (!currentMarks.length) return { error: "This assessment has no enrolled students on its roster." };
+  const currentAttendance = currentMarks.length
+    ? await db.select({ enrollmentId: examAttendance.enrollmentId }).from(examAttendance)
+      .where(and(
+        eq(examAttendance.schoolId, context.schoolId),
+        eq(examAttendance.examSubjectId, record.id),
+        inArray(examAttendance.enrollmentId, currentMarks.map((mark) => mark.enrollmentId)),
+      ))
+    : [];
+  if (!hasCompleteExamAttendance(
+    currentMarks.map((mark) => mark.enrollmentId),
+    currentAttendance.map((attendance) => attendance.enrollmentId),
+  )) {
+    return { error: "Record attendance for every student before saving marks. X and Y codes remain available." };
+  }
   const componentDefinitions = await db.select({
     id: examComponents.id,
     title: examComponents.title,
@@ -1254,7 +1270,6 @@ export async function saveExamMarks(
     eq(examComponents.examSubjectId, record.id),
   )).orderBy(asc(examComponents.sortOrder));
   if (!componentDefinitions.length) return { error: "This assessment has no mark components; ask an administrator to repair its setup." };
-  if (!currentMarks.length) return { error: "This assessment has no enrolled students on its roster." };
   const componentById = new Map(componentDefinitions.map((component) => [component.id, component]));
   const componentRows = await db.select({
     id: examComponentMarks.id,
@@ -1385,6 +1400,21 @@ export async function saveExamMarks(
         eq(examMarks.schoolId, context.schoolId),
         eq(examMarks.examSubjectId, record.id),
       )).for("update");
+    if (lockedMarks.length !== currentMarks.length) return "roster-changed" as const;
+    const lockedAttendance = lockedMarks.length
+      ? await tx.select({ enrollmentId: examAttendance.enrollmentId }).from(examAttendance)
+        .where(and(
+          eq(examAttendance.schoolId, context.schoolId),
+          eq(examAttendance.examSubjectId, record.id),
+          inArray(examAttendance.enrollmentId, lockedMarks.map((mark) => mark.enrollmentId)),
+        )).for("update")
+      : [];
+    if (!hasCompleteExamAttendance(
+      lockedMarks.map((mark) => mark.enrollmentId),
+      lockedAttendance.map((attendance) => attendance.enrollmentId),
+    )) {
+      return "attendance-incomplete" as const;
+    }
     const lockedComponents = await tx.select({
       id: examComponentMarks.id,
       examMarkId: examComponentMarks.examMarkId,
@@ -1484,6 +1514,7 @@ export async function saveExamMarks(
   });
   if (saveOutcome === "locked") return { error: "This assessment was submitted or published while you were editing. Reload before continuing." };
   if (saveOutcome === "roster-changed") return { error: "The assessment roster changed while you were editing. Reload before continuing." };
+  if (saveOutcome === "attendance-incomplete") return { error: "Record attendance for every student before saving marks. X and Y codes remain available." };
   if (saveOutcome === "invalid-mark") return { error: "A mark exceeds the current assessment maximum." };
   revalidatePath(`/admin/examinations/${record.examinationId}`);
   revalidatePath(`/admin/examinations/${record.examinationId}/subjects/${record.id}`);
