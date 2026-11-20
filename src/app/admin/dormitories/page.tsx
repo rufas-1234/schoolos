@@ -427,7 +427,7 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
         <h2 className="font-semibold text-slate-950">Bulk room assignment</h2>
         <p className="mb-4 mt-1 text-sm text-slate-500">
-          Select up to 100 students for one room. The batch is all-or-nothing and checks eligibility, resident policy, branch, and remaining beds before saving.
+          Select up to 100 students. All must meet room, residency, branch, and bed rules; otherwise nothing is saved.
         </p>
         <BulkStudentRoomAssignmentForm students={eligibleStudents} rooms={roomOptions} today={today} />
       </section>
@@ -445,7 +445,7 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
       totalRows={totalRows}
       hrefForPage={hrefForPage}
     />}
-    <p className="text-xs text-slate-500">Older dormitory and room text on student profiles remains available there; structured assignments are managed here.</p>
+    <p className="text-xs text-slate-500">Legacy dormitory notes stay on student profiles; manage assignments here.</p>
   </main>;
 }
 

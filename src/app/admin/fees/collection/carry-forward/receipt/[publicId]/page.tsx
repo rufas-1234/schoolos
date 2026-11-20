@@ -71,7 +71,7 @@ export default async function FeeAdvanceReceiptPage({
       </div>
       {receipt.notes && <p className="break-words text-sm text-slate-600">Notes: {receipt.notes}</p>}
       <p className="rounded-xl border border-slate-200 p-4 text-sm leading-6 text-slate-600">
-        This advance has been added to the student&apos;s carry-forward balance. It can be applied to an outstanding fee invoice when one is available.
+        Advance credited to the student balance. Apply it when a fee invoice is available.
       </p>
       <Link href="/admin/fees/collection/carry-forward" className="print:hidden inline-flex rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50">
         Back to carry-forward fees

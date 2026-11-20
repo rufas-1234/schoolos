@@ -78,8 +78,7 @@ export default async function DeleteStudentRecordsPage() {
           Delete student records
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
-          Permanently remove a student and their enrollment, attendance, academic history, and group memberships.
-          This cannot be undone.
+          Permanently delete the student and their enrollments, attendance, history, and groups. This cannot be undone.
         </p>
       </header>
 

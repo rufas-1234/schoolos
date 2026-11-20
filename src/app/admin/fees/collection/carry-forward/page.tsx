@@ -282,7 +282,7 @@ export default async function FeeCarryForwardPage({
           <p className="text-sm font-semibold text-violet-700">Fee collection</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Carry-forward fees</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Record advance payments for future school fees. Keep the balance on the student&apos;s account and apply it when an invoice is ready.
+            Add advance payments for future fees; the credit stays on the account until applied.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

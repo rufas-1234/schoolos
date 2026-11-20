@@ -511,7 +511,7 @@ export default async function ExamAnalyticsPage({
         <div>
           <p className="text-sm font-semibold text-violet-700">Examinations · Analytics</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">Exam Analytics</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">Explore published results by examination, class, section, subject, and student. Means and grades use the selected examination&apos;s grading and weighting rules.</p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">Explore published results by exam, class, section, subject, or student. Calculations use exam rules.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <DownloadAnalyticsCsv
@@ -584,7 +584,7 @@ export default async function ExamAnalyticsPage({
                   {summary.mean !== null ? ` · cohort mean ${displayScore(summary.mean)} · ${results[0].mean >= summary.mean ? "at or above" : "below"} the cohort mean` : ""}
                   {selectedExam?.allowRanking ? ` · position ${ranks.get(results[0].enrollmentId) ?? "—"} of ${completeResults.length}` : ""}
               </p>
-              <p className="mt-1 text-xs text-violet-800">Student comparison uses complete results within the selected filters. Grade points are not configured in this grading scale.</p>
+              <p className="mt-1 text-xs text-violet-800">Comparisons need complete results. Grade points aren&apos;t configured for this scale.</p>
             </section>
           )}
 
@@ -725,7 +725,7 @@ export default async function ExamAnalyticsPage({
           </AnalyticsPanel>
 
           <p className="text-xs text-slate-500">
-            Incomplete student results are excluded from mean, grade, and rank calculations. Subject scores are normalized to percentages; overall means use each subject&apos;s configured weight. This report is based on published marks only.
+            Incomplete results are excluded. Published scores use subject percentages and weights.
           </p>
         </section>
       )}

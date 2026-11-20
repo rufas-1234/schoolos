@@ -285,7 +285,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </p>
       </header>
       <InventoryModuleNav active={section} permissions={context.grantedPermissions} />
-      {hasDemoRows && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY items and assets are included in these counts and values as workflow examples; they are not real stock or school property.</p>}
+      {hasDemoRows && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Demo items are examples, not real school stock or assets.</p>}
 
       {section !== "assets" && section !== "maintenance" ? (
         <section aria-label="Inventory overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

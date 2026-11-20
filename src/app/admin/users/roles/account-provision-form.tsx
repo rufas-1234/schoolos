@@ -111,12 +111,12 @@ export function AccountProvisionForm({
       </label>
       {personType === "staff" && (
         <p className="rounded-xl bg-violet-50 px-3 py-2.5 text-xs leading-5 text-violet-900">
-          Staff sign in with their profile email; a valid phone number on the profile will also work. Teachers must also have the Teacher role and teaching assignments.
+          Staff sign in with profile email or phone. Teachers also need the Teacher role and teaching assignments.
         </p>
       )}
       {personType === "student" && (
         <p className="rounded-xl bg-violet-50 px-3 py-2.5 text-xs leading-5 text-violet-900">
-          Students sign in with their admission number. Student portal access is linked to the selected student record.
+          Students sign in with their admission number; portal access links to the selected record.
         </p>
       )}
       {personType === "parent" && (

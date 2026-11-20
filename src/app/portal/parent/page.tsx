@@ -172,8 +172,7 @@ export default async function ParentPortalPage() {
           <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
             <h2 className="font-semibold">Parent account not linked</h2>
             <p className="mt-1 leading-6">
-              This account is not matched to an active student record. Ask the school administrator to add this
-              account email to your child’s guardian email field.
+              Your account is not linked to an active student. Ask the school to add your email as a guardian contact.
             </p>
           </section>
         ) : (

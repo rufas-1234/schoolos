@@ -407,7 +407,7 @@ export default async function FeesSetupPage({
           {unavailableClasses.length > 0 && (
             <aside role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <p>
-                Only active classes on active branches can receive new fee structures. These classes are currently excluded:
+                Only active classes on active branches can receive fee structures. Excluded:
               </p>
               <ul className="mt-2 list-inside list-disc">
                 {unavailableClasses.map((classLevel) => (

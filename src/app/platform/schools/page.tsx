@@ -26,7 +26,7 @@ export default async function PlatformSchoolsPage() {
             <p className="text-sm font-semibold uppercase tracking-widest text-violet-700">SchoolOS platform</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">School workspaces</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Provisioning is restricted to configured platform administrators. Each school has separate membership, roles, and tenant-scoped records.
+              Only configured platform admins can create schools. Each school has separate users, roles, and data.
             </p>
           </div>
           <PlatformSignOutButton />

@@ -632,7 +632,7 @@ export default async function AnnualProgressCardPage({
           <Link href="/admin/examinations" className="text-sm font-semibold text-violet-700">← Examinations</Link>
           <p className="mt-4 text-sm font-semibold text-violet-700">{context.schoolName} · Examination reports</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">Annual Progress Card Report</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">Compare published subject results across every examination in an academic year, with annual averages and progress from the first to the latest exam.</p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">Compare published results across the year, with averages and progress from first to latest exam.</p>
         </div>
         {selectedYear && selectedClass && visibleProgress.length > 0 && (
           <PrintButton label={selectedStudentId ? "Print progress card / Save PDF" : "Print class progress cards / Save PDF"} targetId="annual-progress-output" pageOrientation="portrait" pageSize="A4" />

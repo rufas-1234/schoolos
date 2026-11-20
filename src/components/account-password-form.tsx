@@ -13,7 +13,7 @@ export function AccountPasswordForm() {
       <div>
         <h2 className="font-semibold text-slate-950">Change your password</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Choose at least 6 characters with an uppercase letter, a lowercase letter, a number, and a symbol. Common and repetitive passwords are rejected.
+          Use 6+ characters with uppercase, lowercase, a number, and a symbol. Common or repeated passwords are rejected.
         </p>
       </div>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">

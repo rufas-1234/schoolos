@@ -415,7 +415,7 @@ export default async function ExaminationReportPage({
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
           <h1 className="text-xl font-bold text-amber-950">Whole-class report access required</h1>
           <p className="mt-2 text-sm text-amber-900">
-            Your access is limited to assigned subjects. Ask an examination manager to generate whole-class results and report cards.
+            Assigned subjects only. Ask an exam manager for class results and report cards.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm font-semibold text-violet-800">
             <Link href={reportUrl("exam-routine", {})}>Exam Routine</Link>
@@ -917,7 +917,7 @@ export default async function ExaminationReportPage({
       {isOnlineReport ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
           <h2 className="text-lg font-bold text-amber-950">Online exam tracking is not configured</h2>
-          <p className="mt-2 text-sm text-amber-900">SchoolOS currently records in-person exam schedules, attendance and marks. It has no online exam attempt or submission records, so this report cannot show online attempts or scores yet.</p>
+          <p className="mt-2 text-sm text-amber-900">Online attempts aren&apos;t recorded; this report covers in-person schedules, attendance, and marks.</p>
         </section>
       ) : (
         <>

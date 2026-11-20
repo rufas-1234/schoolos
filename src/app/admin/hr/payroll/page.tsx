@@ -139,7 +139,7 @@ export default async function StaffPayrollPage({
         <p className="text-sm font-medium text-violet-700">Human resources</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Payroll records</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
-          Prepare monthly staff payroll, calculate gross and net pay, track payment status, and print the filtered payroll report.
+          Prepare monthly payroll, calculate gross and net pay, track payments, and print reports.
         </p>
       </header>
 

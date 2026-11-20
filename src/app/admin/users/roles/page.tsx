@@ -357,7 +357,7 @@ export default async function UserRolesPage({
                 </section>
               </div>
               <p className="text-sm text-slate-500">
-                Caretaker logins are created from active staff profiles with an email address. Add the person to the staff directory first if needed.
+                Caretakers need an active staff profile and email. Add them to Staff first.
               </p>
             </div>
           ),

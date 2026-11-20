@@ -214,7 +214,7 @@ export function CreateExaminationForm({
           {visibleClasses.length === 0 && <p className="col-span-full text-sm text-slate-500">Add active classes and subject assignments first.</p>}
         </div>
       </fieldset>}
-      {record && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Classes and subjects remain unchanged. Mark distributions can be changed only before marks are entered; a branch change must preserve the student roster.</p>}
+      {record && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Classes and subjects stay fixed. Change mark distributions before entry; preserve the roster when changing branches.</p>}
       {!record && <p className="text-xs text-slate-500">Choose the classes that will take this exam. Currently enrolled students and assigned subjects are added automatically.</p>}
       <SubmitButton pending={pending}>{record ? "Save changes" : "Save Exam"}</SubmitButton>
       <Feedback state={state} />
@@ -260,7 +260,7 @@ export function CreateExamTypeForm({ branches }: { branches: Array<{ id: number;
         </label>
       </div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="averagePassing" /> Use as the school&apos;s average-passing examination</label>
-      <p className="text-xs text-slate-500">Exam types are reusable labels such as First Term or Mid-year. This passing threshold is stored on the type; each examination still uses its selected grading scale for result grades.</p>
+      <p className="text-xs text-slate-500">Exam types store a passing threshold; grades use the scale selected for each exam.</p>
       <SubmitButton pending={pending}>Save exam type</SubmitButton>
       <Feedback state={state} />
     </form>
@@ -602,7 +602,7 @@ export function SaveMarksForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
-      <p className="text-sm text-slate-600">All enrolled students appear on the marks roster regardless of attendance. Attendance remains visible for reference but does not restrict marks entry. The total is calculated from the components entered, out of {maxMarks}; remarks are optional.</p>
+      <p className="text-sm text-slate-600">All enrolled students are listed; attendance doesn&apos;t block marks. Totals use components (max {maxMarks}); remarks are optional.</p>
       <label className="block max-w-lg text-sm font-medium text-slate-700">
         Search students
         <input
@@ -755,7 +755,7 @@ export function ReopenApprovedSubjectForm({ examSubjectId }: { examSubjectId: nu
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
       <div>
         <h2 className="font-bold text-amber-950">Reopen approved marks for correction</h2>
-        <p className="mt-1 text-sm text-amber-900">Existing marks are retained. The subject returns to draft, attendance-based roster sync can add missing students, and the corrected marks must be submitted and approved again. Published examinations cannot be reopened here.</p>
+        <p className="mt-1 text-sm text-amber-900">Marks stay. Reopen to draft, sync missing students, and resubmit for approval. Published exams stay closed.</p>
       </div>
       <label className="block text-sm font-medium text-amber-950">
         Reason for reopening
@@ -805,7 +805,7 @@ export function PublishExamClassForm({
     <form action={action} className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
       <input type="hidden" name="examClassId" value={examClassId} />
       <p className="text-sm font-semibold text-emerald-950">Publish this class&apos;s results</p>
-      <p className="mt-1 text-xs text-emerald-900">Only users with Results publish permission can publish. Attendance must be recorded for every enrolled student before publication, but it does not block marks entry or submission. Results stay locked after publication.</p>
+      <p className="mt-1 text-xs text-emerald-900">Publishers can publish after full attendance is recorded. Marks entry is separate; published results stay locked.</p>
       <button disabled={disabled || pending} className="mt-3 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
         {pending ? "Publishing..." : "Publish class results"}
       </button>

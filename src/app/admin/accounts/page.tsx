@@ -409,8 +409,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         {section === "profit" && (
           <div className="space-y-4">
             <ProfitLossFilters from={from} to={to} />
-            <p className="text-xs text-slate-500">Profit and loss includes approved income and expenses, school fee receipts net of refunds, and excludes transactions still awaiting approval and fee-module test payments.</p>
-            {hasDemoProfitTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY records are included in these totals as workflow examples; they are not real income or expenses.</p>}
+            <p className="text-xs text-slate-500">P&amp;L uses approved activity and fee receipts net of refunds; pending and test items are excluded.</p>
+            {hasDemoProfitTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Demo test records appear in totals but are not real income or expenses.</p>}
             <div className="grid gap-3 sm:grid-cols-3">
               <SummaryCard label="Total income (incl. net fee receipts)" value={displayCurrency(incomeTotal, currency)} />
               <SummaryCard label="Operating expenses" value={displayCurrency(expenseTotal, currency)} />
@@ -432,7 +432,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
 
         {section === "income" && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-500">School fee receipts are included automatically from fee collections in Profit &amp; Loss. Record donations and other non-fee income here to avoid double counting.</p>
+            <p className="text-sm text-slate-500">Fee receipts are added automatically. Record other income here to avoid double counting.</p>
             <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
             <TransactionTable transactions={incomeTransactionPage.rows} currency={currency} reviewNeeded={reviewNeeded} />
             <TablePagination ariaLabel="Income transactions" currentPage={incomeTransactionPage.page} pageSize={incomeTransactionPage.pageSize} totalRows={incomeTransactions.length}
@@ -549,8 +549,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 <SummaryCard label="Approved expenses" value={displayCurrency(expenseTotal, currency)} />
                 <SummaryCard label="Net surplus / (deficit)" value={displayCurrency(netProfit, currency)} tone={netProfit < BigInt(0) ? "rose" : "emerald"} />
               </div>
-              <p className="text-xs text-slate-500">Fees are shown separately from non-fee income. Period totals use approved accounting activity for the selected dates and do not change with the transaction search or status filter; those filters apply to the transaction register and CSV export.</p>
-              {hasDemoReportTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">DEMO TEST ONLY records are included in the transaction list and applicable totals as workflow examples; they are not real income or expenses.</p>}
+              <p className="text-xs text-slate-500">Selected-date totals use approved activity. Filters affect only the register and CSV; fees are separate.</p>
+              {hasDemoReportTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Demo test records appear in the register and totals as examples, not real transactions.</p>}
               <TransactionTable
                 transactions={reportTransactionPage.rows}
                 currency={currency}

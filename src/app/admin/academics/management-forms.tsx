@@ -104,7 +104,7 @@ export function AcademicYearStatusForm({ years }: { years: Option[] }) {
         </select>
       </label>
       <p className="text-xs text-slate-500">
-        Only one year can be active. A year with current student enrollments must be completed before it can be changed or archived.
+        Only one year can be active. Complete years with enrollments before changing or archiving.
       </p>
     </ActionForm>
   );
@@ -1009,7 +1009,7 @@ export function EnrollmentOperationForm({
             <input key={enrollmentId} type="hidden" name="enrollmentIds" value={enrollmentId} />
           ))}
           <p className="text-xs text-slate-500">
-            Everyone starts selected. Uncheck students who should not be promoted, such as students who have failed and need to repeat.
+            Everyone starts selected. Uncheck students who need to repeat.
           </p>
           <label className="flex min-w-0 items-start gap-2 text-sm font-semibold leading-5 text-slate-700">
             <input
@@ -1152,7 +1152,7 @@ export function EnrollmentOperationForm({
       <Field label="Operation date" name="eventDate" type="date" />
       <Field label="Reason / notes" name="reason" placeholder="End-of-year result" />
       <p className="text-xs text-slate-500">
-        In-school transfers can move a student to any class or section in the same year, including a lower class. Promotion or placement and repetition create a new enrollment for a later year, and can also target a different class. The destination section must belong to the selected year.
+        Same-year transfers allow any class or section. Later-year moves start a new enrollment in a section for that year.
       </p>
       {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
       {state.success && <p role="status" className="text-sm text-emerald-700">{state.message ?? "Saved successfully."}</p>}

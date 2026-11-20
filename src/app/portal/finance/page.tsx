@@ -229,7 +229,7 @@ export default async function FinancePortalPage() {
           </section>
 
           <p className="text-xs leading-relaxed text-slate-500">
-            Fee totals are net of recorded reversals. Accounts income and expense totals include approved transactions only; school fee receipts are counted separately to avoid double counting.
+            Fee totals subtract reversals. Account totals use approved transactions; fee receipts are separate.
           </p>
         </section>
 

@@ -6,8 +6,7 @@ export default function UnauthorizedPage() {
       <section className="max-w-md rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">Access not available</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          Your account does not have permission to open this page. Contact your school administrator if you
-          believe this is a mistake.
+          You do not have permission to access this page. Contact your school admin if needed.
         </p>
         <Link
           href="/login"

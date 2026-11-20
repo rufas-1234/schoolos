@@ -299,7 +299,7 @@ export function PayrollForm({
       <Field label="Paid date (required if marked paid)" name="paidDate" type="date" defaultValue={record?.paidDate ?? ""} required={false} />
       <Field label="Notes (optional)" name="notes" maxLength={1000} defaultValue={record?.notes ?? ""} required={false} />
       <p className="text-xs leading-5 text-slate-500">
-        Gross pay is base salary plus allowances. Net pay is gross pay minus deductions; enter any applicable statutory deductions manually.
+        Gross pay = salary + allowances. Net pay = gross minus deductions; enter statutory deductions.
       </p>
     </HrForm>
   );

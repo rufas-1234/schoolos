@@ -180,7 +180,7 @@ export default async function StaffLeavePage({
         <p className="text-sm font-medium text-violet-700">Human resources</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Leave management</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
-          Define leave types, assign an individual calendar-day entitlement to each staff member, then submit and review requests.
+          Define leave types and calendar-day entitlements, then submit and review requests.
         </p>
       </header>
 

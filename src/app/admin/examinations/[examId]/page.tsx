@@ -282,7 +282,7 @@ export default async function ExaminationDetailPage({
       {canReview && exam.status === "open" && (
         <section id="publication-checklist" className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <h2 className="font-bold text-slate-900">Publication checklist</h2>
-          <p className="mt-1 text-sm text-slate-600">{allSubjects.filter((subject) => subject.status === "approved").length} of {allSubjects.length} assessments approved. Assigned class teachers review their class; users with Results publish permission publish results after every subject is approved and complete.</p>
+          <p className="mt-1 text-sm text-slate-600">{allSubjects.filter((subject) => subject.status === "approved").length} of {allSubjects.length} assessments approved. Class teachers review; Results publishers publish when all subjects are approved and complete.</p>
         </section>
       )}
 

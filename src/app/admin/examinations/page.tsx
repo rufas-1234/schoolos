@@ -691,8 +691,8 @@ export default async function ExaminationsPage({
         <section className="space-y-4">
           <div>
             <h2 className="text-xl font-bold text-slate-950">Marks register</h2>
-            <p className="mt-1 text-sm text-slate-500">Filter by branch, exam, class, section, and subject, then open a subject roster for bulk component entry or review.</p>
-            {!isManager && <p className="mt-1 text-sm text-violet-700">Only subjects assigned to you are shown. Ask a school administrator for Examinations setup or Results publish access if your role requires broader exam visibility.</p>}
+            <p className="mt-1 text-sm text-slate-500">Filter by branch, exam, class, section, or subject; open a roster to enter or review marks.</p>
+            {!isManager && <p className="mt-1 text-sm text-violet-700">Only assigned subjects are shown. Ask an administrator for exam setup or Results publish access to see more.</p>}
           </div>
           {assessmentFilterForm("marks")}
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
@@ -714,7 +714,7 @@ export default async function ExaminationsPage({
           <CreateGradingScaleForm />
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 className="text-lg font-bold text-slate-900">Grading rules</h2>
-            <p className="mt-1 text-sm text-slate-600">A Single Exam has one mark component; Multi Exam adds all component marks and maximums to produce each subject total. Subject percentage = total marks ÷ total maximum × 100. Overall percentage is the weighted mean of each subject percentage using the subject assessment weights. Grades use inclusive lower bounds, with the top band including 100%. Class rank uses competition ranking (tied ranks share a position, the next rank skips).</p>
+            <p className="mt-1 text-sm text-slate-600">Single uses one component; Multi sums them. Overall results use subject weights; grades and ranks follow school rules.</p>
           </div>
           <h2 className="text-xl font-bold text-slate-950">Configured grading scales</h2>
           <div className="grid gap-4 md:grid-cols-2">
@@ -780,8 +780,8 @@ export default async function ExaminationsPage({
       {section === "sms" && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
           <h2 className="text-xl font-bold text-amber-950">Send marks by SMS</h2>
-          <p className="mt-2 text-sm text-amber-900">SMS sending is not enabled. SchoolOS has no configured SMS gateway or delivery provider, so it will not send messages or expose student contact details on this page.</p>
-          <p className="mt-2 text-sm text-amber-900">Once a school-approved provider is configured, this section should support a recipient preview, published-results-only selection, explicit confirmation, delivery tracking, and opt-out handling.</p>
+          <p className="mt-2 text-sm text-amber-900">SMS is disabled until a gateway is configured. No messages are sent or student contacts shown.</p>
+          <p className="mt-2 text-sm text-amber-900">SMS delivery features require a school-approved provider.</p>
         </section>
       )}
     </main>

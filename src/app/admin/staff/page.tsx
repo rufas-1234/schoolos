@@ -372,7 +372,7 @@ export default async function StaffDirectoryPage({
         <div className="print:hidden flex gap-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
           <BriefcaseBusiness size={18} className="mt-0.5 shrink-0 text-violet-700" />
           <p className="text-sm leading-6 text-slate-600">
-            Enable login access in a staff profile to reuse an account with the staff email or create a new password account. Assign the Teacher role and its permissions under User Roles before the teacher signs in.
+            Enable login by profile email or create a password account. Assign teachers the Teacher role and teaching assignments.
           </p>
         </div>
       </div>

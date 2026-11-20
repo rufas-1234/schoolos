@@ -209,7 +209,7 @@ export function StaffForm({
               <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-900">A staff login is created automatically</p>
                 <p className="mt-1 leading-6">
-                  The staff number is the username. If it is blank, a staff number is generated. The initial password is Staff@ followed by that number and 1; staff can change it under Account security.
+                  Username: staff number (generated if blank). Initial password: Staff@ + number + 1. Change it in Account security.
                 </p>
               </div>
             ) : (

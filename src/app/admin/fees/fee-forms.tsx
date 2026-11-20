@@ -368,7 +368,7 @@ export function GenerateInvoicesForm({
         placeholder="Search a student or leave blank for the whole class..."
       />
       <p className="text-xs leading-5 text-slate-500">
-        Choose a student to generate only their invoice, or leave blank to generate invoices for all eligible students in the matching class and academic year. Existing invoices are left unchanged.
+        Select one student or leave blank for all eligible students in this class and year. Existing invoices stay unchanged.
       </p>
     </ActionForm>
   );
@@ -427,7 +427,7 @@ export function RecordFeeAdvanceCreditForm({
   return (
     <ActionForm action={recordFeeAdvanceCredit} title="Record advance fee payment" submitLabel="Record advance payment">
       <p className="text-sm text-slate-600">
-        Record money received for a student&apos;s future fees. The credit stays on the student&apos;s account until it is applied to an invoice.
+        Record an advance payment for future fees; the credit stays on the account until applied.
       </p>
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <SelectField label="Student" name="studentId" options={students} />
@@ -586,7 +586,7 @@ export function EditFeeInvoiceForm({
         ]} defaultValue={invoice.fineType} />
       </div>
       <Field label="Fine value" name="fineValue" type="number" defaultValue={invoice.fineValue} />
-      <p className="text-xs text-slate-500">The invoice item identity and generated number are retained. If a payment exists, only its due date may be changed without first recording a reversal or refund.</p>
+      <p className="text-xs text-slate-500">Item and invoice number stay fixed. If paid, change only the due date unless you record a reversal or refund.</p>
     </ActionForm>
   );
 }

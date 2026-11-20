@@ -591,7 +591,7 @@ export default async function FeeReportsPage({
             {requestedFeeTypeId ? ` · ${feeTypesList.find((feeType) => feeType.id === requestedFeeTypeId)?.name ?? "Selected fee type"}` : ""}
             {requestedStatus ? ` · ${requestedStatus === "paid" ? "Fully paid" : requestedStatus === "partial" ? "Partially paid" : "Unpaid"} invoices` : ""}
           </p>
-          <p className="text-xs">Invoice reports include invoices issued or due during this period. Payment and reversal reports use their transaction dates.</p>
+          <p className="text-xs">Invoice reports use issue or due dates; payments and reversals use transaction dates.</p>
         </header>
 
         <section className="grid gap-4 sm:grid-cols-3 print:grid-cols-3">

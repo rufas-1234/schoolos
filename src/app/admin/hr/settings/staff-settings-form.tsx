@@ -36,7 +36,7 @@ export function StaffSettingsForm({
       </header>
       <form action={formAction} className="space-y-5">
         <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-600">Branch, first name, last name, designation, department, and employment type remain visible and required for every staff record.</p>
+          <p className="text-sm text-slate-600">Branch, name, designation, department, and employment type are always required.</p>
           <label className="block space-y-1.5 text-sm font-medium text-slate-700">
             Find a field
             <input

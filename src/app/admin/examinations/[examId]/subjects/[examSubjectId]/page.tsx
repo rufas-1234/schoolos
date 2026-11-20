@@ -394,7 +394,7 @@ export default async function SubjectMarksPage({
       {specialStatusRows.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="font-bold text-amber-950">No-score statuses</h2>
-          <p className="mt-1 text-sm text-amber-900">X is recorded as Cambridge-style “No result”; Y is a school-defined irregularity code and is not an official Cambridge grade. Neither code receives a numeric mark or grade.</p>
+          <p className="mt-1 text-sm text-amber-900">X = Cambridge “No result”; Y = school-defined irregularity. Neither receives a mark or grade.</p>
           <ul className="mt-3 space-y-2 text-sm text-amber-950">
             {specialStatusRows.map((row) => (
               <li key={`${row.status}-${row.name}-${row.lastName}-${row.admissionNumber}`} className="rounded-lg border border-amber-200 bg-white p-3">
@@ -409,7 +409,7 @@ export default async function SubjectMarksPage({
       {subject.examStatus === "open" && subject.status === "draft" && canEnterMarks && roster.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-bold text-slate-900">Submit for approval</h2>
-          <p className="mt-1 text-sm text-slate-600">Submit a complete marks roster for review. Attendance is recorded separately and does not determine who appears on this marks sheet. After submission, you cannot edit marks unless a reviewer returns the assessment for correction. Published results cannot be changed through a teacher correction request.</p>
+          <p className="mt-1 text-sm text-slate-600">Submit complete marks for review. Attendance is separate. Edit only if returned; published results stay locked.</p>
           <SubmitSubjectForm examSubjectId={subject.id} />
         </section>
       )}

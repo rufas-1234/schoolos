@@ -639,7 +639,7 @@ export default async function TeacherPortalPage({
           <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
             <h2 className="font-semibold">Teacher profile not linked</h2>
             <p className="mt-1">
-              Ask a school administrator to link your login account to an active staff and teacher record before using teaching assignments.
+              Ask an admin to link your login to an active teacher profile.
             </p>
           </section>
         ) : (
