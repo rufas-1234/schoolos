@@ -32,15 +32,16 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { canViewExamSubject } from "@/lib/examination-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 import {
+  canViewExamSubject,
   calculateWeightedAverage,
   examAssessmentResultState,
   gradeForPercentage,
   hasCompleteExamResult,
   rankScores,
+  sortExamResultsByRank,
   type GradeBand,
 } from "@/lib/examination-policy";
 import {
@@ -735,6 +736,9 @@ export default async function ExaminationReportPage({
   const ranking = examDetails?.allowRanking
     ? rankScores(results.flatMap((row) => row.overall ? [{ id: row.enrollmentId, score: row.overall.percentage }] : []))
     : new Map<number, number>();
+  const orderedResults = sortExamResultsByRank(results, ranking);
+  const meritResults = orderedResults.filter((row) => row.complete);
+  if (!examDetails?.allowRanking) meritResults.sort((first, second) => first.name.localeCompare(second.name));
   const activeResult = results.find((row) => row.enrollmentId === requestedEnrollmentId) ?? null;
   const reportIsReady = !!examDetails && examDetails.status === "published";
   const canPrintBulkCards = isProgressCard;
@@ -971,13 +975,21 @@ export default async function ExaminationReportPage({
                   <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${examDetails.name} · Merit List`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.yearName} · ${results.filter((row) => row.complete).length} complete results`} />
                   {!examDetails.allowRanking && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Ranking is disabled for this grading scale. Students are listed alphabetically.</p>}
                   <table className="print-report-table w-full border-collapse text-left text-sm">
-                    <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Total</th><th>Average</th><th>Grade</th><th>Comments</th></tr></thead>
-                    <tbody>{[...results].filter((row) => row.complete).sort((a, b) => examDetails.allowRanking ? (ranking.get(a.enrollmentId) ?? 99999) - (ranking.get(b.enrollmentId) ?? 99999) : a.name.localeCompare(b.name)).map((row) => (
+                    <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th><th>Comments</th></tr></thead>
+                    <tbody>{meritResults.map((row) => (
                       <tr key={row.enrollmentId}>
                         <td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td>
                         <td>{row.name}</td>
                         <td>{row.sectionName}</td>
                         <td>{row.admissionNumber ?? "—"}</td>
+                        {assessments.map((item) => {
+                          const mark = row.marks.get(item.id);
+                          const state = row.assessmentStates.get(item.id);
+                          const label = state === "scored" && typeof mark === "number"
+                            ? `${formatMarks(mark)} / ${item.maxMarks}`
+                            : assessmentStatusLabel(row.attendanceStatuses.get(item.id), state);
+                          return <td key={item.id}>{label}</td>;
+                        })}
                         <td>{row.overall?.totalMarks.toFixed(2)} / {row.overall?.maxMarks.toFixed(2)}</td>
                         <td>{row.overall?.percentage.toFixed(2)}%</td>
                         <td>{row.grade?.grade ?? "—"} {row.grade?.description}</td>
@@ -1056,7 +1068,7 @@ export default async function ExaminationReportPage({
                   <div className="overflow-x-auto">
                     <table className="print-report-table w-full border-collapse text-left text-xs">
                       <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th></tr></thead>
-                      <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => {
+                      <tbody>{orderedResults.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => {
                         const mark = row.marks.get(item.id);
                         const state = row.assessmentStates.get(item.id);
                         const label = state === "scored" && typeof mark === "number"

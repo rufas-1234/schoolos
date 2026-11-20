@@ -55,7 +55,6 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
-  { href: "/portal/teacher", label: "Teacher Portal", icon: GraduationCap, permission: "results.enter" },
   {
     href: "/admin/academics",
     label: "Academics",

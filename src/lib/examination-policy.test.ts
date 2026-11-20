@@ -18,6 +18,7 @@ import {
   parseExamComponents,
   parseExamMarkEntry,
   rankScores,
+  sortExamResultsByRank,
   validateGradeBands,
   type GradeBand,
 } from "./examination-policy";
@@ -248,5 +249,19 @@ describe("examination policy", () => {
   it("uses competition ranking for tied scores", () => {
     expect([...rankScores([{ id: 2, score: 90 }, { id: 1, score: 90 }, { id: 3, score: 80 }]).values()])
       .toEqual([1, 1, 3]);
+  });
+
+  it("orders ranked results first, keeps tied ranks stable, and puts unranked results last", () => {
+    const results = [
+      { enrollmentId: 30, student: "Unranked" },
+      { enrollmentId: 20, student: "Tied second" },
+      { enrollmentId: 10, student: "First" },
+      { enrollmentId: 21, student: "Tied third" },
+    ];
+    expect(sortExamResultsByRank(results, new Map([
+      [10, 1],
+      [20, 2],
+      [21, 2],
+    ])).map((result) => result.enrollmentId)).toEqual([10, 20, 21, 30]);
   });
 });

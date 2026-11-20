@@ -305,3 +305,16 @@ export function rankScores(scores: Array<{ id: number; score: number }>): Map<nu
   });
   return ranks;
 }
+
+export function sortExamResultsByRank<T extends { enrollmentId: number }>(
+  results: T[],
+  ranks: ReadonlyMap<number, number>,
+): T[] {
+  return [...results].sort((first, second) => {
+    const firstRank = ranks.get(first.enrollmentId);
+    const secondRank = ranks.get(second.enrollmentId);
+    if (firstRank === undefined) return secondRank === undefined ? 0 : 1;
+    if (secondRank === undefined) return -1;
+    return firstRank - secondRank;
+  });
+}
