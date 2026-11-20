@@ -8,6 +8,7 @@ import {
   rolePermissions,
   roles,
   schoolBranches,
+  schoolCurrencies,
   schoolMemberships,
   schools,
   userRoles,
@@ -45,6 +46,14 @@ export async function provisionSchoolWorkspace(
   const [school] = await tx.select({ id: schools.id }).from(schools)
     .where(eq(schools.publicId, schoolPublicId)).limit(1);
   if (!school) throw new Error("The new school record could not be loaded.");
+  await tx.insert(schoolCurrencies).values({
+    publicId: randomUUID(),
+    schoolId: school.id,
+    code: "USD",
+    name: "US Dollar",
+    symbol: "$",
+    isDefault: true,
+  });
 
   await tx.insert(schoolBranches).values({
     publicId: randomUUID(),

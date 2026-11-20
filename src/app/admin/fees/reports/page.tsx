@@ -16,6 +16,7 @@ import {
   feeStructures,
   feeTypes,
   schools,
+  schoolCurrencies,
   schoolBranches,
   studentEnrollments,
   studentFeeInvoices,
@@ -40,6 +41,7 @@ type SearchParams = {
   sectionId?: string | string[];
   feeTypeId?: string | string[];
   status?: string | string[];
+  currency?: string | string[];
   paymentsPage?: string | string[];
   reversalsPage?: string | string[];
   invoicesPage?: string | string[];
@@ -120,6 +122,20 @@ export default async function FeeReportsPage({
       .where(eq(feeTypes.schoolId, context.schoolId))
       .orderBy(asc(feeTypes.name)),
   ]);
+  const currencyRows = await db.select({
+    code: schoolCurrencies.code,
+    name: schoolCurrencies.name,
+    symbol: schoolCurrencies.symbol,
+  }).from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId));
+  const defaultCurrency = school?.currency ?? "";
+  const requestedCurrency = typeof params.currency === "string" ? params.currency : "";
+  const currency = currencyRows.some((item) => item.code === requestedCurrency)
+    ? requestedCurrency
+    : defaultCurrency;
+  const currencyOptions: SearchableSelectOption[] = currencyRows.map((item) => ({
+    value: item.code,
+    label: `${item.code} · ${item.name} (${item.symbol})`,
+  }));
   const today = todayInTimezone(school?.timezone ?? "UTC");
   const { from, to } = resolveFeeReportDateRange(
     typeof params.from === "string" ? params.from : undefined,
@@ -188,6 +204,7 @@ export default async function FeeReportsPage({
       sectionName: classSections.name,
       yearName: academicYears.name,
       feeTypeName: feeTypes.name,
+      currency: studentFeeInvoices.currency,
     })
       .from(feePayments)
       .innerJoin(studentFeeInvoices, and(
@@ -228,6 +245,7 @@ export default async function FeeReportsPage({
       ))
       .where(and(
         eq(feePayments.schoolId, context.schoolId),
+        eq(studentFeeInvoices.currency, currency),
         gte(feePayments.paidAt, dateRange.start),
         lt(feePayments.paidAt, dateRange.endExclusive),
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
@@ -240,6 +258,7 @@ export default async function FeeReportsPage({
       .offset((paymentPage - 1) * pageSize),
     db.select({
       id: studentFeeInvoices.id,
+      currency: studentFeeInvoices.currency,
       feeTypeId: feeTypes.id,
       amount: studentFeeInvoices.amount,
       discountAmount: studentFeeInvoices.discountAmount,
@@ -286,6 +305,7 @@ export default async function FeeReportsPage({
       ))
       .where(and(
         eq(studentFeeInvoices.schoolId, context.schoolId),
+        eq(studentFeeInvoices.currency, currency),
         or(
           and(
             gte(studentFeeInvoices.dueDate, from),
@@ -338,6 +358,7 @@ export default async function FeeReportsPage({
       ))
       .where(and(
         eq(feePayments.schoolId, context.schoolId),
+        eq(studentFeeInvoices.currency, currency),
         gte(feePayments.paidAt, dateRange.start),
         lt(feePayments.paidAt, dateRange.endExclusive),
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
@@ -361,6 +382,7 @@ export default async function FeeReportsPage({
       branchName: schoolBranches.name,
       className: classLevels.name,
       sectionName: classSections.name,
+      currency: studentFeeInvoices.currency,
     })
       .from(feePaymentReversals)
       .innerJoin(feePayments, and(
@@ -401,6 +423,7 @@ export default async function FeeReportsPage({
       ))
       .where(and(
         eq(feePaymentReversals.schoolId, context.schoolId),
+        eq(studentFeeInvoices.currency, currency),
         gte(feePaymentReversals.createdAt, dateRange.start),
         lt(feePaymentReversals.createdAt, dateRange.endExclusive),
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
@@ -451,6 +474,7 @@ export default async function FeeReportsPage({
       ))
       .where(and(
         eq(feePaymentReversals.schoolId, context.schoolId),
+        eq(studentFeeInvoices.currency, currency),
         gte(feePaymentReversals.createdAt, dateRange.start),
         lt(feePaymentReversals.createdAt, dateRange.endExclusive),
         ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
@@ -539,6 +563,7 @@ export default async function FeeReportsPage({
       ...(requestedSection ? { sectionId: String(requestedSection) } : {}),
       ...(requestedFeeTypeId ? { feeTypeId: String(requestedFeeTypeId) } : {}),
       ...(requestedStatus ? { status: requestedStatus } : {}),
+      currency,
       pageSize: String(pageSize),
       [parameter]: String(page),
     });
@@ -551,7 +576,6 @@ export default async function FeeReportsPage({
     (parseMoneyToMinorUnits(paymentTotals?.fineAmount ?? "0") ?? 0) -
     (parseMoneyToMinorUnits(reversalTotals?.fineAmount ?? "0") ?? 0);
   const totalOutstanding = outstandingInvoices.reduce((total, item) => total + item.balance, 0);
-  const currency = school?.currency ?? "";
 
   return (
     <div className="space-y-6 print-report-page">
@@ -572,11 +596,13 @@ export default async function FeeReportsPage({
         sections={sectionOptions}
         feeTypes={feeTypeOptions}
         statuses={statusOptions}
+        currencies={currencyOptions}
         selectedBranch={requestedBranch === null ? "" : String(requestedBranch)}
         selectedClass={requestedClass === null ? "" : String(requestedClass)}
         selectedSection={requestedSection === null ? "" : String(requestedSection)}
         selectedFeeType={requestedFeeTypeId === null ? "" : String(requestedFeeTypeId)}
         selectedStatus={requestedStatus}
+        selectedCurrency={currency}
       />
 
       <section id="fee-report-content" className="print-report-content space-y-6">
@@ -590,6 +616,7 @@ export default async function FeeReportsPage({
             {requestedSection ? ` · ${sections.find((section) => section.id === requestedSection)?.name ?? "Selected section"}` : ""}
             {requestedFeeTypeId ? ` · ${feeTypesList.find((feeType) => feeType.id === requestedFeeTypeId)?.name ?? "Selected fee type"}` : ""}
             {requestedStatus ? ` · ${requestedStatus === "paid" ? "Fully paid" : requestedStatus === "partial" ? "Partially paid" : "Unpaid"} invoices` : ""}
+            {` · ${currency}`}
           </p>
           <p className="text-xs">Invoice reports use issue or due dates; payments and reversals use transaction dates.</p>
         </header>
@@ -618,9 +645,9 @@ export default async function FeeReportsPage({
               <td className="px-4 py-3">{payment.feeTypeName}</td>
               <td className="px-4 py-3">{formatFeeReportDate(payment.paidAt, school?.timezone ?? "UTC")}</td>
               <td className="px-4 py-3 capitalize">{payment.paymentMethod.replace("_", " ")}</td>
-              <td className="px-4 py-3">{currency} {payment.amount}</td>
-              <td className="px-4 py-3">{currency} {payment.reversedAmount}</td>
-              <td className="px-4 py-3">{currency} {payment.fineAmount}</td>
+              <td className="px-4 py-3">{payment.currency} {payment.amount}</td>
+              <td className="px-4 py-3">{payment.currency} {payment.reversedAmount}</td>
+              <td className="px-4 py-3">{payment.currency} {payment.fineAmount}</td>
               <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${payment.publicId}`}>{payment.receiptNumber}</Link></td>
             </tr>
           ))}
@@ -643,7 +670,7 @@ export default async function FeeReportsPage({
               <td className="px-4 py-3">{reversal.branchName} / {reversal.className} / {reversal.sectionName}</td>
               <td className="px-4 py-3">{formatFeeReportDate(reversal.createdAt, school?.timezone ?? "UTC")}</td>
               <td className="px-4 py-3 capitalize">{reversal.reversalType}</td>
-              <td className="px-4 py-3">{currency} {reversal.amount}</td>
+              <td className="px-4 py-3">{reversal.currency} {reversal.amount}</td>
               <td className="px-4 py-3">{reversal.reason}{reversal.reference ? ` · Ref ${reversal.reference}` : ""}</td>
               <td className="px-4 py-3"><Link className="font-semibold text-violet-700 hover:text-violet-900" href={`/admin/fees/receipt/${reversal.paymentPublicId}`}>{reversal.receiptNumber}</Link></td>
             </tr>
@@ -688,8 +715,8 @@ export default async function FeeReportsPage({
               <td className="px-4 py-3">{invoice.branchName} / {invoice.className} / {invoice.sectionName}</td>
               <td className="px-4 py-3">{invoice.feeTypeName}</td>
               <td className="px-4 py-3">{invoice.dueDate}</td>
-              <td className="px-4 py-3">{currency} {money(invoice.paid)}</td>
-              <td className="px-4 py-3 font-semibold">{currency} {money(invoice.balance)}</td>
+              <td className="px-4 py-3">{invoice.currency} {money(invoice.paid)}</td>
+              <td className="px-4 py-3 font-semibold">{invoice.currency} {money(invoice.balance)}</td>
               <td className="px-4 py-3 capitalize">{invoice.status}</td>
             </tr>
           ))}

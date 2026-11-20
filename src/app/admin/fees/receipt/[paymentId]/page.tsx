@@ -50,7 +50,7 @@ export default async function FeeReceiptPage({
     sectionName: classSections.name,
     groupName: feeGroups.name,
     feeTypeName: feeTypes.name,
-    currency: schools.currency,
+    currency: studentFeeInvoices.currency,
     schoolName: schools.name,
   })
     .from(feePayments)

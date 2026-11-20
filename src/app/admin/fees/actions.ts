@@ -18,6 +18,7 @@ import {
   feePaymentReversals,
   feeStructures,
   feeTypes,
+  schoolCurrencies,
   schools,
   schoolBranches,
   studentEnrollments,
@@ -46,6 +47,7 @@ const optionalText = z.string().trim().max(500).transform((value) => value || nu
 const optionalDescription = z.string().trim().max(1000).transform((value) => value || null);
 const amountField = z.string().refine((value) => parseMoneyToMinorUnits(value) !== null);
 const dateField = z.string().refine(isCalendarDate);
+const currencyField = z.string().regex(/^[A-Z]{3}$/);
 const groupSchema = z.object({ name: nameField, description: optionalDescription });
 const typeSchema = z.object({
   feeGroupId: idField,
@@ -58,6 +60,7 @@ const discountSchema = z.object({
   description: optionalDescription,
   discountType: z.enum(["fixed", "percentage"]),
   value: z.string().regex(/^\d{1,8}(\.\d{1,2})?$/),
+  currency: currencyField,
   frequency: z.enum(["one_time", "yearly"]),
 });
 const studentDiscountSchema = z.object({
@@ -75,6 +78,7 @@ const structureSchema = z.object({
   feeGroupId: idField,
   feeTypeId: idField,
   amount: amountField,
+  currency: currencyField,
   dueDate: dateField,
   fineType: z.enum(["none", "fixed", "percentage"]),
   fineValue: z.string().regex(/^\d{1,8}(\.\d{1,2})?$/),
@@ -90,6 +94,7 @@ const paymentSchema = z.object({
 const advanceCreditSchema = z.object({
   idempotencyKey: z.string().uuid(),
   studentId: idField,
+  currency: currencyField,
   amount: amountField,
   paymentMethod: z.enum(feePaymentMethods),
   reference: z.string().trim().max(120).transform((value) => value || null),
@@ -102,6 +107,7 @@ const applyAdvanceCreditSchema = z.object({
 });
 const bulkPaymentSchema = z.object({
   search: z.string().trim().max(100),
+  currency: currencyField,
   status: z.enum(["", "unpaid", "partial", "paid"]),
   branchId: z.union([z.literal(""), idField]),
   classLevelId: z.union([z.literal(""), idField]),
@@ -382,6 +388,7 @@ export async function createFeeDiscount(
     description: value(formData, "description"),
     discountType: value(formData, "discountType"),
     value: value(formData, "value"),
+    currency: value(formData, "currency"),
     frequency: value(formData, "frequency"),
   });
   const discountMinor = result.success ? parseMoneyToMinorUnits(result.data.value) : null;
@@ -389,6 +396,12 @@ export async function createFeeDiscount(
     (result.data.discountType === "percentage" && discountMinor > 10000)) {
     return { error: "Enter a valid discount; percentage discounts cannot exceed 100%." };
   }
+  const [configuredCurrency] = await db.select({ code: schoolCurrencies.code }).from(schoolCurrencies)
+    .where(and(
+      eq(schoolCurrencies.schoolId, context.schoolId),
+      eq(schoolCurrencies.code, result.data.currency),
+    )).limit(1);
+  if (!configuredCurrency) return { error: "Choose a currency configured for this school." };
   const publicId = randomUUID();
   try {
     const updated = await db.transaction(async (tx) => {
@@ -398,6 +411,7 @@ export async function createFeeDiscount(
         description: result.data.description,
         discountType: result.data.discountType,
         value: result.data.value,
+        currency: result.data.currency,
         frequency: result.data.frequency,
       };
       if (recordId !== null) {
@@ -408,11 +422,11 @@ export async function createFeeDiscount(
         await tx.update(feeDiscounts).set(values)
           .where(and(eq(feeDiscounts.id, recordId), eq(feeDiscounts.schoolId, context.schoolId)));
         await writeAudit(tx, context.schoolId, context.user.id, "fee_discount.updated", "fee_discount", record.publicId,
-          ["name", "code", "description", "discountType", "value", "frequency"]);
+          ["name", "code", "description", "discountType", "value", "currency", "frequency"]);
       } else {
         await tx.insert(feeDiscounts).values({ publicId, schoolId: context.schoolId, ...values });
         await writeAudit(tx, context.schoolId, context.user.id, "fee_discount.created", "fee_discount", publicId,
-          ["name", "code", "description", "discountType", "value", "frequency"]);
+          ["name", "code", "description", "discountType", "value", "currency", "frequency"]);
       }
       return true;
     });
@@ -493,6 +507,7 @@ export async function createFeeStructure(
     feeGroupId: value(formData, "feeGroupId"),
     feeTypeId: value(formData, "feeTypeId"),
     amount: value(formData, "amount"),
+    currency: value(formData, "currency"),
     dueDate: value(formData, "dueDate"),
     fineType: value(formData, "fineType"),
     fineValue: value(formData, "fineValue") || "0",
@@ -503,6 +518,12 @@ export async function createFeeStructure(
       (result.data.fineType === "none" && parseMoneyToMinorUnits(result.data.fineValue) !== 0)) {
     return { error: "Enter a positive fee amount, valid due date, and valid fine settings." };
   }
+  const [configuredCurrency] = await db.select({ code: schoolCurrencies.code }).from(schoolCurrencies)
+    .where(and(
+      eq(schoolCurrencies.schoolId, context.schoolId),
+      eq(schoolCurrencies.code, result.data.currency),
+    )).limit(1);
+  if (!configuredCurrency) return { error: "Choose a currency configured for this school." };
 
   const [branch] = await db.select({ id: schoolBranches.id }).from(schoolBranches)
     .where(and(eq(schoolBranches.id, result.data.branchId), eq(schoolBranches.schoolId, context.schoolId), eq(schoolBranches.status, "active")))
@@ -592,6 +613,7 @@ export async function createFeeStructure(
         feeGroupId: group.id,
         feeTypeId: type.id,
         amount: result.data.amount, dueDate: result.data.dueDate,
+        currency: result.data.currency,
         fineType: result.data.fineType, fineValue: result.data.fineValue,
       };
       const [classLock] = await tx.select({ id: classLevels.id }).from(classLevels)
@@ -630,17 +652,18 @@ export async function createFeeStructure(
           record.classLevelId !== values.classLevelId ||
           record.studentId !== values.studentId ||
           record.feeGroupId !== values.feeGroupId ||
-          record.feeTypeId !== values.feeTypeId
+          record.feeTypeId !== values.feeTypeId ||
+          record.currency !== values.currency
         )) return "linked-invoices";
         await tx.update(feeStructures).set(values)
           .where(and(eq(feeStructures.id, record.id), eq(feeStructures.schoolId, context.schoolId)));
         await writeAudit(tx, context.schoolId, context.user.id, "fee_structure.updated", "fee_structure", record.publicId,
-          ["branchId", "academicYearId", "academicTermId", "classLevelId", "studentId", "feeGroupId", "feeTypeId", "amount", "dueDate", "fineType", "fineValue"]);
+          ["branchId", "academicYearId", "academicTermId", "classLevelId", "studentId", "feeGroupId", "feeTypeId", "amount", "currency", "dueDate", "fineType", "fineValue"]);
         return "updated";
       }
       await tx.insert(feeStructures).values({ publicId, schoolId: context.schoolId, ...values });
       await writeAudit(tx, context.schoolId, context.user.id, "fee_structure.created", "fee_structure", publicId,
-        ["branchId", "academicYearId", "academicTermId", "classLevelId", "studentId", "feeGroupId", "feeTypeId", "amount", "dueDate", "fineType", "fineValue"]);
+        ["branchId", "academicYearId", "academicTermId", "classLevelId", "studentId", "feeGroupId", "feeTypeId", "amount", "currency", "dueDate", "fineType", "fineValue"]);
       return "created";
     });
     if (outcome === "not-found") return { error: "Fee structure not found for this school." };
@@ -675,6 +698,7 @@ export async function generateStudentFeeInvoices(
       discountId: studentFeeDiscounts.discountId,
       discountType: feeDiscounts.discountType,
       discountValue: feeDiscounts.value,
+      discountCurrency: feeDiscounts.currency,
       discountFrequency: feeDiscounts.frequency,
     })
       .from(studentEnrollments)
@@ -711,6 +735,13 @@ export async function generateStudentFeeInvoices(
       return studentId?.success
         ? { error: "The selected student is not eligible for this fee structure; they must be admitted or active and enrolled in the matching class and year." }
         : { created: 0 };
+    }
+    if (eligible.some((row) =>
+      row.discountType === "fixed" &&
+      row.discountId !== null &&
+      row.discountCurrency !== structure.currency
+    )) {
+      return { error: "A fixed discount uses a different currency from this fee structure. Update the discount before generating invoices." };
     }
     const alreadyInvoiced = await tx.select({ enrollmentId: studentFeeInvoices.enrollmentId })
       .from(studentFeeInvoices)
@@ -782,6 +813,7 @@ export async function generateStudentFeeInvoices(
         studentId: row.studentId,
         enrollmentId: row.enrollmentId,
         feeStructureId: structure.id,
+        currency: structure.currency,
         discountId: appliesDiscount ? row.discountId : null,
         amount: (amountMinor / 100).toFixed(2),
         discountAmount: (discountAmount / 100).toFixed(2),
@@ -933,6 +965,7 @@ export async function recordFeeAdvanceCredit(
   const result = advanceCreditSchema.safeParse({
     idempotencyKey: value(formData, "idempotencyKey"),
     studentId: value(formData, "studentId"),
+    currency: value(formData, "currency"),
     amount: value(formData, "amount"),
     paymentMethod: value(formData, "paymentMethod"),
     reference: value(formData, "reference"),
@@ -942,6 +975,12 @@ export async function recordFeeAdvanceCredit(
   if (!result.success || amountMinor === null || amountMinor <= 0) {
     return { error: "Enter a valid positive advance amount and payment method." };
   }
+  const [configuredCurrency] = await db.select({ code: schoolCurrencies.code }).from(schoolCurrencies)
+    .where(and(
+      eq(schoolCurrencies.schoolId, context.schoolId),
+      eq(schoolCurrencies.code, result.data.currency),
+    )).limit(1);
+  if (!configuredCurrency) return { error: "Choose a currency configured for this school." };
 
   const transactionPublicId = randomUUID();
   const receiptNumber = `ADV-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
@@ -958,6 +997,7 @@ export async function recordFeeAdvanceCredit(
       receiptNumber: feeAdvanceTransactions.receiptNumber,
       transactionType: feeAdvanceTransactions.transactionType,
       studentId: feeAdvanceTransactions.studentId,
+      currency: feeAdvanceTransactions.currency,
       amount: feeAdvanceTransactions.amount,
       paymentMethod: feeAdvanceTransactions.paymentMethod,
       reference: feeAdvanceTransactions.reference,
@@ -968,6 +1008,7 @@ export async function recordFeeAdvanceCredit(
     )).limit(1);
     if (duplicate) {
       if (duplicate.transactionType !== "received" || duplicate.studentId !== result.data.studentId ||
+        duplicate.currency !== result.data.currency ||
         parseMoneyToMinorUnits(duplicate.amount) !== amountMinor ||
         duplicate.paymentMethod !== result.data.paymentMethod ||
         duplicate.reference !== result.data.reference || duplicate.notes !== result.data.notes ||
@@ -993,6 +1034,7 @@ export async function recordFeeAdvanceCredit(
       publicId: transactionPublicId,
       schoolId: context.schoolId,
       studentId: student.id,
+      currency: result.data.currency,
       transactionType: "received",
       amount: result.data.amount,
       receiptNumber,
@@ -1072,6 +1114,7 @@ export async function applyFeeAdvanceCredit(
     `) }).from(feeAdvanceTransactions).where(and(
       eq(feeAdvanceTransactions.schoolId, context.schoolId),
       eq(feeAdvanceTransactions.studentId, student.id),
+      eq(feeAdvanceTransactions.currency, invoice.currency),
     ));
     const availableCreditMinor = parseMoneyToMinorUnits(creditTotal?.balance ?? "0");
     if (availableCreditMinor === null) throw new Error("Stored advance credit balance is invalid.");
@@ -1146,6 +1189,7 @@ export async function applyFeeAdvanceCredit(
       studentId: student.id,
       invoiceId: invoice.id,
       paymentId: payment.id,
+      currency: invoice.currency,
       transactionType: "applied",
       amount: appliedAmount,
       idempotencyKey: result.data.idempotencyKey,
@@ -1294,6 +1338,7 @@ export async function recordBulkFeePayments(
   const context = await requireSchoolPermission(["payments.record", "fees.manage"]);
   const result = bulkPaymentSchema.safeParse({
     search: value(formData, "search"),
+    currency: value(formData, "currency"),
     status: value(formData, "status"),
     branchId: value(formData, "branchId"),
     classLevelId: value(formData, "classLevelId"),
@@ -1304,7 +1349,7 @@ export async function recordBulkFeePayments(
   });
   if (!result.success) return { error: "Review the invoice filters and payment details, then try again." };
 
-  const { search, status, branchId, classLevelId, sectionId } = result.data;
+  const { search, currency, status, branchId, classLevelId, sectionId } = result.data;
   const searchTerm = search.toLocaleLowerCase();
   const today = await db.select({ timezone: schools.timezone })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
@@ -1361,6 +1406,7 @@ export async function recordBulkFeePayments(
       .leftJoin(paymentTotals, eq(paymentTotals.invoiceId, studentFeeInvoices.id))
       .where(and(
         eq(studentFeeInvoices.schoolId, context.schoolId),
+        eq(studentFeeInvoices.currency, currency),
         ...(branchId ? [eq(schoolBranches.id, branchId)] : []),
         ...(classLevelId ? [eq(classLevels.id, classLevelId)] : []),
         ...(sectionId ? [eq(classSections.id, sectionId)] : []),
@@ -1597,6 +1643,7 @@ export async function reverseFeePayment(
           studentId: advanceApplication.studentId,
           invoiceId: advanceApplication.invoiceId,
           paymentId: payment.id,
+          currency: invoice.currency,
           transactionType: "restored",
           amount: (restoreMinor / 100).toFixed(2),
           idempotencyKey: `reversal-${result.data.idempotencyKey}`,

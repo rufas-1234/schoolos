@@ -28,6 +28,7 @@ import {
 
 export type FeeOption = { id: number; label: string };
 type ValueOption = { value: string; label: string };
+export type CurrencyOption = ValueOption;
 type FeeDeleteAction = (
   state: FeeActionState,
   formData: FormData,
@@ -206,8 +207,12 @@ export function FeeTypeForm({
 }
 
 export function FeeDiscountForm({
+  currencies,
+  defaultCurrency,
   record,
 }: {
+  currencies: CurrencyOption[];
+  defaultCurrency: string;
   record?: {
     id: number;
     name: string;
@@ -215,6 +220,7 @@ export function FeeDiscountForm({
     description: string | null;
     discountType: string;
     value: string;
+    currency: string;
     frequency: string;
   };
 }) {
@@ -233,6 +239,8 @@ export function FeeDiscountForm({
         { value: "percentage", label: "Percentage" },
       ]} defaultValue={record?.discountType} />
       <Field label="Value (amount or percent)" name="value" type="number" defaultValue={record?.value} />
+      <ValueSelectField label="Currency for fixed discounts" name="currency" options={currencies}
+        defaultValue={record?.currency ?? defaultCurrency} />
       <ValueSelectField label="Frequency" name="frequency" options={[
         { value: "one_time", label: "One time" },
         { value: "yearly", label: "Yearly" },
@@ -279,6 +287,8 @@ export function FeeStructureForm({
   classes,
   groups,
   types,
+  currencies,
+  defaultCurrency,
   record,
 }: {
   branches: FeeOption[];
@@ -288,6 +298,8 @@ export function FeeStructureForm({
   classes: FeeOption[];
   groups: FeeOption[];
   types: FeeOption[];
+  currencies: CurrencyOption[];
+  defaultCurrency: string;
   record?: {
     id: number;
     branchId: number;
@@ -298,6 +310,7 @@ export function FeeStructureForm({
     feeGroupId: number;
     feeTypeId: number;
     amount: string;
+    currency: string;
     dueDate: string;
     fineType: string;
     fineValue: string;
@@ -338,7 +351,11 @@ export function FeeStructureForm({
       <SelectField label="Fee group" name="feeGroupId" options={groups} defaultValue={record?.feeGroupId} />
       <SelectField label="Fee type" name="feeTypeId" options={types} defaultValue={record?.feeTypeId} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Amount" name="amount" type="number" defaultValue={record?.amount} />
+        <div>
+          <ValueSelectField label="Currency" name="currency" options={currencies}
+            defaultValue={record?.currency ?? defaultCurrency} />
+          <Field label="Amount" name="amount" type="number" defaultValue={record?.amount} />
+        </div>
         <Field label="Due date" name="dueDate" type="date" defaultValue={record?.dueDate} />
       </div>
       <ValueSelectField label="Late fine" name="fineType" options={[
@@ -417,11 +434,13 @@ export function RecordFeePaymentForm({
 
 export function RecordFeeAdvanceCreditForm({
   students,
-  currency,
+  currencies,
+  defaultCurrency,
   idempotencyKey,
 }: {
   students: FeeOption[];
-  currency: string;
+  currencies: CurrencyOption[];
+  defaultCurrency: string;
   idempotencyKey: string;
 }) {
   return (
@@ -431,7 +450,8 @@ export function RecordFeeAdvanceCreditForm({
       </p>
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <SelectField label="Student" name="studentId" options={students} />
-      <Field label={`Amount (${currency})`} name="amount" type="number" placeholder="Enter amount received" />
+      <ValueSelectField label="Currency" name="currency" options={currencies} defaultValue={defaultCurrency} />
+      <Field label="Amount" name="amount" type="number" placeholder="Enter amount received" />
       <ValueSelectField label="Payment method" name="paymentMethod" options={[
         { value: "cash", label: "Cash" },
         { value: "bank_transfer", label: "Bank transfer" },
@@ -507,6 +527,7 @@ export function BulkFeePaymentForm({
       <input type="hidden" name="branchId" value={branchId} />
       <input type="hidden" name="classLevelId" value={classLevelId} />
       <input type="hidden" name="sectionId" value={sectionId} />
+      <input type="hidden" name="currency" value={currency} />
       <div className="grid gap-3 sm:grid-cols-2">
         <ValueSelectField label="Payment method" name="paymentMethod" options={[
           { value: "cash", label: "Cash" },

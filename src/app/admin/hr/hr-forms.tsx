@@ -242,18 +242,21 @@ export function PayrollForm({
   branchId,
   branchName,
   staffOptions,
-  currency,
+  currencies,
+  defaultCurrency,
   payPeriod,
   record,
 }: {
   branchId: number;
   branchName: string;
   staffOptions: Option[];
-  currency: string;
+  currencies: Option[];
+  defaultCurrency: string;
   payPeriod: string;
   record?: {
     publicId: string;
     staffId: number;
+    currency: string;
     baseSalary: string;
     allowances: string;
     deductions: string;
@@ -285,10 +288,19 @@ export function PayrollForm({
         placeholder={staffOptions.length ? "Search staff member..." : "No active staff"}
         disabled={!staffOptions.length}
       />
+      <SearchableSelect
+        label="Currency"
+        name="currency"
+        options={currencies}
+        required
+        defaultValue={record?.currency ?? defaultCurrency}
+        placeholder={currencies.length ? "Search currencies..." : "Configure a currency first"}
+        disabled={!currencies.length}
+      />
       <Field label="Pay period" name="payPeriod" type="month" defaultValue={record?.payPeriod ?? payPeriod} />
-      <Field label={`Base salary (${currency})`} name="baseSalary" type="number" min="0.01" step="0.01" defaultValue={record?.baseSalary} />
-      <Field label={`Allowances (${currency})`} name="allowances" type="number" min="0" step="0.01" defaultValue={record?.allowances ?? "0"} />
-      <Field label={`Deductions (${currency})`} name="deductions" type="number" min="0" step="0.01" defaultValue={record?.deductions ?? "0"} />
+      <Field label="Base salary (selected currency)" name="baseSalary" type="number" min="0.01" step="0.01" defaultValue={record?.baseSalary} />
+      <Field label="Allowances (selected currency)" name="allowances" type="number" min="0" step="0.01" defaultValue={record?.allowances ?? "0"} />
+      <Field label="Deductions (selected currency)" name="deductions" type="number" min="0" step="0.01" defaultValue={record?.deductions ?? "0"} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
         Payment status <RequiredMark />
         <select name="status" required defaultValue={record?.status ?? "recorded"} className={inputClass}>

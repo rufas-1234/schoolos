@@ -12,6 +12,7 @@ import {
   feeGroups,
   feeStructures,
   feeTypes,
+  schoolCurrencies,
   schools,
   schoolBranches,
   studentFeeDiscounts,
@@ -57,6 +58,18 @@ export default async function FeesSetupPage({
     requireSchoolPermission("fees.manage"),
     searchParams,
   ]);
+  const currencyRows = await db.select({
+  code: schoolCurrencies.code,
+  name: schoolCurrencies.name,
+  symbol: schoolCurrencies.symbol,
+  }).from(schoolCurrencies)
+  .where(eq(schoolCurrencies.schoolId, context.schoolId))
+  .orderBy(asc(schoolCurrencies.code));
+  const currencyOptions = currencyRows.map((currency) => ({
+  value: currency.code,
+  label: `${currency.code} · ${currency.name} (${currency.symbol})`,
+  }));
+  const currencyNames = new Map(currencyRows.map((currency) => [currency.code, currency.name]));
   const section = query.section === "structures"
     ? "structure"
     : feesSections.find((candidate) => candidate === query.section) ?? "catalog";
@@ -124,6 +137,7 @@ export default async function FeesSetupPage({
         code: feeDiscounts.code,
         discountType: feeDiscounts.discountType,
         value: feeDiscounts.value,
+        currency: feeDiscounts.currency,
         frequency: feeDiscounts.frequency,
       })
         .from(feeDiscounts)
@@ -181,6 +195,7 @@ export default async function FeesSetupPage({
         groupName: feeGroups.name,
         typeName: feeTypes.name,
         amount: feeStructures.amount,
+        currency: feeStructures.currency,
         dueDate: feeStructures.dueDate,
         termName: academicTerms.name,
         studentName: students.firstName,
@@ -331,7 +346,7 @@ export default async function FeesSetupPage({
       {section === "discounts" && (
         <>
           <section className="grid gap-4 xl:grid-cols-2">
-            <FeeDiscountForm />
+            <FeeDiscountForm currencies={currencyOptions} defaultCurrency={school?.currency ?? "USD"} />
             <StudentFeeDiscountForm
               students={studentsForDiscounts}
               discounts={discountOptions}
@@ -349,7 +364,7 @@ export default async function FeesSetupPage({
             {discountPage.rows.map((discount) => (
               <li key={discount.id} className="flex items-center justify-between gap-2">
                 <span>
-                  {feeDisplayName(discount.name)} · {discount.discountType === "percentage" ? `${discount.value}%` : `${school?.currency ?? ""} ${discount.value}`}
+                  {feeDisplayName(discount.name)} · {discount.discountType === "percentage" ? `${discount.value}%` : `${discount.currency} ${discount.value}`}
                 </span>
                 <div className="flex items-center gap-2">
                   <AdminRecordDialog title={feeDisplayName(discount.name)} mode="view">
@@ -357,11 +372,12 @@ export default async function FeesSetupPage({
                       ["Name", feeDisplayName(discount.name)],
                       ["Code", discount.code],
                       ["Method / value", `${discount.discountType} / ${discount.value}`],
+                      ["Currency", `${discount.currency} · ${currencyNames.get(discount.currency) ?? discount.currency}`],
                       ["Frequency", discount.frequency.replace("_", " ")],
                       ["Description", discount.description || "None"],
                     ]} />
                   </AdminRecordDialog>
-                  <AdminRecordDialog title={`Edit ${feeDisplayName(discount.name)}`}><FeeDiscountForm record={{ ...discount, name: feeDisplayName(discount.name) }} /></AdminRecordDialog>
+                  <AdminRecordDialog title={`Edit ${feeDisplayName(discount.name)}`}><FeeDiscountForm currencies={currencyOptions} defaultCurrency={school?.currency ?? "USD"} record={{ ...discount, name: feeDisplayName(discount.name) }} /></AdminRecordDialog>
                   <DeleteFeeRecordForm recordId={discount.id} recordType="discount" />
                 </div>
               </li>
@@ -425,6 +441,8 @@ export default async function FeesSetupPage({
             classes={classOptions}
             groups={groupOptions}
             types={structureTypeOptions}
+            currencies={currencyOptions}
+            defaultCurrency={school?.currency ?? "USD"}
           />
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5">
@@ -439,7 +457,7 @@ export default async function FeesSetupPage({
                     <p className="font-medium text-slate-900">{structure.branchName} · {structure.className} · {structure.yearName}{structure.termName ? ` · ${structure.termName}` : ""}{structure.studentName ? ` · ${structure.studentName} ${structure.studentLastName}` : ""}</p>
                     <p className="mt-1 text-slate-500">{feeDisplayName(structure.typeName)} · due {structure.dueDate}</p>
                   </div>
-                  <p className="font-semibold text-slate-800">{school?.currency} {structure.amount}</p>
+                  <p className="font-semibold text-slate-800">{structure.currency} {structure.amount}</p>
                   <div className="flex items-center gap-2">
                     <AdminRecordDialog title={`${feeDisplayName(structure.typeName)} fee structure`} mode="view">
                       <RecordDetails entries={[
@@ -448,13 +466,13 @@ export default async function FeesSetupPage({
                         ["Student", structure.studentName ? `${structure.studentName} ${structure.studentLastName}` : "Whole class"],
                         ["Fee type", feeDisplayName(structure.typeName)],
                         ["Fee group", feeDisplayName(structure.groupName)],
-                        ["Amount", `${school?.currency ?? ""} ${structure.amount}`],
+                        ["Amount", `${structure.currency} ${structure.amount}`],
                         ["Due date", structure.dueDate],
                         ["Late fine", `${structure.fineType} · ${structure.fineValue}`],
                       ]} />
                     </AdminRecordDialog>
                     <AdminRecordDialog title={`Edit ${feeDisplayName(structure.typeName)} fee structure`} wide>
-                      <FeeStructureForm branches={branchOptions} years={yearOptions} terms={termOptions} students={studentsForDiscounts} classes={classOptions} groups={groupOptions} types={structureTypeOptions} record={structure} />
+                      <FeeStructureForm branches={branchOptions} years={yearOptions} terms={termOptions} students={studentsForDiscounts} classes={classOptions} groups={groupOptions} types={structureTypeOptions} currencies={currencyOptions} defaultCurrency={school?.currency ?? "USD"} record={structure} />
                     </AdminRecordDialog>
                     <DeleteFeeRecordForm recordId={structure.id} recordType="structure" />
                   </div>

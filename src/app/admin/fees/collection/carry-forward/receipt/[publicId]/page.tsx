@@ -24,7 +24,7 @@ export default async function FeeAdvanceReceiptPage({
     studentName: students.firstName,
     studentLastName: students.lastName,
     admissionNumber: students.admissionNumber,
-    currency: schools.currency,
+    currency: feeAdvanceTransactions.currency,
     schoolName: schools.name,
   }).from(feeAdvanceTransactions)
     .innerJoin(students, and(

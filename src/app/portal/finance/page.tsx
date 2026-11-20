@@ -10,6 +10,7 @@ import {
   chartOfAccounts,
   feePaymentReversals,
   feePayments,
+  schoolCurrencies,
   schools,
   studentFeeInvoices,
 } from "@/db/schema";
@@ -37,7 +38,12 @@ function minorUnits(value: string | null | undefined): bigint {
 }
 
 function currencyAmount(minor: bigint, currency: string): string {
-  return new Intl.NumberFormat("en", { style: "currency", currency })
+  return new Intl.NumberFormat("en", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
     .format(Number(minor) / 100);
 }
 
@@ -55,6 +61,10 @@ export default async function FinancePortalPage() {
     timezone: schools.timezone,
   }).from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   const currency = school?.currency ?? "USD";
+  const configuredCurrencies = await db.select({
+    code: schoolCurrencies.code,
+    name: schoolCurrencies.name,
+  }).from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId));
   const today = dateInTimezone(school?.timezone ?? "UTC");
   const monthStart = `${today.slice(0, 7)}-01`;
   const startAt = new Date(`${monthStart}T00:00:00.000Z`);
@@ -62,26 +72,37 @@ export default async function FinancePortalPage() {
   const schoolId = context.schoolId;
 
   const paymentIncomeQuery = db.select({
+    currency: studentFeeInvoices.currency,
     total: sql<string>`COALESCE(SUM(${feePayments.amount} + ${feePayments.fineAmount}), 0)`,
-  }).from(feePayments).where(and(
+  }).from(feePayments)
+    .innerJoin(studentFeeInvoices, and(
+      eq(studentFeeInvoices.id, feePayments.invoiceId),
+      eq(studentFeeInvoices.schoolId, schoolId),
+    ))
+    .where(and(
     eq(feePayments.schoolId, schoolId),
     gte(feePayments.paidAt, startAt),
     lte(feePayments.paidAt, endAt),
     sql`(${feePayments.notes} IS NULL OR ${feePayments.notes} NOT LIKE 'TEST DATA ONLY -%')`,
-  ));
+  )).groupBy(studentFeeInvoices.currency);
   const reversalIncomeQuery = db.select({
+    currency: studentFeeInvoices.currency,
     total: sql<string>`COALESCE(SUM(${feePaymentReversals.amount} + ${feePaymentReversals.fineAmount}), 0)`,
   }).from(feePaymentReversals)
     .innerJoin(feePayments, and(
       eq(feePayments.id, feePaymentReversals.paymentId),
       eq(feePayments.schoolId, schoolId),
     ))
+    .innerJoin(studentFeeInvoices, and(
+      eq(studentFeeInvoices.id, feePayments.invoiceId),
+      eq(studentFeeInvoices.schoolId, schoolId),
+    ))
     .where(and(
       eq(feePaymentReversals.schoolId, schoolId),
       gte(feePaymentReversals.createdAt, startAt),
       lte(feePaymentReversals.createdAt, endAt),
       sql`(${feePayments.notes} IS NULL OR ${feePayments.notes} NOT LIKE 'TEST DATA ONLY -%')`,
-    ));
+    )).groupBy(studentFeeInvoices.currency);
 
   const paymentTotals = db.select({
     invoiceId: feePayments.invoiceId,
@@ -103,10 +124,11 @@ export default async function FinancePortalPage() {
 
   const [paymentIncome, reversalIncome, invoiceSummary, accountSummary, pendingSummary, recentPayments, recentTransactions] =
     await Promise.all([
-      canManageFees ? paymentIncomeQuery : Promise.resolve([{ total: "0" }]),
-      canManageFees ? reversalIncomeQuery : Promise.resolve([{ total: "0" }]),
+      canManageFees ? paymentIncomeQuery : Promise.resolve([] as Array<{ currency: string; total: string }>),
+      canManageFees ? reversalIncomeQuery : Promise.resolve([] as Array<{ currency: string; total: string }>),
       canManageFees
         ? db.select({
+          currency: studentFeeInvoices.currency,
           count: count(),
           balanceMinor: sql<string>`COALESCE(SUM(${balanceMinor}), 0)`,
         }).from(studentFeeInvoices)
@@ -114,10 +136,11 @@ export default async function FinancePortalPage() {
           .where(and(
             eq(studentFeeInvoices.schoolId, schoolId),
             gt(totalDue, paid),
-          ))
-        : Promise.resolve([{ count: 0, balanceMinor: "0" }]),
+          )).groupBy(studentFeeInvoices.currency)
+        : Promise.resolve([]),
       canManageAccounts
         ? db.select({
+          currency: accountTransactions.currency,
           income: sql<string>`COALESCE(SUM(CASE
             WHEN ${accountTransactions.transactionType} = 'income' AND ${chartOfAccounts.code} <> '4000'
               THEN ${accountTransactions.amount}
@@ -137,8 +160,8 @@ export default async function FinancePortalPage() {
             eq(accountTransactions.status, "approved"),
             gte(accountTransactions.transactionDate, monthStart),
             lte(accountTransactions.transactionDate, today),
-          ))
-        : Promise.resolve([{ income: "0", expenses: "0" }]),
+          )).groupBy(accountTransactions.currency)
+        : Promise.resolve([] as Array<{ currency: string; income: string; expenses: string }>),
       canManageAccounts
         ? db.select({ value: count() }).from(accountTransactions).where(and(
           eq(accountTransactions.schoolId, schoolId),
@@ -151,8 +174,13 @@ export default async function FinancePortalPage() {
           receiptNumber: feePayments.receiptNumber,
           amount: feePayments.amount,
           fineAmount: feePayments.fineAmount,
+          currency: studentFeeInvoices.currency,
           paidAt: feePayments.paidAt,
         }).from(feePayments)
+          .innerJoin(studentFeeInvoices, and(
+            eq(studentFeeInvoices.id, feePayments.invoiceId),
+            eq(studentFeeInvoices.schoolId, schoolId),
+          ))
           .where(and(
             eq(feePayments.schoolId, schoolId),
             sql`(${feePayments.notes} IS NULL OR ${feePayments.notes} NOT LIKE 'TEST DATA ONLY -%')`,
@@ -166,6 +194,7 @@ export default async function FinancePortalPage() {
           transactionType: accountTransactions.transactionType,
           transactionDate: accountTransactions.transactionDate,
           amount: accountTransactions.amount,
+          currency: accountTransactions.currency,
           description: accountTransactions.description,
           status: accountTransactions.status,
           accountName: chartOfAccounts.name,
@@ -180,12 +209,33 @@ export default async function FinancePortalPage() {
         : Promise.resolve([]),
     ]);
 
-  const netFees = minorUnits(paymentIncome[0]?.total) - minorUnits(reversalIncome[0]?.total);
-  const outstandingBalance = BigInt(invoiceSummary[0]?.balanceMinor ?? "0");
-  const outstandingCount = Number(invoiceSummary[0]?.count ?? 0);
-  const otherIncome = minorUnits(accountSummary[0]?.income);
-  const expenses = minorUnits(accountSummary[0]?.expenses);
-  const netSurplus = netFees + otherIncome - expenses;
+  const currencies = new Set([
+    currency,
+    ...configuredCurrencies.map((item) => item.code),
+    ...paymentIncome.map((item) => item.currency),
+    ...invoiceSummary.map((item) => item.currency),
+    ...accountSummary.map((item) => item.currency),
+  ]);
+  const financeSummaries = [...currencies].sort().map((code) => {
+    const netFees = paymentIncome.filter((row) => row.currency === code)
+      .reduce((total, row) => total + minorUnits(row.total), BigInt(0))
+      - reversalIncome.filter((row) => row.currency === code)
+        .reduce((total, row) => total + minorUnits(row.total), BigInt(0));
+    const outstanding = invoiceSummary.find((row) => row.currency === code);
+    const account = accountSummary.find((row) => row.currency === code);
+    const otherIncome = minorUnits(account?.income);
+    const expenses = minorUnits(account?.expenses);
+    return {
+      code,
+      name: configuredCurrencies.find((item) => item.code === code)?.name ?? code,
+      netFees,
+      outstandingBalance: BigInt(outstanding?.balanceMinor ?? "0"),
+      outstandingCount: Number(outstanding?.count ?? 0),
+      otherIncome,
+      expenses,
+      netSurplus: netFees + otherIncome - expenses,
+    };
+  });
   const reviewCount = Number(pendingSummary[0]?.value ?? 0);
 
   return (
@@ -212,21 +262,28 @@ export default async function FinancePortalPage() {
           <header className="print-report-heading">
             <p className="print-report-kicker">Finance · {context.schoolName}</p>
             <h2>Monthly finance summary</h2>
-            <p>{monthStart} through {today} · {currency}</p>
+            <p>{monthStart} through {today} · amounts shown by configured currency</p>
           </header>
 
-          <section aria-label="Monthly finance summary" className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {canManageFees && <>
-              <SummaryCard label="Net fee collections this month" value={currencyAmount(netFees, currency)} icon={<CreditCard size={19} />} />
-              <SummaryCard label={`Outstanding invoices · ${outstandingCount}`} value={currencyAmount(outstandingBalance, currency)} icon={<CircleAlert size={19} />} alert={outstandingBalance > BigInt(0)} />
-            </>}
-            {canManageAccounts && <>
-              <SummaryCard label="Other approved income this month" value={currencyAmount(otherIncome, currency)} icon={<Banknote size={19} />} />
-              <SummaryCard label="Approved expenses this month" value={currencyAmount(expenses, currency)} icon={<ReceiptText size={19} />} />
-              {canManageFees && <SummaryCard label="Net surplus / (deficit)" value={currencyAmount(netSurplus, currency)} icon={<ChartNoAxesCombined size={19} />} alert={netSurplus < BigInt(0)} />}
-            </>}
-            {canManageAccounts && <SummaryCard label="Transactions awaiting review" value={String(reviewCount)} icon={<CircleAlert size={19} />} alert={reviewCount > 0} />}
-          </section>
+          {financeSummaries.map((summary) => (
+            <section key={summary.code} aria-label={`${summary.name} monthly finance summary`} className="space-y-3">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                {summary.code} · {summary.name}
+              </h3>
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {canManageFees && <>
+                  <SummaryCard label="Net fee collections this month" value={currencyAmount(summary.netFees, summary.code)} icon={<CreditCard size={19} />} />
+                  <SummaryCard label={`Outstanding invoices · ${summary.outstandingCount}`} value={currencyAmount(summary.outstandingBalance, summary.code)} icon={<CircleAlert size={19} />} alert={summary.outstandingBalance > BigInt(0)} />
+                </>}
+                {canManageAccounts && <>
+                  <SummaryCard label="Other approved income this month" value={currencyAmount(summary.otherIncome, summary.code)} icon={<Banknote size={19} />} />
+                  <SummaryCard label="Approved expenses this month" value={currencyAmount(summary.expenses, summary.code)} icon={<ReceiptText size={19} />} />
+                  {canManageFees && <SummaryCard label="Net surplus / (deficit)" value={currencyAmount(summary.netSurplus, summary.code)} icon={<ChartNoAxesCombined size={19} />} alert={summary.netSurplus < BigInt(0)} />}
+                </>}
+              </div>
+            </section>
+          ))}
+          {canManageAccounts && <SummaryCard label="Transactions awaiting review" value={String(reviewCount)} icon={<CircleAlert size={19} />} alert={reviewCount > 0} />}
 
           <p className="text-xs leading-relaxed text-slate-500">
             Fee totals subtract reversals. Account totals use approved transactions; fee receipts are separate.
@@ -261,7 +318,7 @@ export default async function FinancePortalPage() {
                   <p className="mt-1 text-xs text-slate-500">{payment.paidAt.toLocaleDateString()}</p>
                 </div>
                 <span className="shrink-0 text-sm font-semibold text-slate-800">
-                  {currencyAmount(minorUnits(payment.amount) + minorUnits(payment.fineAmount), currency)}
+                  {currencyAmount(minorUnits(payment.amount) + minorUnits(payment.fineAmount), payment.currency)}
                 </span>
               </article>
             ))}
@@ -281,7 +338,7 @@ export default async function FinancePortalPage() {
                   </p>
                 </div>
                 <span className="shrink-0 text-sm font-semibold text-slate-800">
-                  {currencyAmount(minorUnits(transaction.amount), currency)}
+                  {currencyAmount(minorUnits(transaction.amount), transaction.currency)}
                 </span>
               </article>
             ))}

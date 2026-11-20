@@ -101,6 +101,27 @@ export const schools = mysqlTable("schools", {
   updatedAt: updatedAt(),
 });
 
+export const schoolCurrencies = mysqlTable(
+  "school_currencies",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    code: varchar("code", { length: 3 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    symbol: varchar("symbol", { length: 12 }).notNull(),
+    isDefault: boolean("isDefault").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("school_currencies_school_code_uq").on(table.schoolId, table.code),
+    index("school_currencies_school_default_idx").on(table.schoolId, table.isDefault),
+  ],
+);
+
 export const schoolMemberships = mysqlTable(
   "school_memberships",
   {
@@ -1652,6 +1673,7 @@ export const feeDiscounts = mysqlTable(
     description: varchar("description", { length: 1000 }),
     discountType: varchar("discountType", { length: 20 }).notNull(),
     value: decimal("value", { precision: 10, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     frequency: varchar("frequency", { length: 20 }).notNull().default("yearly"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -1726,6 +1748,7 @@ export const feeStructures = mysqlTable(
       .notNull()
       .references(() => feeTypes.id),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     dueDate: date("dueDate", { mode: "string" }).notNull(),
     fineType: varchar("fineType", { length: 20 }).notNull().default("none"),
     fineValue: decimal("fineValue", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -1772,6 +1795,7 @@ export const studentFeeInvoices = mysqlTable(
     discountId: bigint("discountId", { mode: "number", unsigned: true })
       .references(() => feeDiscounts.id),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     discountAmount: decimal("discountAmount", { precision: 12, scale: 2 }).notNull().default("0"),
     fineType: varchar("fineType", { length: 20 }).notNull().default("none"),
     fineValue: decimal("fineValue", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -1875,6 +1899,7 @@ export const feeAdvanceTransactions = mysqlTable(
       .references(() => studentFeeInvoices.id),
     paymentId: bigint("paymentId", { mode: "number", unsigned: true })
       .references(() => feePayments.id),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     transactionType: varchar("transactionType", { length: 20 }).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     receiptNumber: varchar("receiptNumber", { length: 40 }),
@@ -2254,6 +2279,7 @@ export const schoolBankAccounts = mysqlTable(
     bankName: varchar("bankName", { length: 160 }).notNull(),
     accountName: varchar("accountName", { length: 160 }).notNull(),
     accountNumberLast4: varchar("accountNumberLast4", { length: 4 }),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     openingBalance: decimal("openingBalance", { precision: 12, scale: 2 }).notNull().default("0"),
     status: varchar("status", { length: 20 }).notNull().default("active"),
     createdAt: createdAt(),
@@ -2274,6 +2300,7 @@ export const accountTransactions = mysqlTable(
     transactionType: varchar("transactionType", { length: 20 }).notNull(),
     categoryAccountId: bigint("categoryAccountId", { mode: "number", unsigned: true }).notNull().references(() => chartOfAccounts.id),
     bankAccountId: bigint("bankAccountId", { mode: "number", unsigned: true }).references(() => schoolBankAccounts.id),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     transactionDate: date("transactionDate", { mode: "string" }).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     description: varchar("description", { length: 1000 }).notNull(),
@@ -2301,6 +2328,7 @@ export const fundTransfers = mysqlTable(
     schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
     sourceBankAccountId: bigint("sourceBankAccountId", { mode: "number", unsigned: true }).notNull().references(() => schoolBankAccounts.id),
     destinationBankAccountId: bigint("destinationBankAccountId", { mode: "number", unsigned: true }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     transferDate: date("transferDate", { mode: "string" }).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     reference: varchar("reference", { length: 120 }),

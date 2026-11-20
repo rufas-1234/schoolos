@@ -10,6 +10,7 @@ import {
   auditLogs,
   chartOfAccounts,
   fundTransfers,
+  schoolCurrencies,
   schoolBankAccounts,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -83,12 +84,14 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
   const context = await requireSchoolPermission("accounts.manage");
   const parsed = z.object({
     chartAccountId: idField,
+    currency: z.string().regex(/^[A-Z]{3}$/),
     bankName: nameField,
     accountName: nameField,
     accountNumber: z.string().trim().max(80),
     openingBalance: z.string().trim(),
   }).safeParse({
     chartAccountId: value(formData, "chartAccountId"),
+    currency: value(formData, "currency"),
     bankName: value(formData, "bankName"),
     accountName: value(formData, "accountName"),
     accountNumber: value(formData, "accountNumber"),
@@ -100,6 +103,12 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
       (parsed.data.accountNumber && !/^[0-9 -]{4,80}$/.test(parsed.data.accountNumber))) {
     return { error: "Enter valid bank details and a non-negative opening balance." };
   }
+  const [currency] = await db.select({ code: schoolCurrencies.code }).from(schoolCurrencies)
+    .where(and(
+      eq(schoolCurrencies.schoolId, context.schoolId),
+      eq(schoolCurrencies.code, parsed.data.currency),
+    )).limit(1);
+  if (!currency) return { error: "Choose a currency configured for this school." };
   const [chartAccount] = await db.select({ id: chartOfAccounts.id, accountType: chartOfAccounts.accountType })
     .from(chartOfAccounts).where(and(
       eq(chartOfAccounts.id, parsed.data.chartAccountId),
@@ -116,6 +125,7 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
         publicId,
         schoolId: context.schoolId,
         chartAccountId: chartAccount.id,
+        currency: parsed.data.currency,
         bankName: parsed.data.bankName,
         accountName: parsed.data.accountName,
         accountNumberLast4: last4 || null,
@@ -127,7 +137,7 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
         action: "bank_account.created",
         resourceType: "bank_account",
         resourcePublicId: publicId,
-        changedFields: ["chartAccountId", "bankName", "accountName", "accountNumberLast4", "openingBalance"],
+        changedFields: ["chartAccountId", "currency", "bankName", "accountName", "accountNumberLast4", "openingBalance"],
       });
     });
   } catch (error) {
@@ -145,6 +155,7 @@ export async function createAccountTransaction(
   const context = await requireSchoolPermission("accounts.manage");
   const parsed = z.object({
     transactionType: z.enum(["income", "expense"]),
+    currency: z.string().regex(/^[A-Z]{3}$/),
     categoryAccountId: idField,
     bankAccountId: z.union([z.literal(""), idField]).transform((value) => value === "" ? null : value),
     transactionDate: z.string().refine(isCalendarDate),
@@ -154,6 +165,7 @@ export async function createAccountTransaction(
     reference: z.string().trim().max(120),
   }).safeParse({
     transactionType: value(formData, "transactionType"),
+    currency: value(formData, "currency"),
     categoryAccountId: value(formData, "categoryAccountId"),
     bankAccountId: value(formData, "bankAccountId"),
     transactionDate: value(formData, "transactionDate"),
@@ -183,6 +195,23 @@ export async function createAccountTransaction(
       (parsed.data.bankAccountId !== null && !bankAccount)) {
     return { error: `Choose an active ${expectedType} category and bank account belonging to this school.` };
   }
+  if (parsed.data.bankAccountId !== null) {
+    const [linkedBank] = await db.select({ currency: schoolBankAccounts.currency })
+      .from(schoolBankAccounts).where(and(
+        eq(schoolBankAccounts.id, parsed.data.bankAccountId),
+        eq(schoolBankAccounts.schoolId, context.schoolId),
+      )).limit(1);
+    if (linkedBank?.currency !== parsed.data.currency) {
+      return { error: "The selected bank or cash account uses a different currency." };
+    }
+  } else {
+    const [currency] = await db.select({ code: schoolCurrencies.code }).from(schoolCurrencies)
+      .where(and(
+        eq(schoolCurrencies.schoolId, context.schoolId),
+        eq(schoolCurrencies.code, parsed.data.currency),
+      )).limit(1);
+    if (!currency) return { error: "Choose a currency configured for this school." };
+  }
   const publicId = randomUUID();
   await db.transaction(async (tx) => {
     await tx.insert(accountTransactions).values({
@@ -191,6 +220,7 @@ export async function createAccountTransaction(
       transactionType: expectedType,
       categoryAccountId: category.id,
       bankAccountId: bankAccount?.id ?? null,
+      currency: parsed.data.currency,
       transactionDate: parsed.data.transactionDate,
       amount: formatCostMinorUnits(amount),
       description: parsed.data.description,
@@ -205,7 +235,7 @@ export async function createAccountTransaction(
       action: `account_transaction.${expectedType}_submitted`,
       resourceType: "account_transaction",
       resourcePublicId: publicId,
-      changedFields: ["transactionType", "categoryAccountId", "bankAccountId", "transactionDate", "amount", "description", "payee", "reference", "status"],
+      changedFields: ["transactionType", "categoryAccountId", "bankAccountId", "currency", "transactionDate", "amount", "description", "payee", "reference", "status"],
     });
   });
   revalidateAccounts();
@@ -274,13 +304,21 @@ export async function createFundTransfer(_state: AccountActionState, formData: F
       parsed.data.sourceBankAccountId === parsed.data.destinationBankAccountId) {
     return { error: "Choose two different bank accounts and enter a positive amount and valid date." };
   }
-  const accounts = await db.select({ id: schoolBankAccounts.id }).from(schoolBankAccounts).where(and(
+  const accounts = await db.select({
+    id: schoolBankAccounts.id,
+    currency: schoolBankAccounts.currency,
+  }).from(schoolBankAccounts).where(and(
     eq(schoolBankAccounts.schoolId, context.schoolId),
     eq(schoolBankAccounts.status, "active"),
   ));
   const accountIds = new Set(accounts.map((account) => account.id));
   if (!accountIds.has(parsed.data.sourceBankAccountId) || !accountIds.has(parsed.data.destinationBankAccountId)) {
     return { error: "Choose active source and destination accounts belonging to this school." };
+  }
+  const sourceAccount = accounts.find((account) => account.id === parsed.data.sourceBankAccountId);
+  const destinationAccount = accounts.find((account) => account.id === parsed.data.destinationBankAccountId);
+  if (!sourceAccount || !destinationAccount || sourceAccount.currency !== destinationAccount.currency) {
+    return { error: "Fund transfers require source and destination accounts in the same currency." };
   }
   const publicId = randomUUID();
   await db.transaction(async (tx) => {
@@ -289,6 +327,7 @@ export async function createFundTransfer(_state: AccountActionState, formData: F
       schoolId: context.schoolId,
       sourceBankAccountId: parsed.data.sourceBankAccountId,
       destinationBankAccountId: parsed.data.destinationBankAccountId,
+      currency: sourceAccount.currency,
       transferDate: parsed.data.transferDate,
       amount: formatCostMinorUnits(amount),
       reference: parsed.data.reference || null,

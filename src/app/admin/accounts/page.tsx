@@ -7,8 +7,10 @@ import {
   feePaymentReversals,
   feePayments,
   fundTransfers,
+  schoolCurrencies,
   schools,
   schoolBankAccounts,
+  studentFeeInvoices,
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -142,6 +144,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         bankName: schoolBankAccounts.bankName,
         accountName: schoolBankAccounts.accountName,
         accountNumberLast4: schoolBankAccounts.accountNumberLast4,
+        currency: schoolBankAccounts.currency,
         openingBalance: schoolBankAccounts.openingBalance,
         status: schoolBankAccounts.status,
         chartAccountId: schoolBankAccounts.chartAccountId,
@@ -159,6 +162,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         transactionType: accountTransactions.transactionType,
         transactionDate: accountTransactions.transactionDate,
         amount: accountTransactions.amount,
+        currency: accountTransactions.currency,
         description: accountTransactions.description,
         payee: accountTransactions.payee,
         reference: accountTransactions.reference,
@@ -182,6 +186,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         id: fundTransfers.id,
         transferDate: fundTransfers.transferDate,
         amount: fundTransfers.amount,
+        currency: fundTransfers.currency,
         reference: fundTransfers.reference,
         note: fundTransfers.note,
         sourceId: fundTransfers.sourceBankAccountId,
@@ -202,6 +207,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       db.select({
         type: accountTransactions.transactionType,
         amount: accountTransactions.amount,
+        currency: accountTransactions.currency,
         accountName: chartOfAccounts.name,
         accountCode: chartOfAccounts.code,
         transactionDate: accountTransactions.transactionDate,
@@ -223,6 +229,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         transactionType: accountTransactions.transactionType,
         transactionDate: accountTransactions.transactionDate,
         amount: accountTransactions.amount,
+        currency: accountTransactions.currency,
         description: accountTransactions.description,
         payee: accountTransactions.payee,
         reference: accountTransactions.reference,
@@ -251,6 +258,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         id: fundTransfers.id,
         transferDate: fundTransfers.transferDate,
         amount: fundTransfers.amount,
+        currency: fundTransfers.currency,
         reference: fundTransfers.reference,
         note: fundTransfers.note,
         sourceName: sourceBankAccount.accountName,
@@ -270,19 +278,35 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           lte(fundTransfers.transferDate, to),
         ))
         .orderBy(desc(fundTransfers.transferDate), desc(fundTransfers.id)),
-      db.select({ amount: feePayments.amount, fineAmount: feePayments.fineAmount })
+      db.select({
+        amount: feePayments.amount,
+        fineAmount: feePayments.fineAmount,
+        currency: studentFeeInvoices.currency,
+      })
         .from(feePayments)
+        .innerJoin(studentFeeInvoices, and(
+          eq(studentFeeInvoices.id, feePayments.invoiceId),
+          eq(studentFeeInvoices.schoolId, context.schoolId),
+        ))
         .where(and(
           eq(feePayments.schoolId, context.schoolId),
           gte(feePayments.paidAt, startAt),
           lte(feePayments.paidAt, endAt),
           sql`(${feePayments.notes} IS NULL OR ${feePayments.notes} NOT LIKE 'TEST DATA ONLY -%')`,
         )),
-      db.select({ amount: feePaymentReversals.amount, fineAmount: feePaymentReversals.fineAmount })
+      db.select({
+        amount: feePaymentReversals.amount,
+        fineAmount: feePaymentReversals.fineAmount,
+        currency: studentFeeInvoices.currency,
+      })
         .from(feePaymentReversals)
         .innerJoin(feePayments, and(
           eq(feePayments.id, feePaymentReversals.paymentId),
           eq(feePayments.schoolId, context.schoolId),
+        ))
+        .innerJoin(studentFeeInvoices, and(
+          eq(studentFeeInvoices.id, feePayments.invoiceId),
+          eq(studentFeeInvoices.schoolId, context.schoolId),
         ))
         .where(and(
           eq(feePaymentReversals.schoolId, context.schoolId),
@@ -313,6 +337,17 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         .where(eq(fundTransfers.schoolId, context.schoolId))
         .groupBy(fundTransfers.destinationBankAccountId),
     ]);
+  const currencyRows = await db.select({
+    code: schoolCurrencies.code,
+    name: schoolCurrencies.name,
+    symbol: schoolCurrencies.symbol,
+  }).from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId))
+    .orderBy(asc(schoolCurrencies.code));
+  const currencyOptions = currencyRows.map((row) => ({
+    code: row.code,
+    label: `${row.code} · ${row.name} (${row.symbol})`,
+  }));
+  const currencyNames = new Map(currencyRows.map((row) => [row.code, row.name]));
 
   const reportTransactions = accountReportTransactions.filter((transaction) =>
     !searchTerm || `${transaction.description} ${transaction.accountName} ${transaction.accountCode} ${transaction.payee ?? ""} ${transaction.reference ?? ""}`
@@ -344,17 +379,46 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const expenseAccounts = accountOptions(activeAccounts.filter((account) => account.accountType === "expense"));
   const bankOptions = bankAccounts.filter((bank) => bank.status === "active").map((bank) => ({
     id: bank.id,
-    label: `${bank.accountName} · ${bank.bankName}`,
+    label: `${bank.accountName} · ${bank.bankName} · ${bank.currency}`,
   }));
-  const transactionIncome = pnlTransactions.filter((row) => row.type === "income" && row.accountCode !== "4000");
-  const expenses = pnlTransactions.filter((row) => row.type === "expense");
-  const otherIncomeTotal = transactionIncome.reduce((total, row) => total + moneyMinor(row.amount), BigInt(0));
-  const feeIncome = feeIncomeRows.reduce((total, row) => total + moneyMinor(row.amount) + moneyMinor(row.fineAmount), BigInt(0));
-  const reversedFeeIncome = reversals.reduce((total, row) => total + moneyMinor(row.amount) + moneyMinor(row.fineAmount), BigInt(0));
-  const feeIncomeTotal = feeIncome - reversedFeeIncome;
-  const incomeTotal = otherIncomeTotal + feeIncomeTotal;
-  const expenseTotal = expenses.reduce((total, row) => total + moneyMinor(row.amount), BigInt(0));
-  const netProfit = incomeTotal - expenseTotal;
+  const accountFormProps = {
+    assetAccounts,
+    incomeAccounts,
+    expenseAccounts,
+    banks: bankOptions,
+    currencies: currencyOptions,
+    defaultCurrency: currency,
+    currentDate: today,
+  };
+  const pnlCurrencyCodes = new Set([
+    currency,
+    ...currencyRows.map((row) => row.code),
+    ...pnlTransactions.map((row) => row.currency),
+    ...feeIncomeRows.map((row) => row.currency),
+    ...reversals.map((row) => row.currency),
+  ]);
+  const pnlSummaries = [...pnlCurrencyCodes].sort().map((code) => {
+    const incomeRows = pnlTransactions.filter((row) => row.currency === code && row.type === "income" && row.accountCode !== "4000");
+    const expenseRows = pnlTransactions.filter((row) => row.currency === code && row.type === "expense");
+    const netFees = feeIncomeRows
+      .filter((row) => row.currency === code)
+      .reduce((total, row) => total + moneyMinor(row.amount) + moneyMinor(row.fineAmount), BigInt(0))
+      - reversals.filter((row) => row.currency === code)
+        .reduce((total, row) => total + moneyMinor(row.amount) + moneyMinor(row.fineAmount), BigInt(0));
+    const otherIncome = incomeRows.reduce((total, row) => total + moneyMinor(row.amount), BigInt(0));
+    const expensesTotal = expenseRows.reduce((total, row) => total + moneyMinor(row.amount), BigInt(0));
+    const incomeTotal = netFees + otherIncome;
+    return {
+      code,
+      netFees,
+      incomeRows,
+      expenseRows,
+      otherIncome,
+      expensesTotal,
+      incomeTotal,
+      netProfit: incomeTotal - expensesTotal,
+    };
+  });
   const hasDemoProfitTransactions = pnlTransactions.some((row) => row.description.startsWith("DEMO TEST ONLY - "));
   const hasDemoReportTransactions = reportTransactions.some((row) => row.description.startsWith("DEMO TEST ONLY - "));
   const bankActivity = new Map<number, { income: bigint; expense: bigint }>();
@@ -411,30 +475,37 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             <ProfitLossFilters from={from} to={to} />
             <p className="text-xs text-slate-500">P&amp;L uses approved activity and fee receipts net of refunds; pending and test items are excluded.</p>
             {hasDemoProfitTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Demo test records appear in totals but are not real income or expenses.</p>}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <SummaryCard label="Total income (incl. net fee receipts)" value={displayCurrency(incomeTotal, currency)} />
-              <SummaryCard label="Operating expenses" value={displayCurrency(expenseTotal, currency)} />
-              <SummaryCard label="Net surplus / (deficit)" value={displayCurrency(netProfit, currency)} tone={netProfit < BigInt(0) ? "rose" : "emerald"} />
-            </div>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <SummaryTable title="Income statement" rows={[
-                { label: "School fee receipts (net of reversals)", value: displayCurrency(feeIncomeTotal, currency) },
-                ...sumByAccount(transactionIncome).map((row) => ({ label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, currency) })),
-                { label: "Total income", value: displayCurrency(incomeTotal, currency), strong: true },
-              ]} />
-              <SummaryTable title="Expenses" rows={[
-                ...sumByAccount(expenses).map((row) => ({ label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, currency) })),
-                { label: "Total expenses", value: displayCurrency(expenseTotal, currency), strong: true },
-              ]} />
-            </div>
+            {pnlSummaries.map((summary) => (
+              <section key={summary.code} className="space-y-3">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                  {summary.code} · {currencyNames.get(summary.code) ?? summary.code}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <SummaryCard label="Total income (incl. net fee receipts)" value={displayCurrency(summary.incomeTotal, summary.code)} />
+                  <SummaryCard label="Operating expenses" value={displayCurrency(summary.expensesTotal, summary.code)} />
+                  <SummaryCard label="Net surplus / (deficit)" value={displayCurrency(summary.netProfit, summary.code)} tone={summary.netProfit < BigInt(0) ? "rose" : "emerald"} />
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <SummaryTable title="Income statement" rows={[
+                    { label: "School fee receipts (net of reversals)", value: displayCurrency(summary.netFees, summary.code) },
+                    ...sumByAccount(summary.incomeRows).map((row) => ({ label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, summary.code) })),
+                    { label: "Total income", value: displayCurrency(summary.incomeTotal, summary.code), strong: true },
+                  ]} />
+                  <SummaryTable title="Expenses" rows={[
+                    ...sumByAccount(summary.expenseRows).map((row) => ({ label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, summary.code) })),
+                    { label: "Total expenses", value: displayCurrency(summary.expensesTotal, summary.code), strong: true },
+                  ]} />
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
         {section === "income" && (
           <div className="space-y-4">
             <p className="text-sm text-slate-500">Fee receipts are added automatically. Record other income here to avoid double counting.</p>
-            <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
-            <TransactionTable transactions={incomeTransactionPage.rows} currency={currency} reviewNeeded={reviewNeeded} />
+            <AccountForms section={section} {...accountFormProps} />
+            <TransactionTable transactions={incomeTransactionPage.rows} reviewNeeded={reviewNeeded} />
             <TablePagination ariaLabel="Income transactions" currentPage={incomeTransactionPage.page} pageSize={incomeTransactionPage.pageSize} totalRows={incomeTransactions.length}
               hrefForPage={(page) => pageHref("incomePage", page)} />
           </div>
@@ -448,15 +519,15 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               </a>
               . Add or update them there; only active expense accounts appear in this form.
             </p>
-            <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
-            <TransactionTable transactions={expenseTransactionPage.rows} currency={currency} reviewNeeded={reviewNeeded} />
+            <AccountForms section={section} {...accountFormProps} />
+            <TransactionTable transactions={expenseTransactionPage.rows} reviewNeeded={reviewNeeded} />
             <TablePagination ariaLabel="Expense transactions" currentPage={expenseTransactionPage.page} pageSize={expenseTransactionPage.pageSize} totalRows={expenseTransactions.length}
               hrefForPage={(page) => pageHref("expensePage", page)} />
           </div>
         )}
         {section === "chart" && (
           <div className="space-y-4">
-            <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
+            <AccountForms section={section} {...accountFormProps} />
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account name</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Description</th><th className="px-4 py-3">Status</th></tr></thead>
@@ -471,12 +542,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         )}
         {section === "bank" && (
           <div className="space-y-4">
-            <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
+            <AccountForms section={section} {...accountFormProps} />
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Linked chart account</th><th className="px-4 py-3">Opening balance</th><th className="px-4 py-3">Current balance</th><th className="px-4 py-3">Status</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">{bankPage.rows.map((bank) => (
-                  <tr key={bank.id}><td className="px-4 py-3 font-semibold">{bank.accountName}<span className="block text-xs text-slate-500">{bank.bankName}{bank.accountNumberLast4 ? ` ···· ${bank.accountNumberLast4}` : ""}</span></td><td className="px-4 py-3">{bank.chartCode} · {bank.chartName}</td><td className="px-4 py-3">{displayAmount(bank.openingBalance, currency)}</td><td className="px-4 py-3 font-semibold">{displayCurrency(bankBalances.get(bank.id) ?? BigInt(0), currency)}</td><td className="px-4 py-3 capitalize">{bank.status}</td></tr>
+                  <tr key={bank.id}><td className="px-4 py-3 font-semibold">{bank.accountName}<span className="block text-xs text-slate-500">{bank.bankName}{bank.accountNumberLast4 ? ` ···· ${bank.accountNumberLast4}` : ""}</span></td><td className="px-4 py-3">{bank.chartCode} · {bank.chartName}</td><td className="px-4 py-3">{displayAmount(bank.openingBalance, bank.currency)}</td><td className="px-4 py-3 font-semibold">{displayCurrency(bankBalances.get(bank.id) ?? BigInt(0), bank.currency)}</td><td className="px-4 py-3 capitalize">{bank.status}</td></tr>
                 ))}{!bankAccounts.length && <EmptyRow columns={5} text="Add a bank or cash account and link it to an asset account." />}</tbody>
               </table>
             </div>
@@ -486,12 +557,12 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         )}
         {section === "transfers" && (
           <div className="space-y-4">
-            <AccountForms section={section} assetAccounts={assetAccounts} incomeAccounts={incomeAccounts} expenseAccounts={expenseAccounts} banks={bankOptions} currentDate={today} />
+            <AccountForms section={section} {...accountFormProps} />
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[650px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">From</th><th className="px-4 py-3">To</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Reference / note</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">{transferPage.rows.map((transfer) => (
-                  <tr key={transfer.id}><td className="px-4 py-3">{transfer.transferDate}</td><td className="px-4 py-3">{transfer.sourceName}</td><td className="px-4 py-3">{transfer.destinationName}</td><td className="px-4 py-3 font-semibold">{displayAmount(transfer.amount, currency)}</td><td className="px-4 py-3">{transfer.reference ?? "—"}<span className="block text-xs text-slate-500">{transfer.note ?? ""}</span></td></tr>
+                  <tr key={transfer.id}><td className="px-4 py-3">{transfer.transferDate}</td><td className="px-4 py-3">{transfer.sourceName}</td><td className="px-4 py-3">{transfer.destinationName}</td><td className="px-4 py-3 font-semibold">{displayAmount(transfer.amount, transfer.currency)}</td><td className="px-4 py-3">{transfer.reference ?? "—"}<span className="block text-xs text-slate-500">{transfer.note ?? ""}</span></td></tr>
                 ))}{!transfers.length && <EmptyRow columns={5} text="No fund transfers have been recorded." />}</tbody>
               </table>
             </div>
@@ -543,29 +614,42 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 <h2>Accounts activity report</h2>
                 <p>{from} through {to} · {reportStatus === "all" ? "All statuses" : `${reportStatus} transactions`} · {reportTransactions.length} transactions{search ? ` · Search: ${search}` : ""}</p>
               </header>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard label="Net fee receipts" value={displayCurrency(feeIncomeTotal, currency)} />
-                <SummaryCard label="Other approved income" value={displayCurrency(otherIncomeTotal, currency)} />
-                <SummaryCard label="Approved expenses" value={displayCurrency(expenseTotal, currency)} />
-                <SummaryCard label="Net surplus / (deficit)" value={displayCurrency(netProfit, currency)} tone={netProfit < BigInt(0) ? "rose" : "emerald"} />
-              </div>
+              {pnlSummaries.map((summary) => (
+                <section key={summary.code} className="space-y-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                    {summary.code} · {currencyNames.get(summary.code) ?? summary.code}
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <SummaryCard label="Net fee receipts" value={displayCurrency(summary.netFees, summary.code)} />
+                    <SummaryCard label="Other approved income" value={displayCurrency(summary.otherIncome, summary.code)} />
+                    <SummaryCard label="Approved expenses" value={displayCurrency(summary.expensesTotal, summary.code)} />
+                    <SummaryCard label="Net surplus / (deficit)" value={displayCurrency(summary.netProfit, summary.code)} tone={summary.netProfit < BigInt(0) ? "rose" : "emerald"} />
+                  </div>
+                </section>
+              ))}
               <p className="text-xs text-slate-500">Selected-date totals use approved activity. Filters affect only the register and CSV; fees are separate.</p>
               {hasDemoReportTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Demo test records appear in the register and totals as examples, not real transactions.</p>}
               <TransactionTable
                 transactions={reportTransactionPage.rows}
-                currency={currency}
                 reviewNeeded={reportTransactions.filter((row) => row.status === "pending")}
               />
               <TablePagination ariaLabel="Accounts report transactions" currentPage={reportTransactionPage.page} pageSize={reportTransactionPage.pageSize} totalRows={reportTransactions.length}
                 hrefForPage={(page) => pageHref("reportTransactionsPage", page)} />
               <div className="grid gap-4 xl:grid-cols-2">
-                <SummaryTable title="Income by category" rows={[
-                  { label: "School fee receipts (net of reversals)", value: displayCurrency(feeIncomeTotal, currency) },
-                  ...sumByAccount(transactionIncome).map((row) => ({ label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, currency) })),
-                ]} />
-                <SummaryTable title="Expenses by category" rows={sumByAccount(expenses).map((row) => ({
-                  label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, currency),
-                }))} />
+                {pnlSummaries.map((summary) => (
+                  <div key={summary.code} className="space-y-3">
+                    <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                      {summary.code} · {currencyNames.get(summary.code) ?? summary.code}
+                    </h3>
+                    <SummaryTable title="Income by category" rows={[
+                      { label: "School fee receipts (net of reversals)", value: displayCurrency(summary.netFees, summary.code) },
+                      ...sumByAccount(summary.incomeRows).map((row) => ({ label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, summary.code) })),
+                    ]} />
+                    <SummaryTable title="Expenses by category" rows={sumByAccount(summary.expenseRows).map((row) => ({
+                      label: `${row.code} · ${row.name}`, value: displayCurrency(row.total, summary.code),
+                    }))} />
+                  </div>
+                ))}
               </div>
               <div className="grid gap-4 xl:grid-cols-2">
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -574,7 +658,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                     <table className="w-full min-w-[520px] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Opening balance</th><th className="px-4 py-3">Current balance</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">{bankAccounts.map((bank) => (
-                        <tr key={bank.id}><td className="px-4 py-3">{bank.accountName}<span className="block text-xs text-slate-500">{bank.bankName}</span></td><td className="px-4 py-3">{displayAmount(bank.openingBalance, currency)}</td><td className="px-4 py-3 font-semibold">{displayCurrency(bankBalances.get(bank.id) ?? BigInt(0), currency)}</td></tr>
+                        <tr key={bank.id}><td className="px-4 py-3">{bank.accountName}<span className="block text-xs text-slate-500">{bank.bankName}</span></td><td className="px-4 py-3">{displayAmount(bank.openingBalance, bank.currency)}</td><td className="px-4 py-3 font-semibold">{displayCurrency(bankBalances.get(bank.id) ?? BigInt(0), bank.currency)}</td></tr>
                       ))}{!bankAccounts.length && <EmptyRow columns={3} text="No bank or cash accounts have been set up." />}</tbody>
                     </table>
                   </div>
@@ -585,7 +669,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                     <table className="w-full min-w-[520px] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / reference</th><th className="px-4 py-3">From / to</th><th className="px-4 py-3">Amount</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">{reportTransferPage.rows.map((transfer) => (
-                        <tr key={transfer.id}><td className="px-4 py-3">{transfer.transferDate}<span className="block text-xs text-slate-500">{transfer.reference ?? transfer.note ?? "—"}</span></td><td className="px-4 py-3">{transfer.sourceName ?? "Unknown"}<span className="block text-xs text-slate-500">to {transfer.destinationName ?? "Unknown"}</span></td><td className="px-4 py-3 font-semibold">{displayAmount(transfer.amount, currency)}</td></tr>
+                        <tr key={transfer.id}><td className="px-4 py-3">{transfer.transferDate}<span className="block text-xs text-slate-500">{transfer.reference ?? transfer.note ?? "—"}</span></td><td className="px-4 py-3">{transfer.sourceName ?? "Unknown"}<span className="block text-xs text-slate-500">to {transfer.destinationName ?? "Unknown"}</span></td><td className="px-4 py-3 font-semibold">{displayAmount(transfer.amount, transfer.currency)}</td></tr>
                       ))}{!reportTransfers.length && <EmptyRow columns={3} text="No transfers were recorded for this period." />}</tbody>
                     </table>
                   </div>
@@ -639,6 +723,7 @@ type TransactionRow = {
   transactionType: string;
   transactionDate: string;
   amount: string;
+  currency: string;
   description: string;
   payee: string | null;
   reference: string | null;
@@ -653,11 +738,9 @@ type TransactionRow = {
 
 function TransactionTable({
   transactions,
-  currency,
   reviewNeeded,
 }: {
   transactions: TransactionRow[];
-  currency: string;
   reviewNeeded: TransactionRow[];
 }) {
   const reviewIds = new Set(reviewNeeded.map((row) => row.id));
@@ -670,7 +753,7 @@ function TransactionTable({
             <td className="px-4 py-3"><strong>{transaction.transactionDate}</strong><span className="block text-xs text-slate-500">{transaction.description}{transaction.reference ? ` · Ref: ${transaction.reference}` : ""}</span></td>
             <td className="px-4 py-3">{transaction.accountCode} · {transaction.accountName}</td>
             <td className="px-4 py-3">{transaction.payee ?? "—"}</td>
-            <td className="px-4 py-3 font-semibold">{displayAmount(transaction.amount, currency)}</td>
+            <td className="px-4 py-3 font-semibold">{displayAmount(transaction.amount, transaction.currency)}</td>
             <td className="px-4 py-3 capitalize">{transaction.status}<span className="block text-xs text-slate-500">{transaction.approverName ? `By ${transaction.approverName} · ${displayTimestamp(transaction.approvedAt)}` : `Submitted by ${transaction.submitterName}`}</span></td>
             <td className="px-4 py-3">{reviewIds.has(transaction.id) ? <ReviewTransactionForm transactionId={transaction.id} /> : "—"}</td>
           </tr>

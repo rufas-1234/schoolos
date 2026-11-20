@@ -11,11 +11,13 @@ export function FeeReportFilters({
   sections,
   feeTypes,
   statuses,
+  currencies,
   selectedBranch,
   selectedClass,
   selectedSection,
   selectedFeeType,
   selectedStatus,
+  selectedCurrency,
 }: {
   from: string;
   to: string;
@@ -24,11 +26,13 @@ export function FeeReportFilters({
   sections: SearchableSelectOption[];
   feeTypes: SearchableSelectOption[];
   statuses: SearchableSelectOption[];
+  currencies: SearchableSelectOption[];
   selectedBranch: string;
   selectedClass: string;
   selectedSection: string;
   selectedFeeType: string;
   selectedStatus: string;
+  selectedCurrency: string;
 }) {
   return (
     <SmartFilterForm method="get" className="print:hidden grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -72,6 +76,13 @@ export function FeeReportFilters({
         options={statuses}
         defaultValue={selectedStatus}
         placeholder="Search statuses..."
+      />
+      <SearchableSelect
+        label="Currency"
+        name="currency"
+        options={currencies}
+        defaultValue={selectedCurrency}
+        placeholder="Search currencies..."
       />
       <div className="flex items-end">
         <a

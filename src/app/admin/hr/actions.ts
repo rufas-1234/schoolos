@@ -8,6 +8,7 @@ import { db } from "@/db";
 import {
   auditLogs,
   schoolBranches,
+  schoolCurrencies,
   schools,
   staffAttendance,
   staffLeaveBalances,
@@ -526,6 +527,7 @@ export async function recordStaffPayroll(
   const result = z.object({
     staffId: idField,
     branchId: idField,
+    currency: z.string().regex(/^[A-Z]{3}$/),
     payPeriod: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
     baseSalary: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
     allowances: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
@@ -536,6 +538,7 @@ export async function recordStaffPayroll(
   }).safeParse({
     staffId: value(formData, "staffId"),
     branchId: value(formData, "branchId"),
+    currency: value(formData, "currency"),
     payPeriod: value(formData, "payPeriod"),
     baseSalary: value(formData, "baseSalary"),
     allowances: value(formData, "allowances"),
@@ -561,9 +564,13 @@ export async function recordStaffPayroll(
       eq(staffMembers.schoolId, context.schoolId),
       eq(staffMembers.branchId, result.data.branchId),
     )).limit(1);
-  const [school] = await db.select({ currency: schools.currency })
-    .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
-  if (!staff || !school) return { error: "Choose a staff member belonging to this school." };
+  const [configuredCurrency] = await db.select({ code: schoolCurrencies.code })
+    .from(schoolCurrencies).where(and(
+      eq(schoolCurrencies.schoolId, context.schoolId),
+      eq(schoolCurrencies.code, result.data.currency),
+    )).limit(1);
+  if (!staff) return { error: "Choose a staff member belonging to this school." };
+  if (!configuredCurrency) return { error: "Choose a currency configured for this school." };
 
   const publicId = randomUUID();
   try {
@@ -577,7 +584,7 @@ export async function recordStaffPayroll(
         allowances: formatPayrollMinorUnits(allowances),
         deductions: formatPayrollMinorUnits(deductions),
         amount: formatPayrollMinorUnits(payroll.net),
-        currency: school.currency,
+        currency: configuredCurrency.code,
         paidDate: result.data.paidDate || null,
         status: result.data.status,
         notes: result.data.notes || null,
@@ -604,6 +611,7 @@ export async function updateStaffPayroll(
     publicId: z.string().uuid(),
     staffId: idField,
     branchId: idField,
+    currency: z.string().regex(/^[A-Z]{3}$/),
     payPeriod: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
     baseSalary: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
     allowances: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
@@ -615,6 +623,7 @@ export async function updateStaffPayroll(
     publicId: value(formData, "publicId"),
     staffId: value(formData, "staffId"),
     branchId: value(formData, "branchId"),
+    currency: value(formData, "currency"),
     payPeriod: value(formData, "payPeriod"),
     baseSalary: value(formData, "baseSalary"),
     allowances: value(formData, "allowances"),
@@ -640,9 +649,13 @@ export async function updateStaffPayroll(
       eq(staffMembers.schoolId, context.schoolId),
       eq(staffMembers.branchId, result.data.branchId),
     )).limit(1);
-  const [school] = await db.select({ currency: schools.currency })
-    .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
-  if (!staff || !school) return { error: "Choose a staff member belonging to this school." };
+  const [configuredCurrency] = await db.select({ code: schoolCurrencies.code })
+    .from(schoolCurrencies).where(and(
+      eq(schoolCurrencies.schoolId, context.schoolId),
+      eq(schoolCurrencies.code, result.data.currency),
+    )).limit(1);
+  if (!staff) return { error: "Choose a staff member belonging to this school." };
+  if (!configuredCurrency) return { error: "Choose a currency configured for this school." };
 
   try {
     const outcome = await db.transaction(async (tx) => {
@@ -659,7 +672,7 @@ export async function updateStaffPayroll(
         allowances: formatPayrollMinorUnits(allowances),
         deductions: formatPayrollMinorUnits(deductions),
         amount: formatPayrollMinorUnits(payroll.net),
-        currency: school.currency,
+        currency: configuredCurrency.code,
         paidDate: result.data.status === "paid" ? result.data.paidDate : null,
         status: result.data.status,
         notes: result.data.notes || null,

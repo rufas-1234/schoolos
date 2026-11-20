@@ -15,6 +15,7 @@ import {
   feeStructures,
   feeTypes,
   schools,
+  schoolCurrencies,
   studentEnrollments,
   studentFeeInvoices,
   students,
@@ -22,7 +23,7 @@ import {
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { calculateFineMinorUnits, parseMoneyToMinorUnits } from "@/lib/fees-policy";
-import { ApplyFeeAdvanceCreditForm, RecordFeeAdvanceCreditForm, type FeeOption } from "../../fee-forms";
+import { ApplyFeeAdvanceCreditForm, RecordFeeAdvanceCreditForm, type CurrencyOption, type FeeOption } from "../../fee-forms";
 
 type SearchParams = { search?: string | string[]; page?: string | string[]; pageSize?: string | string[] };
 
@@ -61,16 +62,27 @@ export default async function FeeCarryForwardPage({
   const [school] = await db.select({ currency: schools.currency, timezone: schools.timezone })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   const currency = school?.currency ?? "";
+  const currencyRows = await db.select({
+    code: schoolCurrencies.code,
+    name: schoolCurrencies.name,
+    symbol: schoolCurrencies.symbol,
+  }).from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId));
+  const currencyOptions: CurrencyOption[] = currencyRows.map((item) => ({
+    value: item.code,
+    label: `${item.code} · ${item.name} (${item.symbol})`,
+  }));
+  const currencyNames = new Map(currencyRows.map((item) => [item.code, item.name]));
   const today = todayInTimezone(school?.timezone ?? "UTC");
 
   const creditBalances = db.select({
     studentId: feeAdvanceTransactions.studentId,
+    currency: feeAdvanceTransactions.currency,
     balanceMinor: sql<string>`SUM(CASE WHEN ${feeAdvanceTransactions.transactionType} = 'applied'
       THEN -ROUND(${feeAdvanceTransactions.amount} * 100)
       ELSE ROUND(${feeAdvanceTransactions.amount} * 100) END)`.as("balanceMinor"),
   }).from(feeAdvanceTransactions)
     .where(eq(feeAdvanceTransactions.schoolId, context.schoolId))
-    .groupBy(feeAdvanceTransactions.studentId)
+    .groupBy(feeAdvanceTransactions.studentId, feeAdvanceTransactions.currency)
     .as("fee_advance_balances");
   const searchFilter = search ? or(
     like(students.firstName, `%${search}%`),
@@ -86,8 +98,9 @@ export default async function FeeCarryForwardPage({
         eq(students.schoolId, context.schoolId),
       ))
       .where(creditConditions),
-    db.select({ totalMinor: sum(creditBalances.balanceMinor) })
-      .from(creditBalances).where(gt(creditBalances.balanceMinor, sql`0`)),
+    db.select({ currency: creditBalances.currency, totalMinor: sum(creditBalances.balanceMinor) })
+      .from(creditBalances).where(gt(creditBalances.balanceMinor, sql`0`))
+      .groupBy(creditBalances.currency),
     db.select({
       id: students.id,
       firstName: students.firstName,
@@ -127,6 +140,7 @@ export default async function FeeCarryForwardPage({
       lastName: students.lastName,
       admissionNumber: students.admissionNumber,
       transactionType: feeAdvanceTransactions.transactionType,
+      currency: feeAdvanceTransactions.currency,
       amount: feeAdvanceTransactions.amount,
       receiptNumber: feeAdvanceTransactions.receiptNumber,
       reference: feeAdvanceTransactions.reference,
@@ -157,6 +171,7 @@ export default async function FeeCarryForwardPage({
   const page = Math.min(requestedPage, pageCount);
   const creditRows = await db.select({
     studentId: students.id,
+    currency: creditBalances.currency,
     firstName: students.firstName,
     lastName: students.lastName,
     admissionNumber: students.admissionNumber,
@@ -170,7 +185,6 @@ export default async function FeeCarryForwardPage({
     .orderBy(asc(students.lastName), asc(students.firstName))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
-  const totalAvailableMinor = minorUnits(totalRows[0]?.totalMinor);
   const activeStudents = new Map<number, FeeOption>();
   for (const enrollment of activeEnrollmentRows) {
     if (!activeStudents.has(enrollment.id)) {
@@ -181,7 +195,7 @@ export default async function FeeCarryForwardPage({
     }
   }
   const studentIds = creditRows.map((student) => student.studentId);
-  const invoicesByStudent = new Map<number, FeeOption[]>();
+  const invoicesByStudent = new Map<string, FeeOption[]>();
   if (studentIds.length) {
     const paymentTotals = db.select({
       invoiceId: feePayments.invoiceId,
@@ -193,6 +207,7 @@ export default async function FeeCarryForwardPage({
     const invoices = await db.select({
       id: studentFeeInvoices.id,
       studentId: studentFeeInvoices.studentId,
+      currency: studentFeeInvoices.currency,
       invoiceNumber: studentFeeInvoices.invoiceNumber,
       amount: studentFeeInvoices.amount,
       discountAmount: studentFeeInvoices.discountAmount,
@@ -234,12 +249,13 @@ export default async function FeeCarryForwardPage({
       if (fine === null) continue;
       const balance = amount - discount + fine - paid;
       if (balance <= 0) continue;
-      const options = invoicesByStudent.get(invoice.studentId) ?? [];
+      const key = `${invoice.studentId}:${invoice.currency}`;
+      const options = invoicesByStudent.get(key) ?? [];
       options.push({
         id: invoice.id,
-        label: `${invoice.invoiceNumber} · ${invoice.feeTypeName}${invoice.termName ? ` · ${invoice.termName}` : ""} · ${invoice.yearName} · ${currency} ${money(balance)} due`,
+        label: `${invoice.invoiceNumber} · ${invoice.feeTypeName}${invoice.termName ? ` · ${invoice.termName}` : ""} · ${invoice.yearName} · ${invoice.currency} ${money(balance)} due`,
       });
-      invoicesByStudent.set(invoice.studentId, options);
+      invoicesByStudent.set(key, options);
     }
   }
 
@@ -256,7 +272,7 @@ export default async function FeeCarryForwardPage({
         student: `${transaction.firstName} ${transaction.lastName}`,
         admission: transaction.admissionNumber ?? "",
         activity: isApplied ? "Credit applied" : isRestored ? "Credit restored" : "Advance received",
-        amount: `${isApplied ? "−" : isRestored ? "+" : ""}${currency} ${money(amountMinor)}`,
+        amount: `${isApplied ? "−" : isRestored ? "+" : ""}${transaction.currency} ${money(amountMinor)}`,
         reference: transaction.invoiceNumber ?? transaction.receiptNumber ?? transaction.reference ?? "—",
         date: transaction.createdAt.toISOString().slice(0, 10),
       },
@@ -291,14 +307,16 @@ export default async function FeeCarryForwardPage({
           </Link>
           {studentsForAdvance.length > 0 && (
             <AdminActionDialog label="Record advance payment" title="Record an advance fee payment">
-              <RecordFeeAdvanceCreditForm students={studentsForAdvance} currency={currency} idempotencyKey={randomUUID()} />
+              <RecordFeeAdvanceCreditForm students={studentsForAdvance} currencies={currencyOptions} defaultCurrency={currency} idempotencyKey={randomUUID()} />
             </AdminActionDialog>
           )}
         </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <SummaryCard label="Available carry-forward balance" value={`${currency} ${money(totalAvailableMinor)}`} />
+        {totalRows.map((row) => (
+          <SummaryCard key={row.currency} label={`Available carry-forward balance · ${row.currency} · ${currencyNames.get(row.currency) ?? row.currency}`} value={`${row.currency} ${money(minorUnits(row.totalMinor))}`} />
+        ))}
         <SummaryCard label="Students with available credit" value={String(totalCount)} />
         <SummaryCard label="Recent credit activity" value={String(recentTransactions.length)} />
       </div>
@@ -328,7 +346,7 @@ export default async function FeeCarryForwardPage({
           <div className="grid gap-3 lg:grid-cols-2">
             {creditRows.map((student) => {
               const balance = minorUnits(student.balanceMinor);
-              const invoices = invoicesByStudent.get(student.studentId) ?? [];
+              const invoices = invoicesByStudent.get(`${student.studentId}:${student.currency}`) ?? [];
               return (
                 <article key={student.studentId} className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -338,7 +356,7 @@ export default async function FeeCarryForwardPage({
                     </div>
                     <div className="shrink-0 rounded-xl bg-emerald-50 px-3 py-2 sm:text-right">
                       <p className="text-xs font-medium text-emerald-800">Available credit</p>
-                      <p className="mt-0.5 text-lg font-bold text-emerald-900">{currency} {money(balance)}</p>
+                      <p className="mt-0.5 text-lg font-bold text-emerald-900">{student.currency} {money(balance)}</p>
                     </div>
                   </div>
                   {invoices.length ? (

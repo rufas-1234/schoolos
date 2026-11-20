@@ -13,6 +13,7 @@ import {
   feeStructures,
   feeTypes,
   schools,
+  schoolCurrencies,
   schoolBranches,
   studentEnrollments,
   studentFeeInvoices,
@@ -29,6 +30,7 @@ type SearchParams = {
   branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
+  currency?: string | string[];
 };
 
 function parseId(value: string | string[] | undefined): number | null {
@@ -69,6 +71,7 @@ export default async function FeeInvoicePrintPage({
   const branchId = parseId(params.branchId);
   const classLevelId = parseId(params.classLevelId);
   const sectionId = parseId(params.sectionId);
+  const requestedCurrency = typeof params.currency === "string" ? params.currency : "";
   const invalidDirectSelector =
     (params.invoiceId !== undefined && (!invoiceId || params.studentId !== undefined ||
       params.search !== undefined || params.status !== undefined || params.branchId !== undefined ||
@@ -96,6 +99,14 @@ export default async function FeeInvoicePrintPage({
   })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   if (!school) notFound();
+  if (requestedCurrency) {
+    const [configuredCurrency] = await db.select({ code: schoolCurrencies.code })
+      .from(schoolCurrencies).where(and(
+        eq(schoolCurrencies.schoolId, context.schoolId),
+        eq(schoolCurrencies.code, requestedCurrency),
+      )).limit(1);
+    if (!configuredCurrency) notFound();
+  }
   const today = todayInTimezone(school.timezone);
   const paymentTotalsForFilter = db.select({
     invoiceId: feePayments.invoiceId,
@@ -123,6 +134,7 @@ export default async function FeeInvoicePrintPage({
     id: studentFeeInvoices.id,
     publicId: studentFeeInvoices.publicId,
     invoiceNumber: studentFeeInvoices.invoiceNumber,
+    currency: studentFeeInvoices.currency,
     amount: studentFeeInvoices.amount,
     discountAmount: studentFeeInvoices.discountAmount,
     fineType: studentFeeInvoices.fineType,
@@ -190,6 +202,7 @@ export default async function FeeInvoicePrintPage({
     .leftJoin(paymentTotalsForFilter, eq(paymentTotalsForFilter.invoiceId, studentFeeInvoices.id))
     .where(and(
       eq(studentFeeInvoices.schoolId, context.schoolId),
+      ...(requestedCurrency ? [eq(studentFeeInvoices.currency, requestedCurrency)] : []),
       ...(invoiceId ? [eq(studentFeeInvoices.publicId, invoiceId)] : []),
       ...(studentId ? [eq(students.id, studentId)] : []),
       ...(branchId ? [eq(schoolBranches.id, branchId)] : []),
@@ -225,14 +238,21 @@ export default async function FeeInvoicePrintPage({
     row.invoiceId,
     parseMoneyToMinorUnits(row.paid ?? "0") ?? 0,
   ]));
-  const totalOutstanding = printableInvoices.reduce((sumDue, invoice) => {
+  const outstandingByCurrency = new Map<string, number>();
+  for (const invoice of printableInvoices) {
     const amount = parseMoneyToMinorUnits(invoice.amount) ?? 0;
     const discount = parseMoneyToMinorUnits(invoice.discountAmount) ?? 0;
     const fine = today > invoice.dueDate
       ? calculateFineMinorUnits(amount - discount, invoice.fineType, invoice.fineValue) ?? 0
       : 0;
-    return sumDue + Math.max(0, amount - discount + fine - (paidByInvoice.get(invoice.id) ?? 0));
-  }, 0);
+    const total = (outstandingByCurrency.get(invoice.currency) ?? 0) +
+      Math.max(0, amount - discount + fine - (paidByInvoice.get(invoice.id) ?? 0));
+    if (!Number.isSafeInteger(total)) throw new Error("Invoice balance total exceeds the supported range.");
+    outstandingByCurrency.set(invoice.currency, total);
+  }
+  const totalOutstanding = [...outstandingByCurrency]
+    .map(([currency, amount]) => `${currency} ${money(amount)}`)
+    .join(" · ") || `${requestedCurrency || school.currency} 0.00`;
 
   return (
     <main className="fee-invoice-page mx-auto max-w-5xl space-y-6 p-6 text-slate-900 print:max-w-none print:p-0">
@@ -243,7 +263,7 @@ export default async function FeeInvoicePrintPage({
           <p className="mt-2 text-sm text-slate-600">
             {tooManyInvoices
               ? "More than 500 invoices match these filters. Narrow the search before printing."
-              : `${printableInvoices.length} invoice${printableInvoices.length === 1 ? "" : "s"} · Total outstanding ${school.currency} ${money(totalOutstanding)}`}
+              : `${printableInvoices.length} invoice${printableInvoices.length === 1 ? "" : "s"} · Total outstanding ${totalOutstanding}`}
           </p>
         </div>
         <div className="flex items-center gap-3 print:hidden">
@@ -322,21 +342,21 @@ export default async function FeeInvoicePrintPage({
                 <tr>
                   <td>1</td>
                   <td>{feeDisplayName(invoice.typeName)}</td>
-                  <td className="text-right">{school.currency} {money(amount)}</td>
-                  <td className="text-right">{school.currency} {money(amount)}</td>
+                  <td className="text-right">{invoice.currency} {money(amount)}</td>
+                  <td className="text-right">{invoice.currency} {money(amount)}</td>
                 </tr>
-                {discount > 0 && <tr><td></td><td>Discount</td><td></td><td className="text-right">− {school.currency} {money(discount)}</td></tr>}
-                {fine > 0 && <tr><td></td><td>Late fine</td><td></td><td className="text-right">{school.currency} {money(fine)}</td></tr>}
+                {discount > 0 && <tr><td></td><td>Discount</td><td></td><td className="text-right">− {invoice.currency} {money(discount)}</td></tr>}
+                {fine > 0 && <tr><td></td><td>Late fine</td><td></td><td className="text-right">{invoice.currency} {money(fine)}</td></tr>}
               </tbody>
             </table>
 
             <div className="fee-invoice-totals ml-auto grid max-w-sm grid-cols-2 gap-x-6 gap-y-2 text-right text-sm">
-              <span>Subtotal</span><strong>{school.currency} {money(amount)}</strong>
-              {discount > 0 && <><span>Discount</span><strong>− {school.currency} {money(discount)}</strong></>}
-              {fine > 0 && <><span>Late fine</span><strong>{school.currency} {money(fine)}</strong></>}
-              <span className="fee-invoice-total-label">Total</span><strong className="fee-invoice-total-amount">{school.currency} {money(total)}</strong>
-              <span>Amount paid</span><strong>{school.currency} {money(paid)}</strong>
-              <span className="font-semibold">Amount due</span><strong className="fee-invoice-balance">{school.currency} {money(balance)}</strong>
+              <span>Subtotal</span><strong>{invoice.currency} {money(amount)}</strong>
+              {discount > 0 && <><span>Discount</span><strong>− {invoice.currency} {money(discount)}</strong></>}
+              {fine > 0 && <><span>Late fine</span><strong>{invoice.currency} {money(fine)}</strong></>}
+              <span className="fee-invoice-total-label">Total</span><strong className="fee-invoice-total-amount">{invoice.currency} {money(total)}</strong>
+              <span>Amount paid</span><strong>{invoice.currency} {money(paid)}</strong>
+              <span className="font-semibold">Amount due</span><strong className="fee-invoice-balance">{invoice.currency} {money(balance)}</strong>
               <span>Payment status</span><strong className="fee-invoice-status capitalize">{status}</strong>
             </div>
 

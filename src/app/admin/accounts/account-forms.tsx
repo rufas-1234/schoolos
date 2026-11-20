@@ -13,6 +13,7 @@ import {
 } from "./actions";
 
 export type AccountOption = { id: number; label: string };
+export type AccountCurrencyOption = { code: string; label: string };
 
 function ActionForm({
   action,
@@ -80,12 +81,32 @@ function SelectField({
   );
 }
 
+function CurrencyField({
+  currencies,
+  defaultValue,
+}: {
+  currencies: AccountCurrencyOption[];
+  defaultValue: string;
+}) {
+  return (
+    <label className="block text-sm text-slate-700">
+      <span className="mb-1 block font-medium">Currency</span>
+      <select name="currency" defaultValue={defaultValue} required
+        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+        {currencies.map((currency) => <option key={currency.code} value={currency.code}>{currency.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
 export function AccountForms({
   section,
   assetAccounts,
   incomeAccounts,
   expenseAccounts,
   banks,
+  currencies,
+  defaultCurrency,
   currentDate,
 }: {
   section: string;
@@ -93,6 +114,8 @@ export function AccountForms({
   incomeAccounts: AccountOption[];
   expenseAccounts: AccountOption[];
   banks: AccountOption[];
+  currencies: AccountCurrencyOption[];
+  defaultCurrency: string;
   currentDate: string;
 }) {
   return (
@@ -118,6 +141,7 @@ export function AccountForms({
           <TextField label="Account display name" name="accountName" placeholder="School operating account" />
           <TextField label="Account number (only last 4 are stored)" name="accountNumber" required={false} />
           <SelectField label="Linked asset account" name="chartAccountId" options={assetAccounts} />
+          <CurrencyField currencies={currencies} defaultValue={defaultCurrency} />
           <TextField label="Opening balance" name="openingBalance" type="number" defaultValue="0" />
         </div>
       </ActionForm>}
@@ -127,6 +151,7 @@ export function AccountForms({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <SelectField label="Income category" name="categoryAccountId" options={incomeAccounts} />
           <SelectField label="Deposit to bank / cash" name="bankAccountId" options={banks} required={false} />
+          <CurrencyField currencies={currencies} defaultValue={defaultCurrency} />
           <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
           <TextField label="Amount" name="amount" type="number" />
           <TextField label="Description" name="description" />
@@ -140,6 +165,7 @@ export function AccountForms({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <SelectField label="Expense category" name="categoryAccountId" options={expenseAccounts} />
           <SelectField label="Paid from bank / cash" name="bankAccountId" options={banks} required={false} />
+          <CurrencyField currencies={currencies} defaultValue={defaultCurrency} />
           <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
           <TextField label="Amount" name="amount" type="number" />
           <TextField label="Description" name="description" placeholder="Staff expense, supplies, utilities..." />

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { and, asc, desc, eq, like, or } from "drizzle-orm";
 import { db } from "@/db";
-import { schoolBranches, schools, staffMembers, staffPayrollRecords } from "@/db/schema";
+import { schoolBranches, schoolCurrencies, schools, staffMembers, staffPayrollRecords } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { AdminRecordDialog } from "@/components/admin-data-table";
 import {
@@ -29,7 +29,7 @@ export default async function StaffPayrollPage({
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const params = await searchParams;
-  const [schoolResult, branches] = await Promise.all([
+  const [schoolResult, branches, currencyRows] = await Promise.all([
     db.select({
       currency: schools.currency,
       timezone: schools.timezone,
@@ -41,6 +41,14 @@ export default async function StaffPayrollPage({
         eq(schoolBranches.status, "active"),
       ))
       .orderBy(asc(schoolBranches.name)),
+    db.select({
+      code: schoolCurrencies.code,
+      name: schoolCurrencies.name,
+      symbol: schoolCurrencies.symbol,
+      isDefault: schoolCurrencies.isDefault,
+    }).from(schoolCurrencies)
+      .where(eq(schoolCurrencies.schoolId, context.schoolId))
+      .orderBy(desc(schoolCurrencies.isDefault), asc(schoolCurrencies.code)),
   ]);
   const school = schoolResult[0];
   if (!school) throw new Error("School settings could not be loaded.");
@@ -100,6 +108,11 @@ export default async function StaffPayrollPage({
       .orderBy(desc(staffPayrollRecords.createdAt), asc(staffMembers.lastName)),
   ]);
   const currency = school.currency;
+  const currencies = currencyRows.map((item) => ({
+    value: item.code,
+    label: `${item.code} — ${item.name} (${item.symbol})`,
+  }));
+  const defaultCurrency = currencyRows.find((item) => item.isDefault)?.code ?? currency;
   const totalsByCurrency = new Map<string, { gross: bigint; deductions: bigint; net: bigint }>();
   for (const record of records) {
     const totals = totalsByCurrency.get(record.currency) ?? {
@@ -178,7 +191,8 @@ export default async function StaffPayrollPage({
             branchId={branch.id}
             branchName={branch.name}
             staffOptions={staffOptions}
-            currency={currency}
+            currencies={currencies}
+            defaultCurrency={defaultCurrency}
             payPeriod={payPeriod}
           />
         ) : (
@@ -271,7 +285,8 @@ export default async function StaffPayrollPage({
                               branchId={branchId ?? 0}
                               branchName={branch?.name ?? ""}
                               staffOptions={staffOptionsForEditing}
-                              currency={currency}
+                              currencies={currencies}
+                              defaultCurrency={defaultCurrency}
                               payPeriod={payPeriod}
                               record={record}
                             />

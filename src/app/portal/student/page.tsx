@@ -276,6 +276,7 @@ export default async function StudentPortalPage({
         id: studentFeeInvoices.id,
         studentId: studentFeeInvoices.studentId,
         invoiceNumber: studentFeeInvoices.invoiceNumber,
+        currency: studentFeeInvoices.currency,
         amount: studentFeeInvoices.amount,
         discountAmount: studentFeeInvoices.discountAmount,
         fineType: studentFeeInvoices.fineType,
@@ -711,8 +712,12 @@ export default async function StudentPortalPage({
       fineMinor,
     };
   });
-  const totalBalanceMinor = invoiceRows.reduce((total, invoice) => total + invoice.balanceMinor, 0);
-  if (!Number.isSafeInteger(totalBalanceMinor)) throw new Error("Outstanding fee balance exceeds the supported range.");
+  const balancesByCurrency = new Map<string, number>();
+  for (const invoice of invoiceRows) {
+    const balance = (balancesByCurrency.get(invoice.currency) ?? 0) + invoice.balanceMinor;
+    if (!Number.isSafeInteger(balance)) throw new Error("Outstanding fee balance exceeds the supported range.");
+    balancesByCurrency.set(invoice.currency, balance);
+  }
   const resultSearch = query.results?.trim().slice(0, 100).toLocaleLowerCase() ?? "";
   const feeFilter = query.fees === "outstanding" ? "outstanding" : "all";
   const librarySearch = libraryFilter.toLocaleLowerCase();
@@ -738,10 +743,15 @@ export default async function StudentPortalPage({
   const visibleTimetable = timetable.filter((lesson) =>
     timetableFilter === "all" || lesson.dayOfWeek === Number(timetableFilter),
   );
-  const formatMoney = (minor: number) => new Intl.NumberFormat(undefined, {
+  const formatMoney = (minor: number, currency: string) => new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: context.schoolCurrency,
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(minor / 100);
+  const outstandingByCurrency = [...balancesByCurrency]
+    .map(([currency, balance]) => formatMoney(balance, currency))
+    .join(" · ") || formatMoney(0, context.schoolCurrency);
   const paymentMethodLabel = (method: string) => method.replaceAll("_", " ");
 
   return (
@@ -800,7 +810,7 @@ export default async function StudentPortalPage({
               </article>
               <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="font-bold text-slate-950">Outstanding fees</h2>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{formatMoney(totalBalanceMinor)}</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{outstandingByCurrency}</p>
                 <Link href="/portal/student?section=fees" className="mt-3 inline-flex text-sm font-semibold text-violet-700 hover:text-violet-900">
                   View invoices
                 </Link>
@@ -1129,7 +1139,7 @@ export default async function StudentPortalPage({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <SectionHeading title="Fee invoices" description="Your invoices and outstanding balances." />
                 <p className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
-                  Total outstanding: {formatMoney(totalBalanceMinor)}
+                  Total outstanding: {outstandingByCurrency}
                 </p>
               </div>
               <FilterForm
@@ -1195,11 +1205,11 @@ export default async function StudentPortalPage({
                             <tr>
                               <td>1</td>
                               <td>{feeDisplayName(invoice.typeName)}{invoice.groupName ? ` · ${invoice.groupName}` : ""}</td>
-                              <td className="text-right">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</td>
-                              <td className="text-right">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</td>
+                              <td className="text-right">{invoice.currency} {(invoice.amountMinor / 100).toFixed(2)}</td>
+                              <td className="text-right">{invoice.currency} {(invoice.amountMinor / 100).toFixed(2)}</td>
                             </tr>
-                            {invoice.discountMinor > 0 && <tr><td></td><td>Discount</td><td></td><td className="text-right">− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</td></tr>}
-                            {invoice.fineMinor > 0 && <tr><td></td><td>Late fine</td><td></td><td className="text-right">{context.schoolCurrency} {(invoice.fineMinor / 100).toFixed(2)}</td></tr>}
+                            {invoice.discountMinor > 0 && <tr><td></td><td>Discount</td><td></td><td className="text-right">− {invoice.currency} {(invoice.discountMinor / 100).toFixed(2)}</td></tr>}
+                            {invoice.fineMinor > 0 && <tr><td></td><td>Late fine</td><td></td><td className="text-right">{invoice.currency} {(invoice.fineMinor / 100).toFixed(2)}</td></tr>}
                           </tbody>
                         </table>
                       </div>
@@ -1210,29 +1220,29 @@ export default async function StudentPortalPage({
                             <div className="min-w-0">
                               <p className="font-semibold text-slate-900">{feeDisplayName(invoice.typeName)}</p>
                               {invoice.groupName && <p className="mt-0.5 text-xs text-slate-500">{invoice.groupName}</p>}
-                              <p className="mt-1 text-xs text-slate-500">Qty 1 · Unit price {context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</p>
+                              <p className="mt-1 text-xs text-slate-500">Qty 1 · Unit price {invoice.currency} {(invoice.amountMinor / 100).toFixed(2)}</p>
                             </div>
-                            <strong className="max-w-[45%] shrink-0 break-words text-right text-sm text-slate-900">{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</strong>
+                            <strong className="max-w-[45%] shrink-0 break-words text-right text-sm text-slate-900">{invoice.currency} {(invoice.amountMinor / 100).toFixed(2)}</strong>
                           </div>
                           {invoice.discountMinor > 0 && (
                             <div className="mt-3 flex justify-between gap-3 border-t border-slate-100 pt-2 text-sm">
-                              <span>Discount</span><strong className="shrink-0">− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</strong>
+                              <span>Discount</span><strong className="shrink-0">− {invoice.currency} {(invoice.discountMinor / 100).toFixed(2)}</strong>
                             </div>
                           )}
                           {invoice.fineMinor > 0 && (
                             <div className="mt-2 flex justify-between gap-3 text-sm">
-                              <span>Late fine</span><strong className="shrink-0">{context.schoolCurrency} {(invoice.fineMinor / 100).toFixed(2)}</strong>
+                              <span>Late fine</span><strong className="shrink-0">{invoice.currency} {(invoice.fineMinor / 100).toFixed(2)}</strong>
                             </div>
                           )}
                         </div>
                       </div>
                       <div className="fee-invoice-totals ml-auto grid w-full max-w-sm grid-cols-2 gap-x-4 gap-y-2 break-words text-right text-sm sm:gap-x-6">
-                        <span>Subtotal</span><strong>{context.schoolCurrency} {(invoice.amountMinor / 100).toFixed(2)}</strong>
-                        {invoice.discountMinor > 0 && <><span>Discount</span><strong>− {context.schoolCurrency} {(invoice.discountMinor / 100).toFixed(2)}</strong></>}
-                        {invoice.fineMinor > 0 && <><span>Late fine</span><strong>{context.schoolCurrency} {(invoice.fineMinor / 100).toFixed(2)}</strong></>}
-                        <span className="fee-invoice-total-label">Total</span><strong className="fee-invoice-total-amount">{context.schoolCurrency} {((invoice.amountMinor - invoice.discountMinor + invoice.fineMinor) / 100).toFixed(2)}</strong>
-                        <span>Amount paid</span><strong>{context.schoolCurrency} {(invoice.paidMinor / 100).toFixed(2)}</strong>
-                        <span className="font-semibold">Amount due</span><strong className="fee-invoice-balance">{context.schoolCurrency} {(invoice.balanceMinor / 100).toFixed(2)}</strong>
+                        <span>Subtotal</span><strong>{invoice.currency} {(invoice.amountMinor / 100).toFixed(2)}</strong>
+                        {invoice.discountMinor > 0 && <><span>Discount</span><strong>− {invoice.currency} {(invoice.discountMinor / 100).toFixed(2)}</strong></>}
+                        {invoice.fineMinor > 0 && <><span>Late fine</span><strong>{invoice.currency} {(invoice.fineMinor / 100).toFixed(2)}</strong></>}
+                        <span className="fee-invoice-total-label">Total</span><strong className="fee-invoice-total-amount">{invoice.currency} {((invoice.amountMinor - invoice.discountMinor + invoice.fineMinor) / 100).toFixed(2)}</strong>
+                        <span>Amount paid</span><strong>{invoice.currency} {(invoice.paidMinor / 100).toFixed(2)}</strong>
+                        <span className="font-semibold">Amount due</span><strong className="fee-invoice-balance">{invoice.currency} {(invoice.balanceMinor / 100).toFixed(2)}</strong>
                         <span>Payment status</span><strong className="fee-invoice-status capitalize">{feeInvoiceStatus(invoice.amountMinor - invoice.discountMinor + invoice.fineMinor, invoice.paidMinor) ?? "unpaid"}</strong>
                       </div>
                       <footer className="fee-invoice-footer grid min-w-0 gap-4 border-t border-slate-200 pt-4 sm:grid-cols-[1fr_auto] sm:items-end sm:gap-5 sm:pt-5">
@@ -1278,7 +1288,7 @@ export default async function StudentPortalPage({
                         </header>
                         <section className="fee-receipt-total rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
                           <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Amount received</p>
-                          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{context.schoolCurrency} {payment.amount}</p>
+                          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{invoice.currency} {payment.amount}</p>
                           <p className="mt-2 text-sm text-slate-600">
                             Payment recorded on {formatFeeReportDate(payment.paidAt, context.schoolTimezone)}
                           </p>
@@ -1293,10 +1303,10 @@ export default async function StudentPortalPage({
                           <ReceiptField label="Reference" value={payment.reference || "—"} />
                         </section>
                         <section className="space-y-3 rounded-xl bg-slate-50 p-5">
-                          <ReceiptTotal label="Payment amount" value={`${context.schoolCurrency} ${payment.amount}`} />
-                          <ReceiptTotal label="Reversed / refunded" value={formatMoney(reversed)} />
-                          <ReceiptTotal label="Net payment retained" value={formatMoney(net)} />
-                          <ReceiptTotal label="Late fine included" value={`${context.schoolCurrency} ${payment.fineAmount}`} />
+                          <ReceiptTotal label="Payment amount" value={`${invoice.currency} ${payment.amount}`} />
+                          <ReceiptTotal label="Reversed / refunded" value={formatMoney(reversed, invoice.currency)} />
+                          <ReceiptTotal label="Net payment retained" value={formatMoney(net, invoice.currency)} />
+                          <ReceiptTotal label="Late fine included" value={`${invoice.currency} ${payment.fineAmount}`} />
                         </section>
                         {payment.notes && (
                           <div>
@@ -1310,7 +1320,7 @@ export default async function StudentPortalPage({
                             <ul className="mt-2 space-y-2 text-sm text-slate-600">
                               {paymentReversals.map((reversal, index) => (
                                 <li key={`${reversal.createdAt.toISOString()}-${index}`}>
-                                  {reversal.reversalType} · {context.schoolCurrency} {reversal.amount} · {reversal.reason}
+                                  {reversal.reversalType} · {invoice.currency} {reversal.amount} · {reversal.reason}
                                   {reversal.reference ? ` · Ref ${reversal.reference}` : ""}
                                 </li>
                               ))}

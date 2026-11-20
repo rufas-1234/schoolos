@@ -13,6 +13,7 @@ import {
   feeStructures,
   feeTypes,
   schools,
+  schoolCurrencies,
   schoolBranches,
   studentEnrollments,
   studentFeeInvoices,
@@ -37,6 +38,7 @@ type SearchParams = {
   branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
+  currency?: string | string[];
   page?: string | string[];
   pageSize?: string | string[];
 };
@@ -81,6 +83,17 @@ export default async function FeeCollectionPage({
     : 1;
   const [school] = await db.select({ currency: schools.currency, timezone: schools.timezone })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
+  const currency = school?.currency ?? "";
+  const currencyRows = await db.select({ code: schoolCurrencies.code, name: schoolCurrencies.name, symbol: schoolCurrencies.symbol })
+    .from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId));
+  const requestedCurrency = typeof params.currency === "string" ? params.currency : "";
+  const selectedCurrency = currencyRows.some((item) => item.code === requestedCurrency)
+    ? requestedCurrency
+    : currency;
+  const currencyOptions: SearchableSelectOption[] = currencyRows.map((item) => ({
+    value: item.code,
+    label: `${item.code} · ${item.name} (${item.symbol})`,
+  }));
   const today = todayInTimezone(school?.timezone ?? "UTC");
   const paymentTotals = db.select({
     invoiceId: feePayments.invoiceId,
@@ -107,6 +120,7 @@ export default async function FeeCollectionPage({
   END`;
   const invoiceFilters = [
     eq(studentFeeInvoices.schoolId, context.schoolId),
+    eq(studentFeeInvoices.currency, selectedCurrency),
     ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
     ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
     ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
@@ -126,6 +140,7 @@ export default async function FeeCollectionPage({
     publicId: studentFeeInvoices.publicId,
     invoiceNumber: studentFeeInvoices.invoiceNumber,
     amount: studentFeeInvoices.amount,
+    currency: studentFeeInvoices.currency,
     discountAmount: studentFeeInvoices.discountAmount,
     fineType: studentFeeInvoices.fineType,
     fineValue: studentFeeInvoices.fineValue,
@@ -284,7 +299,6 @@ export default async function FeeCollectionPage({
       receiptsByInvoice.set(receipt.invoiceId, invoiceReceipts);
     }
   }
-  const currency = school?.currency ?? "";
   const branchOptions: SearchableSelectOption[] = [
     { value: "", label: "All branches" },
     ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
@@ -305,7 +319,7 @@ export default async function FeeCollectionPage({
     .filter((invoice) => invoice.balance > 0)
     .map((invoice) => ({
       id: invoice.id,
-      label: `${invoice.invoiceNumber} · ${invoice.studentName} ${invoice.studentLastName} · ${currency} ${money(invoice.balance)} due`,
+      label: `${invoice.invoiceNumber} · ${invoice.studentName} ${invoice.studentLastName} · ${invoice.currency} ${money(invoice.balance)} due`,
     }));
   const firstResult = matchingCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastResult = Math.min(page * pageSize, matchingCount);
@@ -316,6 +330,7 @@ export default async function FeeCollectionPage({
     if (requestedBranch !== null) query.set("branchId", String(requestedBranch));
     if (requestedClass !== null) query.set("classLevelId", String(requestedClass));
     if (requestedSection !== null) query.set("sectionId", String(requestedSection));
+    query.set("currency", selectedCurrency);
     query.set("page", String(targetPage));
     query.set("pageSize", String(pageSize));
     return `/admin/fees/collection?${query.toString()}`;
@@ -343,14 +358,16 @@ export default async function FeeCollectionPage({
           branches={branchOptions}
           classes={classOptions}
           sections={sectionOptions}
+          currencies={currencyOptions}
           selectedBranch={requestedBranch === null ? "" : String(requestedBranch)}
           selectedClass={requestedClass === null ? "" : String(requestedClass)}
           selectedSection={requestedSection === null ? "" : String(requestedSection)}
           selectedStatus={statusFilter}
+          selectedCurrency={selectedCurrency}
         />
         <AdminActionDialog label="Quick add payment" title="Quick add payment">
           <RecordFeePaymentForm
-            currency={currency}
+            currency={selectedCurrency}
             idempotencyKey={randomUUID()}
             invoices={payableInvoices}
           />
@@ -364,7 +381,7 @@ export default async function FeeCollectionPage({
         sectionId={requestedSection === null ? "" : String(requestedSection)}
         invoiceCount={bulkInvoiceCount}
         outstandingMinor={bulkOutstandingMinor}
-        currency={currency}
+        currency={selectedCurrency}
       />
       <Link
         href={`/admin/fees/invoices/print?${new URLSearchParams({
@@ -373,6 +390,7 @@ export default async function FeeCollectionPage({
           ...(requestedBranch !== null ? { branchId: String(requestedBranch) } : {}),
           ...(requestedClass !== null ? { classLevelId: String(requestedClass) } : {}),
           ...(requestedSection !== null ? { sectionId: String(requestedSection) } : {}),
+          currency: selectedCurrency,
         }).toString()}`}
         className="inline-flex rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
       >
@@ -381,7 +399,7 @@ export default async function FeeCollectionPage({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <SummaryCard label="Invoices matching filters" value={String(matchingCount)} />
-        <SummaryCard label="Outstanding on this page" value={`${currency} ${money(totalOutstanding)}`} />
+        <SummaryCard label={`Outstanding on this page · ${selectedCurrency}`} value={`${selectedCurrency} ${money(totalOutstanding)}`} />
       </div>
 
       <nav aria-label="Invoice pages" className="flex flex-wrap items-center justify-between gap-3">
@@ -465,10 +483,10 @@ export default async function FeeCollectionPage({
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-right text-sm">
-                <span className="text-slate-500">Fee</span><span>{currency} {money(parseMoneyToMinorUnits(invoice.amount) ?? 0)}</span>
-                <span className="text-slate-500">Paid</span><span>{currency} {money(invoice.paid)}</span>
+                <span className="text-slate-500">Fee</span><span>{invoice.currency} {money(parseMoneyToMinorUnits(invoice.amount) ?? 0)}</span>
+                <span className="text-slate-500">Paid</span><span>{invoice.currency} {money(invoice.paid)}</span>
                 <span className="font-semibold text-slate-800">Balance</span>
-                <span className="font-semibold text-slate-800">{currency} {money(Math.max(0, invoice.balance))}</span>
+                <span className="font-semibold text-slate-800">{invoice.currency} {money(Math.max(0, invoice.balance))}</span>
                 <span>Status</span><span className="capitalize">{invoice.status}</span>
               </div>
             </div>
@@ -479,7 +497,7 @@ export default async function FeeCollectionPage({
                   <RecordFeePaymentForm
                     invoiceId={invoice.id}
                     maxAmount={money(invoice.balance)}
-                    currency={currency}
+                    currency={invoice.currency}
                     idempotencyKey={randomUUID()}
                   />
                 </div>

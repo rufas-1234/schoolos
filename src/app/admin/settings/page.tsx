@@ -1,15 +1,21 @@
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { schools } from "@/db/schema";
+import { schoolCurrencies, schools } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { SchoolSettingsForm } from "./school-settings-form";
+import { SchoolCurrencySettings, SchoolSettingsForm } from "./school-settings-form";
 import { SchoolLogoUpload } from "./school-logo-upload";
 
 export default async function SchoolSettingsPage() {
   const context = await requireSchoolPermission("school.settings.manage");
   const [school] = await db.select().from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   if (!school) notFound();
+  const currencies = await db.select({
+    code: schoolCurrencies.code,
+    name: schoolCurrencies.name,
+    symbol: schoolCurrencies.symbol,
+    isDefault: schoolCurrencies.isDefault,
+  }).from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId));
 
   return (
     <div className="mx-auto max-w-4xl space-y-7">
@@ -24,7 +30,10 @@ export default async function SchoolSettingsPage() {
         <SchoolLogoUpload logoUrl={school.logoUrl} />
       </section>
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
-        <SchoolSettingsForm school={school} />
+        <SchoolSettingsForm school={school} currencies={currencies} />
+      </section>
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
+        <SchoolCurrencySettings currencies={currencies} />
       </section>
     </div>
   );
