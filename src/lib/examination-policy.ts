@@ -21,6 +21,20 @@ export type ExamMarkEntry =
   | { kind: "score"; marks: number | null }
   | { kind: "status"; status: "x" | "y" };
 
+const examAttendanceStatuses: ExamAttendanceStatus[] = [
+  "present",
+  "absent",
+  "late",
+  "excused",
+  "not_applicable",
+  "x",
+  "y",
+];
+
+export function isExamAttendanceStatus(value: string): value is ExamAttendanceStatus {
+  return examAttendanceStatuses.some((status) => status === value);
+}
+
 export const examMarkEntryInputPattern = String.raw`\s*(?:[0-9]{1,6}(?:\.[0-9]{1,2})?|[xXyY])\s*`;
 
 export function canEditExamAttendance(input: {
@@ -78,10 +92,7 @@ export function examAssessmentResultState(input: {
   isCompulsory: boolean;
   hasMark: boolean;
 }): ExamAssessmentResultState {
-  if (
-    input.attendanceStatus !== null &&
-    !["present", "absent", "late", "excused", "not_applicable", "x", "y"].includes(input.attendanceStatus)
-  ) return "missing";
+  if (input.attendanceStatus !== null && !isExamAttendanceStatus(input.attendanceStatus)) return "missing";
   if (input.attendanceStatus === "not_applicable" && !input.isCompulsory) return "not-applicable";
   if (input.attendanceStatus === "x" || input.attendanceStatus === "y") return "no-result";
   return input.hasMark ? "scored" : "missing";

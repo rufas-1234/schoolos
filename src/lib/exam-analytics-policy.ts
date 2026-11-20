@@ -1,4 +1,71 @@
-import { gradeForPercentage, type GradeBand } from "./examination-policy";
+import {
+  gradeForPercentage,
+  isExamAttendanceStatus,
+  type ExamAttendanceStatus,
+  type GradeBand,
+} from "./examination-policy";
+
+export const examAnalyticsReportViews = [
+  "overview",
+  "classes",
+  "sections",
+  "subjects",
+  "students",
+  "attendance",
+  "trends",
+] as const;
+
+export type ExamAnalyticsReportView = (typeof examAnalyticsReportViews)[number];
+
+export function resolveExamAnalyticsReportView(value: string | undefined): ExamAnalyticsReportView {
+  return examAnalyticsReportViews.find((view) => view === value) ?? "overview";
+}
+
+export type ExamAttendanceSummary = {
+  assignedSessions: number;
+  expectedSessions: number;
+  recordedSessions: number;
+  pendingSessions: number;
+  coveragePercent: number | null;
+  statuses: Record<ExamAttendanceStatus, number>;
+};
+
+export function summarizeExamAttendance(
+  assignedSessions: number,
+  recordedStatuses: string[],
+): ExamAttendanceSummary {
+  if (!Number.isInteger(assignedSessions) || assignedSessions < 0) {
+    throw new Error("Assigned exam attendance sessions must be a non-negative integer.");
+  }
+  const statuses: Record<ExamAttendanceStatus, number> = {
+    present: 0,
+    absent: 0,
+    late: 0,
+    excused: 0,
+    not_applicable: 0,
+    x: 0,
+    y: 0,
+  };
+  for (const status of recordedStatuses) {
+    if (!isExamAttendanceStatus(status)) throw new Error("Unknown exam attendance status in analytics.");
+    statuses[status] += 1;
+  }
+  const exemptSessions = statuses.not_applicable;
+  const expectedSessions = assignedSessions - exemptSessions;
+  const recordedSessions = recordedStatuses.length - exemptSessions;
+  if (expectedSessions < 0 || recordedSessions > expectedSessions) {
+    throw new Error("Exam attendance records exceed the assigned analytics cohort.");
+  }
+  const pendingSessions = expectedSessions - recordedSessions;
+  return {
+    assignedSessions,
+    expectedSessions,
+    recordedSessions,
+    pendingSessions,
+    coveragePercent: expectedSessions ? recordedSessions / expectedSessions * 100 : null,
+    statuses,
+  };
+}
 
 export type ExamAnalyticsSummary = {
   count: number;

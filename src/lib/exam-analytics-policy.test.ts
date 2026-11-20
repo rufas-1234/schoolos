@@ -3,6 +3,8 @@ import {
   analyzeSubjectLearners,
   analyticsRank,
   gradeDistribution,
+  resolveExamAnalyticsReportView,
+  summarizeExamAttendance,
   summarizeExamScores,
 } from "./exam-analytics-policy";
 import type { GradeBand } from "./examination-policy";
@@ -64,5 +66,34 @@ describe("exam analytics policy", () => {
     ]);
     expect([...analyzeSubjectLearners(scores, bands, false).values()])
       .toEqual([{ grade: "A", rank: null }, { grade: "A", rank: null }, { grade: "C", rank: null }]);
+  });
+
+  it("resolves report dropdown selections and falls back to the overview", () => {
+    expect(resolveExamAnalyticsReportView("sections")).toBe("sections");
+    expect(resolveExamAnalyticsReportView("unknown")).toBe("overview");
+  });
+
+  it("reports attendance coverage without counting not-applicable sessions as missing or treating X/Y as present", () => {
+    expect(summarizeExamAttendance(5, ["present", "late", "x", "not_applicable"])).toEqual({
+      assignedSessions: 5,
+      expectedSessions: 4,
+      recordedSessions: 3,
+      pendingSessions: 1,
+      coveragePercent: 75,
+      statuses: {
+        present: 1,
+        absent: 0,
+        late: 1,
+        excused: 0,
+        not_applicable: 1,
+        x: 1,
+        y: 0,
+      },
+    });
+  });
+
+  it("rejects unknown attendance statuses and records beyond the assigned cohort", () => {
+    expect(() => summarizeExamAttendance(1, ["unknown"])).toThrow("Unknown exam attendance status");
+    expect(() => summarizeExamAttendance(0, ["present"])).toThrow("exceed the assigned analytics cohort");
   });
 });

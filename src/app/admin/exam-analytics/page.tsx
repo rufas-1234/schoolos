@@ -11,6 +11,7 @@ import {
   classSections,
   classSubjects,
   examClasses,
+  examAttendance,
   examGradeBands,
   examGradingScales,
   examMarks,
@@ -29,7 +30,10 @@ import {
   analyzeSubjectLearners,
   analyticsRank,
   gradeDistribution,
+  resolveExamAnalyticsReportView,
+  summarizeExamAttendance,
   summarizeExamScores,
+  type ExamAnalyticsReportView,
 } from "@/lib/exam-analytics-policy";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { DownloadAnalyticsCsv } from "./download-analytics-csv";
@@ -42,6 +46,7 @@ type Query = {
   sectionId?: string | string[];
   subjectId?: string | string[];
   studentId?: string | string[];
+  report?: string | string[];
 };
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -73,11 +78,22 @@ type ScoreRow = {
   sectionName: string;
   classLevelId: number;
   className: string;
+  classBranchName: string;
   marks: Map<number, number | null>;
   complete: boolean;
   mean: number | null;
   grade: GradeBand | null;
 };
+
+const reportOptions: { value: ExamAnalyticsReportView; label: string; description: string }[] = [
+  { value: "overview", label: "Overview", description: "School-wide highlights and score distribution" },
+  { value: "classes", label: "Class comparison", description: "Overall class performance and completion" },
+  { value: "sections", label: "Section comparison", description: "Compare streams within and across classes" },
+  { value: "subjects", label: "Subject analysis", description: "Score coverage, grades, and subject results" },
+  { value: "students", label: "Student rankings", description: "Student results across the selected cohort" },
+  { value: "attendance", label: "Exam attendance", description: "Coverage and status breakdown by class and section" },
+  { value: "trends", label: "Performance trends", description: "Compare published exams in the academic year" },
+];
 
 export default async function ExamAnalyticsPage({
   searchParams,
@@ -91,6 +107,7 @@ export default async function ExamAnalyticsPage({
   const requestedSectionId = validId(first(query.sectionId));
   const requestedSubjectId = validId(first(query.subjectId));
   const requestedStudentId = validId(first(query.studentId));
+  const reportView = resolveExamAnalyticsReportView(first(query.report));
   const [school, publishedExams] = await Promise.all([
     db.select({ name: schools.name, logoUrl: schools.logoUrl })
       .from(schools).where(eq(schools.id, context.schoolId)).limit(1).then((rows) => rows[0]),
@@ -170,6 +187,10 @@ export default async function ExamAnalyticsPage({
       eq(classLevels.id, classSections.classLevelId),
       eq(classLevels.schoolId, context.schoolId),
     ))
+    .innerJoin(schoolBranches, and(
+      eq(schoolBranches.id, classLevels.branchId),
+      eq(schoolBranches.schoolId, context.schoolId),
+    ))
     .where(and(
       eq(classSections.schoolId, context.schoolId),
       eq(classSections.academicYearId, selectedExam.academicYearId),
@@ -229,6 +250,7 @@ export default async function ExamAnalyticsPage({
     sectionName: classSections.name,
     classLevelId: classLevels.id,
     className: classLevels.name,
+    classBranchName: schoolBranches.name,
   }).from(studentEnrollments)
     .innerJoin(classSections, and(
       eq(classSections.id, studentEnrollments.classSectionId),
@@ -237,6 +259,10 @@ export default async function ExamAnalyticsPage({
     .innerJoin(classLevels, and(
       eq(classLevels.id, classSections.classLevelId),
       eq(classLevels.schoolId, context.schoolId),
+    ))
+    .innerJoin(schoolBranches, and(
+      eq(schoolBranches.id, classLevels.branchId),
+      eq(schoolBranches.schoolId, context.schoolId),
     ))
     .innerJoin(students, and(
       eq(students.id, studentEnrollments.studentId),
@@ -259,6 +285,17 @@ export default async function ExamAnalyticsPage({
     inArray(examMarks.enrollmentId, roster.map((row) => row.enrollmentId)),
     inArray(examMarks.examSubjectId, assessmentRows.map((row) => row.id)),
   )) : [];
+  const attendanceRows = reportView === "attendance" && roster.length && assessmentRows.length
+    ? await db.select({
+      enrollmentId: examAttendance.enrollmentId,
+      examSubjectId: examAttendance.examSubjectId,
+      status: examAttendance.status,
+    }).from(examAttendance).where(and(
+      eq(examAttendance.schoolId, context.schoolId),
+      inArray(examAttendance.enrollmentId, roster.map((row) => row.enrollmentId)),
+      inArray(examAttendance.examSubjectId, assessmentRows.map((row) => row.id)),
+    ))
+    : [];
   const gradeRows = selectedExam ? await db.select({
     minPercent: examGradeBands.minPercent,
     maxPercent: examGradeBands.maxPercent,
@@ -317,20 +354,49 @@ export default async function ExamAnalyticsPage({
   const passMark = selectedExam?.averagePassing ? Number(selectedExam.averageMark) : null;
   const passCount = passMark === null ? null : scores.filter((score) => score >= passMark).length;
   const completionRate = cohortResults.length ? completeResults.length / cohortResults.length * 100 : 0;
-  const sectionPerformance = new Map<string, { className: string; sectionName: string; scores: number[]; enrolled: number; completed: number }>();
+  type ScoreGroup = {
+    branchName: string;
+    className: string;
+    sectionName?: string;
+    scores: number[];
+    enrolled: number;
+    completed: number;
+    passed: number;
+  };
+  const classPerformance = new Map<number, ScoreGroup>();
+  const sectionPerformance = new Map<string, ScoreGroup>();
   for (const row of cohortResults) {
+    const classGroup = classPerformance.get(row.classLevelId) ?? {
+      branchName: row.classBranchName,
+      className: row.className,
+      scores: [],
+      enrolled: 0,
+      completed: 0,
+      passed: 0,
+    };
+    classGroup.enrolled += 1;
+    if (row.mean !== null) {
+      classGroup.scores.push(row.mean);
+      classGroup.completed += 1;
+      if (passMark !== null && row.mean >= passMark) classGroup.passed += 1;
+    }
+    classPerformance.set(row.classLevelId, classGroup);
+
     const key = `${row.classLevelId}:${row.sectionId}`;
     const group = sectionPerformance.get(key) ?? {
+      branchName: row.classBranchName,
       className: row.className,
       sectionName: row.sectionName,
       scores: [],
       enrolled: 0,
       completed: 0,
+      passed: 0,
     };
     group.enrolled += 1;
     if (row.mean !== null) {
       group.scores.push(row.mean);
       group.completed += 1;
+      if (passMark !== null && row.mean >= passMark) group.passed += 1;
     }
     sectionPerformance.set(key, group);
   }
@@ -340,12 +406,20 @@ export default async function ExamAnalyticsPage({
       const marks = row.marks.get(assessment.id);
       return typeof marks === "number" ? [marks / Number(assessment.maxMarks) * 100] : [];
     });
+    const subjectGradeDistribution = gradeDistribution(subjectScores, bands);
+    const highestGrade = [...bands].sort((a, b) => b.minPercent - a.minPercent)[0]?.grade ?? null;
     return {
       ...assessment,
       summary: summarizeExamScores(subjectScores),
       enrolled: relevantResults.length,
+      scoreRate: relevantResults.length ? subjectScores.length / relevantResults.length * 100 : 0,
+      highestGrade,
+      highestGradeCount: subjectGradeDistribution.find((item) => item.grade === highestGrade)?.count ?? 0,
     };
   });
+  const subjectHighlightRows = [...subjectPerformance].sort((a, b) =>
+    (b.summary.mean ?? -1) - (a.summary.mean ?? -1) || a.subjectName.localeCompare(b.subjectName),
+  );
   const subjectLearnerDetails = new Map<number, Map<number, { grade: string | null; rank: number | null }>>();
   for (const assessment of assessmentRows) {
     const scores = cohortResults.flatMap((row) => {
@@ -359,10 +433,53 @@ export default async function ExamAnalyticsPage({
       analyzeSubjectLearners(scores, bands, selectedExam?.allowRanking ?? false),
     );
   }
+  const attendanceByEnrollmentSubject = new Map<string, string>();
+  for (const attendance of attendanceRows) {
+    attendanceByEnrollmentSubject.set(`${attendance.enrollmentId}:${attendance.examSubjectId}`, attendance.status);
+  }
+  type AttendanceGroup = {
+    branchName: string;
+    className: string;
+    sectionName: string;
+    assignedSessions: number;
+    statuses: string[];
+  };
+  const attendanceGroups = new Map<string, AttendanceGroup>();
+  const overallAttendanceInput = { assignedSessions: 0, statuses: [] as string[] };
+  for (const learner of cohortResults) {
+    const key = `${learner.classLevelId}:${learner.sectionId}`;
+    const group = attendanceGroups.get(key) ?? {
+      branchName: learner.classBranchName,
+      className: learner.className,
+      sectionName: learner.sectionName,
+      assignedSessions: 0,
+      statuses: [],
+    };
+    const learnerAssessments = assessmentRows.filter((assessment) => assessment.classLevelId === learner.classLevelId);
+    for (const assessment of learnerAssessments) {
+      const status = attendanceByEnrollmentSubject.get(`${learner.enrollmentId}:${assessment.id}`);
+      group.assignedSessions += 1;
+      overallAttendanceInput.assignedSessions += 1;
+      if (status) {
+        group.statuses.push(status);
+        overallAttendanceInput.statuses.push(status);
+      }
+    }
+    attendanceGroups.set(key, group);
+  }
+  const attendanceSummary = summarizeExamAttendance(
+    overallAttendanceInput.assignedSessions,
+    overallAttendanceInput.statuses,
+  );
+  const attendancePerformance = [...attendanceGroups.entries()].map(([key, group]) => ({
+    key,
+    ...group,
+    summary: summarizeExamAttendance(group.assignedSessions, group.statuses),
+  }));
   const selectedSubjectIdentity = requestedSubjectId
     ? assessmentRows.find((item) => item.id === requestedSubjectId)?.subjectId ?? null
     : null;
-  const trendExamRows = selectedExam && selectedClass
+  const trendExamMatches = reportView === "trends" && selectedExam && classLevelIds.length
     ? await db.select({
       id: examinations.id,
       name: examinations.name,
@@ -371,7 +488,7 @@ export default async function ExamAnalyticsPage({
       .innerJoin(examClasses, and(
         eq(examClasses.examinationId, examinations.id),
         eq(examClasses.schoolId, context.schoolId),
-        eq(examClasses.classLevelId, selectedClass.classLevelId),
+        inArray(examClasses.classLevelId, classLevelIds),
       ))
       .where(and(
         eq(examinations.schoolId, context.schoolId),
@@ -380,9 +497,11 @@ export default async function ExamAnalyticsPage({
       ))
       .orderBy(asc(examinations.startDate), asc(examinations.name))
     : [];
+  const trendExamRows = [...new Map(trendExamMatches.map((exam) => [exam.id, exam])).values()];
   const trendAssessmentRows = trendExamRows.length
     ? await db.select({
       examId: examClasses.examinationId,
+      classLevelId: examClasses.classLevelId,
       examSubjectId: examSubjects.id,
       subjectId: subjects.id,
       maxMarks: examSubjects.maxMarks,
@@ -392,7 +511,7 @@ export default async function ExamAnalyticsPage({
         eq(examClasses.id, examSubjects.examClassId),
         eq(examClasses.schoolId, context.schoolId),
         inArray(examClasses.examinationId, trendExamRows.map((item) => item.id)),
-        eq(examClasses.classLevelId, selectedClass!.classLevelId),
+        inArray(examClasses.classLevelId, classLevelIds),
       ))
       .innerJoin(classSubjects, and(
         eq(classSubjects.id, examSubjects.classSubjectId),
@@ -443,9 +562,11 @@ export default async function ExamAnalyticsPage({
     const cohortScores: number[] = [];
     let selectedStudentScore: number | null = null;
     for (const learner of roster) {
+      const learnerAssessments = assessments.filter((assessment) => assessment.classLevelId === learner.classLevelId);
+      if (!learnerAssessments.length) continue;
       const marks = trendMarks.get(trendExam.id)?.get(learner.enrollmentId);
-      if (!marks || !assessments.every((assessment) => typeof marks.get(assessment.examSubjectId) === "number")) continue;
-      const result = calculateWeightedAverage(assessments.map((assessment) => ({
+      if (!marks || !learnerAssessments.every((assessment) => typeof marks.get(assessment.examSubjectId) === "number")) continue;
+      const result = calculateWeightedAverage(learnerAssessments.map((assessment) => ({
         marks: Number(marks.get(assessment.examSubjectId)),
         maxMarks: Number(assessment.maxMarks),
         weight: Number(assessment.weight),
@@ -460,8 +581,30 @@ export default async function ExamAnalyticsPage({
       selectedStudentScore,
     }];
   });
-  const filteredOptions = assessmentRows;
-  const csvHeaders = [
+  const classComparisonRows = [...classPerformance.entries()].map(([classLevelId, group]) => ({
+    classLevelId,
+    ...group,
+    summary: summarizeExamScores(group.scores),
+  })).sort((a, b) => (b.summary.mean ?? -1) - (a.summary.mean ?? -1) || a.className.localeCompare(b.className));
+  const sectionComparisonRows = [...sectionPerformance.entries()].map(([key, group]) => ({
+    key,
+    ...group,
+    summary: summarizeExamScores(group.scores),
+  })).sort((a, b) => (b.summary.mean ?? -1) - (a.summary.mean ?? -1) ||
+    a.className.localeCompare(b.className) || (a.sectionName ?? "").localeCompare(b.sectionName ?? ""));
+  const attendancePerformanceRows = [...attendancePerformance].sort((a, b) =>
+    (b.summary.coveragePercent ?? -1) - (a.summary.coveragePercent ?? -1) || a.className.localeCompare(b.className),
+  );
+  const studentResultRows = [...results].sort((a, b) => {
+    if (selectedExam?.allowRanking) {
+      if (a.mean === null && b.mean !== null) return 1;
+      if (b.mean === null && a.mean !== null) return -1;
+      return (a.mean !== null && b.mean !== null ? b.mean - a.mean : 0) ||
+        a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
+    }
+    return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
+  });
+  const studentCsvHeaders = [
     "Student",
     "Admission number",
     "Class",
@@ -470,13 +613,13 @@ export default async function ExamAnalyticsPage({
     "Mean grade",
     ...(selectedExam?.allowRanking ? ["Position"] : []),
     "Result status",
-    ...filteredOptions.flatMap((item) => [
+    ...assessmentRows.flatMap((item) => [
       `${item.className} - ${item.subjectName} (%)`,
       `${item.className} - ${item.subjectName} grade`,
       ...(selectedExam?.allowRanking ? [`${item.className} - ${item.subjectName} position`] : []),
     ]),
   ];
-  const csvRows = results.map((row) => [
+  const studentCsvRows = studentResultRows.map((row) => [
     `${row.firstName} ${row.lastName}`,
     row.admissionNumber ?? "",
     row.className,
@@ -485,7 +628,7 @@ export default async function ExamAnalyticsPage({
     row.grade?.grade ?? "",
     ...(selectedExam?.allowRanking ? [row.mean === null ? "" : ranks.get(row.enrollmentId) ?? ""] : []),
     row.complete ? "Complete" : "Incomplete",
-    ...filteredOptions
+    ...assessmentRows
       .filter((item) => item.classLevelId === row.classLevelId)
       .flatMap((item) => {
         const marks = row.marks.get(item.id);
@@ -497,6 +640,92 @@ export default async function ExamAnalyticsPage({
         ];
       }),
   ]);
+  const csvOutput = reportView === "classes"
+    ? {
+      headers: ["Branch", "Class", "Enrolled", "Complete results", "Completion rate (%)", "Mean (%)", "Median (%)", "Highest (%)", "Lowest (%)", ...(passMark === null ? [] : ["At / above threshold"])],
+      rows: classComparisonRows.map((item) => [
+        item.branchName,
+        item.className,
+        item.enrolled,
+        item.completed,
+        item.enrolled ? (item.completed / item.enrolled * 100).toFixed(2) : "0.00",
+        item.summary.mean?.toFixed(2) ?? "",
+        item.summary.median?.toFixed(2) ?? "",
+        item.summary.highest?.toFixed(2) ?? "",
+        item.summary.lowest?.toFixed(2) ?? "",
+        ...(passMark === null ? [] : [`${item.passed}/${item.completed}`]),
+      ]),
+    }
+    : reportView === "sections"
+      ? {
+        headers: ["Branch", "Class", "Section", "Enrolled", "Complete results", "Completion rate (%)", "Mean (%)", "Median (%)", "Highest (%)", "Lowest (%)", ...(passMark === null ? [] : ["At / above threshold"])],
+        rows: sectionComparisonRows.map((item) => [
+          item.branchName,
+          item.className,
+          item.sectionName ?? "",
+          item.enrolled,
+          item.completed,
+          item.enrolled ? (item.completed / item.enrolled * 100).toFixed(2) : "0.00",
+          item.summary.mean?.toFixed(2) ?? "",
+          item.summary.median?.toFixed(2) ?? "",
+          item.summary.highest?.toFixed(2) ?? "",
+          item.summary.lowest?.toFixed(2) ?? "",
+          ...(passMark === null ? [] : [`${item.passed}/${item.completed}`]),
+        ]),
+      }
+      : reportView === "subjects"
+        ? {
+          headers: ["Branch", "Class", "Subject", "Students scored", "Enrolled", "Score coverage (%)", "Mean (%)", "Median (%)", "Highest (%)", "Lowest (%)", "Top grade", "Top grade count"],
+          rows: subjectPerformance.map((item) => [
+            item.classBranchName,
+            item.className,
+            item.subjectName,
+            item.summary.count,
+            item.enrolled,
+            item.scoreRate.toFixed(2),
+            item.summary.mean?.toFixed(2) ?? "",
+            item.summary.median?.toFixed(2) ?? "",
+            item.summary.highest?.toFixed(2) ?? "",
+            item.summary.lowest?.toFixed(2) ?? "",
+            item.highestGrade ?? "",
+            item.highestGradeCount,
+          ]),
+        }
+        : reportView === "attendance"
+          ? {
+            headers: ["Branch", "Class", "Section", "Expected sessions", "Recorded sessions", "Pending sessions", "Coverage (%)", "Present", "Late", "Absent", "Excused", "X", "Y", "Not applicable"],
+            rows: attendancePerformanceRows.map((item) => [
+              item.branchName,
+              item.className,
+              item.sectionName,
+              item.summary.expectedSessions,
+              item.summary.recordedSessions,
+              item.summary.pendingSessions,
+              item.summary.coveragePercent?.toFixed(2) ?? "",
+              item.summary.statuses.present,
+              item.summary.statuses.late,
+              item.summary.statuses.absent,
+              item.summary.statuses.excused,
+              item.summary.statuses.x,
+              item.summary.statuses.y,
+              item.summary.statuses.not_applicable,
+            ]),
+          }
+          : reportView === "trends"
+            ? {
+              headers: ["Examination", "Date", "Complete results", "Mean (%)", "Median (%)", "Highest (%)", "Lowest (%)", ...(requestedStudentId ? ["Selected student (%)"] : [])],
+              rows: performanceTrend.map((item) => [
+                item.name,
+                item.startDate,
+                item.summary.count,
+                item.summary.mean?.toFixed(2) ?? "",
+                item.summary.median?.toFixed(2) ?? "",
+                item.summary.highest?.toFixed(2) ?? "",
+                item.summary.lowest?.toFixed(2) ?? "",
+                ...(requestedStudentId ? [item.selectedStudentScore?.toFixed(2) ?? ""] : []),
+              ]),
+            }
+            : { headers: studentCsvHeaders, rows: studentCsvRows };
   const schoolLogo = schoolLogoSource(school?.logoUrl ?? null);
   const subjectLabel = requestedSubjectId
     ? assessmentRows.find((item) => item.id === requestedSubjectId)?.subjectName ?? "Selected subject"
@@ -504,6 +733,7 @@ export default async function ExamAnalyticsPage({
   const studentLabel = requestedStudentId
     ? results[0] ? `${results[0].firstName} ${results[0].lastName}` : "Selected student"
     : "All students";
+  const activeReport = reportOptions.find((option) => option.value === reportView) ?? reportOptions[0];
 
   return (
     <main className="exam-analytics-page exam-report-document space-y-6">
@@ -511,23 +741,26 @@ export default async function ExamAnalyticsPage({
         <div>
           <p className="text-sm font-semibold text-violet-700">Examinations · Analytics</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">Exam Analytics</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">Explore published results by exam, class, section, subject, or student. Calculations use exam rules.</p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">Compare published results across classes, streams, subjects, and students. Choose a report view and filters; score calculations follow the selected exam rules.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <DownloadAnalyticsCsv
-            headers={csvHeaders}
-            rows={csvRows}
-            fileName={`${(selectedExam?.name ?? "exam").replace(/[^\w-]+/g, "-")}-analytics.csv`}
+            headers={csvOutput.headers}
+            rows={csvOutput.rows}
+            fileName={`${(selectedExam?.name ?? "exam").replace(/[^\w-]+/g, "-")}-${reportView}-analytics.csv`}
           />
           <PrintButton label="Print analytics report" targetId="exam-analytics-report" pageSize="A4" pageOrientation="landscape" />
         </div>
       </header>
 
-      <SmartFilterForm method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-5 print:hidden">
+      <SmartFilterForm method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-6 print:hidden">
         <SearchableSelect label="Published examination" name="examId" required
           defaultValue={String(selectedExam?.id ?? "")}
           options={publishedExams.map((exam) => ({ value: String(exam.id), label: `${exam.name} · ${exam.yearName}` }))}
           placeholder="Search examinations..." />
+        <SearchableSelect label="Report view" name="report" defaultValue={reportView}
+          options={reportOptions.map((option) => ({ value: option.value, label: option.label }))}
+          placeholder="Choose a report..." />
         <SearchableSelect label="Class" name="classId" defaultValue={String(selectedClass?.id ?? "")}
           options={[{ value: "", label: "All classes" }, ...classRows.map((item) => ({ value: String(item.id), label: `${item.branchName} · ${item.className}` }))]}
           placeholder="Search classes..." />
@@ -540,7 +773,7 @@ export default async function ExamAnalyticsPage({
         <SearchableSelect label="Student" name="studentId" defaultValue={String(results.find((row) => row.enrollmentId === requestedStudentId)?.enrollmentId ?? "")}
           options={[{ value: "", label: "All students" }, ...roster.map((row) => ({ value: String(row.enrollmentId), label: `${row.firstName} ${row.lastName} · ${row.className} ${row.sectionName}` }))]}
           placeholder="Search students..." />
-        <div className="flex items-end gap-2 xl:col-span-5">
+        <div className="flex items-end gap-2 xl:col-span-6">
           <button type="submit" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
           <a href="/admin/exam-analytics" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
         </div>
@@ -564,6 +797,9 @@ export default async function ExamAnalyticsPage({
               <p className="mt-1 text-xs text-slate-500">
                 {selectedClass?.className ?? "All classes"} · {selectedSection?.name ?? "All sections"} · {subjectLabel} · {studentLabel}
               </p>
+              <p className="mt-2 inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800">
+                {activeReport.label}
+              </p>
             </div>
           </header>
 
@@ -576,7 +812,7 @@ export default async function ExamAnalyticsPage({
               : <MetricCard label="Score range" value={`${rounded(summary.lowest)}–${rounded(summary.highest)}%`} detail={`Median ${rounded(summary.median)}%`} />}
           </section>
 
-          {requestedStudentId && results[0]?.mean !== null && results[0]?.mean !== undefined && (
+          {reportView === "students" && requestedStudentId && results[0]?.mean !== null && results[0]?.mean !== undefined && (
             <section className="rounded-xl border border-violet-100 bg-violet-50 p-4">
               <h3 className="font-semibold text-violet-950">Student comparison</h3>
               <p className="mt-1 text-sm text-violet-900">
@@ -588,144 +824,273 @@ export default async function ExamAnalyticsPage({
             </section>
           )}
 
-          <div className="grid gap-5 xl:grid-cols-2">
-            <AnalyticsPanel title="Grade distribution" description="Completed student results grouped by the selected examination grading scale.">
-              {distribution.length && scores.length ? (
-                <div className="space-y-3">
-                  {distribution.map((item) => (
-                    <div key={item.grade} className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-3 text-sm">
-                      <span className="font-semibold">{item.grade}</span>
-                      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-violet-600" style={{ width: `${item.count / scores.length * 100}%` }} />
+          {reportView === "overview" && (
+            <div className="grid gap-5 xl:grid-cols-2">
+              <AnalyticsPanel title="Grade distribution" description="Complete overall results grouped by the selected grading scale.">
+                {distribution.length && scores.length ? (
+                  <div className="space-y-3">
+                    {distribution.map((item) => (
+                      <div key={item.grade} className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-3 text-sm">
+                        <span className="font-semibold">{item.grade}</span>
+                        <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-violet-600" style={{ width: `${item.count / scores.length * 100}%` }} />
+                        </div>
+                        <span className="text-right tabular-nums">{item.count}</span>
                       </div>
-                      <span className="text-right tabular-nums">{item.count}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className="text-sm text-slate-500">No complete scores are available for this selection.</p>}
-            </AnalyticsPanel>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-slate-500">No complete scores are available for this selection.</p>}
+              </AnalyticsPanel>
+              <AnalyticsPanel title="Class highlights" description="Best-performing class means; use Class comparison for the full table.">
+                {classComparisonRows.length ? (
+                  <div className="space-y-3">
+                    {classComparisonRows.slice(0, 5).map((item) => (
+                      <div key={item.classLevelId} className="grid grid-cols-[minmax(0,1fr)_5rem] items-center gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{item.branchName} · {item.className}</p>
+                          <ScoreBar value={item.summary.mean} />
+                        </div>
+                        <p className="text-right text-sm font-bold tabular-nums">{displayScore(item.summary.mean)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-slate-500">No active class enrollments match these filters.</p>}
+              </AnalyticsPanel>
+              <AnalyticsPanel title="Section highlights" description="Section means use complete overall student results only.">
+                {sectionComparisonRows.length ? (
+                  <div className="space-y-3">
+                    {sectionComparisonRows.slice(0, 5).map((item) => (
+                      <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_5rem] items-center gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{item.className} · {item.sectionName}</p>
+                          <ScoreBar value={item.summary.mean} />
+                        </div>
+                        <p className="text-right text-sm font-bold tabular-nums">{displayScore(item.summary.mean)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-slate-500">No active section enrollments match these filters.</p>}
+              </AnalyticsPanel>
+              <AnalyticsPanel title="Subject highlights" description="Subject mean uses students with a recorded numeric mark.">
+                {subjectHighlightRows.length ? (
+                  <div className="space-y-3">
+                    {subjectHighlightRows.slice(0, 5).map((item) => (
+                      <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_5rem] items-center gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{item.className} · {item.subjectName}</p>
+                          <ScoreBar value={item.summary.mean} />
+                        </div>
+                        <p className="text-right text-sm font-bold tabular-nums">{displayScore(item.summary.mean)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-slate-500">No scored subjects match these filters.</p>}
+              </AnalyticsPanel>
+            </div>
+          )}
 
-            <AnalyticsPanel title="Class and stream comparison" description="Mean result per class section; incomplete results are excluded from means.">
-              {sectionPerformance.size ? (
+          {reportView === "classes" && (
+            <AnalyticsPanel title="Overall class comparison" description={`Weighted overall mean for each class across its sections. Complete results only; ${passMark === null ? "the exam type has no overall pass threshold." : `the overall pass threshold is ${passMark}%.`}`}>
+              {classComparisonRows.length ? (
                 <div className="overflow-x-auto">
-                  <table className="print-report-table w-full min-w-[520px] border-collapse text-left text-sm">
-                    <thead><tr><th>Class / section</th><th>Mean</th><th>Complete</th><th>Range</th></tr></thead>
-                    <tbody>{[...sectionPerformance.entries()].map(([key, group]) => {
-                      const sectionSummary = summarizeExamScores(group.scores);
+                  <table className="print-report-table w-full min-w-[920px] border-collapse text-left text-sm">
+                    <thead><tr><th>Branch · class</th><th>Mean</th><th>Profile</th><th>Median</th><th>Highest</th><th>Lowest</th><th>Complete</th><th>Completion</th>{passMark !== null && <th>At threshold</th>}</tr></thead>
+                    <tbody>{classComparisonRows.map((item) => (
+                      <tr key={item.classLevelId}>
+                        <td>{item.branchName} · {item.className}</td>
+                        <td className="font-semibold">{displayScore(item.summary.mean)}</td>
+                        <td><ScoreBar value={item.summary.mean} /></td>
+                        <td>{displayScore(item.summary.median)}</td>
+                        <td>{displayScore(item.summary.highest)}</td>
+                        <td>{displayScore(item.summary.lowest)}</td>
+                        <td>{item.completed} / {item.enrolled}</td>
+                        <td>{item.enrolled ? `${(item.completed / item.enrolled * 100).toFixed(1)}%` : "—"}</td>
+                        {passMark !== null && <td>{item.passed} / {item.completed}</td>}
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : <p className="text-sm text-slate-500">No active class enrollments match these filters.</p>}
+            </AnalyticsPanel>
+          )}
+
+          {reportView === "sections" && (
+            <AnalyticsPanel title="Class section / stream comparison" description={`Compare weighted overall means for every section. Incomplete results are excluded; ${passMark === null ? "no overall pass threshold is configured." : `the overall pass threshold is ${passMark}%.`}`}>
+              {sectionComparisonRows.length ? (
+                <div className="overflow-x-auto">
+                  <table className="print-report-table w-full min-w-[980px] border-collapse text-left text-sm">
+                    <thead><tr><th>Branch · class · section</th><th>Mean</th><th>Profile</th><th>Median</th><th>Range</th><th>Complete</th><th>Completion</th>{passMark !== null && <th>At threshold</th>}</tr></thead>
+                    <tbody>{sectionComparisonRows.map((item) => (
+                      <tr key={item.key}>
+                        <td>{item.branchName} · {item.className} · {item.sectionName}</td>
+                        <td className="font-semibold">{displayScore(item.summary.mean)}</td>
+                        <td><ScoreBar value={item.summary.mean} /></td>
+                        <td>{displayScore(item.summary.median)}</td>
+                        <td>{displayScore(item.summary.lowest)}–{displayScore(item.summary.highest)}</td>
+                        <td>{item.completed} / {item.enrolled}</td>
+                        <td>{item.enrolled ? `${(item.completed / item.enrolled * 100).toFixed(1)}%` : "—"}</td>
+                        {passMark !== null && <td>{item.passed} / {item.completed}</td>}
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : <p className="text-sm text-slate-500">No active section enrollments match these filters.</p>}
+            </AnalyticsPanel>
+          )}
+
+          {reportView === "subjects" && (
+            <AnalyticsPanel title="Subject performance and coverage" description="Scores are normalized to percentages so subjects with different maximum marks can be compared. Highest grade follows the selected grading scale.">
+              {subjectPerformance.length ? (
+                <div className="overflow-x-auto">
+                  <table className="print-report-table w-full min-w-[980px] border-collapse text-left text-sm">
+                    <thead><tr><th>Branch · class</th><th>Subject</th><th>Scored / enrolled</th><th>Coverage</th><th>Mean</th><th>Median</th><th>Highest</th><th>Lowest</th><th>Top grade</th></tr></thead>
+                    <tbody>{[...subjectPerformance].sort((a, b) =>
+                      (b.summary.mean ?? -1) - (a.summary.mean ?? -1) || a.subjectName.localeCompare(b.subjectName),
+                    ).map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.classBranchName} · {item.className}</td>
+                        <td>{item.subjectName}<span className="block text-xs text-slate-500">{item.subjectCode}</span></td>
+                        <td>{item.summary.count} / {item.enrolled}</td>
+                        <td><div className="flex items-center gap-2"><ScoreBar value={item.scoreRate} /><span>{item.scoreRate.toFixed(1)}%</span></div></td>
+                        <td className="font-semibold">{displayScore(item.summary.mean)}</td>
+                        <td>{displayScore(item.summary.median)}</td>
+                        <td>{displayScore(item.summary.highest)}</td>
+                        <td>{displayScore(item.summary.lowest)}</td>
+                        <td>{item.highestGrade ? `${item.highestGrade} · ${item.highestGradeCount}` : "—"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : <p className="text-sm text-slate-500">No published subject marks match these filters.</p>}
+            </AnalyticsPanel>
+          )}
+
+          {reportView === "students" && (
+            <AnalyticsPanel
+              title={requestedStudentId ? "Student result detail" : selectedExam?.allowRanking ? "Student rankings across the selected cohort" : "Student performance"}
+              description={selectedExam?.allowRanking
+                ? "Overall positions use competition ranking across the selected classes and sections; subject positions are calculated within each class."
+                : "This grading scale has ranking disabled; student rows are sorted alphabetically. Incomplete results are not ranked."}
+            >
+              {studentResultRows.length ? (
+                <div className="overflow-x-auto">
+                  <table className="print-report-table w-full min-w-[1050px] border-collapse text-left text-sm">
+                    <thead><tr>
+                      {selectedExam?.allowRanking && <th>Position</th>}
+                      <th>Student</th><th>Class / section</th><th>Mean</th><th>Grade</th><th>Completion</th><th>Subjects scored</th><th>Highest subject</th><th>Lowest subject</th>
+                      {assessmentRows.map((item) => <th key={item.id}>{item.subjectName}<span className="block text-xs font-normal text-slate-500">Score · Grade · Position</span></th>)}
+                    </tr></thead>
+                    <tbody>{studentResultRows.map((row) => {
+                      const subjectScores = assessmentRows
+                        .filter((item) => item.classLevelId === row.classLevelId)
+                        .flatMap((item) => {
+                          const marks = row.marks.get(item.id);
+                          return typeof marks === "number"
+                            ? [{ name: item.subjectName, score: marks / Number(item.maxMarks) * 100 }]
+                            : [];
+                        }).sort((a, b) => b.score - a.score);
+                      const bestSubject = subjectScores[0];
+                      const lowestSubject = subjectScores[subjectScores.length - 1];
                       return (
-                        <tr key={key}>
-                          <td>{group.className} · {group.sectionName}</td>
-                          <td>{displayScore(sectionSummary.mean)}</td>
-                          <td>{group.completed} / {group.enrolled}</td>
-                          <td>{rounded(sectionSummary.lowest)}–{rounded(sectionSummary.highest)}%</td>
+                        <tr key={row.enrollmentId}>
+                          {selectedExam?.allowRanking && <td>{row.mean === null ? "—" : ranks.get(row.enrollmentId) ?? "—"}</td>}
+                          <td>{row.firstName} {row.lastName}<span className="block text-xs text-slate-500">{row.admissionNumber || "—"} · {row.rollNumber || "—"}</span></td>
+                          <td>{row.className} · {row.sectionName}</td>
+                          <td className="font-semibold">{displayScore(row.mean)}<ScoreBar value={row.mean} /></td>
+                          <td>{row.grade ? `${row.grade.grade} · ${row.grade.description}` : "—"}</td>
+                          <td>{row.complete ? "Complete" : "Incomplete"}</td>
+                          <td>{subjectScores.length} / {assessmentRows.filter((item) => item.classLevelId === row.classLevelId).length}</td>
+                          <td>{bestSubject ? `${bestSubject.name} · ${bestSubject.score.toFixed(1)}%` : "—"}</td>
+                          <td>{lowestSubject ? `${lowestSubject.name} · ${lowestSubject.score.toFixed(1)}%` : "—"}</td>
+                          {assessmentRows.map((item) => {
+                            const marks = row.marks.get(item.id);
+                            const detail = subjectLearnerDetails.get(item.id)?.get(row.enrollmentId);
+                            return (
+                              <td key={item.id}>
+                                {typeof marks === "number" ? (
+                                  <>
+                                    <span>{displayScore(marks / Number(item.maxMarks) * 100)}</span>
+                                    <span className="block text-xs text-slate-500">
+                                      {detail?.grade ?? "Ungraded"}
+                                      {detail?.rank !== null && detail?.rank !== undefined ? ` · #${detail.rank}` : ""}
+                                    </span>
+                                  </>
+                                ) : "—"}
+                              </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}</tbody>
                   </table>
                 </div>
-              ) : <p className="text-sm text-slate-500">No active student enrollments match these filters.</p>}
+              ) : <p className="text-sm text-slate-500">No active students are enrolled in the selected class / section.</p>}
             </AnalyticsPanel>
-          </div>
+          )}
 
-          {selectedClass && (
+          {reportView === "attendance" && (
+            <>
+              <section aria-label="Exam attendance summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 print:grid-cols-4">
+                <MetricCard label="Expected subject sessions" value={String(attendanceSummary.expectedSessions)} detail="Not-applicable sessions are excluded" />
+                <MetricCard label="Recorded" value={String(attendanceSummary.recordedSessions)} detail="Includes present, late, excused, absent, X, and Y" />
+                <MetricCard label="Pending records" value={String(attendanceSummary.pendingSessions)} detail="Expected sessions with no recorded status" />
+                <MetricCard label="Recording coverage" value={displayScore(attendanceSummary.coveragePercent)} detail="Recorded / expected sessions" />
+              </section>
+              <AnalyticsPanel title="Exam attendance by class and section" description="X and Y are recorded separately and are not counted as present. Not-applicable sessions are excluded from coverage.">
+                {attendancePerformanceRows.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="print-report-table w-full min-w-[1040px] border-collapse text-left text-sm">
+                      <thead><tr><th>Branch · class · section</th><th>Coverage</th><th>Recorded / expected</th><th>Pending</th><th>Present</th><th>Late</th><th>Absent</th><th>Excused</th><th>X</th><th>Y</th><th>Not applicable</th></tr></thead>
+                      <tbody>{attendancePerformanceRows.map((item) => (
+                        <tr key={item.key}>
+                          <td>{item.branchName} · {item.className} · {item.sectionName}</td>
+                          <td>{displayScore(item.summary.coveragePercent)}</td>
+                          <td>{item.summary.recordedSessions} / {item.summary.expectedSessions}</td>
+                          <td>{item.summary.pendingSessions}</td>
+                          <td>{item.summary.statuses.present}</td>
+                          <td>{item.summary.statuses.late}</td>
+                          <td>{item.summary.statuses.absent}</td>
+                          <td>{item.summary.statuses.excused}</td>
+                          <td>{item.summary.statuses.x}</td>
+                          <td>{item.summary.statuses.y}</td>
+                          <td>{item.summary.statuses.not_applicable}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : <p className="text-sm text-slate-500">No enrolled students or subject sessions match these filters.</p>}
+              </AnalyticsPanel>
+            </>
+          )}
+
+          {reportView === "trends" && (
             <AnalyticsPanel
-              title={requestedStudentId ? "Student and class performance trend" : "Class performance trend"}
-              description={`Complete published results for ${selectedExam?.yearName}; same class and ${selectedSubjectIdentity ? "subject" : "subjects"} across exams.`}
+              title={requestedStudentId ? "Student and cohort performance trend" : "Academic-year performance trend"}
+              description={`Published examinations in ${selectedExam?.yearName}; each student's mean is calculated from that class's same subject set and assessment weights.`}
             >
               {performanceTrend.length ? (
                 <div className="overflow-x-auto">
-                  <table className="print-report-table w-full min-w-[560px] border-collapse text-left text-sm">
-                    <thead><tr><th>Examination</th><th>Class mean</th>{requestedStudentId && <th>Student mean</th>}<th>Complete results</th><th>Score profile</th></tr></thead>
+                  <table className="print-report-table w-full min-w-[720px] border-collapse text-left text-sm">
+                    <thead><tr><th>Examination</th><th>Cohort mean</th><th>Profile</th>{requestedStudentId && <th>Selected student</th>}<th>Complete results</th><th>Median</th><th>Range</th></tr></thead>
                     <tbody>{performanceTrend.map((item) => (
                       <tr key={item.id}>
                         <td>{item.name}<span className="block text-xs text-slate-500">{item.startDate}</span></td>
-                        <td>{displayScore(item.summary.mean)}</td>
+                        <td className="font-semibold">{displayScore(item.summary.mean)}</td>
+                        <td><ScoreBar value={item.summary.mean} /></td>
                         {requestedStudentId && <td>{displayScore(item.selectedStudentScore)}</td>}
                         <td>{item.summary.count}</td>
-                        <td>
-                          {item.summary.mean === null
-                            ? "—"
-                            : <div className="h-3 min-w-32 overflow-hidden rounded-full bg-slate-100">
-                              <div className="h-full rounded-full bg-violet-600" style={{ width: `${item.summary.mean}%` }} />
-                            </div>}
-                        </td>
+                        <td>{displayScore(item.summary.median)}</td>
+                        <td>{displayScore(item.summary.lowest)}–{displayScore(item.summary.highest)}</td>
                       </tr>
                     ))}</tbody>
                   </table>
                 </div>
-              ) : <p className="text-sm text-slate-500">No published results are available for this class and subject combination.</p>}
+              ) : <p className="text-sm text-slate-500">No published results in this academic year match the selected class / subject.</p>}
             </AnalyticsPanel>
           )}
 
-          <AnalyticsPanel title="Subject performance" description="Mean percentage is calculated from students with a mark for that subject.">
-            {subjectPerformance.length ? (
-              <div className="overflow-x-auto">
-                <table className="print-report-table w-full min-w-[620px] border-collapse text-left text-sm">
-                  <thead><tr><th>Class</th><th>Subject</th><th>Students scored</th><th>Mean</th><th>Median</th><th>Highest</th><th>Lowest</th></tr></thead>
-                  <tbody>{subjectPerformance.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.classBranchName} · {item.className}</td>
-                      <td>{item.subjectName}<span className="block text-xs text-slate-500">{item.subjectCode}</span></td>
-                      <td>{item.summary.count} / {item.enrolled}</td>
-                      <td>{displayScore(item.summary.mean)}</td>
-                      <td>{displayScore(item.summary.median)}</td>
-                      <td>{displayScore(item.summary.highest)}</td>
-                      <td>{displayScore(item.summary.lowest)}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            ) : <p className="text-sm text-slate-500">No published subject marks match these filters.</p>}
-          </AnalyticsPanel>
-
-          <AnalyticsPanel title={requestedStudentId ? "Student result detail" : "Student performance report"} description="Grades use the selected scale; ranks use competition ranking, and missing marks stay incomplete.">
-            {results.length ? (
-              <div className="overflow-x-auto">
-                <table className="print-report-table w-full min-w-[780px] border-collapse text-left text-sm">
-                  <thead><tr>
-                    {selectedExam?.allowRanking && <th>Position</th>}
-                    <th>Student</th><th>Class / section</th><th>Mean</th><th>Grade</th><th>Completion</th>
-                    {assessmentRows.map((item) => <th key={item.id}>{item.subjectName}<span className="block text-xs font-normal text-slate-500">Score · Grade · Position</span></th>)}
-                  </tr></thead>
-                  <tbody>{[...results].sort((a, b) => {
-                    if (a.mean === null && b.mean !== null) return 1;
-                    if (b.mean === null && a.mean !== null) return -1;
-                    return (a.mean !== null && b.mean !== null ? b.mean - a.mean : 0) ||
-                      a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
-                  }).map((row) => (
-                    <tr key={row.enrollmentId}>
-                      {selectedExam?.allowRanking && <td>{row.mean === null ? "—" : ranks.get(row.enrollmentId) ?? "—"}</td>}
-                      <td>{row.firstName} {row.lastName}<span className="block text-xs text-slate-500">{row.admissionNumber || "—"} · {row.rollNumber || "—"}</span></td>
-                      <td>{row.className} · {row.sectionName}</td>
-                      <td className="font-semibold">{displayScore(row.mean)}</td>
-                      <td>{row.grade ? `${row.grade.grade} · ${row.grade.description}` : "—"}</td>
-                      <td>{row.complete ? "Complete" : "Incomplete"}</td>
-                      {assessmentRows.map((item) => {
-                        const marks = row.marks.get(item.id);
-                        const detail = subjectLearnerDetails.get(item.id)?.get(row.enrollmentId);
-                        return (
-                          <td key={item.id}>
-                            {typeof marks === "number" ? (
-                              <>
-                                <span>{displayScore(marks / Number(item.maxMarks) * 100)}</span>
-                                <span className="block text-xs text-slate-500">
-                                  {detail?.grade ?? "Ungraded"}
-                                  {detail?.rank !== null && detail?.rank !== undefined ? ` · #${detail.rank}` : ""}
-                                </span>
-                              </>
-                            ) : "—"}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            ) : <p className="text-sm text-slate-500">No active students are enrolled in the selected class / section.</p>}
-          </AnalyticsPanel>
-
           <p className="text-xs text-slate-500">
-            Incomplete results are excluded. Published scores use subject percentages and weights.
+            Results use published marks only. Incomplete overall results are excluded from overall means and ranks; subject summaries use numeric scores entered for that subject.
           </p>
         </section>
       )}
@@ -739,6 +1104,15 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{value}</p>
       <p className="mt-1 text-xs text-slate-500">{detail}</p>
+    </div>
+  );
+}
+
+function ScoreBar({ value }: { value: number | null }) {
+  const width = value === null ? 0 : Math.max(0, Math.min(100, value));
+  return (
+    <div aria-hidden="true" className="mt-1 h-2 w-full min-w-20 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-full rounded-full bg-violet-600" style={{ width: `${width}%` }} />
     </div>
   );
 }
