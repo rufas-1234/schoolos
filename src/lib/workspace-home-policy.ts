@@ -1,8 +1,9 @@
 export function getWorkspaceHomePath(
   permissions: readonly string[],
-  linkedPortals: { student?: boolean; parent?: boolean; staff?: boolean } = {},
+  linkedPortals: { student?: boolean; parent?: boolean; staff?: boolean; teacher?: boolean } = {},
 ): string {
   const granted = new Set(permissions);
+  if (linkedPortals.teacher && granted.has("results.enter")) return "/portal/teacher";
   if (granted.has("dashboard.view")) return "/admin/dashboard";
   if (granted.has("roles.manage")) return "/admin/users";
   if (granted.has("school.settings.manage")) return "/admin/settings";

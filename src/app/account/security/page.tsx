@@ -21,7 +21,7 @@ export default async function AccountSecurityPage() {
       .where(and(eq(userStudentLinks.schoolId, context.schoolId), eq(userStudentLinks.userId, context.user.id), eq(userStudentLinks.accessType, "student"))),
     db.select({ studentId: userStudentLinks.studentId }).from(userStudentLinks)
       .where(and(eq(userStudentLinks.schoolId, context.schoolId), eq(userStudentLinks.userId, context.user.id), eq(userStudentLinks.accessType, "parent"))),
-    db.select({ id: staffMembers.id }).from(staffMembers)
+    db.select({ id: staffMembers.id, personnelRole: staffMembers.personnelRole }).from(staffMembers)
       .where(and(eq(staffMembers.schoolId, context.schoolId), eq(staffMembers.linkedUserId, context.user.id), eq(staffMembers.status, "active"))),
     db.select({ id: students.id }).from(students)
       .where(and(eq(students.schoolId, context.schoolId), inArray(students.status, ["admitted", "active"]), eq(students.email, context.user.email)))
@@ -36,6 +36,7 @@ export default async function AccountSecurityPage() {
     student: linkedStudent,
     parent: linkedParent,
     staff: staffRecords.length > 0,
+    teacher: staffRecords.some((record) => record.personnelRole === "teacher"),
   });
   const navigation = workspacePath === "/account/security"
     ? [{ href: "/account/security", label: "Account security", icon: KeyRound }]

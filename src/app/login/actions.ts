@@ -83,17 +83,17 @@ export async function getSignedInWorkspacePath(): Promise<string> {
           : eq(students.guardianEmail, context.user.email),
       ))
       .limit(1),
-    db.select({ id: staffMembers.id }).from(staffMembers)
+    db.select({ id: staffMembers.id, personnelRole: staffMembers.personnelRole }).from(staffMembers)
       .where(and(
         eq(staffMembers.schoolId, context.schoolId),
         eq(staffMembers.linkedUserId, context.user.id),
         eq(staffMembers.status, "active"),
-      ))
-      .limit(1),
+      )),
   ]);
   return getWorkspaceHomePath(permissionKeys, {
     student: studentRecord.length > 0,
     parent: parentRecord.length > 0,
     staff: staffRecord.length > 0,
+    teacher: staffRecord.some((record) => record.personnelRole === "teacher"),
   });
 }

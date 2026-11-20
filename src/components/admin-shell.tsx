@@ -62,7 +62,7 @@ const navigation: NavigationItem[] = [
     permission: "academics.manage",
     permissionAlternatives: ["school.settings.manage"],
     children: [
-      ...academicSections.map((section) => ({
+      ...academicSections.filter((section) => section.id !== "teachers").map((section) => ({
         id: section.id,
         label: section.label,
         href: `/admin/academics?section=${section.id}`,

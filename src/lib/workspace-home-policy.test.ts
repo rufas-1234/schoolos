@@ -45,4 +45,9 @@ describe("workspace home policy", () => {
     expect(getWorkspaceHomePath(["dashboard.view"], { student: true })).toBe("/admin/dashboard");
     expect(getWorkspaceHomePath(["results.enter"], { parent: true })).toBe("/portal/teacher");
   });
+
+  it("sends linked teacher staff accounts to the teacher portal even when they have dashboard access", () => {
+    expect(getWorkspaceHomePath(["dashboard.view", "results.enter"], { teacher: true })).toBe("/portal/teacher");
+    expect(getWorkspaceHomePath(["dashboard.view"], { teacher: true })).toBe("/admin/dashboard");
+  });
 });

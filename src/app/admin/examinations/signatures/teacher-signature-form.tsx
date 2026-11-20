@@ -3,6 +3,67 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminDataTable, AdminRecordDialog } from "@/components/admin-data-table";
+
+type TeacherSignatureEntry = {
+  teacherId: number;
+  teacherName: string;
+  jobTitle: string;
+  signatureId?: number;
+};
+
+export function TeacherSignatureDirectory({ teachers }: { teachers: TeacherSignatureEntry[] }) {
+  return (
+    <AdminDataTable
+      title="Teacher signatures"
+      columns={[
+        { key: "teacher", label: "Teacher" },
+        { key: "jobTitle", label: "Job title" },
+        { key: "signatureStatus", label: "Signature status" },
+      ]}
+      filters={[{
+        key: "signatureFilter",
+        label: "Signature status",
+        options: [
+          { value: "Uploaded", label: "Signature uploaded" },
+          { value: "Missing", label: "Needs a signature" },
+        ],
+      }]}
+      rows={teachers.map((teacher) => {
+        const signatureStatus = teacher.signatureId === undefined ? "Missing" : "Uploaded";
+        return {
+          id: teacher.teacherId,
+          values: {
+            teacher: teacher.teacherName,
+            jobTitle: teacher.jobTitle,
+            signatureStatus,
+            signatureFilter: signatureStatus,
+          },
+          searchableText: `${teacher.teacherName} ${teacher.jobTitle} ${signatureStatus}`,
+          actions: (
+            <AdminRecordDialog
+              mode="edit"
+              showLabel
+              title={`${signatureStatus === "Missing" ? "Upload" : "Replace"} ${teacher.teacherName} signature`}
+              triggerLabel={signatureStatus === "Missing" ? "Upload" : "Replace"}
+            >
+              <TeacherSignatureForm
+                teacherId={teacher.teacherId}
+                teacherName={teacher.teacherName}
+                jobTitle={teacher.jobTitle}
+                signatureId={teacher.signatureId}
+              />
+            </AdminRecordDialog>
+          ),
+        };
+      })}
+      emptyMessage="No teacher profiles are available."
+      hideDefaultView
+      showRowNumber={false}
+      mobileCardView
+    />
+  );
+}
 
 export function TeacherSignatureForm({
   teacherId,

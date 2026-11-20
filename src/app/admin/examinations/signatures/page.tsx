@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { examReportSignatures, examTeacherSignatures, staffMembers, teachers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { SignatureForm, type SignatureRole } from "./signature-form";
-import { TeacherSignatureForm } from "./teacher-signature-form";
+import { TeacherSignatureDirectory, TeacherSignatureForm } from "./teacher-signature-form";
 
 export const dynamic = "force-dynamic";
 
@@ -86,19 +86,26 @@ export default async function ExamReportSignaturesPage() {
       <SignatureForm role={"headteacher" satisfies SignatureRole} version={headteacherSignature?.updatedAt.getTime()} />
     </section>}
     <section>
-      <h2 className="mb-3 text-lg font-semibold text-slate-950">{canManageAll ? "Teacher signatures" : "My report signature"}</h2>
+      {!canManageAll && <h2 className="mb-3 text-lg font-semibold text-slate-950">My report signature</h2>}
       {teacherRows.length
-        ? <div className="grid gap-4 lg:grid-cols-2">
-          {teacherRows.map((teacher) => (
-            <TeacherSignatureForm
-              key={teacher.id}
-              teacherId={teacher.id}
-              teacherName={`${teacher.firstName} ${teacher.lastName}`}
-              jobTitle={teacher.jobTitle ?? ""}
-              signatureId={latestSignatureByTeacher.get(teacher.id)}
-            />
-          ))}
-        </div>
+        ? canManageAll
+          ? <TeacherSignatureDirectory teachers={teacherRows.map((teacher) => ({
+            teacherId: teacher.id,
+            teacherName: `${teacher.firstName} ${teacher.lastName}`,
+            jobTitle: teacher.jobTitle ?? "",
+            signatureId: latestSignatureByTeacher.get(teacher.id),
+          }))} />
+          : <div className="grid gap-4 lg:grid-cols-2">
+            {teacherRows.map((teacher) => (
+              <TeacherSignatureForm
+                key={teacher.id}
+                teacherId={teacher.id}
+                teacherName={`${teacher.firstName} ${teacher.lastName}`}
+                jobTitle={teacher.jobTitle ?? ""}
+                signatureId={latestSignatureByTeacher.get(teacher.id)}
+              />
+            ))}
+          </div>
         : <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No active teacher profile is linked to your account. Ask a school administrator to link your staff account to a teacher profile.</p>}
     </section>
   </main>;
