@@ -148,7 +148,9 @@ The school approval and archive workflow adds migration `0052_fuzzy_mach_iv.sql`
 
 See `.env.example` for the required variable names. Do not commit `.env` or any credentials. Keep TiDB and object-storage credentials in server-only environment variables; only the app name is public.
 
-Student documents and profile photos are stored outside the application filesystem. Configure a private Vercel Blob store (providing `BLOB_READ_WRITE_TOKEN` or `BLOB_STORE_ID` with Vercel OIDC) or all five `OBJECT_STORAGE_*` variables for S3-compatible storage. Documents accept PDF, JPEG, PNG, and WebP; profile photos accept JPEG, PNG, and WebP. Files are limited to 4 MB each. Private downloads are served through authenticated application routes.
+Student documents and profile photos are stored outside the application filesystem. Configure a private Vercel Blob store (providing `BLOB_READ_WRITE_TOKEN` or `BLOB_STORE_ID` with Vercel OIDC), or configure all five `OBJECT_STORAGE_*` variables for S3-compatible storage such as Cloudflare R2. A complete S3-compatible configuration takes precedence over Vercel Blob; a partial configuration fails explicitly. For R2, set `OBJECT_STORAGE_ENDPOINT` to `https://<account-id>.r2.cloudflarestorage.com`, `OBJECT_STORAGE_REGION` to `auto`, and use a private bucket with a bucket-scoped object read/write API token. Documents accept PDF, JPEG, PNG, and WebP; profile photos accept JPEG, PNG, and WebP. Files are limited to 4 MB each. Private downloads are served through authenticated application routes.
+
+To migrate an existing Vercel Blob store to R2, configure the source Vercel Blob credentials and all five R2 `OBJECT_STORAGE_*` variables in `.env.local`. The migration command first performs a read-only count and size check; pass `-- --execute` to copy blobs while preserving their existing keys. The script never deletes source blobs, so verify uploads and downloads before removing the Vercel Blob credentials or store.
 
 ## Deployment
 

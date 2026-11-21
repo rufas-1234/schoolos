@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { createSchoolAccount, type RoleActionState } from "../../settings/role-actions";
 import { getStudentRoleId } from "@/lib/account-provisioning-policy";
+import { AccountSetupLink } from "@/components/account-setup-link";
 
 type ProfileOption = {
   id: number;
@@ -51,7 +52,7 @@ export function AccountProvisionForm({
       <div>
         <h2 className="font-semibold text-slate-900">Create a login account</h2>
         <p className="mt-1 text-sm leading-5 text-slate-500">
-          Select an existing school profile, create a password, and assign its school roles.
+          Select an existing school profile and assign its school roles. Staff and student accounts receive a one-time password setup link.
         </p>
       </div>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
@@ -175,33 +176,38 @@ export function AccountProvisionForm({
           {roles.length === 0 && <p className="text-sm text-slate-500">Create a role before provisioning an account.</p>}
         </div>
       </fieldset>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Create password
-        <input
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          minLength={6}
-          maxLength={128}
-          required
-          className={fieldClass}
-        />
-        <span className="block text-xs font-normal text-slate-500">Use at least 6 characters with uppercase, lowercase, a number, and a symbol.</span>
-      </label>
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Confirm password
-        <input
-          name="passwordConfirmation"
-          type="password"
-          autoComplete="new-password"
-          minLength={6}
-          maxLength={128}
-          required
-          className={fieldClass}
-        />
-      </label>
+      {personType === "parent" && (
+        <>
+          <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+            Create password
+            <input
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={6}
+              maxLength={128}
+              required
+              className={fieldClass}
+            />
+            <span className="block text-xs font-normal text-slate-500">Use at least 6 characters with uppercase, lowercase, a number, and a symbol.</span>
+          </label>
+          <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+            Confirm password
+            <input
+              name="passwordConfirmation"
+              type="password"
+              autoComplete="new-password"
+              minLength={6}
+              maxLength={128}
+              required
+              className={fieldClass}
+            />
+          </label>
+        </>
+      )}
       {state.error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{state.error}</p>}
       {state.success && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{state.message ?? "Account created and linked successfully."}</p>}
+      {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
       <button
         disabled={pending || roles.length === 0 || profiles.length === 0}
         className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"

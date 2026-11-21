@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { staffMembers, uploadedFiles } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
+import { getBoundedRequest, maxUploadRequestBodyBytes } from "@/lib/request-body-limit";
 
 const maxFileSize = 4 * 1024 * 1024;
 const allowedDocuments = new Set([
@@ -19,7 +20,9 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
-  const formData = await request.formData();
+  const bounded = await getBoundedRequest(request, maxUploadRequestBodyBytes);
+  if (!bounded.ok) return bounded.response;
+  const formData = await bounded.request.formData();
   const purpose = z.enum(["profilePhoto", "resume", "joiningLetter", "otherDocument"])
     .safeParse(formData.get("purpose"));
   const staffPublicId = z.string().uuid().optional()

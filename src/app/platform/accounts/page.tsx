@@ -31,7 +31,7 @@ export default async function PlatformAccountsPage() {
             <p className="mt-4 text-sm font-semibold uppercase tracking-widest text-violet-700">SchoolOS platform</p>
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">Account recovery</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Correct a school member&apos;s login email or set a temporary password. Changes apply across the account&apos;s linked schools, clear stored sessions, and are audited. No recovery email is sent.
+              Correct a school member&apos;s login email or issue an expiring, one-time password setup link. Setup disables sign-in and clears sessions until the recipient chooses a password. Changes apply across linked schools and are audited; no recovery email is sent.
             </p>
             <Link href="/guide" className="mt-3 inline-block text-sm font-semibold text-violet-700 underline underline-offset-4 hover:text-violet-900">
               Open the SchoolOS user guide

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { auditLogs, schools, uploadedFiles } from "@/db/schema";
 import { requireSchoolMember, requireSchoolPermission } from "@/lib/access-control";
 import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
+import { getBoundedRequest, maxUploadRequestBodyBytes } from "@/lib/request-body-limit";
 
 export const runtime = "nodejs";
 
@@ -57,7 +58,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const context = await requireSchoolPermission("school.settings.manage");
-  const formData = await request.formData();
+  const bounded = await getBoundedRequest(request, maxUploadRequestBodyBytes);
+  if (!bounded.ok) return bounded.response;
+  const formData = await bounded.request.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
     return Response.json({ error: "Choose an image file for the school logo." }, { status: 400 });

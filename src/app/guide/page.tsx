@@ -193,7 +193,7 @@ export default function GuidePage() {
               </ol>
               <p><strong>Staff directory and settings:</strong> use departments and designations to keep records consistent; staff settings control which profile fields are visible or required. Staff profiles can include employment, contact, emergency contact, qualification, and document details. Deactivate rather than delete a staff profile when preserving history is important.</p>
               <p><strong>Staff accounts and access:</strong> create or link a login only for staff who need system access, enable login where appropriate, and assign the least-privilege school role. Review the account status shown in the Staff Directory and disable access when someone leaves or changes duties.</p>
-              <p><strong>Account email/password recovery:</strong> platform operators can open Platform → <strong>Account recovery</strong>, verify the requester, correct the login email, and optionally set a temporary password. The tool clears sessions, is audited, and does not send a recovery email; communicate temporary credentials only through a verified secure channel. Keep the staff/student profile email up to date separately.</p>
+              <p><strong>Account email/password recovery:</strong> platform operators can open Platform → <strong>Account recovery</strong>, independently verify the requester, correct the login email, and optionally issue a one-time password setup link. Setup links expire after 24 hours, work once, disable sign-in until the recipient chooses a password, clear active sessions, and are audited. No recovery email is sent; share links only through a verified secure channel. Keep the staff/student profile email up to date separately.</p>
               <p>Payroll stores pay-period records and payment status; it does not calculate tax, deductions, benefits, or take-home pay. Review the values entered before marking a payroll record paid. HR reports are for staff attendance; payroll and leave access depends on permissions.</p>
             </GuideSection>
 
@@ -277,8 +277,8 @@ export default function GuidePage() {
                 <Step n={2}>Review the school identity and contacts. Approve a legitimate pending application to enable its workspace, or reject it when it should not be activated.</Step>
                 <Step n={3}>Edit school details as authorized. Archive a workspace to disable access without deleting tenant data; restore it only after confirming the request.</Step>
                 <Step n={4}>Return an approved school to pending review only when access must be paused for a documented review. Check the resulting status before leaving the page.</Step>
-                <Step n={5}>Open <strong>Account recovery</strong>, find the account, and independently verify the requester before changing the login email or setting a temporary password.</Step>
-                <Step n={6}>Send temporary credentials through an approved secure channel, never in a public comment or shared document. Recovery changes clear existing sessions and are audited; the platform does not send an email automatically.</Step>
+                <Step n={5}>Open <strong>Account recovery</strong>, find the account, and independently verify the requester before changing the login email or issuing a one-time password setup link.</Step>
+                <Step n={6}>Share the one-time setup link through an approved secure channel, never in a public comment or shared document. The recipient chooses their own password; the platform does not send an email automatically.</Step>
               </ol>
               <p>Platform-admin status does not by itself grant access to a school’s student or financial records. Workspace management and member account recovery are separate: recovery applies to the account across linked schools, while each school continues to manage its own roles and operational records.</p>
             </GuideSection>

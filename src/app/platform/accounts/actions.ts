@@ -1,13 +1,10 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import {
-  account as authAccount,
   auditLogs,
   schoolMemberships,
   session,
@@ -17,10 +14,10 @@ import {
   userStudentLinks,
 } from "@/db/schema";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { issuePasswordSetupLink } from "@/lib/account-setup";
 import { requirePlatformAdmin } from "@/lib/platform-access";
-import { getStaffLoginPasswordError } from "@/lib/staff-policy";
 
-export type PlatformAccountRecoveryState = { error?: string; success?: string };
+export type PlatformAccountRecoveryState = { error?: string; success?: string; setupUrl?: string };
 
 export async function updatePlatformAccountCredentials(
   _previousState: PlatformAccountRecoveryState,
@@ -30,18 +27,15 @@ export async function updatePlatformAccountCredentials(
   const parsed = z.object({
     userId: z.string().uuid(),
     email: z.string().trim().email().max(320).transform((email) => email.toLowerCase()),
-    password: z.string().max(128),
-    passwordConfirmation: z.string().max(128),
+    issuePasswordSetup: z.string().transform((value) => value === "true"),
   }).safeParse({
     userId: formData.get("userId"),
     email: formData.get("email"),
-    password: formData.get("password") ?? "",
-    passwordConfirmation: formData.get("passwordConfirmation") ?? "",
+    issuePasswordSetup: formData.get("issuePasswordSetup") ?? "",
   });
   if (!parsed.success) return { error: "Enter a valid email address and account." };
-  const { userId, email, password, passwordConfirmation } = parsed.data;
-  const passwordError = getStaffLoginPasswordError(password, passwordConfirmation);
-  if (passwordError) return { error: passwordError };
+  const { userId, email, issuePasswordSetup } = parsed.data;
+  let setupUrl: string | undefined;
 
   try {
     const outcome = await db.transaction(async (tx) => {
@@ -58,7 +52,6 @@ export async function updatePlatformAccountCredentials(
       if (!memberships.length) return "account-not-found" as const;
 
       const emailChanged = target.email.toLowerCase() !== email;
-      const passwordHash = password ? await hashPassword(password) : null;
       if (emailChanged) await tx.update(user).set({ email }).where(eq(user.id, userId));
 
       if (emailChanged) {
@@ -78,34 +71,13 @@ export async function updatePlatformAccountCredentials(
         }
       }
 
-      if (passwordHash) {
-        const [credentialAccount] = await tx.select({ id: authAccount.id })
-          .from(authAccount)
-          .where(and(
-            eq(authAccount.userId, userId),
-            eq(authAccount.providerId, "credential"),
-          ))
-          .for("update")
-          .limit(1);
-        if (credentialAccount) {
-          await tx.update(authAccount).set({ password: passwordHash })
-            .where(eq(authAccount.id, credentialAccount.id));
-        } else {
-          await tx.insert(authAccount).values({
-            id: randomUUID(),
-            accountId: userId,
-            providerId: "credential",
-            userId,
-            password: passwordHash,
-          });
-        }
-      }
+      if (issuePasswordSetup) setupUrl = await issuePasswordSetupLink(tx, userId);
 
-      if (emailChanged || passwordHash) {
+      if (emailChanged || issuePasswordSetup) {
         await tx.delete(session).where(eq(session.userId, userId));
         const changedFields = [
           ...(emailChanged ? ["credential.email"] : []),
-          ...(passwordHash ? ["credential.password"] : []),
+          ...(issuePasswordSetup ? ["credential.password", "user.isActive"] : []),
         ];
         for (const membership of memberships) {
           await tx.insert(auditLogs).values({
@@ -132,5 +104,8 @@ export async function updatePlatformAccountCredentials(
   revalidatePath("/admin/users");
   revalidatePath("/admin/students");
   revalidatePath("/admin/staff");
-  return { success: "Account updated. No email was sent; share the new credentials securely." };
+  return {
+    success: "Account updated.",
+    ...(setupUrl ? { setupUrl } : {}),
+  };
 }

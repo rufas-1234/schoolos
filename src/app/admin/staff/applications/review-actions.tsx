@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { AdminActionDialog } from "@/components/admin-data-table";
+import { AccountSetupLink } from "@/components/account-setup-link";
 import {
   reviewPublicStaffApplication,
   type StaffActionState,
@@ -34,9 +35,12 @@ function ReviewDecisionForm({
       </form>
       {state.error && <p role="alert" className="max-w-56 text-xs text-red-700">{state.error}</p>}
       {state.success && (
-        <p role="status" className="max-w-72 break-words text-xs text-slate-600">
-          {state.message ?? `Application ${decision === "approve" ? "approved" : "rejected"}.`}
-        </p>
+        <div className="max-w-72 space-y-2">
+          <p role="status" className="break-words text-xs text-slate-600">
+            {state.message ?? `Application ${decision === "approve" ? "approved" : "rejected"}.`}
+          </p>
+          {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
+        </div>
       )}
     </div>
   );

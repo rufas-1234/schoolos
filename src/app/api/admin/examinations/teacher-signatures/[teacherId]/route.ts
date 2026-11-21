@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolMember, requireSchoolPermission } from "@/lib/access-control";
 import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
+import { getBoundedRequest, maxUploadRequestBodyBytes } from "@/lib/request-body-limit";
 
 export const runtime = "nodejs";
 
@@ -139,7 +140,9 @@ export async function POST(
     .limit(1);
   if (!teacher) return Response.json({ error: "You may only upload a signature for your own active teacher profile." }, { status: 403 });
 
-  const formData = await request.formData();
+  const bounded = await getBoundedRequest(request, maxUploadRequestBodyBytes);
+  if (!bounded.ok) return bounded.response;
+  const formData = await bounded.request.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
     return Response.json({ error: "Choose an image file for this teacher signature." }, { status: 400 });

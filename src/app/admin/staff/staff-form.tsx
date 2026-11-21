@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
+import { AccountSetupLink } from "@/components/account-setup-link";
 import { createStaffMember, updateStaffMember, type StaffActionState } from "./actions";
 import type { StaffCustomField, StaffDocuments, StaffStoredFile } from "@/db/schema";
 import { employmentTypes, staffContractTypes, staffGenders, staffMaritalStatuses, staffRoles } from "@/lib/staff-policy";
@@ -97,8 +98,6 @@ export function StaffForm({
   const [pendingUploads, setPendingUploads] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
   const submittedValues = useRef<Map<string, string[]> | null>(null);
-  const accountPasswordRef = useRef<HTMLInputElement>(null);
-  const accountPasswordConfirmationRef = useRef<HTMLInputElement>(null);
   const [selectedBranchId, setSelectedBranchId] = useState(record?.branchId?.toString() ?? "");
   const [loginAccessEnabled, setLoginAccessEnabled] = useState(record?.loginAccessEnabled ?? false);
   const customField = (index: number) => record?.customFields?.[index];
@@ -107,18 +106,13 @@ export function StaffForm({
 
   useEffect(() => {
     if (state.success) {
-      if (accountPasswordRef.current) accountPasswordRef.current.value = "";
-      if (accountPasswordConfirmationRef.current) accountPasswordConfirmationRef.current.value = "";
+      const setupField = formRef.current?.elements.namedItem("issuePasswordSetup");
+      if (setupField instanceof HTMLInputElement) setupField.checked = false;
       submittedValues.current = null;
       return;
     }
-    if (state.error) {
-      if (accountPasswordRef.current) accountPasswordRef.current.value = "";
-      if (accountPasswordConfirmationRef.current) accountPasswordConfirmationRef.current.value = "";
-    }
     if (!state.error || !submittedValues.current || !formRef.current) return;
     for (const [name, values] of submittedValues.current) {
-      if (name === "accountPassword" || name === "accountPasswordConfirmation") continue;
       const field = formRef.current.elements.namedItem(name);
       if (field instanceof RadioNodeList) {
         field.value = values[0] ?? "";
@@ -211,14 +205,14 @@ export function StaffForm({
             </Field>
             {record && (
               <p className="sm:col-span-2 text-xs leading-5 text-slate-500">
-                Changing this email also updates the linked staff login. Passwords are set manually here; no email is sent.
+                Changing this email also updates the linked staff login. Password resets use a one-time setup link; no password is shown to staff.
               </p>
             )}
             {!record ? (
               <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-900">A staff login is created automatically</p>
                 <p className="mt-1 leading-6">
-                  Username: staff number (generated if blank). Initial password: Staff@ + number + 1. Change it in Account security.
+                  Username: staff number (generated if blank). A one-time password setup link will appear after saving.
                 </p>
               </div>
             ) : (
@@ -227,13 +221,7 @@ export function StaffForm({
                 <input
                   type="checkbox"
                   checked={loginAccessEnabled}
-                  onChange={(event) => {
-                    setLoginAccessEnabled(event.currentTarget.checked);
-                    if (!event.currentTarget.checked) {
-                      if (accountPasswordRef.current) accountPasswordRef.current.value = "";
-                      if (accountPasswordConfirmationRef.current) accountPasswordConfirmationRef.current.value = "";
-                    }
-                  }}
+                  onChange={(event) => setLoginAccessEnabled(event.currentTarget.checked)}
                   className="mt-1 accent-violet-700"
                 />
                 <span>
@@ -244,35 +232,15 @@ export function StaffForm({
                 </span>
               </label>
               {loginAccessEnabled && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                    <span>Set or reset password <span className="font-normal text-slate-500">(leave blank to keep an existing password)</span></span>
-                    <input
-                      ref={accountPasswordRef}
-                      name="accountPassword"
-                      type="password"
-                      autoComplete="new-password"
-                      minLength={6}
-                      maxLength={128}
-                      className={inputClass}
-                    />
-                    <span className="block text-xs font-normal text-slate-500">
-                      At least 6 characters with uppercase, lowercase, a number, and a symbol.
+                <label className="flex items-start gap-2 text-sm text-slate-700">
+                  <input type="checkbox" name="issuePasswordSetup" value="true" className="mt-1 accent-violet-700" />
+                  <span>
+                    Issue a new one-time password setup link
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                      Sign-in will be disabled until the staff member sets a password. Existing sessions are revoked.
                     </span>
-                  </label>
-                  <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                    <span>Confirm password</span>
-                    <input
-                      ref={accountPasswordConfirmationRef}
-                      name="accountPasswordConfirmation"
-                      type="password"
-                      autoComplete="new-password"
-                      minLength={6}
-                      maxLength={128}
-                      className={inputClass}
-                    />
-                  </label>
-                </div>
+                  </span>
+                </label>
               )}
             </div>
             )}
@@ -395,9 +363,12 @@ export function StaffForm({
       {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
       <div className="admin-dialog-form-actions flex items-center justify-between border-t border-slate-100 pt-4">
         {state.success && (
-          <p role="status" className="text-sm font-medium text-emerald-700">
-            {state.message ?? `Staff profile saved.${loginAccessEnabled ? " Assign the school role under User Roles before the staff member signs in." : ""}`}
-          </p>
+          <div className="space-y-3">
+            <p role="status" className="text-sm font-medium text-emerald-700">
+              {state.message ?? `Staff profile saved.${loginAccessEnabled ? " Assign the school role under User Roles before the staff member signs in." : ""}`}
+            </p>
+            {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
+          </div>
         )}
         {!state.success && <span />}
         <button

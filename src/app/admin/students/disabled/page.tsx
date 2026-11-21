@@ -11,7 +11,7 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { transitionStudentStatus } from "../actions";
+import { transitionStudentStatusDirect } from "../actions";
 
 export default async function DisabledStudentsPage() {
   const context = await requireSchoolPermission("students.view");
@@ -199,7 +199,7 @@ export default async function DisabledStudentsPage() {
             record.phone ?? "",
           ].join(" "),
           actions: canUpdate ? (
-            <form action={transitionStudentStatus}>
+            <form action={transitionStudentStatusDirect}>
               <input type="hidden" name="publicId" value={record.publicId} />
               <input type="hidden" name="nextStatus" value="active" />
               <AdminConfirmSubmitButton

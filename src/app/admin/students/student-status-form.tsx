@@ -1,7 +1,9 @@
 "use client";
 
+import { useActionState } from "react";
 import { AdminConfirmSubmitButton } from "@/components/admin-data-table";
-import { transitionStudentStatus } from "./actions";
+import { AccountSetupLink } from "@/components/account-setup-link";
+import { transitionStudentStatusAction } from "./actions";
 
 export function StudentStatusForm({
   publicId,
@@ -14,6 +16,7 @@ export function StudentStatusForm({
   currentStatus: string;
   nextStatus: string;
 }) {
+  const [state, actionHandler, pending] = useActionState(transitionStudentStatusAction, {});
   const action = nextStatus === "active"
     ? currentStatus === "inactive" || currentStatus === "disabled" ? "reactivate" : "enroll"
     : nextStatus === "disabled"
@@ -38,16 +41,19 @@ export function StudentStatusForm({
             : "Reopen";
 
   return (
-    <form action={transitionStudentStatus}>
+    <form action={actionHandler} className="space-y-2">
       <input type="hidden" name="publicId" value={publicId} />
       <input type="hidden" name="nextStatus" value={nextStatus} />
       <AdminConfirmSubmitButton
         label={`${label} ${studentName}`}
-        buttonText={label}
+        buttonText={pending ? "Saving..." : label}
         confirmationTitle={`Confirm ${label.toLowerCase()}`}
         confirmationMessage={`Are you sure you want to ${action} ${studentName}?`}
         variant={nextStatus === "rejected" || nextStatus === "inactive" || nextStatus === "disabled" ? "danger" : "primary"}
+        disabled={pending}
       />
+      {state.error && <p role="alert" className="text-xs text-rose-700">{state.error}</p>}
+      {state.setupUrls?.map((url) => <AccountSetupLink key={url} url={url} />)}
     </form>
   );
 }

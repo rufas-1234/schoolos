@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useActionState, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AdminConfirmSubmitButton } from "@/components/admin-data-table";
+import { AccountSetupLink } from "@/components/account-setup-link";
 import { RequiredMark } from "@/components/required-mark";
 import { SearchableSelect } from "@/components/searchable-select";
 import type { StudentAdditionalDetails, StudentFieldSettings } from "@/db/schema";
@@ -116,18 +117,15 @@ export function StudentForm({
 
   useEffect(() => {
     if (state.success || state.error) {
-      for (const name of ["accountPassword", "accountPasswordConfirmation"]) {
-        const field = formRef.current?.elements.namedItem(name);
-        if (field instanceof HTMLInputElement) field.value = "";
-      }
       if (state.success) {
+        const setupField = formRef.current?.elements.namedItem("issuePasswordSetup");
+        if (setupField instanceof HTMLInputElement) setupField.checked = false;
         submittedValues.current = null;
         return;
       }
     }
     if (!state.error || !submittedValues.current || !formRef.current) return;
     for (const [name, values] of submittedValues.current) {
-      if (name === "accountPassword" || name === "accountPasswordConfirmation") continue;
       const field = formRef.current.elements.namedItem(name);
       if (field instanceof RadioNodeList) {
         field.value = values[0] ?? "";
@@ -175,7 +173,7 @@ export function StudentForm({
         const formData = new FormData(event.currentTarget);
         const snapshot = new Map<string, string[]>();
         for (const [name, value] of formData.entries()) {
-          if (typeof value !== "string" || name === "accountPassword" || name === "accountPasswordConfirmation") continue;
+          if (typeof value !== "string") continue;
           snapshot.set(name, [...(snapshot.get(name) ?? []), value]);
         }
         submittedValues.current = snapshot;
@@ -404,10 +402,17 @@ export function StudentForm({
           {record && (
             <>
               <p className="sm:col-span-2 text-xs leading-5 text-slate-500">
-                Changing this email also updates the linked student login. Set a temporary password below if needed; no email is sent.
+                Changing this email also updates the linked student login. Password resets use a one-time setup link; no password is shown to staff.
               </p>
-              <Field label="Set or reset student login password (leave blank to keep it)" name="accountPassword" type="password" minLength={6} maxLength={128} autoComplete="new-password" />
-              <Field label="Confirm student login password" name="accountPasswordConfirmation" type="password" minLength={6} maxLength={128} autoComplete="new-password" />
+              <label className="sm:col-span-2 flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="issuePasswordSetup" value="true" className="mt-1 accent-violet-700" />
+                <span>
+                  Issue a new one-time password setup link
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    This disables sign-in until the student sets a new password. Any existing sessions are revoked.
+                  </span>
+                </span>
+              </label>
             </>
           )}
           <Field label="Student phone" name="phone" required={fieldConfig("phone").required} visible={fieldConfig("phone").enabled} defaultValue={record?.phone ?? ""} />
@@ -601,11 +606,14 @@ export function StudentForm({
 
       {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
       {state.success && (
-        <p role="status" className="text-sm text-emerald-700">
-          {record
-            ? "Student record updated."
-            : "Admission and class placement added to the review queue."}
-        </p>
+        <div className="space-y-3">
+          <p role="status" className="text-sm text-emerald-700">
+            {record
+              ? "Student record updated."
+              : "Admission and class placement added to the review queue."}
+          </p>
+          {state.setupUrls?.map((url) => <AccountSetupLink key={url} url={url} />)}
+        </div>
       )}
       <div className="admin-dialog-form-actions flex justify-end">
         {record

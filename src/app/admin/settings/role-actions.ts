@@ -23,13 +23,14 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolAccountInputSchema } from "@/lib/account-provisioning-policy";
+import { issuePasswordSetupLink } from "@/lib/account-setup";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import {
   normalizePhoneIdentifier,
   shouldSkipConflictingLoginIdentifier,
 } from "@/lib/login-identifier-policy";
 
-export type RoleActionState = { error?: string; success?: boolean; message?: string };
+export type RoleActionState = { error?: string; success?: boolean; message?: string; setupUrl?: string };
 
 function value(formData: FormData, key: string): string {
   const field = formData.get(key);
@@ -57,12 +58,12 @@ export async function createSchoolAccount(
     personType: value(formData, "personType"),
     recordId: value(formData, "recordId"),
     parentLogin: value(formData, "parentLogin"),
-    password: value(formData, "password"),
-    passwordConfirmation: value(formData, "passwordConfirmation"),
+    password: value(formData, "password") || undefined,
+    passwordConfirmation: value(formData, "passwordConfirmation") || undefined,
     roleIds: roleIds(formData),
   });
   if (!parsed.success) {
-    return { error: "Choose a profile and at least one school role, then enter matching passwords with uppercase, lowercase, a number, and a symbol (6 characters minimum)." };
+    return { error: "Choose a profile and at least one school role. Parent accounts also require a strong password." };
   }
 
   const selectedRoles = await db.select({ id: roles.id })
@@ -75,7 +76,10 @@ export async function createSchoolAccount(
     return { error: "One or more selected roles are unavailable for this school." };
   }
 
-  const passwordHash = await hashPassword(parsed.data.password);
+  const passwordHash = parsed.data.personType === "parent"
+    ? await hashPassword(parsed.data.password!)
+    : null;
+  let setupUrl: string | undefined;
   let phoneIdentifierUnavailable = false;
   try {
     const outcome = await db.transaction(async (tx) => {
@@ -222,15 +226,17 @@ export async function createSchoolAccount(
         name,
         email,
         emailVerified: false,
-        isActive: true,
+        isActive: parsed.data.personType === "parent",
       });
-      await tx.insert(authAccount).values({
-        id: randomUUID(),
-        accountId: userId,
-        providerId: "credential",
-        userId,
-        password: passwordHash,
-      });
+      if (passwordHash) {
+        await tx.insert(authAccount).values({
+          id: randomUUID(),
+          accountId: userId,
+          providerId: "credential",
+          userId,
+          password: passwordHash,
+        });
+      }
       await tx.insert(schoolMemberships).values({
         schoolId: context.schoolId,
         userId,
@@ -272,6 +278,7 @@ export async function createSchoolAccount(
           accessType: parsed.data.personType,
         })));
       }
+      if (!passwordHash) setupUrl = await issuePasswordSetupLink(tx, userId);
       await tx.insert(auditLogs).values({
         schoolId: context.schoolId,
         actorUserId: context.user.id,
@@ -323,12 +330,15 @@ export async function createSchoolAccount(
   revalidatePath("/admin/staff");
   revalidatePath("/portal/student");
   revalidatePath("/portal/parent");
-  return phoneIdentifierUnavailable
-    ? {
-      success: true,
-      message: "Account created and linked successfully. The phone number is already used by another login, so this staff account must sign in with its profile email.",
-    }
-    : { success: true };
+  return {
+    success: true,
+    ...(setupUrl ? { setupUrl } : {}),
+    ...(phoneIdentifierUnavailable
+      ? {
+        message: "Account created and linked. The phone number is already used by another login, so this staff account must sign in with its profile email.",
+      }
+      : {}),
+  };
 }
 
 export async function createSchoolRole(

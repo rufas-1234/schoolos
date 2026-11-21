@@ -7,6 +7,7 @@ import { matchesFileSignature } from "@/lib/file-signature";
 import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
 import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
+import { getBoundedRequest, maxUploadRequestBodyBytes } from "@/lib/request-body-limit";
 
 const maxFileSize = 4 * 1024 * 1024;
 const allowedDocumentTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -44,7 +45,9 @@ export async function POST(
   });
   if (!allowed) return Response.json({ error: "Too many uploads. Please wait before trying again." }, { status: 429 });
 
-  const formData = await request.formData();
+  const bounded = await getBoundedRequest(request, maxUploadRequestBodyBytes);
+  if (!bounded.ok) return bounded.response;
+  const formData = await bounded.request.formData();
   const purpose = z.enum(["document", "profile-photo"]).safeParse(formData.get("purpose"));
   const file = formData.get("file");
   if (!purpose.success || !(file instanceof File)) {

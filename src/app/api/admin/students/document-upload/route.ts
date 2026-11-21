@@ -3,8 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { students, uploadedFiles } from "@/db/schema";
-import { requireSchoolPermission } from "@/lib/access-control";
+import { requireSchoolMember, requireSchoolPermission } from "@/lib/access-control";
 import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
+import { getBoundedRequest, maxUploadRequestBodyBytes } from "@/lib/request-body-limit";
 
 const maxFileSize = 4 * 1024 * 1024;
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -12,7 +13,10 @@ const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "ima
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
+  await requireSchoolMember();
+  const bounded = await getBoundedRequest(request, maxUploadRequestBodyBytes);
+  if (!bounded.ok) return bounded.response;
+  const formData = await bounded.request.formData();
   const uploadMode = z.enum(["create", "update"]).safeParse(formData.get("mode"));
   const uploadPurpose = z.enum(["document", "profile-photo"]).safeParse(
     formData.get("purpose") ?? "document",

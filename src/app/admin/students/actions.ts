@@ -1,7 +1,6 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -9,7 +8,6 @@ import { z } from "zod";
 import { db } from "@/db";
 import {
   academicYears,
-  account as authAccount,
   auditLogs,
   classLevels,
   classSections,
@@ -32,7 +30,7 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
-import { getStaffLoginPasswordError } from "@/lib/staff-policy";
+import { issuePasswordSetupLink } from "@/lib/account-setup";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
 import { normalizeAdmissionIdentifier } from "@/lib/login-identifier-policy";
 import { consumePublicAdmissionRateLimit } from "@/lib/public-admission-rate-limit";
@@ -143,6 +141,7 @@ const updateStudentSchema = personalDetailsSchema.extend({
 export type StudentActionState = {
   error?: string;
   success?: boolean;
+  setupUrls?: string[];
 }
 
 function revalidateStudentPages() {
@@ -738,13 +737,11 @@ export async function updateStudent(
   }
 
   const details = result.data;
-  const accountPassword = readFormValue(formData, "accountPassword");
-  const accountPasswordConfirmation = readFormValue(formData, "accountPasswordConfirmation");
-  const passwordError = getStaffLoginPasswordError(accountPassword, accountPasswordConfirmation);
-  if (passwordError) return { error: passwordError };
+  const issueSetupLink = formData.get("issuePasswordSetup") === "true";
   if (!hasValidDocumentScope(details.additionalDetails, context.schoolPublicId)) {
     return { error: "The uploaded documents do not belong to this school." };
   }
+  const setupUrls: string[] = [];
   const outcome = await db.transaction(async (tx) => {
     const [student] = await tx
       .select({
@@ -797,12 +794,11 @@ export async function updateStudent(
         eq(userStudentLinks.accessType, "student"),
       ))
       .for("update");
-    if (accountPassword && linkedStudentUsers.length === 0) return "student-login-not-found";
-    const passwordHash = accountPassword ? await hashPassword(accountPassword) : null;
+    if (issueSetupLink && linkedStudentUsers.length === 0) return "student-login-not-found";
     const loginEmail = details.email.trim().toLowerCase();
     for (const linkedAccount of linkedStudentUsers) {
       const emailChanged = Boolean(loginEmail && linkedAccount.email.toLowerCase() !== loginEmail);
-      if (!emailChanged && !passwordHash) continue;
+      if (!emailChanged && !issueSetupLink) continue;
       const [otherActiveMembership] = await tx.select({ id: schoolMemberships.id })
         .from(schoolMemberships)
         .where(and(
@@ -818,29 +814,8 @@ export async function updateStudent(
       if (emailChanged) {
         await tx.update(user).set({ email: loginEmail }).where(eq(user.id, linkedAccount.userId));
       }
-      if (passwordHash) {
-        const [credentialAccount] = await tx.select({ id: authAccount.id })
-          .from(authAccount)
-          .where(and(
-            eq(authAccount.userId, linkedAccount.userId),
-            eq(authAccount.providerId, "credential"),
-          ))
-          .for("update")
-          .limit(1);
-        if (credentialAccount) {
-          await tx.update(authAccount).set({ password: passwordHash })
-            .where(eq(authAccount.id, credentialAccount.id));
-        } else {
-          await tx.insert(authAccount).values({
-            id: randomUUID(),
-            accountId: linkedAccount.userId,
-            providerId: "credential",
-            userId: linkedAccount.userId,
-            password: passwordHash,
-          });
-        }
-      }
-      if (emailChanged || passwordHash) {
+      if (issueSetupLink) setupUrls.push(await issuePasswordSetupLink(tx, linkedAccount.userId));
+      if (emailChanged || issueSetupLink) {
         await tx.delete(session).where(eq(session.userId, linkedAccount.userId));
         await tx.insert(auditLogs).values({
           schoolId: context.schoolId,
@@ -850,7 +825,7 @@ export async function updateStudent(
           resourcePublicId: publicId.data,
           changedFields: [
             ...(emailChanged ? ["credential.email"] : []),
-            ...(passwordHash ? ["credential.password"] : []),
+            ...(issueSetupLink ? ["credential.password", "user.isActive"] : []),
           ],
         });
       }
@@ -916,7 +891,7 @@ export async function updateStudent(
   revalidateStudentPages();
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin/users");
-  return { success: true };
+  return { success: true, ...(setupUrls.length ? { setupUrls } : {}) };
 }
 
 const transitionSchema = z.object({
@@ -924,7 +899,7 @@ const transitionSchema = z.object({
   nextStatus: z.enum(studentStatuses),
 });
 
-export async function transitionStudentStatus(formData: FormData): Promise<void> {
+export async function transitionStudentStatus(formData: FormData): Promise<StudentActionState> {
   const context = await requireSchoolPermission("students.update");
   const result = transitionSchema.safeParse({
     publicId: formData.get("publicId"),
@@ -932,6 +907,7 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
   });
   if (!result.success) throw new Error("Invalid admission status request.");
 
+  let setupUrl: string | undefined;
   const outcome = await db.transaction(async (tx) => {
     const [student] = await tx
       .select({
@@ -993,21 +969,14 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
         if (existingEmail) return "account-conflict";
 
         const userId = randomUUID();
-        const password = `Student@${student.admissionNumber}1`;
         await tx.insert(user).values({
           id: userId,
           name: `${student.firstName} ${student.lastName}`,
           email,
           emailVerified: false,
-          isActive: true,
+          isActive: false,
         });
-        await tx.insert(authAccount).values({
-          id: randomUUID(),
-          accountId: userId,
-          providerId: "credential",
-          userId,
-          password: await hashPassword(password),
-        });
+        setupUrl = await issuePasswordSetupLink(tx, userId);
         await tx.insert(schoolMemberships).values({
           schoolId: context.schoolId,
           userId,
@@ -1106,4 +1075,19 @@ export async function transitionStudentStatus(formData: FormData): Promise<void>
   revalidateStudentPages();
   revalidatePath("/admin/admissions");
   revalidatePath("/admin/dashboard");
+  return {
+    success: true,
+    ...(setupUrl ? { setupUrls: [setupUrl] } : {}),
+  };
+}
+
+export async function transitionStudentStatusAction(
+  _previousState: StudentActionState,
+  formData: FormData,
+): Promise<StudentActionState> {
+  return transitionStudentStatus(formData);
+}
+
+export async function transitionStudentStatusDirect(formData: FormData): Promise<void> {
+  await transitionStudentStatus(formData);
 }

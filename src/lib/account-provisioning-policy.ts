@@ -9,17 +9,24 @@ export const schoolAccountInputSchema = z.object({
     (value) => value === "" ? undefined : value,
     z.enum(["email", "phone"]).optional(),
   ),
-  password: z.string().min(minimumPasswordLength).max(128).refine(
-    (password) => getPasswordStrengthError(password) === null,
-    "Choose a strong password with uppercase, lowercase, a number, and a symbol.",
-  ),
-  passwordConfirmation: z.string().max(128),
+  password: z.string().max(128).optional(),
+  passwordConfirmation: z.string().max(128).optional(),
   roleIds: z.array(z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe()))
     .min(1)
     .refine((ids) => new Set(ids).size === ids.length),
-}).refine((data) => data.password === data.passwordConfirmation, {
-  path: ["passwordConfirmation"],
-  message: "Passwords do not match.",
+}).refine((data) => {
+  if (data.personType !== "parent") {
+    return !data.password && !data.passwordConfirmation;
+  }
+  return Boolean(
+    data.password &&
+    data.password.length >= minimumPasswordLength &&
+    getPasswordStrengthError(data.password) === null &&
+    data.password === data.passwordConfirmation,
+  );
+}, {
+  path: ["password"],
+  message: "Parent accounts require matching passwords with uppercase, lowercase, a number, and a symbol.",
 });
 
 export function getStudentRoleId(roles: { id: number; name: string }[]): number | null {

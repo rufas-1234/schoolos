@@ -129,6 +129,15 @@ function getS3CompatibleConfiguration() {
     OBJECT_STORAGE_SECRET_ACCESS_KEY,
   } = process.env;
 
+  const values = [
+    OBJECT_STORAGE_ENDPOINT,
+    OBJECT_STORAGE_REGION,
+    OBJECT_STORAGE_BUCKET,
+    OBJECT_STORAGE_ACCESS_KEY_ID,
+    OBJECT_STORAGE_SECRET_ACCESS_KEY,
+  ];
+  if (values.every((value) => !value)) return null;
+
   if (
     !OBJECT_STORAGE_ENDPOINT
     || !OBJECT_STORAGE_REGION
@@ -136,7 +145,7 @@ function getS3CompatibleConfiguration() {
     || !OBJECT_STORAGE_ACCESS_KEY_ID
     || !OBJECT_STORAGE_SECRET_ACCESS_KEY
   ) {
-    return null;
+    throw new Error("S3-compatible storage configuration is incomplete.");
   }
 
   return {
@@ -157,13 +166,13 @@ export function isObjectStorageConfigured() {
 }
 
 export function getObjectStorage(): ObjectStorage {
-  if (process.env.BLOB_READ_WRITE_TOKEN || (process.env.BLOB_STORE_ID && process.env.VERCEL_OIDC_TOKEN)) {
-    return new VercelBlobStorage();
-  }
-
   const s3Configuration = getS3CompatibleConfiguration();
   if (s3Configuration) {
     return new S3CompatibleStorage(s3Configuration);
+  }
+
+  if (process.env.BLOB_READ_WRITE_TOKEN || (process.env.BLOB_STORE_ID && process.env.VERCEL_OIDC_TOKEN)) {
+    return new VercelBlobStorage();
   }
 
   throw new Error("Object storage is not fully configured.");

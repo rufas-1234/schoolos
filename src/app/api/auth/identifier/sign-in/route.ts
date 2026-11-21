@@ -7,6 +7,7 @@ import {
   normalizeAdmissionIdentifier,
   normalizePhoneIdentifier,
 } from "@/lib/login-identifier-policy";
+import { getBoundedRequest, maxApiRequestBodyBytes } from "@/lib/request-body-limit";
 
 const invalidCredentials = () => Response.json(
   { message: "Sign-in failed. Check your credentials or contact your administrator." },
@@ -15,8 +16,10 @@ const invalidCredentials = () => Response.json(
 
 export async function POST(request: Request) {
   let submitted: { identifier?: unknown; password?: unknown };
+  const bounded = await getBoundedRequest(request, maxApiRequestBodyBytes);
+  if (!bounded.ok) return bounded.response;
   try {
-    submitted = await request.json() as { identifier?: unknown; password?: unknown };
+    submitted = await bounded.request.json() as { identifier?: unknown; password?: unknown };
   } catch {
     return invalidCredentials();
   }
@@ -62,6 +65,11 @@ export async function POST(request: Request) {
     if (uniqueMatches.length !== 1) return invalidCredentials();
     email = uniqueMatches[0].email;
   }
+  const [account] = await db.select({ isActive: user.isActive })
+    .from(user)
+    .where(eq(user.email, email))
+    .limit(1);
+  if (!account?.isActive) return invalidCredentials();
 
   const headers = new Headers(request.headers);
   headers.delete("content-length");

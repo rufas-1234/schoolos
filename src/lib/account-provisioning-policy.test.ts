@@ -31,17 +31,29 @@ describe("student account eligibility", () => {
 });
 
 describe("school account input validation", () => {
-  it("accepts student account submissions when the parent-only login method is absent", () => {
+  it("accepts student account submissions without asking an administrator to set a password", () => {
     const result = schoolAccountInputSchema.safeParse({
       personType: "student",
       recordId: "42",
       parentLogin: "",
-      password: "student-password",
-      passwordConfirmation: "student-password",
       roleIds: ["7"],
     });
 
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.parentLogin).toBeUndefined();
+  });
+
+  it("rejects administrator-supplied passwords for staff and student accounts", () => {
+    for (const personType of ["staff", "student"] as const) {
+      const result = schoolAccountInputSchema.safeParse({
+        personType,
+        recordId: "42",
+        roleIds: ["7"],
+        password: "A-strong-password-123!",
+        passwordConfirmation: "A-strong-password-123!",
+      });
+
+      expect(result.success).toBe(false);
+    }
   });
 });
