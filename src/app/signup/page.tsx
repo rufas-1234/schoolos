@@ -7,7 +7,7 @@ export default function SignupPage() {
   const enabled = isMultiSchoolEnabled() && Boolean(process.env.DATABASE_URL?.trim());
 
   return (
-    <main className="auth-entry-page flex min-h-dvh items-center justify-center bg-[#f7f7fa] px-3 py-8 sm:px-4 sm:py-10">
+    <main className="auth-entry-page signup-entry-page flex min-h-dvh items-center justify-center px-3 py-8 sm:px-4 sm:py-10">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_24px_80px_-34px_rgba(54,34,84,0.28)] md:grid-cols-[0.85fr_1.15fr]">
         <section className="relative hidden min-h-[680px] flex-col justify-between overflow-hidden bg-violet-800 p-10 text-white md:flex">
           <div className="absolute -right-24 -top-20 h-80 w-80 rounded-full border border-white/10" />
