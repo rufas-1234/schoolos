@@ -3,45 +3,20 @@
 :root {
   --background: #f7f7fa;
   --foreground: #20202a;
-  --primary: #142967;
-  --accent: #812e2b;
+  --primary: #7027b8;
   --muted: #85828d;
-  --report-brand: #142967;
-  --report-accent: #812e2b;
+  --report-brand: #4f46a5;
+  --report-accent: #0f766e;
   --report-ink: #1f2937;
   --report-muted: #64748b;
   --report-border: #cbd5e1;
-  --report-soft: #eff2fa;
-  --color-violet-50: #f0f3fb;
-  --color-violet-100: #e3e8f4;
-  --color-violet-200: #c9d2e8;
-  --color-violet-300: #a0b1d5;
-  --color-violet-400: #7188bc;
-  --color-violet-500: #4b659f;
-  --color-violet-600: #304b86;
-  --color-violet-700: #142967;
-  --color-violet-800: #132758;
-  --color-violet-900: #0f2049;
-  --color-violet-950: #091535;
+  --report-soft: #eef2ff;
   color-scheme: light;
 }
 
 .dark {
   --background: #0b1120;
   --foreground: #e2e8f0;
-  --primary: #9fb6ee;
-  --accent: #e3a09b;
-  --color-violet-50: #0c1734;
-  --color-violet-100: #12234a;
-  --color-violet-200: #1c3567;
-  --color-violet-300: #2e4d88;
-  --color-violet-400: #425d95;
-  --color-violet-500: #304b86;
-  --color-violet-600: #243c74;
-  --color-violet-700: #1a326c;
-  --color-violet-800: #132758;
-  --color-violet-900: #0f2049;
-  --color-violet-950: #091535;
   color-scheme: dark;
 }
 
@@ -61,24 +36,24 @@
 }
 
 .dark .admin-shell-sidebar {
-  border-color: #29385d;
-  background-color: #101a36;
+  border-color: #3b3150;
+  background-color: #1d1a29;
 }
 
 .dark .admin-shell-topbar {
-  border-color: #29385d;
-  background-color: #142143;
-  color: #dbeafe;
+  border-color: #3b3150;
+  background-color: #211d2e;
+  color: #e9d5ff;
 }
 
 .dark .admin-shell-sidebar [class*="text-violet-"],
 .dark .admin-shell-topbar [class*="text-violet-"] {
-  color: #c0cff2;
+  color: #e9d5ff;
 }
 
 .dark .admin-shell-sidebar [class*="border-violet-"],
 .dark .admin-shell-topbar [class*="border-violet-"] {
-  border-color: #3b4e7e;
+  border-color: #514466;
 }
 
 .dark .portal-shell-content > header {
@@ -102,7 +77,7 @@
 
 .dark .portal-shell-root > aside [class*="text-violet-"],
 .dark .portal-shell-content > header [class*="text-violet-"] {
-  color: #c0cff2;
+  color: #ddd6fe;
 }
 
 .dark .portal-shell-root > aside [class*="border-slate-"] {
@@ -157,7 +132,7 @@
 
 .dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
   :not(.exam-report-document):not(.exam-report-document *)[class~="bg-violet-50"] {
-  background-color: #12234a;
+  background-color: #312e4e;
 }
 
 .dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
@@ -207,6 +182,212 @@
   border-color: #334155;
 }
 
+/* Keep tinted callouts legible as their backgrounds move to dark surfaces. */
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-amber-50"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-amber-100"] {
+  background-color: #422006;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-rose-50"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-rose-100"] {
+  background-color: #4c0519;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-emerald-50"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-emerald-100"] {
+  background-color: #052e16;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-sky-50"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-sky-100"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-blue-100"] {
+  background-color: #082f49;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-orange-50"] {
+  background-color: #431407;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="bg-violet-100"] {
+  background-color: #1c3567;
+}
+
+/* Accent text otherwise keeps dark-mode-inappropriate colors from light mode. */
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-amber-700"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-amber-800"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-amber-900"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-amber-950"] {
+  color: #fde68a !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-blue-800"] {
+  color: #bfdbfe !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-emerald-700"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-emerald-800"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-emerald-900"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-emerald-950"] {
+  color: #a7f3d0 !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-orange-700"] {
+  color: #fed7aa !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-red-700"] {
+  color: #fca5a5 !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-rose-600"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-rose-700"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-rose-800"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-rose-900"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-rose-950"] {
+  color: #fecdd3 !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-sky-700"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-sky-800"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-sky-900"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-sky-950"] {
+  color: #bae6fd !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-300"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-400"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-500"] {
+  color: #9fb6ee !important;
+}
+
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-600"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-700"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-800"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-900"],
+.dark :is(.admin-shell-main, .portal-shell-content)
+  :not(.exam-report-document):not(.exam-report-document *)[class~="text-violet-950"] {
+  color: #c0cff2 !important;
+}
+
+@media screen {
+/* Exam analytics remains a dedicated report surface, so theme it explicitly. */
+.dark .exam-analytics-page {
+  --report-brand: #9fb6ee;
+  --report-accent: #e3a09b;
+  --report-ink: #e2e8f0;
+  --report-muted: #cbd5e1;
+  --report-border: #475569;
+  --report-soft: #17284e;
+}
+
+.dark .exam-analytics-page #exam-analytics-report,
+.dark .exam-analytics-page #exam-analytics-report .print-report-panel,
+.dark .exam-analytics-page #exam-analytics-report [aria-label="Exam summary"] > div {
+  border-color: #475569 !important;
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+
+.dark .exam-analytics-page #exam-analytics-report [class~="bg-violet-50"] {
+  border-color: #3b4e7e !important;
+  background-color: #12234a !important;
+}
+
+.dark .exam-analytics-page #exam-analytics-report [class~="bg-slate-100"] {
+  background-color: #334155 !important;
+}
+
+.dark .exam-analytics-page #exam-analytics-report .print-report-panel > header {
+  border-color: #475569 !important;
+  background-color: #172033 !important;
+}
+
+.dark .exam-analytics-page #exam-analytics-report .print-report-panel > header h3,
+.dark .exam-analytics-page #exam-analytics-report .print-report-heading h2 {
+  color: #dbeafe !important;
+}
+
+.dark .exam-analytics-page #exam-analytics-report .print-report-table th {
+  border-color: #64748b !important;
+  background-color: #1a2e5e !important;
+  color: #dbeafe !important;
+}
+
+.dark .exam-analytics-page #exam-analytics-report .print-report-table td {
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .exam-analytics-page #exam-analytics-report .print-report-table tbody tr:nth-child(even) {
+  background-color: #172033 !important;
+}
+
+.dark .exam-analytics-page #exam-analytics-report .analytics-score-track {
+  background-color: #334155 !important;
+}
+
+.dark .exam-analytics-page [class~="text-slate-950"],
+.dark .exam-analytics-page [class~="text-slate-900"],
+.dark .exam-analytics-page [class~="text-slate-800"] {
+  color: #f1f5f9 !important;
+}
+
+.dark .exam-analytics-page [class~="text-slate-700"] {
+  color: #e2e8f0 !important;
+}
+
+.dark .exam-analytics-page [class~="text-slate-600"],
+.dark .exam-analytics-page [class~="text-slate-500"],
+.dark .exam-analytics-page [class~="text-slate-400"] {
+  color: #cbd5e1 !important;
+}
+
+.dark .exam-analytics-page [class~="text-violet-700"],
+.dark .exam-analytics-page [class~="text-violet-800"],
+.dark .exam-analytics-page [class~="text-violet-900"],
+.dark .exam-analytics-page [class~="text-violet-950"] {
+  color: #c0cff2 !important;
+}
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -218,6 +399,24 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+.auth-entry-page {
+  --primary: #142967;
+  --color-violet-50: #f0f3fb;
+  --color-violet-100: #e3e8f4;
+  --color-violet-200: #c9d2e8;
+  --color-violet-300: #a0b1d5;
+  --color-violet-400: #7188bc;
+  --color-violet-500: #4b659f;
+  --color-violet-600: #304b86;
+  --color-violet-700: #142967;
+  --color-violet-800: #132758;
+  --color-violet-900: #0f2049;
+  --color-violet-950: #091535;
+  color-scheme: light;
+  background-color: #f7f7fa;
+  color: #20202a;
 }
 
 html {
@@ -542,12 +741,12 @@ h6 {
 }
 
 .exam-report-document {
-  --report-brand: #142967;
-  --report-accent: #812e2b;
-  --report-ink: #172033;
-  --report-muted: #526174;
-  --report-border: #cbd6e8;
-  --report-soft: #eff2fa;
+  --report-brand: #3f3a3a;
+  --report-accent: #3f3a3a;
+  --report-ink: #222;
+  --report-muted: #5f5a59;
+  --report-border: #c9c6c4;
+  --report-soft: #f1f0ef;
 }
 
 .exam-report-document .print-report-heading,
@@ -2542,6 +2741,149 @@ h6 {
   main {
     max-width: none !important;
     padding: 0 !important;
+  }
+
+  .exam-analytics-page [data-print-target] {
+    color: #172033 !important;
+    background: #fff !important;
+    font-size: 8.5pt !important;
+    line-height: 1.35 !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-heading {
+    min-height: 19mm;
+    margin-bottom: 4mm;
+    border-bottom: 0.7mm solid #6d28d9 !important;
+    padding: 2mm 20mm 3mm !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-heading img {
+    width: 16mm !important;
+    height: 16mm !important;
+    object-fit: contain;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-kicker {
+    color: #6d28d9 !important;
+    font-size: 7pt !important;
+    letter-spacing: 0.12em;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-heading h2 {
+    color: #172033 !important;
+    font-size: 16pt !important;
+  }
+
+  .exam-analytics-page [data-print-target] .exam-analytics-report-badges {
+    justify-content: center;
+    gap: 2mm;
+  }
+
+  .exam-analytics-page [data-print-target] .exam-analytics-report-badges p {
+    border: 0.25mm solid #d8ccec !important;
+    border-radius: 99px;
+    background: #f5f3ff !important;
+    padding: 1.2mm 3mm !important;
+    color: #5b21b6 !important;
+    font-size: 7pt !important;
+  }
+
+  .exam-analytics-page [data-print-target] [aria-label="Exam summary"] {
+    gap: 2mm !important;
+    margin-bottom: 4mm;
+  }
+
+  .exam-analytics-page [data-print-target] [aria-label="Exam summary"] > div {
+    break-inside: avoid;
+    border: 0.25mm solid #d8ccec !important;
+    border-top: 0.9mm solid #7c3aed !important;
+    border-radius: 2mm !important;
+    background: #faf9ff !important;
+    padding: 3mm !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-panel {
+    margin-top: 3mm;
+    border: 0.3mm solid #d8ccec !important;
+    border-radius: 2mm !important;
+    break-inside: auto !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-panel > header {
+    border-bottom: 0.3mm solid #d8ccec !important;
+    background: #f5f3ff !important;
+    padding: 2.5mm 3mm !important;
+    break-after: avoid;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-panel > header h3 {
+    color: #5b21b6 !important;
+    font-size: 9pt !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-panel > header p {
+    color: #475569 !important;
+    font-size: 7pt !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-panel > div:last-child {
+    padding: 2.5mm 3mm !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-table {
+    font-size: 7.5pt !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-table thead {
+    display: table-header-group !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-table th {
+    border-color: #c4b5fd !important;
+    background: #ede9fe !important;
+    color: #4c1d95 !important;
+    font-size: 6.5pt !important;
+    line-height: 1.2 !important;
+    padding: 1.8mm 1.5mm !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-table td {
+    border-color: #d8dee9 !important;
+    color: #172033 !important;
+    line-height: 1.25 !important;
+    padding: 1.7mm 1.5mm !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-table tbody tr:nth-child(even) {
+    background: #f8f7fc !important;
+  }
+
+  .exam-analytics-page [data-print-target] .print-report-table tbody tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .exam-analytics-page [data-print-target] .analytics-score-track {
+    height: 2mm !important;
+    min-width: 12mm !important;
+    border: 0.2mm solid #ddd6fe;
+    background: #ede9fe !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .exam-analytics-page [data-print-target] .analytics-score-fill {
+    background: #7c3aed !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .exam-analytics-page [data-print-target] > p:last-child {
+    margin-top: 3mm;
+    border-top: 0.25mm solid #d8dee9;
+    padding-top: 2mm;
+    color: #475569 !important;
+    font-size: 7pt !important;
   }
 
   .admin-shell-content {

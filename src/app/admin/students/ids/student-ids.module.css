@@ -1,7 +1,4 @@
 .page {
-  --id-navy: #101f5c;
-  --id-maroon: #812e2b;
-  --id-ink: #20243c;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -21,15 +18,15 @@
   height: 46px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid #d5d9ec;
+  border: 1px solid #e6d9f3;
   border-radius: 14px;
-  background: #eef1fa;
-  color: var(--id-navy);
+  background: #f5edfb;
+  color: #7027b8;
 }
 
 .heading h1 {
   margin: 1px 0 3px;
-  color: #1d2340;
+  color: #20172b;
   font-size: 25px;
   font-weight: 750;
   letter-spacing: -0.035em;
@@ -37,13 +34,13 @@
 
 .heading p:last-child {
   margin: 0;
-  color: #687087;
+  color: #756d7d;
   font-size: 13px;
 }
 
 .eyebrow {
   margin: 0;
-  color: var(--id-maroon);
+  color: #7b5c93;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -54,17 +51,17 @@
   grid-template-columns: minmax(210px, 1.6fr) repeat(5, minmax(120px, 1fr));
   align-items: end;
   gap: 12px;
-  border: 1px solid #e1e4ed;
+  border: 1px solid #e9e3ee;
   border-radius: 16px;
-  background: white;
+  background: #fff;
   padding: 16px;
-  box-shadow: 0 3px 14px #111f5c0c;
+  box-shadow: 0 3px 14px #21102b08;
 }
 
 .filters label {
   display: grid;
   gap: 6px;
-  color: #4d5366;
+  color: #57505d;
   font-size: 11px;
   font-weight: 700;
 }
@@ -73,19 +70,19 @@
 .filters select {
   width: 100%;
   height: 40px;
-  border: 1px solid #d9deeb;
+  border: 1px solid #e3dfe7;
   border-radius: 10px;
   background: #fff;
   padding: 0 11px;
-  color: #20243c;
+  color: #28222e;
   font-size: 13px;
   outline: none;
 }
 
 .filters input:focus,
 .filters select:focus {
-  border-color: #687bb9;
-  box-shadow: 0 0 0 3px #101f5c18;
+  border-color: #9e68cc;
+  box-shadow: 0 0 0 3px #7027b816;
 }
 
 .register {
@@ -99,7 +96,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border: 1px solid #e1e4ed;
+  border: 1px solid #e9e3ee;
   border-radius: 14px;
   background: #fff;
   padding: 13px 16px;
@@ -110,7 +107,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  color: #252b45;
+  color: #2d2633;
   font-size: 14px;
   font-weight: 750;
 }
@@ -118,7 +115,7 @@
 .selectedCount {
   display: block;
   margin: 3px 0 0 24px;
-  color: #6f7689;
+  color: #827a88;
   font-size: 11px;
 }
 
@@ -143,16 +140,16 @@
 }
 
 .selectButton {
-  border: 1px solid #d8ddeb;
-  background: white;
-  color: #414962;
+  border: 1px solid #e4dce9;
+  background: #fff;
+  color: #554c5b;
 }
 
 .printButton {
-  border: 1px solid var(--id-navy);
-  background: var(--id-navy);
+  border: 1px solid #7027b8;
+  background: #7027b8;
   color: #fff;
-  box-shadow: 0 3px 8px #101f5c2b;
+  box-shadow: 0 3px 8px #7027b82b;
 }
 
 .selectButton:disabled,
@@ -163,7 +160,7 @@
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(315px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   align-items: start;
   gap: 18px;
 }
@@ -182,24 +179,27 @@
   align-self: flex-start;
   gap: 7px;
   padding-left: 5px;
-  color: #596078;
+  color: #645b6a;
   font-size: 11px;
   font-weight: 650;
 }
 
 .cardSelect input {
-  accent-color: var(--id-navy);
+  accent-color: #7027b8;
 }
 
 .idCard {
+  --card-red: #9b1f28;
+  --card-blue: #39799e;
+  --card-gold: #b7963f;
   position: relative;
   width: 100%;
-  max-width: 355px;
-  aspect-ratio: 64 / 102;
-  border: 1px solid #e2e5ed;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 8px 22px #101f5c1a;
+  max-width: 440px;
+  aspect-ratio: 85.6 / 53.98;
+  border: 1px solid #e5dfd4;
+  border-radius: 16px;
+  background: #f2f3f5;
+  box-shadow: 0 8px 22px #30203b18;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
@@ -209,47 +209,45 @@
   display: flex;
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
   flex-direction: column;
-  align-items: center;
   overflow: hidden;
-  border: 5px solid white;
+  border: 5px solid #fff;
   border-radius: inherit;
   background:
-    linear-gradient(145deg, transparent 0 58%, #f7f8fc 58.2% 59%, transparent 59.2%),
-    linear-gradient(32deg, transparent 0 74%, #f5f6fa 74.2% 75%, transparent 75.2%),
-    #fff;
-  padding: 4% 4% 19% 10%;
-  color: var(--id-ink);
+    radial-gradient(ellipse at 52% 46%, #fff 0 30%, #fbfaf8 69%, #f3f1ed 100%);
+  padding: 3% 3.5%;
+  color: #28242a;
 }
 
 .cardTopArt {
   position: absolute;
   z-index: 0;
   inset: 0 0 auto;
-  height: 41%;
-  background: var(--id-maroon);
+  height: 39%;
+  background:
+    linear-gradient(144deg, #f0dfbd 0 39%, #d5bd91 39.4% 40.5%, transparent 41%),
+    linear-gradient(32deg, transparent 0 68%, #fbf2e0 68.3% 73%, transparent 73.4%),
+    linear-gradient(157deg, transparent 0 43%, #9b1f28 43.4% 73%, transparent 73.5%);
 }
 
 .cardTopArt::before {
   position: absolute;
-  top: -34%;
-  left: 16%;
-  width: 68%;
-  height: 118%;
-  border-bottom: 3px solid var(--id-maroon);
-  border-radius: 0 0 46% 46% / 0 0 23% 23%;
-  background: #fff;
+  inset: 0;
+  background:
+    linear-gradient(145deg, transparent 0 54%, #fff9 54.4% 57%, transparent 57.4%),
+    linear-gradient(22deg, transparent 0 73%, #c99c4c 73.4% 75%, transparent 75.4%);
   content: "";
 }
 
 .cardTopArt::after {
   position: absolute;
-  right: -14%;
-  bottom: -11%;
-  left: -14%;
-  height: 20%;
-  border-bottom: 2px solid #a34a45;
-  border-radius: 0 0 50% 50%;
+  top: 0;
+  right: -7%;
+  width: 37%;
+  height: 100%;
+  background: linear-gradient(148deg, #b5262e 0 55%, #e3c242 55.5% 58%, transparent 58.5%);
+  clip-path: polygon(31% 0, 100% 0, 100% 100%, 0 13%);
   content: "";
 }
 
@@ -258,11 +256,12 @@
   z-index: 1;
   display: grid;
   width: 100%;
-  min-height: 18%;
-  flex: 0 0 18%;
-  grid-template-columns: 19% minmax(0, 1fr);
+  height: 28%;
+  flex: 0 0 28%;
+  grid-template-columns: 13% minmax(0, 1fr);
   align-items: center;
   gap: 3%;
+  padding-right: 17%;
 }
 
 .logoFrame {
@@ -271,15 +270,17 @@
   aspect-ratio: 1;
   place-items: center;
   overflow: hidden;
-  border: 2px solid var(--id-navy);
+  border: 2px solid #fff;
   border-radius: 50%;
-  background: #fff;
-  color: var(--id-navy);
+  background: radial-gradient(circle, #fbf0c8 0 49%, #b28b3e 51% 57%, #fff 59%);
+  color: #8e6423;
   font-size: clamp(16px, 4vw, 25px);
-  font-weight: 850;
+  font-weight: 800;
+  box-shadow: 0 2px 8px #241b2530;
 }
 
 .logoFrame img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -288,19 +289,20 @@
 
 .schoolCopy {
   min-width: 0;
-  text-align: center;
 }
 
 .schoolTitle {
   display: -webkit-box;
   overflow: hidden;
   margin: 0;
-  color: var(--id-navy);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(14px, 4vw, 22px);
+  color: #851e27;
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: clamp(13px, 3.6vw, 19px);
   font-weight: 900;
-  line-height: 0.98;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
   text-overflow: ellipsis;
+  text-transform: uppercase;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -309,48 +311,67 @@
   display: -webkit-box;
   overflow: hidden;
   margin: 3px 0 0;
-  color: #383d55;
-  font-size: clamp(8px, 2.2vw, 11px);
-  font-weight: 750;
+  color: #39799e;
+  font-size: clamp(8px, 2vw, 10px);
+  font-weight: 800;
   line-height: 1.15;
   text-overflow: ellipsis;
+  text-transform: uppercase;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
 }
 
-.sideTitle {
+.yearTag {
   position: absolute;
   z-index: 2;
-  top: 43%;
-  bottom: 20%;
-  left: 2.5%;
-  display: flex;
-  align-items: center;
-  color: var(--id-navy);
-  font-size: clamp(13px, 3.5vw, 19px);
-  font-weight: 900;
-  letter-spacing: 0.025em;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  top: 0;
+  right: 0;
+  border-radius: 0 0 0 8px;
+  background: #a5222b;
+  padding: 4px 7px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.planeMark {
+  position: absolute;
+  z-index: 2;
+  top: 24%;
+  right: 3%;
+  width: 13%;
+  height: auto;
+  filter: drop-shadow(0 2px 1px #54202b26);
+}
+
+.cardBody {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 29% minmax(0, 1fr);
+  align-items: stretch;
+  gap: 4%;
+  padding: 0 1% 8%;
 }
 
 .studentPortrait {
   position: relative;
   display: grid;
-  width: 58%;
-  height: 30%;
-  min-height: 0;
-  flex: 0 0 30%;
+  width: 100%;
+  height: 86%;
+  align-self: center;
   place-items: center;
   overflow: hidden;
-  margin: 0 auto 2%;
-  border: 3px solid var(--id-navy);
-  border-radius: 13% 13% 11% 11%;
-  background: #f7f8fc;
-  color: #344064;
+  border: 3px solid #fff;
+  border-radius: 42% 42% 5px 5px;
+  background: linear-gradient(150deg, #d9eaec, #fbf1e6 72%);
+  color: #875b6f;
   font-size: clamp(18px, 5vw, 28px);
   font-weight: 800;
-  box-shadow: 0 2px 6px #101f5c18;
+  box-shadow: 0 3px 10px #201c2422, 0 0 0 1px #e7e3df;
 }
 
 .studentPortrait img {
@@ -366,154 +387,210 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  background: linear-gradient(145deg, #f1f3f9, #fff);
-  color: #4b5b8d;
+  background: radial-gradient(circle at 50% 25%, #fff 0 18%, transparent 18.5%), linear-gradient(145deg, #d9eaec, #fbf1e6 72%);
+  color: #39799e;
 }
 
 .avatarFallback span {
   border-radius: 10px;
-  background: #fff;
+  background: #fff9;
   padding: 2px 8px;
   font-size: 12px;
   font-weight: 850;
   letter-spacing: 0.1em;
 }
 
+.studentInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding-top: 1%;
+}
+
 .studentName {
   max-width: 100%;
   overflow: hidden;
-  color: var(--id-navy);
-  font-size: clamp(12px, 3.3vw, 18px);
+  color: #387da7;
+  font-size: clamp(12px, 3.1vw, 17px);
   font-weight: 900;
   line-height: 1.1;
-  text-align: center;
+  letter-spacing: 0.015em;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .classPill {
-  max-width: 88%;
+  max-width: 78%;
   overflow: hidden;
-  margin: 4px 0 6px;
-  border-radius: 8px;
-  background: var(--id-maroon);
-  padding: 5px 12px;
+  align-self: flex-start;
+  margin: 4px 0 5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #7d1722, #a1222b 50%, #7d1722);
+  padding: 3px 10px;
   color: #fff;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 850;
   line-height: 1.1;
-  text-align: center;
+  letter-spacing: 0.02em;
   text-overflow: ellipsis;
+  text-transform: uppercase;
   white-space: nowrap;
+  box-shadow: 0 2px 3px #50101826;
 }
 
 .details {
   display: flex;
-  width: 100%;
   min-height: 0;
   flex: 1;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 1px 2px;
+  gap: 3px;
+  padding: 1px;
 }
 
 .detail {
   display: grid;
-  grid-template-columns: 15px minmax(72px, 38%) 6px minmax(0, 1fr);
+  min-width: 0;
+  grid-template-columns: minmax(76px, 35%) 7px minmax(0, 1fr);
   align-items: start;
   gap: 4px;
-  color: #252a40;
-  font-size: clamp(8px, 2.1vw, 10px);
-  line-height: 1.22;
-}
-
-.detailIcon {
-  margin-top: 1px;
-  color: var(--id-navy);
+  color: #252126;
+  font-size: clamp(7px, 1.8vw, 9px);
+  line-height: 1.15;
 }
 
 .detail b {
-  font-weight: 850;
+  overflow: hidden;
+  color: #292328;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail span:nth-child(2) {
+  color: #b9935c;
+  font-weight: 900;
 }
 
 .detail span:last-child {
   overflow: hidden;
   font-weight: 550;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailValueWrap {
+  overflow-wrap: anywhere;
+  text-overflow: clip !important;
 }
 
 .cardFooter {
   position: absolute;
   z-index: 2;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 19%;
+  right: 3.5%;
+  bottom: 2%;
+  left: 3.5%;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 5px;
 }
 
-.principalSignature {
-  position: absolute;
-  right: 7%;
-  bottom: 47%;
+.signature {
+  min-width: 24%;
+  border-bottom: 1px solid #5f5960;
+  padding: 0 6px 3px;
+  color: #81767e;
+  font-family: cursive;
+  font-size: 7px;
+  line-height: 1.15;
+  text-align: center;
+  transform: rotate(-5deg);
+}
+
+.signature b {
+  display: block;
+  color: #312b30;
+  font-family: var(--font-body), sans-serif;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.phoneBadge {
   display: flex;
-  width: 34%;
-  flex-direction: column;
+  max-width: 58%;
   align-items: center;
-  color: var(--id-navy);
-  font-size: 9px;
-  font-weight: 900;
-}
-
-.signatureLine {
-  width: 92%;
-  height: 24px;
-  border-bottom: 1px solid #28345e;
-}
-
-.contactBand {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  min-height: 40%;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
+  gap: 4px;
   overflow: hidden;
-  background: var(--id-navy);
-  padding: 5px 9%;
+  border: 1px solid #d8bd69;
+  border-radius: 15px;
+  background: linear-gradient(90deg, #ae8a36, #c6a24a);
+  padding: 3px 8px;
   color: #fff;
-}
-
-.contactBand p {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  margin: 0;
-  font-size: clamp(7px, 2vw, 10px);
-  line-height: 1.2;
+  font-size: 9px;
+  font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-shadow: 0 2px 4px #6e531d29;
 }
 
-.contactBand svg {
+.phoneBadge span {
+  display: grid;
+  width: 15px;
+  height: 15px;
   flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #2c261b;
+  color: #f5dc80;
+  font-size: 9px;
+}
+
+.watermark {
+  position: absolute;
+  z-index: 1;
+  bottom: 1%;
+  left: 1%;
+  display: grid;
+  width: 12%;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid #67c5ce;
+  border-radius: 50%;
+  color: #42afbd;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.watermark::before,
+.watermark::after {
+  position: absolute;
+  width: 75%;
+  height: 75%;
+  border: 1px solid #67c5ce;
+  border-radius: 50%;
+  content: "";
+}
+
+.watermark::after {
+  width: 48%;
+  height: 48%;
+}
+
+.watermark span {
+  font-size: 16px;
 }
 
 .bottomRibbon {
   position: absolute;
-  z-index: 1;
-  right: -5%;
-  bottom: 7%;
-  left: -5%;
-  height: 12%;
-  background: var(--id-maroon);
-  clip-path: polygon(0 61%, 17% 48%, 37% 66%, 62% 35%, 81% 58%, 100% 28%, 100% 100%, 0 100%);
+  z-index: 0;
+  right: -7%;
+  bottom: -1px;
+  width: 42%;
+  height: 13%;
+  background: linear-gradient(145deg, transparent 0 16%, #841a23 16.5% 50%, #fff 50.5% 53%, #b21f28 53.5% 100%);
+  clip-path: polygon(45% 0, 100% 0, 100% 100%, 0 100%);
   pointer-events: none;
 }
 
@@ -524,14 +601,14 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border: 1px dashed #d8ddeb;
+  border: 1px dashed #ded5e5;
   border-radius: 16px;
   background: #fff;
-  color: #788096;
+  color: #8b7f92;
 }
 
 .emptyState strong {
-  color: #303750;
+  color: #3d3343;
   font-size: 14px;
 }
 
@@ -545,12 +622,12 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  color: #687087;
+  color: #817988;
   font-size: 11px;
 }
 
 .limitNotice {
-  color: #8d3431;
+  color: #9a661d;
 }
 
 @media (max-width: 1100px) {
@@ -603,13 +680,21 @@
   }
 
   .idCard {
-    max-width: 330px;
+    max-width: min(100%, 440px);
   }
+}
+
+@page {
+  size: 85.6mm 53.98mm;
+  margin: 0;
 }
 
 @media print {
   .page {
-    gap: 0;
+    display: block;
+    width: 85.6mm;
+    min-width: 0;
+    margin: 0;
     padding: 0;
   }
 
@@ -625,29 +710,34 @@
   .register,
   .cardGrid {
     display: block;
-  }
-
-  .cardGrid {
-    display: grid;
-    grid-template-columns: repeat(2, 64mm);
-    justify-content: start;
-    align-items: start;
-    gap: 5mm 7mm;
+    width: 85.6mm;
+    margin: 0;
+    padding: 0;
   }
 
   .cardItem {
-    display: none;
+    display: none !important;
+    width: 85.6mm;
+    height: 53.98mm;
+    margin: 0;
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
   .cardItem[data-selected="true"] {
-    display: block;
+    display: block !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .cardItem[data-selected="true"][data-last-selected="true"] {
+    break-after: auto;
+    page-break-after: auto;
   }
 
   .idCard {
-    width: 64mm;
-    height: 102mm;
+    width: 85.6mm;
+    height: 53.98mm;
     max-width: none;
     aspect-ratio: auto;
     border: 0;
@@ -657,18 +747,19 @@
 
   .cardBorder {
     border: 1.2mm solid #fff;
-    border-radius: 3mm;
-    padding: 4% 4% 19% 10%;
+    border-radius: 2.5mm;
+    padding: 2.5mm 3mm;
   }
 
   .cardHeader {
-    grid-template-columns: 14mm minmax(0, 1fr);
-    min-height: 18%;
-    flex-basis: 18%;
+    height: 28%;
+    flex-basis: 28%;
+    grid-template-columns: 12mm minmax(0, 1fr);
+    gap: 2mm;
+    padding-right: 17mm;
   }
 
   .logoFrame {
-    width: 13mm;
     border-width: 0.6mm;
     font-size: 5mm;
   }
@@ -678,80 +769,86 @@
   }
 
   .schoolTitle {
-    font-size: 4mm;
+    font-size: 3.5mm;
   }
 
   .schoolSubtitle {
-    margin-top: 0.8mm;
+    margin-top: 0.5mm;
+    font-size: 1.9mm;
+  }
+
+  .yearTag {
+    padding: 1mm 1.7mm;
     font-size: 2mm;
   }
 
-  .sideTitle {
-    font-size: 3.3mm;
+  .planeMark {
+    right: 2.5mm;
+    width: 11mm;
+  }
+
+  .cardBody {
+    grid-template-columns: 23mm minmax(0, 1fr);
+    gap: 3mm;
+    padding: 0 0.5mm 4mm;
   }
 
   .studentPortrait {
+    height: 85%;
     border-width: 0.8mm;
     font-size: 5mm;
   }
 
   .studentName {
-    font-size: 3.2mm;
+    font-size: 3mm;
   }
 
   .classPill {
-    margin: 0.8mm 0 1.2mm;
-    border-radius: 1.5mm;
-    padding: 1mm 2mm;
-    font-size: 2.1mm;
+    margin: 0.7mm 0 0.8mm;
+    padding: 0.6mm 1.5mm;
+    font-size: 1.8mm;
   }
 
   .details {
-    gap: 1.2mm;
-    padding: 0.5mm;
+    gap: 0.45mm;
+    padding: 0;
   }
 
   .detail {
-    grid-template-columns: 3mm minmax(18mm, 38%) 1.5mm minmax(0, 1fr);
-    gap: 0.8mm;
-    font-size: 2.15mm;
-    line-height: 1.2;
+    grid-template-columns: 17mm 1.2mm minmax(0, 1fr);
+    gap: 0.7mm;
+    font-size: 1.75mm;
+    line-height: 1.08;
   }
 
-  .detailIcon {
-    width: 2.5mm;
-    height: 2.5mm;
+  .cardFooter {
+    right: 3mm;
+    bottom: 1.4mm;
+    left: 3mm;
   }
 
-  .principalSignature {
-    font-size: 2mm;
+  .signature {
+    padding: 0 1mm 0.5mm;
+    font-size: 1.6mm;
   }
 
-  .signatureLine {
-    height: 6mm;
+  .signature b {
+    font-size: 1.8mm;
   }
 
-  .contactBand {
-    gap: 0.6mm;
-    padding: 1mm 8%;
-  }
-
-  .contactBand p {
+  .phoneBadge {
     gap: 1mm;
-    font-size: 1.9mm;
+    padding: 0.7mm 1.5mm;
+    font-size: 1.8mm;
   }
 
-  .contactBand svg {
-    width: 2mm;
-    height: 2mm;
+  .phoneBadge span {
+    width: 2.8mm;
+    height: 2.8mm;
+    font-size: 1.6mm;
   }
 
-  .bottomRibbon {
-    height: 12%;
-  }
-
-  @page {
-    size: A4;
-    margin: 10mm;
+  .watermark span {
+    font-size: 3mm;
   }
 }

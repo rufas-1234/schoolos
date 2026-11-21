@@ -749,7 +749,12 @@ export default async function ExamAnalyticsPage({
             rows={csvOutput.rows}
             fileName={`${(selectedExam?.name ?? "exam").replace(/[^\w-]+/g, "-")}-${reportView}-analytics.csv`}
           />
-          <PrintButton label="Print analytics report" targetId="exam-analytics-report" pageSize="A4" pageOrientation="landscape" />
+          <PrintButton
+            label={selectedClass ? `Print ${selectedClass.className} PDF report` : "Print analytics PDF report"}
+            targetId="exam-analytics-report"
+            pageSize="A4"
+            pageOrientation="landscape"
+          />
         </div>
       </header>
 
@@ -790,16 +795,25 @@ export default async function ExamAnalyticsPage({
             {schoolLogo && <Image src={schoolLogo} unoptimized width={64} height={64} alt={`${school?.name ?? context.schoolName} logo`} className="h-16 w-16 object-contain" />}
             <div className="flex-1">
               <p className="print-report-kicker text-sm font-semibold uppercase tracking-wide">{school?.name ?? context.schoolName} · Exam Analytics</p>
-              <h2 className="mt-1 text-2xl font-bold">{selectedExam?.name}</h2>
+              <h2 className="mt-1 text-2xl font-bold">
+                {selectedExam?.name}{selectedClass ? ` · ${selectedClass.className}` : ""}
+              </h2>
               <p className="mt-1 text-sm text-slate-600">
                 {selectedExam?.yearName} · {selectedExam?.startDate} – {selectedExam?.endDate} · {selectedExam?.scaleName}
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 {selectedClass?.className ?? "All classes"} · {selectedSection?.name ?? "All sections"} · {subjectLabel} · {studentLabel}
               </p>
-              <p className="mt-2 inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800">
-                {activeReport.label}
-              </p>
+              <div className="exam-analytics-report-badges mt-2 flex flex-wrap justify-center gap-2">
+                <p className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800">
+                  {activeReport.label}
+                </p>
+                {selectedClass && reportView !== "overview" && (
+                  <p className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    Class report{selectedSection ? ` · ${selectedSection.name}` : " · all sections"}
+                  </p>
+                )}
+              </div>
             </div>
           </header>
 
@@ -1111,8 +1125,12 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
 function ScoreBar({ value }: { value: number | null }) {
   const width = value === null ? 0 : Math.max(0, Math.min(100, value));
   return (
-    <div aria-hidden="true" className="mt-1 h-2 w-full min-w-20 overflow-hidden rounded-full bg-slate-100">
-      <div className="h-full rounded-full bg-violet-600" style={{ width: `${width}%` }} />
+    <div
+      role="img"
+      aria-label={value === null ? "No score" : `${value.toFixed(1)} percent`}
+      className="analytics-score-track mt-1 h-2 w-full min-w-20 overflow-hidden rounded-full bg-slate-100"
+    >
+      <div className="analytics-score-fill h-full rounded-full bg-violet-600" style={{ width: `${width}%` }} />
     </div>
   );
 }

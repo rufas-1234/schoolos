@@ -72,7 +72,13 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
     firstName: students.firstName,
     lastName: students.lastName,
     admissionNumber: students.admissionNumber,
+    dateOfBirth: students.dateOfBirth,
     currentAddress: students.currentAddress,
+    fatherName: students.fatherName,
+    fatherPhone: students.fatherPhone,
+    motherName: students.motherName,
+    guardianName: students.guardianName,
+    guardianPhone: students.guardianPhone,
     phone: students.phone,
     additionalDetails: students.additionalDetails,
     className: classLevels.name,
@@ -99,11 +105,14 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
       publicId: row.publicId,
       name: `${row.firstName} ${row.lastName}`.trim(),
       admissionNumber: row.admissionNumber,
+      dateOfBirth: row.dateOfBirth,
       className: row.className,
       sectionName: row.sectionName,
       rollNumber: row.rollNumber,
       yearName: row.yearName,
-      phone: row.phone,
+      fatherName: row.fatherName ?? row.guardianName,
+      motherName: row.motherName,
+      phone: row.phone ?? row.guardianPhone ?? row.fatherPhone,
       address: row.currentAddress,
       photoUrl: photo?.objectKey ? `/api/admin/students/${row.publicId}/photo` : null,
     });
@@ -146,7 +155,7 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
       />
 
       {records.length === 1000 && <p className={styles.limitNotice}>Showing the first 1,000 students. Narrow the filters for a larger print batch.</p>}
-      <div className={styles.printHint}><Printer size={15} /> Cards print at ID size. In the print dialog, choose 100% scale and enable background graphics.</div>
+      <div className={styles.printHint}><Printer size={15} /> Print one CR80 / ID-1 card per page (85.6 x 54 mm). Choose the card printer, landscape, 100% scale, and borderless printing.</div>
     </main>
   );
 }

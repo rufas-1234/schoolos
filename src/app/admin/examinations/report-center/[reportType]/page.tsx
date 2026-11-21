@@ -661,6 +661,10 @@ export default async function ExaminationReportPage({
      signature.role === "Subject teacher" ||
      signature.teacherId === row.classTeacherId,
     );
+  const classTeacherSignatureForStudent = (row: (typeof resultRows)[number]) =>
+    reportTeacherSignatures.filter((signature) =>
+      signature.role === "Class teacher" && signature.teacherId === row.classTeacherId,
+    );
   const sectionSummary = [...new Set(resultRows.map((row) => row.sectionName))].join(", ");
   const canViewPhotos = context.grantedPermissions.includes("students.view");
   const [markRows, attendanceRows, gradeRows, remarksRows] = resultRows.length && assessments.length
@@ -1127,7 +1131,10 @@ export default async function ExaminationReportPage({
                       schoolPhone={examDetails.schoolPhone}
                       schoolEmail={examDetails.schoolEmail}
                       signatures={configuredSignatures}
-                      teacherSignatures={deputyHeadteacherSignatures}
+                      teacherSignatures={[
+                        ...classTeacherSignatureForStudent(activeResult),
+                        ...deputyHeadteacherSignatures,
+                      ]}
                       currency={examDetails.schoolCurrency}
                       feeBalanceMinor={feeBalanceByStudent.get(activeResult.studentId) ?? 0}
                       showFeeBalance={showFeeBalance}
@@ -1152,7 +1159,10 @@ export default async function ExaminationReportPage({
                         schoolPhone={examDetails.schoolPhone}
                         schoolEmail={examDetails.schoolEmail}
                         signatures={configuredSignatures}
-                        teacherSignatures={deputyHeadteacherSignatures}
+                        teacherSignatures={[
+                          ...classTeacherSignatureForStudent(row),
+                          ...deputyHeadteacherSignatures,
+                        ]}
                         currency={examDetails.schoolCurrency}
                         feeBalanceMinor={feeBalanceByStudent.get(row.studentId) ?? 0}
                         showFeeBalance={showFeeBalance}

@@ -31,7 +31,7 @@ import {
   examAssessmentResultState,
   hasCompleteExamResult,
 } from "@/lib/examination-policy";
-import { getDeputyHeadteacherSignatures } from "@/lib/exam-report-signatures";
+import { getDeputyHeadteacherSignatures, getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 
@@ -265,7 +265,7 @@ function StudentProgressCard({
   yearName: string;
   className: string;
   signatures: Array<{ role: string; updatedAt: Date }>;
-  teacherSignatures: Awaited<ReturnType<typeof getDeputyHeadteacherSignatures>>;
+  teacherSignatures: Awaited<ReturnType<typeof getExamTeacherSignatures>>;
   last: boolean;
 }) {
   const logo = schoolLogoSource(schoolLogoUrl);
@@ -592,7 +592,16 @@ export default async function AnnualProgressCardPage({
       ? `/api/admin/students/${row.studentPublicId}/photo`
       : null,
   }));
-  const teacherSignatures = await getDeputyHeadteacherSignatures(context.schoolId);
+  const classTeacherIds = [...new Set(rawRoster.flatMap((row) =>
+    row.classTeacherId === null ? [] : [row.classTeacherId],
+  ))];
+  const [classTeacherSignatures, deputyHeadteacherSignatures] = await Promise.all([
+    getExamTeacherSignatures(context.schoolId, classTeacherIds.map((teacherId) => ({
+      teacherId,
+      role: "Class teacher" as const,
+    }))),
+    getDeputyHeadteacherSignatures(context.schoolId),
+  ]);
   const [markRows, attendanceRows] = assessments.length && rawRoster.length
     ? await Promise.all([
       db.select({
@@ -697,7 +706,10 @@ export default async function AnnualProgressCardPage({
               yearName={selectedYear.name}
               className={selectedClass.label}
               signatures={signatures}
-              teacherSignatures={teacherSignatures}
+              teacherSignatures={[
+                ...classTeacherSignatures.filter((signature) => signature.teacherId === student.classTeacherId),
+                ...deputyHeadteacherSignatures,
+              ]}
               last={index === visibleProgress.length - 1}
             />
           ))}

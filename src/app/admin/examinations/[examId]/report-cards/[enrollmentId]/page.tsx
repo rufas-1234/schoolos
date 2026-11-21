@@ -31,7 +31,7 @@ import { PrintButton } from "@/components/print-button";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
-import { getDeputyHeadteacherSignatures } from "@/lib/exam-report-signatures";
+import { getDeputyHeadteacherSignatures, getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import {
   calculateWeightedAverage,
   canPreviewDraftTestReport,
@@ -252,7 +252,14 @@ export default async function ReportCardPage({
       draftPreview ? eq(examSubjects.status, "draft") : eq(examSubjects.status, "published"),
     ))
     .orderBy(asc(subjects.name));
-  const teacherSignatures = await getDeputyHeadteacherSignatures(context.schoolId);
+  const [classTeacherSignatures, deputyHeadteacherSignatures] = await Promise.all([
+    getExamTeacherSignatures(context.schoolId, [{
+      teacherId: record.classTeacherId,
+      role: "Class teacher",
+    }]),
+    getDeputyHeadteacherSignatures(context.schoolId),
+  ]);
+  const teacherSignatures = [...classTeacherSignatures, ...deputyHeadteacherSignatures];
   const assessmentIds = assessments.map((assessment) => assessment.id);
   const [markRows, attendanceRows] = assessmentIds.length
     ? await Promise.all([
