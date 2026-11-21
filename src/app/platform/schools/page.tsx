@@ -7,7 +7,6 @@ import { requirePlatformAdmin } from "@/lib/platform-access";
 import { getSchoolDisplayStatus } from "@/lib/school-lifecycle-policy";
 import { CreateSchoolForm } from "./create-school-form";
 import { SchoolManagementControls } from "./school-management-controls";
-import { PlatformSignOutButton } from "./sign-out-button";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +41,6 @@ export default async function PlatformSchoolsPage() {
             <Link href="/platform/accounts" className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-800">
               Account recovery
             </Link>
-            <PlatformSignOutButton />
           </div>
         </header>
 
