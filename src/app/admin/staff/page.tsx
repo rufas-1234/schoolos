@@ -220,7 +220,7 @@ export default async function StaffDirectoryPage({
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Link href={`/staff-registration/${context.schoolPublicId}`} target="_blank" rel="noreferrer"
+          <Link href={`/staff-registration/${context.schoolPublicId}`}
             className="inline-flex items-center justify-center border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Preview form
           </Link>

@@ -14,6 +14,7 @@ import {
 import { normalizeStudentFieldSettings, studentSettingFields } from "@/lib/student-settings";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
+import { PublicPlatformShell } from "@/components/public-platform-shell";
 import { PublicAdmissionForm } from "./public-admission-form";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +97,15 @@ export default async function PublicAdmissionPage({
   const schoolLogo = schoolLogoSource(school.logoUrl);
 
   return (
+    <PublicPlatformShell
+      title="Online student registration"
+      schoolName={school.name}
+      navigation={[
+        { href: `/admission/${school.publicId}`, label: "Student admission" },
+        { href: `/staff-registration/${school.publicId}`, label: "Staff registration" },
+        { href: "/guide", label: "User guide" },
+      ]}
+    >
     <main className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-5xl space-y-5">
         <header className="border border-slate-300 bg-white p-5 sm:p-7">
@@ -128,5 +138,6 @@ export default async function PublicAdmissionPage({
         )}
       </div>
     </main>
+    </PublicPlatformShell>
   );
 }

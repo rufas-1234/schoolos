@@ -92,7 +92,7 @@ export default async function AdmissionDeskPage() {
           <h2 className="font-semibold text-rose-950">Online registration form</h2>
           <p className="mt-1 break-all font-mono text-xs text-rose-900">{publicFormPath}</p>
         </div>
-        <Link href={publicFormPath} target="_blank" rel="noreferrer" className="inline-flex shrink-0 justify-center rounded-lg bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-950">
+        <Link href={publicFormPath} className="inline-flex shrink-0 justify-center rounded-lg bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-950">
           Preview form
         </Link>
       </section>

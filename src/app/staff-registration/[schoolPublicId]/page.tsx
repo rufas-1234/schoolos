@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
+import { PublicPlatformShell } from "@/components/public-platform-shell";
 import {
   defaultRequiredStaffFields,
   normalizePublicStaffVisibleFields,
@@ -80,6 +81,15 @@ export default async function PublicStaffRegistrationPage({
   const schoolLogo = schoolLogoSource(school.logoUrl);
 
   return (
+    <PublicPlatformShell
+      title="Staff registration"
+      schoolName={school.name}
+      navigation={[
+        { href: `/admission/${school.publicId}`, label: "Student admission" },
+        { href: `/staff-registration/${school.publicId}`, label: "Staff registration" },
+        { href: "/guide", label: "User guide" },
+      ]}
+    >
     <main className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-5xl space-y-5">
         <header className="border border-slate-300 bg-white p-5 sm:p-7">
@@ -114,5 +124,6 @@ export default async function PublicStaffRegistrationPage({
         )}
       </div>
     </main>
+    </PublicPlatformShell>
   );
 }

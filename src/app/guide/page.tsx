@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { PublicPlatformShell } from "@/components/public-platform-shell";
 
 export const metadata: Metadata = {
   title: "SchoolOS User Guide",
@@ -27,7 +28,7 @@ const sections = [
 
 function GuideSection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-8 border-t border-slate-200 pt-8">
+    <section id={id} className="scroll-mt-24 border-t border-slate-200 pt-8">
       <h2 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h2>
       <div className="mt-4 space-y-4 text-[15px] leading-7 text-slate-700">{children}</div>
     </section>
@@ -40,7 +41,11 @@ function Step({ n, children }: { n: number; children: ReactNode }) {
 
 export default function GuidePage() {
   return (
-    <main className="min-h-dvh bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-12">
+    <PublicPlatformShell
+      title="SchoolOS user guide"
+      navigation={sections.map(([id, label], index) => ({ href: `#${id}`, label: `${index + 1}. ${label}` }))}
+    >
+      <main className="min-h-dvh bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-5xl">
         <header className="rounded-3xl bg-gradient-to-br from-violet-900 to-violet-700 px-6 py-9 text-white shadow-lg sm:px-10 sm:py-12">
           <Link href="/login" className="text-sm font-semibold text-violet-100 hover:text-white">← Back to sign in</Link>
@@ -52,14 +57,7 @@ export default function GuidePage() {
           <p className="mt-4 text-sm text-violet-200">Last reviewed: November 2026 · For the features currently available in this SchoolOS installation</p>
         </header>
 
-        <div className="mt-7 grid gap-7 lg:grid-cols-[250px_minmax(0,1fr)]">
-          <nav aria-label="Guide contents" className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
-            <h2 className="font-semibold">In this guide</h2>
-            <ol className="mt-3 space-y-2 text-sm leading-5 text-violet-800">
-              {sections.map(([id, label], index) => <li key={id}><a className="hover:underline" href={`#${id}`}>{index + 1}. {label}</a></li>)}
-            </ol>
-          </nav>
-
+        <div className="mt-7">
           <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
             <div className="mb-8 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
               <strong>Before you begin:</strong> Your school administrator creates your account and assigns your access. Keep student and staff information confidential. Check the selected school name in the top bar before recording or changing anything.
@@ -312,6 +310,7 @@ export default function GuidePage() {
           </article>
         </div>
       </div>
-    </main>
+      </main>
+    </PublicPlatformShell>
   );
 }
