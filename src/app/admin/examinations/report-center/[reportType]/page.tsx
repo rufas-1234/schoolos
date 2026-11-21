@@ -656,12 +656,12 @@ export default async function ExaminationReportPage({
   const deputyHeadteacherSignatures = isProgressCard
     ? await getDeputyHeadteacherSignatures(context.schoolId)
     : [];
-  const teacherSignaturesForStudent = (row: (typeof resultRows)[number]) =>
+  const teacherSignaturesForStudent = (row: { classTeacherId: number | null }) =>
     reportTeacherSignatures.filter((signature) =>
      signature.role === "Subject teacher" ||
      signature.teacherId === row.classTeacherId,
     );
-  const classTeacherSignatureForStudent = (row: (typeof resultRows)[number]) =>
+  const classTeacherSignatureForStudent = (row: { classTeacherId: number | null }) =>
     reportTeacherSignatures.filter((signature) =>
       signature.role === "Class teacher" && signature.teacherId === row.classTeacherId,
     );
