@@ -155,7 +155,7 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
       />
 
       {records.length === 1000 && <p className={styles.limitNotice}>Showing the first 1,000 students. Narrow the filters for a larger print batch.</p>}
-      <div className={styles.printHint}><Printer size={15} /> Print one CR80 / ID-1 card per page (85.6 x 54 mm). Choose the card printer, landscape, 100% scale, and borderless printing.</div>
+      <div className={styles.printHint}><Printer size={15} /> Use your ID printer with CR80 / ID-1 stock (85.6 x 54 mm), landscape, 100% scale, and no margins if supported. Do not select A4 or letter.</div>
     </main>
   );
 }

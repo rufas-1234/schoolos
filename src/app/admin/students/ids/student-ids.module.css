@@ -690,6 +690,11 @@
 }
 
 @media print {
+  :global(.admin-print-header),
+  :global(.admin-print-footer) {
+    display: none !important;
+  }
+
   .page {
     display: block;
     width: 85.6mm;
