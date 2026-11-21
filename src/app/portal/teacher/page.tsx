@@ -167,21 +167,19 @@ export default async function TeacherPortalPage({
         sectionName: classSections.name,
         subjectName: subjects.name,
         roomNumber: classRooms.roomNumber,
+        classTeacherId: classSections.classTeacherId,
+        subjectTeacherId: classSubjects.teacherId,
+        assignedTeacherFirstName: teachers.firstName,
+        assignedTeacherLastName: teachers.lastName,
       }).from(classRoutines)
         .innerJoin(classSubjects, and(
           eq(classSubjects.id, classRoutines.classSubjectId),
           eq(classSubjects.schoolId, context.schoolId),
         ))
-        .innerJoin(teachers, and(
+        .leftJoin(teachers, and(
           eq(teachers.id, classSubjects.teacherId!),
           eq(teachers.schoolId, context.schoolId),
           eq(teachers.status, "active"),
-        ))
-        .innerJoin(staffMembers, and(
-          eq(staffMembers.id, teachers.staffMemberId!),
-          eq(staffMembers.schoolId, context.schoolId),
-          eq(staffMembers.linkedUserId, context.user.id),
-          eq(staffMembers.status, "active"),
         ))
         .innerJoin(subjects, and(
           eq(subjects.id, classSubjects.subjectId),
@@ -207,7 +205,10 @@ export default async function TeacherPortalPage({
         ))
         .where(and(
           eq(classRoutines.schoolId, context.schoolId),
-          inArray(classSubjects.teacherId, teacherIds),
+          or(
+            inArray(classSubjects.teacherId, teacherIds),
+            inArray(classSections.classTeacherId, teacherIds),
+          ),
         ))
         .orderBy(asc(classRoutines.dayOfWeek), asc(classRoutines.startsAt)) : Promise.resolve([]),
       showOverview || activeSection === "assessments" ? db.select({
@@ -272,7 +273,7 @@ export default async function TeacherPortalPage({
           inArray(classSubjects.teacherId, teacherIds),
         ))
         .orderBy(asc(examSubjects.examDate), asc(classLevels.name), asc(subjects.name)) : Promise.resolve([]),
-      showOverview || activeSection === "register" ? db.select({
+      showOverview || ["classes", "register", "timetable"].includes(activeSection) ? db.select({
         id: classSections.id,
         academicYearId: classSections.academicYearId,
         classLevelId: classSections.classLevelId,
@@ -303,6 +304,58 @@ export default async function TeacherPortalPage({
         .orderBy(asc(academicYears.startDate), asc(classLevels.name), asc(classSections.name)) : Promise.resolve([]),
     ])
     : [[], [], [], []];
+
+  const classTeacherSubjects = classTeacherSections.length && (showOverview || activeSection === "classes")
+    ? await db.select({
+      classSectionId: classSections.id,
+      subjectName: subjects.name,
+      subjectCode: subjects.code,
+      teacherFirstName: teachers.firstName,
+      teacherLastName: teachers.lastName,
+    }).from(classSections)
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSections.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+        eq(classLevels.status, "active"),
+      ))
+      .innerJoin(academicYears, and(
+        eq(academicYears.id, classSections.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+        eq(academicYears.status, "active"),
+      ))
+      .innerJoin(classSubjects, and(
+        eq(classSubjects.classLevelId, classLevels.id),
+        eq(classSubjects.schoolId, context.schoolId),
+      ))
+      .innerJoin(subjects, and(
+        eq(subjects.id, classSubjects.subjectId),
+        eq(subjects.schoolId, context.schoolId),
+      ))
+      .leftJoin(teachers, and(
+        eq(teachers.id, classSubjects.teacherId!),
+        eq(teachers.schoolId, context.schoolId),
+        eq(teachers.status, "active"),
+      ))
+      .where(and(
+        eq(classSections.schoolId, context.schoolId),
+        inArray(classSections.id, classTeacherSections.map((section) => section.id)),
+      ))
+      .orderBy(asc(subjects.name))
+    : [];
+  const classTeacherSubjectsBySection = new Map<number, typeof classTeacherSubjects>();
+  for (const subject of classTeacherSubjects) {
+    const subjectsForSection = classTeacherSubjectsBySection.get(subject.classSectionId) ?? [];
+    subjectsForSection.push(subject);
+    classTeacherSubjectsBySection.set(subject.classSectionId, subjectsForSection);
+  }
+  const classTeacherSectionsWithSubjects = classTeacherSections.map((section) => ({
+    ...section,
+    subjects: classTeacherSubjectsBySection.get(section.id) ?? [],
+  }));
+  const filteredClassTeacherSections = classTeacherSectionsWithSubjects.filter((section) =>
+    `${section.branchName} ${section.yearName} ${section.className} ${section.sectionName} ${section.subjects.map((subject) => `${subject.subjectName} ${subject.subjectCode} ${subject.teacherFirstName ?? ""} ${subject.teacherLastName ?? ""}`).join(" ")}`
+      .toLocaleLowerCase().includes(normalizedSearch),
+  );
 
   const assessmentExamClassIds = [...new Set(assessmentRows.map((assessment) => assessment.examClassId))];
   const assessmentSectionRows = assessmentExamClassIds.length
@@ -364,7 +417,7 @@ export default async function TeacherPortalPage({
       .innerJoin(examinations, and(
         eq(examinations.id, examClasses.examinationId),
         eq(examinations.schoolId, context.schoolId),
-        eq(examinations.status, "open"),
+        inArray(examinations.status, ["open", "published"]),
       ))
       .innerJoin(academicYears, and(
         eq(academicYears.id, examinations.academicYearId),
@@ -588,8 +641,21 @@ export default async function TeacherPortalPage({
     assessments
       .map((assessment) => [assessment.examId, assessment.examName]),
   )].sort((a, b) => a[1].localeCompare(b[1]));
-  const filteredRoutines = routines.filter((routine) =>
-    `${weekdays.get(routine.dayOfWeek) ?? "Other"} ${routine.startsAt} ${routine.endsAt} ${routine.className} ${routine.sectionName} ${routine.subjectName} ${routine.roomNumber ?? ""}`
+  const routinesWithRoles = routines.map((routine) => {
+    const isSubjectTeacher = routine.subjectTeacherId !== null && teacherIds.includes(routine.subjectTeacherId);
+    const isClassTeacher = routine.classTeacherId !== null && teacherIds.includes(routine.classTeacherId);
+    return {
+      ...routine,
+      assignedTeacherName: routine.assignedTeacherFirstName
+        ? `${routine.assignedTeacherFirstName} ${routine.assignedTeacherLastName}`
+        : "Not assigned",
+      teacherRole: isSubjectTeacher && isClassTeacher
+        ? "Subject and class teacher"
+        : isSubjectTeacher ? "Subject teacher" : "Class teacher",
+    };
+  });
+  const filteredRoutines = routinesWithRoles.filter((routine) =>
+    `${weekdays.get(routine.dayOfWeek) ?? "Other"} ${routine.startsAt} ${routine.endsAt} ${routine.className} ${routine.sectionName} ${routine.subjectName} ${routine.roomNumber ?? ""} ${routine.assignedTeacherName} ${routine.teacherRole}`
       .toLocaleLowerCase().includes(normalizedSearch),
   );
   const grantedPermissions = new Set(context.grantedPermissions);
@@ -682,9 +748,9 @@ export default async function TeacherPortalPage({
                 </section>
 
                 <section aria-label="Portal sections" className="print:hidden grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <QuickLink href="/portal/teacher?section=classes" label="My classes" detail={`${uniqueAssignments.length} assigned subject sections`} icon={UsersRound} />
+                  <QuickLink href="/portal/teacher?section=classes" label="My classes" detail={`${uniqueAssignments.length} subject assignments · ${classTeacherSections.length} appointed classes`} icon={UsersRound} />
                   <QuickLink href="/portal/teacher?section=register" label="Class register" detail={`${classTeacherSections.length} appointed classes`} icon={UsersRound} />
-                  <QuickLink href="/portal/teacher?section=assessments" label="Examination work" detail={`${assessments.length} available assessments`} icon={ClipboardCheck} />
+                  <QuickLink href="/portal/teacher?section=assessments" label="Examination work" detail={`${assessments.length} subject assessments · ${classTeacherExamRows.length} class exams`} icon={ClipboardCheck} />
                   <QuickLink href="/portal/teacher?section=timetable" label="My timetable" detail={`${routines.length} scheduled lessons`} icon={CalendarDays} />
                 </section>
               </>
@@ -692,29 +758,65 @@ export default async function TeacherPortalPage({
 
             {activeSection === "classes" && (
               <section id="classes" className="space-y-4">
-                <SectionHeading title="My classes" description="Your current classes and subjects." />
+                <SectionHeading title="My classes" description="Your subject assignments and classes you are appointed to lead." />
                 <SectionFilter section="classes" search={search} />
-                {filteredAssignments.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {filteredAssignments.map((assignment) => (
-                    <article
-                      key={`${assignment.yearName}-${assignment.className}-${assignment.sectionName}-${assignment.subjectName}`}
-                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
-                        {assignment.branchName} · {assignment.yearName}
-                      </p>
-                      <h3 className="mt-2 text-lg font-bold text-slate-950">
-                        {assignment.className} · {assignment.sectionName}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-600">{assignment.subjectName}</p>
-                      <p className="mt-2 text-xs text-slate-400">{assignment.subjectCode}</p>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState>{search ? "No assignments match your search." : "There are no subject assignments in an active academic year yet."}</EmptyState>
-              )}
+                {filteredClassTeacherSections.length > 0 && (
+                  <section className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Classes you lead</h3>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {filteredClassTeacherSections.map((section) => (
+                        <article key={section.id} className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                            {section.branchName} · {section.yearName}
+                          </p>
+                          <h4 className="mt-2 text-lg font-bold text-slate-950">
+                            {section.className} · {section.sectionName}
+                          </h4>
+                          {section.subjects.length ? (
+                            <ul className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                              {section.subjects.map((subject) => (
+                                <li key={`${section.id}-${subject.subjectName}`} className="text-sm text-slate-700">
+                                  <span className="font-medium">{subject.subjectName}</span>
+                                  {subject.subjectCode && <span className="ml-1 text-xs text-slate-500">({subject.subjectCode})</span>}
+                                  <span className="block text-xs text-slate-500">
+                                    Subject teacher: {subject.teacherFirstName
+                                      ? `${subject.teacherFirstName} ${subject.teacherLastName}`
+                                      : "Not assigned"}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : <p className="mt-3 text-sm text-slate-500">No subjects are configured for this class yet.</p>}
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {filteredAssignments.length > 0 && (
+                  <section className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Your subject assignments</h3>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {filteredAssignments.map((assignment) => (
+                        <article
+                          key={`${assignment.yearName}-${assignment.className}-${assignment.sectionName}-${assignment.subjectName}`}
+                          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                            {assignment.branchName} · {assignment.yearName}
+                          </p>
+                          <h4 className="mt-2 text-lg font-bold text-slate-950">
+                            {assignment.className} · {assignment.sectionName}
+                          </h4>
+                          <p className="mt-1 text-sm text-slate-600">{assignment.subjectName}</p>
+                          <p className="mt-2 text-xs text-slate-400">{assignment.subjectCode}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {!filteredClassTeacherSections.length && !filteredAssignments.length && (
+                  <EmptyState>{search ? "No assignments match your search." : "There are no subject assignments or class-teacher appointments in an active academic year yet."}</EmptyState>
+                )}
               </section>
             )}
 
@@ -730,7 +832,7 @@ export default async function TeacherPortalPage({
             </section>}
 
             {activeSection === "assessments" && <section id="assessments" className="space-y-4">
-              <SectionHeading title="Examination work" description="Filter by title, status, section, or class." />
+              <SectionHeading title="Examination work" description="Review assessments for your subjects and progress for classes you lead." />
               <SectionFilter
                 section="assessments"
                 search={search}
@@ -817,11 +919,11 @@ export default async function TeacherPortalPage({
                   </div>
                 </>
               ) : (
-                <EmptyState>{search || assessmentStatusFilter || assessmentTitleFilter ? "No assessments match these filters." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
+                <EmptyState>{search || assessmentStatusFilter || assessmentTitleFilter ? "No subject assessments match these filters." : classTeacherExamRows.length ? "No subject assessments are assigned directly to you. Class examination progress is listed below." : "No open or published assessments are assigned to you for the active academic year."}</EmptyState>
               )}
               {classTeacherExamRows.length > 0 && (
                 <section className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/60 p-4 sm:p-5">
-                  <SectionHeading title="Class results to review" description="Review submissions for your class. Publishing requires Results publish permission." />
+                  <SectionHeading title="Class examination progress" description="See open submissions and published assessments for your appointed classes. Publishing requires Results publish permission." />
                   <div className="grid gap-3 lg:grid-cols-2">
                     {classTeacherExamRows.map((examClass) => {
                       const progress = classTeacherProgress.get(examClass.examClassId) ?? { total: 0, submitted: 0, approved: 0, published: 0 };
@@ -857,7 +959,7 @@ export default async function TeacherPortalPage({
 
             {activeSection === "timetable" && <section id="timetable" className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <SectionHeading title="My weekly timetable" description="Lessons for your current subjects and sections." />
+                <SectionHeading title="My weekly timetable" description="Your subject-teaching periods and the schedules for classes you lead." />
                 {filteredRoutines.length > 0 && <PrintButton targetId="teacher-timetable-print" label="Print timetable" pageOrientation="landscape" />}
               </div>
               <SectionFilter section="timetable" search={search} />
@@ -872,6 +974,7 @@ export default async function TeacherPortalPage({
                         </div>
                         <p className="mt-2 text-sm text-slate-700">{routine.startsAt}–{routine.endsAt}</p>
                         <p className="mt-1 text-sm text-slate-600">{routine.className} · {routine.sectionName}</p>
+                        <p className="mt-1 text-xs text-slate-500">{routine.teacherRole} · Subject teacher: {routine.assignedTeacherName}</p>
                         <p className="mt-1 text-xs text-slate-500">Room {routine.roomNumber ?? "not assigned"}</p>
                       </article>
                     ))}
@@ -885,6 +988,7 @@ export default async function TeacherPortalPage({
                           <th className="px-4 py-3 font-semibold">Time</th>
                           <th className="px-4 py-3 font-semibold">Class section</th>
                           <th className="px-4 py-3 font-semibold">Subject</th>
+                          <th className="px-4 py-3 font-semibold">Assignment / teacher</th>
                           <th className="px-4 py-3 font-semibold">Room</th>
                         </tr>
                       </thead>
@@ -895,6 +999,7 @@ export default async function TeacherPortalPage({
                             <td className="px-4 py-3 text-slate-700">{routine.startsAt}–{routine.endsAt}</td>
                             <td className="px-4 py-3 text-slate-700">{routine.className} · {routine.sectionName}</td>
                             <td className="px-4 py-3 text-slate-700">{routine.subjectName}</td>
+                            <td className="px-4 py-3 text-slate-700">{routine.teacherRole} · {routine.assignedTeacherName}</td>
                             <td className="px-4 py-3 text-slate-700">{routine.roomNumber ?? "—"}</td>
                           </tr>
                         ))}
@@ -904,7 +1009,7 @@ export default async function TeacherPortalPage({
                   </div>
                 </div>
               ) : (
-                <EmptyState>{search ? "No timetable lessons match your search." : "No timetable periods have been scheduled for your active-year assignments."}</EmptyState>
+                <EmptyState>{search ? "No timetable lessons match your search." : "No timetable periods have been scheduled for your active-year subject assignments or appointed classes. Ask the school administrator to add the class routine."}</EmptyState>
               )}
             </section>}
           </>
