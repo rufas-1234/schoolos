@@ -4,7 +4,7 @@ type PrintOptions = {
   title?: string;
   targetId?: string;
   pageOrientation?: "portrait" | "landscape";
-  pageSize?: "A4";
+  pageSize?: "A4" | "ID-1";
   pageMargin?: string;
 };
 
@@ -19,15 +19,24 @@ export function printCurrentPage({
   pageSize = "A4",
   pageMargin,
 }: PrintOptions = {}) {
-  const target = targetId ? document.getElementById(targetId) : null;
+  const target = targetId
+    ? document.getElementById(targetId)
+    : document.querySelector<HTMLElement>(".fee-receipt-page")
+      ?? document.querySelector<HTMLElement>(".print-report-content")
+      ?? document.querySelector<HTMLElement>(".admin-data-table")
+      ?? document.querySelector<HTMLElement>("main");
   if (targetId && !target) {
     window.alert("The selected report content could not be found. Refresh the page and try again.");
+    return;
+  }
+  if (!target) {
+    window.alert("Printable report content could not be found. Refresh the page and try again.");
     return;
   }
 
   const printHeader = document.querySelector<HTMLElement>(".admin-print-header");
   const printFooter = document.querySelector<HTMLElement>(".admin-print-footer");
-  const isExamReport = Boolean(target?.closest(".exam-report-document"));
+  const isExamReport = Boolean(target.closest(".exam-report-document"));
   const retainedRoots = [
     target,
     ...(isExamReport ? [] : [printHeader, printFooter]),
@@ -39,12 +48,18 @@ export function printCurrentPage({
     target: string | null;
   }> = [];
   const previousTitle = document.title;
+  const rootWasDark = document.documentElement.classList.contains("dark");
+  const bodyWasDark = document.body.classList.contains("dark");
   const previousPrintPageSize = document.body.getAttribute("data-print-page-size");
   const previousPrintOrientation = document.body.getAttribute("data-print-orientation");
   const pageStyle = document.createElement("style");
   pageStyle.dataset.adminPrintPage = "true";
-  pageStyle.textContent = `@page { size: ${pageSize} ${pageOrientation}; margin: ${isExamReport ? "5mm" : pageMargin ?? "27mm 14mm 20mm"}; }`;
+  const pageSizeRule = pageSize === "ID-1" ? "85.6mm 53.98mm" : `${pageSize} ${pageOrientation}`;
+  const pageMargins = pageSize === "ID-1" ? "0" : isExamReport ? "5mm" : pageMargin ?? "27mm 14mm 20mm";
+  pageStyle.textContent = `@page { size: ${pageSizeRule}; margin: ${pageMargins}; }`;
   document.head.append(pageStyle);
+  document.documentElement.classList.remove("dark");
+  document.body.classList.remove("dark");
   document.body.classList.add("print-target-active");
   if (isExamReport) document.body.classList.add("print-exam-report");
   document.body.setAttribute("data-print-page-size", pageSize);
@@ -103,6 +118,8 @@ export function printCurrentPage({
     }
     document.body.classList.remove("print-target-active");
     document.body.classList.remove("print-exam-report");
+    if (rootWasDark) document.documentElement.classList.add("dark");
+    if (bodyWasDark) document.body.classList.add("dark");
     if (previousPrintPageSize === null) document.body.removeAttribute("data-print-page-size");
     else document.body.setAttribute("data-print-page-size", previousPrintPageSize);
     if (previousPrintOrientation === null) document.body.removeAttribute("data-print-orientation");
@@ -119,7 +136,7 @@ export function printElementById(
   elementId: string,
   title: string,
   pageOrientation?: "portrait" | "landscape",
-  pageSize?: "A4",
+  pageSize?: "A4" | "ID-1",
 ) {
   printCurrentPage({ targetId: elementId, title, pageOrientation, pageSize });
 }
@@ -135,7 +152,7 @@ export function PrintButton({
   label?: string;
   targetId?: string;
   pageOrientation?: "portrait" | "landscape";
-  pageSize?: "A4";
+  pageSize?: "A4" | "ID-1";
   pageMargin?: string;
   disabled?: boolean;
 }) {

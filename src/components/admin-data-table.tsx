@@ -362,6 +362,7 @@ export function AdminDataTable({
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [printAll, setPrintAll] = useState(false);
   const [showAllRecords, setShowAllRecords] = useState(false);
+  const printTargetId = useId();
   const hasActions = rows.length > 0;
   const hasActiveFilters = filters.some((filter) => Boolean(filterValues[filter.key]));
   const criteriaReady =
@@ -374,12 +375,12 @@ export function AdminDataTable({
     if (!printAll) return;
     const resetPrint = () => setPrintAll(false);
     window.addEventListener("afterprint", resetPrint);
-    const timer = window.setTimeout(() => printCurrentPage(), 0);
+    const timer = window.setTimeout(() => printCurrentPage({ targetId: printTargetId, title }), 0);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("afterprint", resetPrint);
     };
-  }, [printAll]);
+  }, [printAll, printTargetId, title]);
 
   const filteredRows = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -452,7 +453,7 @@ export function AdminDataTable({
   }
 
   return (
-    <section className="admin-data-table min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section id={printTargetId} className="admin-data-table min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <h2 className="admin-table-print-title">{title}</h2>
       <div className="print:hidden flex flex-col gap-4 border-b border-slate-100 p-5 lg:flex-row lg:items-center lg:justify-between">
         <div>

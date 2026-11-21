@@ -1672,6 +1672,16 @@ h6 {
     visibility: visible !important;
   }
 
+  body.print-target-active[data-print-page-size="ID-1"] [data-print-target] {
+    width: 85.6mm !important;
+    max-width: 85.6mm !important;
+  }
+
+  body.print-target-active[data-print-page-size="ID-1"]::before {
+    display: none !important;
+    content: none !important;
+  }
+
   body.print-target-active [data-print-target] .student-profile-print-only {
     display: block !important;
   }

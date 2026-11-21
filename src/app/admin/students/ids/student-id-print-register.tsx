@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Check, Printer, Square, UserRound, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { printCurrentPage } from "@/components/print-button";
 import styles from "./student-ids.module.css";
 
 export type StudentIdCardRecord = {
@@ -54,14 +55,24 @@ export function StudentIdPrintRegister({ records, schoolName, schoolEmail, schoo
           <button className={styles.selectButton} type="button" onClick={toggleAll} disabled={!records.length}>
             {allSelected ? <Check size={16} /> : <Square size={16} />}{allSelected ? "Clear selection" : "Select all"}
           </button>
-          <button className={styles.printButton} type="button" onClick={() => window.print()} disabled={!selectedIds.length}>
+          <button
+            className={styles.printButton}
+            type="button"
+            onClick={() => printCurrentPage({
+              targetId: "student-id-card-grid",
+              title: "Student ID cards",
+              pageOrientation: "landscape",
+              pageSize: "ID-1",
+            })}
+            disabled={!selectedIds.length}
+          >
             <Printer size={16} /> Print {selectedIds.length || "selected"} ID cards
           </button>
         </div>
       </div>
 
       {records.length ? (
-        <div className={styles.cardGrid}>
+        <div id="student-id-card-grid" className={styles.cardGrid}>
           {records.map((record) => {
             const isSelected = selected.has(record.id);
             return (
