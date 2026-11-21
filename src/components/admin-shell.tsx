@@ -57,6 +57,21 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
   {
+    href: "/admin/academics",
+    label: "Academics",
+    icon: CalendarDays,
+    permission: "academics.manage",
+    permissionAlternatives: ["school.settings.manage"],
+    children: [
+      ...academicSections.filter((section) => section.id !== "teachers").map((section) => ({
+        id: section.id,
+        label: section.label,
+        href: `/admin/academics?section=${section.id}`,
+        matchQuery: { key: "section", value: section.id },
+      })),
+    ],
+  },
+  {
     href: "/admin/students",
     label: "Student Info",
     icon: Users,
@@ -72,21 +87,6 @@ const navigation: NavigationItem[] = [
         permission: "students.view",
         permissionAlternatives: ["students.update", "academics.manage", "school.settings.manage"],
       },
-    ],
-  },
-  {
-    href: "/admin/academics",
-    label: "Academics",
-    icon: CalendarDays,
-    permission: "academics.manage",
-    permissionAlternatives: ["school.settings.manage"],
-    children: [
-      ...academicSections.filter((section) => section.id !== "teachers").map((section) => ({
-        id: section.id,
-        label: section.label,
-        href: `/admin/academics?section=${section.id}`,
-        matchQuery: { key: "section", value: section.id },
-      })),
     ],
   },
   {
