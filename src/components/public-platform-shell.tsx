@@ -18,8 +18,8 @@ export function PublicPlatformShell({
   navigation: PublicPlatformLink[];
 }) {
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] flex-col border-r border-violet-900/15 bg-[#eadcf4] px-5 py-6 text-violet-950 lg:flex">
+    <div className="min-h-dvh bg-[#f3f8f4] text-slate-900">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] flex-col border-r border-violet-900/15 bg-[#dcefe4] px-5 py-6 text-violet-950 lg:flex">
         <Link href="/guide" className="mb-8 flex items-center gap-3 px-2">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-700 text-lg font-bold text-white" aria-hidden="true">S</span>
           <span>
@@ -53,7 +53,7 @@ export function PublicPlatformShell({
       </aside>
 
       <div className="lg:pl-[260px]">
-        <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b border-violet-900/15 bg-[#eadcf4] px-4 py-3 text-violet-950 shadow-sm sm:px-6 md:min-h-[76px] md:px-8">
+        <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b border-violet-900/15 bg-[#dcefe4] px-4 py-3 text-violet-950 shadow-sm sm:px-6 md:min-h-[76px] md:px-8">
           <div className="min-w-0">
             <p className="truncate text-sm font-extrabold sm:text-base">{title}</p>
             <p className="hidden truncate text-xs text-violet-800 sm:block">{schoolName ?? "SchoolOS school management"}</p>

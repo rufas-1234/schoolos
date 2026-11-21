@@ -491,7 +491,7 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-violet-900/15 bg-[#eadcf4] px-5 py-6">
+    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-violet-900/15 bg-[#dcefe4] px-5 py-6">
       <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/75 text-violet-900 shadow-sm">
           {schoolLogo
@@ -721,7 +721,7 @@ export function AdminShell({
   );
 
   return (
-    <div className="admin-shell-root min-h-dvh bg-[#f7f7fa]">
+    <div className="admin-shell-root min-h-dvh bg-[#f3f8f4]">
       <header className="admin-print-header" aria-label={`${schoolName} letterhead`}>
         <div className="admin-print-crest" aria-hidden="true">
           {schoolLogo
@@ -771,7 +771,7 @@ export function AdminShell({
       )}
 
       <div className="admin-shell-content lg:pl-[260px]">
-        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-violet-900/15 bg-[#eadcf4] px-3 text-violet-950 shadow-sm shadow-violet-950/10 sm:px-5 md:h-[76px] md:px-8">
+        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-violet-900/15 bg-[#dcefe4] px-3 text-violet-950 shadow-sm shadow-violet-950/10 sm:px-5 md:h-[76px] md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
               ref={navigationTriggerRef}

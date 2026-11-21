@@ -104,9 +104,9 @@ function StudentIdCard({ record, schoolName, schoolEmail, schoolLogo, schoolPhon
           <div className={styles.yearTag}>{record.yearName ?? new Date().getFullYear()}</div>
         </div>
         <svg className={styles.planeMark} viewBox="0 0 84 72" aria-hidden="true">
-          <path d="M4 10 79 2 38 34 4 10Z" fill="#f5d837" stroke="#28242a" strokeWidth="2.2" />
-          <path d="m4 10 34 24 9 32 9-43L4 10Z" fill="#22a9df" stroke="#28242a" strokeWidth="2.2" />
-          <path d="m38 34 41-32-23 21-9 43-9-32Z" fill="#f8e54b" stroke="#28242a" strokeWidth="2.2" />
+          <path d="M4 10 79 2 38 34 4 10Z" fill="#a9cc67" stroke="#18312d" strokeWidth="2.2" />
+          <path d="m4 10 34 24 9 32 9-43L4 10Z" fill="#258a78" stroke="#18312d" strokeWidth="2.2" />
+          <path d="m38 34 41-32-23 21-9 43-9-32Z" fill="#dcefe4" stroke="#18312d" strokeWidth="2.2" />
           <path d="m14 15 47 7-23 12" fill="none" stroke="#fff" strokeWidth="2" opacity=".8" />
         </svg>
         <div className={styles.cardBody}>
