@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { GraduationCap, KeyRound, LogOut, Menu, X, type LucideIcon } from "lucide-react";
+import { CircleHelp, GraduationCap, KeyRound, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -109,6 +109,23 @@ export function PortalShell({
         <KeyRound size={18} aria-hidden="true" />
         Account security
       </Link>}
+      <Link
+        href="/guide"
+        onClick={() => {
+          setActiveAnchor("");
+          if (mobile) setMobileMenuOpen(false);
+        }}
+        aria-current={pathname === "/guide" ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+          pathname === "/guide"
+            ? "bg-white text-violet-800 shadow-sm"
+            : "text-slate-700 hover:bg-white/80 hover:text-slate-950",
+        )}
+      >
+        <CircleHelp size={18} aria-hidden="true" />
+        User guide
+      </Link>
     </>;
   }
 

@@ -56,6 +56,11 @@ export default function LoginPage() {
           <Suspense fallback={<div className="mt-8 h-56 animate-pulse rounded-xl bg-slate-50" />}>
             <LoginForm />
           </Suspense>
+          <p className="mt-4 text-center text-sm">
+            <Link href="/guide" className="font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900">
+              Read the complete SchoolOS user guide
+            </Link>
+          </p>
           {canSignUp && (
             <div className="mt-7 border-t border-slate-100 pt-6 text-center">
               <p className="text-sm text-slate-500">New to SchoolOS?</p>

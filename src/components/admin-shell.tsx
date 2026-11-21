@@ -10,6 +10,7 @@ import {
   BedDouble,
   BriefcaseBusiness,
   CalendarDays,
+  CircleHelp,
   CircleDollarSign,
   ChevronDown,
   GraduationCap,
@@ -699,6 +700,15 @@ export function AdminShell({
           );
         })}
       </nav>
+
+      <Link
+        href="/guide"
+        onClick={() => setOpen(false)}
+        className="mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-violet-950/85 transition hover:bg-white/50 hover:text-violet-950"
+      >
+        <CircleHelp size={18} strokeWidth={1.8} />
+        User guide
+      </Link>
 
       <div className="mt-auto flex justify-center border-t border-violet-900/20 pt-4">
         <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/75 text-xs font-bold text-violet-900" title={schoolName}>

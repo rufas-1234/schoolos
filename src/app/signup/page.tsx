@@ -49,6 +49,11 @@ export default function SignupPage() {
           <p className="mt-6 text-center text-sm text-slate-500">
             Already have an account? <Link href="/login" className="font-semibold text-violet-700 hover:text-violet-900">Sign in</Link>
           </p>
+          <p className="mt-3 text-center text-sm">
+            <Link href="/guide" className="font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900">
+              Read the SchoolOS user guide
+            </Link>
+          </p>
         </section>
       </div>
     </main>

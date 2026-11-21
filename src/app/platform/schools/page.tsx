@@ -36,6 +36,9 @@ export default async function PlatformSchoolsPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/guide" className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-800">
+              User guide
+            </Link>
             <Link href="/platform/accounts" className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-800">
               Account recovery
             </Link>
