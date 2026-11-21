@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import { SearchableSelect } from "@/components/searchable-select";
 import { printCurrentPage } from "@/components/print-button";
 import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -118,6 +118,8 @@ export function AdminRecordDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const pathname = usePathname();
+  const previousPathname = useRef(pathname);
   const Icon = mode === "view" ? Eye : Pencil;
   const actionLabel = mode === "view" ? "View" : "Edit";
 
@@ -127,6 +129,12 @@ export function AdminRecordDialog({
     if (initialOpen && !dialog.open) dialog.showModal();
     else if (!initialOpen && dialog.open) dialog.close();
   }, [initialOpen]);
+
+  useEffect(() => {
+    if (previousPathname.current === pathname) return;
+    previousPathname.current = pathname;
+    if (dialogRef.current?.open) dialogRef.current.close();
+  }, [pathname]);
 
   return (
     <>
