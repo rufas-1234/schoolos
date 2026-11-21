@@ -1,53 +1,757 @@
-.page{display:flex;flex-direction:column;gap:20px;padding:24px;min-width:0}.heading{display:flex;align-items:center;gap:14px}.headingIcon{display:grid;place-items:center;width:46px;height:46px;border:1px solid #e6d9f3;border-radius:14px;background:#f5edfb;color:#7027b8}.heading h1{margin:1px 0 3px;color:#20172b;font-size:25px;font-weight:750;letter-spacing:-.035em}.heading p:last-child{margin:0;color:#756d7d;font-size:13px}.eyebrow{margin:0;color:#7b5c93;font-size:10px;font-weight:800;letter-spacing:.15em}.filters{display:grid;grid-template-columns:minmax(210px,1.6fr) repeat(5,minmax(120px,1fr));align-items:end;gap:12px;border:1px solid #e9e3ee;border-radius:16px;background:white;padding:16px;box-shadow:0 3px 14px #21102b08}.filters label{display:grid;gap:6px;color:#57505d;font-size:11px;font-weight:700}.filters input,.filters select{width:100%;height:40px;border:1px solid #e3dfe7;border-radius:10px;background:#fff;padding:0 11px;color:#28222e;font-size:13px;outline:none}.filters input:focus,.filters select:focus{border-color:#9e68cc;box-shadow:0 0 0 3px #7027b816}.register{display:flex;flex-direction:column;gap:14px}.registerBar{display:flex;justify-content:space-between;align-items:center;gap:16px;border:1px solid #e9e3ee;border-radius:14px;background:#fff;padding:13px 16px}.resultCount{display:flex;align-items:center;gap:8px;margin:0;color:#2d2633;font-size:14px;font-weight:750}.selectedCount{display:block;margin:3px 0 0 24px;color:#827a88;font-size:11px}.registerActions{display:flex;align-items:center;gap:8px}.selectButton,.printButton{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;border-radius:10px;padding:0 13px;font-size:12px;font-weight:700;cursor:pointer}.selectButton{border:1px solid #e4dce9;background:white;color:#554c5b}.printButton{border:1px solid #7027b8;background:#7027b8;color:#fff;box-shadow:0 3px 8px #7027b82b}.selectButton:disabled,.printButton:disabled{cursor:not-allowed;opacity:.48}.cardGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(315px,1fr));align-items:start;gap:18px}.cardItem{display:flex;flex-direction:column;gap:8px;align-items:center;min-width:0}.cardSelect{display:flex;align-items:center;gap:7px;align-self:flex-start;padding-left:5px;color:#645b6a;font-size:11px;font-weight:650}.cardSelect input{accent-color:#7027b8}.idCard{position:relative;width:100%;max-width:355px;aspect-ratio:68/102;padding:9px;border-radius:19px;background:#f2f3f5;box-shadow:0 8px 22px #30203b18}.cardBorder{position:relative;display:flex;flex-direction:column;align-items:center;width:100%;height:100%;overflow:hidden;border:5px solid #fff;border-radius:14px;background:linear-gradient(135deg,#fff 0%,#fff 64%,#f7f5f0 100%);padding:12px 13px 9px;color:#201a1d}.cardTopArt{position:absolute;inset:0 0 auto;height:27%;background:radial-gradient(ellipse at 10% 5%,#fff9 0 18%,transparent 18.5%),linear-gradient(139deg,#f5e5c7 0 43%,transparent 43.5%),linear-gradient(156deg,transparent 0 45%,#b82f31 45.5% 75%,transparent 75.5%);opacity:.96}.cardTopArt:after{position:absolute;top:0;right:-7%;width:35%;height:100%;content:"";background:linear-gradient(148deg,#b5262e 0 55%,#efca45 55.5% 59%,transparent 59.5%);clip-path:polygon(35% 0,100% 0,100% 100%,0 17%)}.cardHeader{position:relative;z-index:1;display:grid;grid-template-columns:42px 1fr;align-items:start;width:100%;min-height:42px}.logoFrame{display:grid;place-items:center;width:37px;height:37px;overflow:hidden;border:2px solid white;border-radius:50%;background:#fff4d9;color:#8e6423;font-size:20px;font-weight:800;box-shadow:0 1px 4px #0002}.logoFrame img{width:100%;height:100%;object-fit:cover}.yearTag{position:absolute;top:1px;right:0;color:#fff;font-size:9px;font-weight:800}.schoolCopy{display:none}.schoolTitle{position:relative;z-index:1;max-width:100%;margin:4px 0 1px;color:#861e27;text-align:center;font-size:clamp(14px,4vw,22px);font-weight:900;line-height:1.05;letter-spacing:.005em;text-transform:uppercase}.schoolSubtitle{position:relative;z-index:1;max-width:100%;height:16px;overflow:hidden;margin:2px 0 4px;color:#39789c;text-align:center;font-size:9px;font-weight:850;line-height:1.2;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}.studentPortrait{position:relative;display:grid;place-items:center;width:29%;height:30%;min-height:0;overflow:hidden;margin:0 auto 5px;border:3px solid white;border-radius:10px 10px 4px 4px;background:linear-gradient(145deg,#e7eef1,#f7eee5);color:#875b6f;font-size:22px;font-weight:800;box-shadow:0 2px 8px #1c17221d}.studentPortrait img{object-fit:cover;object-position:center 28%}.studentName{max-width:100%;overflow:hidden;color:#39789c;text-align:center;font-size:clamp(12px,3.1vw,17px);font-weight:900;line-height:1.1;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}.classPill{max-width:88%;overflow:hidden;margin:4px 0 5px;border-radius:3px;background:#941e27;padding:3px 10px;color:#fff;text-align:center;font-size:10px;font-weight:850;line-height:1.1;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}.details{display:flex;flex-direction:column;justify-content:center;width:100%;flex:1;gap:3px;padding:2px 1px 4px}.detail{display:grid;grid-template-columns:minmax(83px,40%) 7px minmax(0,1fr);align-items:start;gap:4px;color:#252126;font-size:clamp(8px,2.1vw,10px);line-height:1.22}.detail b{font-weight:800}.detail span:last-child{overflow:hidden;font-weight:550;text-overflow:ellipsis}.cardFooter{position:relative;z-index:1;display:flex;align-items:end;justify-content:space-between;width:100%;gap:5px;margin-top:auto}.signature{color:#44535b;font-size:7px;line-height:1.15;transform:rotate(-7deg)}.signature b{font-family:cursive;font-size:9px}.phoneBadge{display:flex;align-items:center;gap:4px;max-width:75%;overflow:hidden;border:1px solid #d8bd69;border-radius:12px;background:#b7963f;padding:3px 7px;color:#fff;font-size:9px;font-weight:850;text-overflow:ellipsis;white-space:nowrap}.phoneBadge span{display:grid;place-items:center;width:13px;height:13px;border-radius:50%;background:#2c261b;color:#f5dc80;font-size:8px}.bottomRibbon{position:absolute;right:-7%;bottom:-1px;width:46%;height:12%;background:linear-gradient(145deg,transparent 0 15%,#8e1d25 15.5% 60%,#fff 60.5% 64%,#af2229 64.5%);clip-path:polygon(45% 0,100% 0,100% 100%,0 100%)}.emptyState{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:210px;border:1px dashed #ded5e5;border-radius:16px;background:#fff;color:#8b7f92}.emptyState strong{color:#3d3343;font-size:14px}.emptyState span{font-size:12px}.limitNotice,.printHint{display:flex;align-items:center;gap:8px;margin:0;color:#817988;font-size:11px}.limitNotice{color:#9a661d}
-@media(max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.searchField{grid-column:span 3}}
-@media(max-width:650px){.page{gap:14px;padding:16px}.heading h1{font-size:21px}.filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px}.searchField{grid-column:span 2}.registerBar{align-items:flex-start;flex-direction:column}.registerActions{width:100%}.selectButton,.printButton{flex:1;padding:0 8px}.cardGrid{grid-template-columns:1fr}.idCard{max-width:330px}}
-@media print{.page{gap:0;padding:0}.heading,.filters,.registerBar,.cardSelect,.printHint,.limitNotice{display:none!important}.register,.cardGrid{display:block}.cardGrid{display:grid;grid-template-columns:repeat(2,68mm);justify-content:start;align-items:start;gap:5mm 7mm}.cardItem{display:none;break-inside:avoid;page-break-inside:avoid}.cardItem[data-selected="true"]{display:block}.idCard{width:68mm;height:102mm;max-width:none;aspect-ratio:auto;padding:2mm;border:0;border-radius:0;box-shadow:none;print-color-adjust:exact;-webkit-print-color-adjust:exact}.cardBorder{border-width:1.2mm;border-radius:3mm;padding:3mm 3.2mm 2.3mm}.cardTopArt{height:27%}.cardHeader{grid-template-columns:10mm 1fr;min-height:10mm}.logoFrame{width:9mm;height:9mm;border-width:.5mm;font-size:5mm}.logoFrame img{width:100%;height:100%}.yearTag{font-size:2.3mm}.schoolTitle{margin:1mm 0 .4mm;font-size:4.1mm}.schoolSubtitle{height:3.5mm;margin:.4mm 0 1mm;font-size:2.1mm}.studentPortrait{margin-bottom:1mm;border-width:.7mm;border-radius:2mm 2mm 1mm 1mm;font-size:5mm}.studentName{font-size:3.4mm}.classPill{margin:.8mm 0 1mm;padding:.7mm 2mm;font-size:2.2mm}.details{gap:.7mm;padding:.5mm .2mm 1mm}.detail{grid-template-columns:21mm 1.5mm minmax(0,1fr);gap:.8mm;font-size:2.15mm;line-height:1.2}.phoneBadge{gap:1mm;border-radius:3mm;padding:.7mm 1.5mm;font-size:2mm}.phoneBadge span{width:3mm;height:3mm;font-size:1.8mm}.signature{font-size:1.7mm}.signature b{font-size:2.2mm}.bottomRibbon{height:12%}@page{size:A4;margin:10mm}}
+.page {
+  --id-navy: #101f5c;
+  --id-maroon: #812e2b;
+  --id-ink: #20243c;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+}
 
-/* ID face: match the portrait layout, warm diagonal header, and school-color footer in the supplied reference. */
-.cardBorder{background-color:#fff;background-image:radial-gradient(ellipse at 52% 46%,#fff 0 30%,#fbfaf8 69%,#f3f1ed 100%);}
-.cardTopArt{height:29%;background:linear-gradient(144deg,#f0dfbd 0 39%,#d5bd91 39.4% 40.5%,transparent 41%),linear-gradient(32deg,transparent 0 68%,#fbf2e0 68.3% 73%,transparent 73.4%),linear-gradient(157deg,transparent 0 43%,#9b1f28 43.4% 73%,transparent 73.5%);}
-.cardTopArt:before{position:absolute;inset:0;content:"";background:linear-gradient(145deg,transparent 0 54%,#fff9 54.4% 57%,transparent 57.4%),linear-gradient(22deg,transparent 0 73%,#c99c4c 73.4% 75%,transparent 75.4%);}
-.cardTopArt:after{right:-7%;width:37%;background:linear-gradient(148deg,#b5262e 0 55%,#e3c242 55.5% 58%,transparent 58.5%);clip-path:polygon(31% 0,100% 0,100% 100%,0 13%);}
-.cardHeader{display:block;min-height:44px;}
-.logoFrame{position:absolute;top:0;left:50%;width:43px;height:43px;transform:translateX(-50%);border:3px solid #fff;border-radius:50%;background:radial-gradient(circle,#fbf0c8 0 49%,#b28b3e 51% 57%,#fff 59%);box-shadow:0 2px 8px #241b2530;}
-.yearTag{z-index:2;top:0;right:0;border-radius:0 0 0 8px;background:#a5222b;padding:4px 7px;color:#fff;font-size:10px;letter-spacing:.04em;}
-.planeMark{position:absolute;z-index:2;top:23px;right:7px;width:21%;height:auto;filter:drop-shadow(0 2px 1px #54202b26);}
-.schoolTitle{margin-top:3px;color:#851e27;font-family:var(--font-display),Impact,sans-serif;font-size:clamp(15px,4.3vw,23px);font-stretch:condensed;font-weight:900;letter-spacing:-.035em;text-shadow:0 1px #fff8;}
-.schoolSubtitle{height:18px;margin:2px 0 5px;color:#39799e;font-size:10px;letter-spacing:.035em;}
-.studentPortrait{width:34%;height:30%;margin-bottom:7px;border:4px solid #fff;border-radius:48% 48% 5px 5px;background:linear-gradient(150deg,#d9eaec,#fbf1e6 72%);box-shadow:0 3px 10px #201c2422,0 0 0 1px #e7e3df;}
-.studentName{color:#387da7;font-size:clamp(13px,3.4vw,18px);letter-spacing:.015em;text-shadow:0 1px #fff;}
-.classPill{margin:5px 0 7px;border-radius:2px;background:linear-gradient(90deg,#7d1722,#a1222b 50%,#7d1722);box-shadow:0 2px 3px #50101826;letter-spacing:.02em;}
-.details{gap:4px;padding:3px 3px 7px;}
-.detail{grid-template-columns:minmax(88px,40%) 8px minmax(0,1fr);gap:5px;font-size:clamp(8px,2.15vw,10.5px);line-height:1.24;}
-.detail b{color:#292328;}
-.detail span:nth-child(2){color:#b9935c;font-weight:900;}
-.cardFooter{padding:5px 1px 1px;}
-.signature{min-width:80px;border-bottom:1px solid #5f5960;padding:0 6px 3px;color:#81767e;font-family:cursive;font-size:8px;text-align:center;transform:rotate(-5deg);}
-.signature b{display:block;color:#312b30;font-family:var(--font-body),sans-serif;font-size:8px;font-weight:800;}
-.phoneBadge{max-width:76%;gap:5px;border:1px solid #d8bd69;border-radius:15px;background:linear-gradient(90deg,#ae8a36,#c6a24a);padding:4px 9px;font-size:10px;box-shadow:0 2px 4px #6e531d29;}
-.phoneBadge span{width:17px;height:17px;font-size:10px;}
-.watermark{position:absolute;bottom:3%;left:-5%;display:grid;place-items:center;width:19%;aspect-ratio:1;border:2px solid #67c5ce;border-radius:50%;color:#42afbd;opacity:.65;}
-.watermark:before,.watermark:after{position:absolute;width:75%;height:75%;border:1px solid #67c5ce;border-radius:50%;content:"";}
-.watermark:after{width:48%;height:48%;}
-.watermark span{font-size:16px;}
-.bottomRibbon{right:-7%;bottom:-1px;width:48%;height:13%;background:linear-gradient(145deg,transparent 0 16%,#841a23 16.5% 50%,#fff 50.5% 53%,#b21f28 53.5% 100%);}
-@media print{.cardHeader{min-height:10mm}.logoFrame{top:0;left:50%;width:9mm;height:9mm;border-width:.6mm}.yearTag{top:0;right:0;padding:1mm 1.7mm;font-size:2.2mm}.planeMark{top:5mm;right:1.5mm;width:21%;}.schoolTitle{margin-top:.6mm;font-size:4.2mm}.schoolSubtitle{height:3.8mm;margin:.5mm 0 1.1mm;font-size:2.1mm}.studentPortrait{width:34%;height:30%;margin-bottom:1.5mm;border-width:.8mm}.studentName{font-size:3.4mm}.classPill{margin:.9mm 0 1.2mm}.details{gap:.8mm;padding:.6mm .5mm 1.3mm}.detail{grid-template-columns:21mm 1.8mm minmax(0,1fr);gap:1mm;font-size:2.15mm}.signature{min-width:19mm;padding:0 1mm .7mm;font-size:1.8mm}.signature b{font-size:1.8mm}.phoneBadge{gap:1.2mm;padding:.9mm 2mm;font-size:2.2mm}.phoneBadge span{width:3.5mm;height:3.5mm;font-size:2mm}.watermark span{font-size:3.5mm}}
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
 
-.cardHeader{height:18%;min-height:70px;flex:0 0 18%;}
-.logoFrame{top:6px;left:50%;width:15%;height:auto;aspect-ratio:1;}
-.schoolTitle{margin-top:7px;}
-.studentPortrait{height:24%;flex:0 0 24%;margin:10px auto 7px;}
-.cardFooter{z-index:2;}
-.phoneBadge{position:absolute;left:50%;bottom:0;max-width:58%;transform:translateX(-50%);}
-.watermark,.bottomRibbon{z-index:0;pointer-events:none;}
-.logoFrame img{display:block;object-fit:contain;padding:3px;}
-.avatarFallback{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;height:100%;background:radial-gradient(circle at 50% 25%,#fff 0 18%,transparent 18.5%),linear-gradient(145deg,#d9eaec,#fbf1e6 72%);color:#39799e;}
-.avatarFallback span{border-radius:10px;background:#fff9;padding:2px 8px;font-size:12px;font-weight:850;letter-spacing:.1em;}
-.detailValueWrap{overflow-wrap:anywhere;text-overflow:clip!important;}
-@media print{
-  .cardHeader{height:16%;min-height:16mm;flex-basis:16%;}
-  .logoFrame{top:1mm;width:15%;height:auto;}
-  .schoolTitle{margin-top:1mm;}
-  .studentPortrait{height:24%;flex-basis:24%;margin:2mm auto 1.5mm;}
-  .phoneBadge{left:50%;bottom:0;max-width:58%;transform:translateX(-50%);}
+.headingIcon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #d5d9ec;
+  border-radius: 14px;
+  background: #eef1fa;
+  color: var(--id-navy);
+}
+
+.heading h1 {
+  margin: 1px 0 3px;
+  color: #1d2340;
+  font-size: 25px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.heading p:last-child {
+  margin: 0;
+  color: #687087;
+  font-size: 13px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--id-maroon);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.6fr) repeat(5, minmax(120px, 1fr));
+  align-items: end;
+  gap: 12px;
+  border: 1px solid #e1e4ed;
+  border-radius: 16px;
+  background: white;
+  padding: 16px;
+  box-shadow: 0 3px 14px #111f5c0c;
+}
+
+.filters label {
+  display: grid;
+  gap: 6px;
+  color: #4d5366;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.filters input,
+.filters select {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #d9deeb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 11px;
+  color: #20243c;
+  font-size: 13px;
+  outline: none;
+}
+
+.filters input:focus,
+.filters select:focus {
+  border-color: #687bb9;
+  box-shadow: 0 0 0 3px #101f5c18;
+}
+
+.register {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.registerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #e1e4ed;
+  border-radius: 14px;
+  background: #fff;
+  padding: 13px 16px;
+}
+
+.resultCount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #252b45;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.selectedCount {
+  display: block;
+  margin: 3px 0 0 24px;
+  color: #6f7689;
+  font-size: 11px;
+}
+
+.registerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selectButton,
+.printButton {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.selectButton {
+  border: 1px solid #d8ddeb;
+  background: white;
+  color: #414962;
+}
+
+.printButton {
+  border: 1px solid var(--id-navy);
+  background: var(--id-navy);
+  color: #fff;
+  box-shadow: 0 3px 8px #101f5c2b;
+}
+
+.selectButton:disabled,
+.printButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(315px, 1fr));
+  align-items: start;
+  gap: 18px;
+}
+
+.cardItem {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardSelect {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  padding-left: 5px;
+  color: #596078;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.cardSelect input {
+  accent-color: var(--id-navy);
+}
+
+.idCard {
+  position: relative;
+  width: 100%;
+  max-width: 355px;
+  aspect-ratio: 64 / 102;
+  border: 1px solid #e2e5ed;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 22px #101f5c1a;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.cardBorder {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  border: 5px solid white;
+  border-radius: inherit;
+  background:
+    linear-gradient(145deg, transparent 0 58%, #f7f8fc 58.2% 59%, transparent 59.2%),
+    linear-gradient(32deg, transparent 0 74%, #f5f6fa 74.2% 75%, transparent 75.2%),
+    #fff;
+  padding: 4% 4% 19% 10%;
+  color: var(--id-ink);
+}
+
+.cardTopArt {
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 auto;
+  height: 41%;
+  background: var(--id-maroon);
+}
+
+.cardTopArt::before {
+  position: absolute;
+  top: -34%;
+  left: 16%;
+  width: 68%;
+  height: 118%;
+  border-bottom: 3px solid var(--id-maroon);
+  border-radius: 0 0 46% 46% / 0 0 23% 23%;
+  background: #fff;
+  content: "";
+}
+
+.cardTopArt::after {
+  position: absolute;
+  right: -14%;
+  bottom: -11%;
+  left: -14%;
+  height: 20%;
+  border-bottom: 2px solid #a34a45;
+  border-radius: 0 0 50% 50%;
+  content: "";
+}
+
+.cardHeader {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 100%;
+  min-height: 18%;
+  flex: 0 0 18%;
+  grid-template-columns: 19% minmax(0, 1fr);
+  align-items: center;
+  gap: 3%;
+}
+
+.logoFrame {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid var(--id-navy);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--id-navy);
+  font-size: clamp(16px, 4vw, 25px);
+  font-weight: 850;
+}
+
+.logoFrame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 3px;
+}
+
+.schoolCopy {
+  min-width: 0;
+  text-align: center;
+}
+
+.schoolTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--id-navy);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(14px, 4vw, 22px);
+  font-weight: 900;
+  line-height: 0.98;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.schoolSubtitle {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 3px 0 0;
+  color: #383d55;
+  font-size: clamp(8px, 2.2vw, 11px);
+  font-weight: 750;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.sideTitle {
+  position: absolute;
+  z-index: 2;
+  top: 43%;
+  bottom: 20%;
+  left: 2.5%;
+  display: flex;
+  align-items: center;
+  color: var(--id-navy);
+  font-size: clamp(13px, 3.5vw, 19px);
+  font-weight: 900;
+  letter-spacing: 0.025em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.studentPortrait {
+  position: relative;
+  display: grid;
+  width: 58%;
+  height: 30%;
+  min-height: 0;
+  flex: 0 0 30%;
+  place-items: center;
+  overflow: hidden;
+  margin: 0 auto 2%;
+  border: 3px solid var(--id-navy);
+  border-radius: 13% 13% 11% 11%;
+  background: #f7f8fc;
+  color: #344064;
+  font-size: clamp(18px, 5vw, 28px);
+  font-weight: 800;
+  box-shadow: 0 2px 6px #101f5c18;
+}
+
+.studentPortrait img {
+  object-fit: cover;
+  object-position: center 28%;
+}
+
+.avatarFallback {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: linear-gradient(145deg, #f1f3f9, #fff);
+  color: #4b5b8d;
+}
+
+.avatarFallback span {
+  border-radius: 10px;
+  background: #fff;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+.studentName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--id-navy);
+  font-size: clamp(12px, 3.3vw, 18px);
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.classPill {
+  max-width: 88%;
+  overflow: hidden;
+  margin: 4px 0 6px;
+  border-radius: 8px;
+  background: var(--id-maroon);
+  padding: 5px 12px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 1px 2px;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: 15px minmax(72px, 38%) 6px minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+  color: #252a40;
+  font-size: clamp(8px, 2.1vw, 10px);
+  line-height: 1.22;
+}
+
+.detailIcon {
+  margin-top: 1px;
+  color: var(--id-navy);
+}
+
+.detail b {
+  font-weight: 850;
+}
+
+.detail span:last-child {
+  overflow: hidden;
+  font-weight: 550;
+  text-overflow: ellipsis;
+}
+
+.cardFooter {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 19%;
+}
+
+.principalSignature {
+  position: absolute;
+  right: 7%;
+  bottom: 47%;
+  display: flex;
+  width: 34%;
+  flex-direction: column;
+  align-items: center;
+  color: var(--id-navy);
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.signatureLine {
+  width: 92%;
+  height: 24px;
+  border-bottom: 1px solid #28345e;
+}
+
+.contactBand {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  min-height: 40%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  overflow: hidden;
+  background: var(--id-navy);
+  padding: 5px 9%;
+  color: #fff;
+}
+
+.contactBand p {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  margin: 0;
+  font-size: clamp(7px, 2vw, 10px);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactBand svg {
+  flex: 0 0 auto;
+}
+
+.bottomRibbon {
+  position: absolute;
+  z-index: 1;
+  right: -5%;
+  bottom: 7%;
+  left: -5%;
+  height: 12%;
+  background: var(--id-maroon);
+  clip-path: polygon(0 61%, 17% 48%, 37% 66%, 62% 35%, 81% 58%, 100% 28%, 100% 100%, 0 100%);
+  pointer-events: none;
+}
+
+.emptyState {
+  display: flex;
+  min-height: 210px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px dashed #d8ddeb;
+  border-radius: 16px;
+  background: #fff;
+  color: #788096;
+}
+
+.emptyState strong {
+  color: #303750;
+  font-size: 14px;
+}
+
+.emptyState span {
+  font-size: 12px;
+}
+
+.limitNotice,
+.printHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #687087;
+  font-size: 11px;
+}
+
+.limitNotice {
+  color: #8d3431;
+}
+
+@media (max-width: 1100px) {
+  .filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .searchField {
+    grid-column: span 3;
+  }
+}
+
+@media (max-width: 650px) {
+  .page {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .heading h1 {
+    font-size: 21px;
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .searchField {
+    grid-column: span 2;
+  }
+
+  .registerBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .registerActions {
+    width: 100%;
+  }
+
+  .selectButton,
+  .printButton {
+    flex: 1;
+    padding: 0 8px;
+  }
+
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .idCard {
+    max-width: 330px;
+  }
+}
+
+@media print {
+  .page {
+    gap: 0;
+    padding: 0;
+  }
+
+  .heading,
+  .filters,
+  .registerBar,
+  .cardSelect,
+  .printHint,
+  .limitNotice {
+    display: none !important;
+  }
+
+  .register,
+  .cardGrid {
+    display: block;
+  }
+
+  .cardGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 64mm);
+    justify-content: start;
+    align-items: start;
+    gap: 5mm 7mm;
+  }
+
+  .cardItem {
+    display: none;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .cardItem[data-selected="true"] {
+    display: block;
+  }
+
+  .idCard {
+    width: 64mm;
+    height: 102mm;
+    max-width: none;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .cardBorder {
+    border: 1.2mm solid #fff;
+    border-radius: 3mm;
+    padding: 4% 4% 19% 10%;
+  }
+
+  .cardHeader {
+    grid-template-columns: 14mm minmax(0, 1fr);
+    min-height: 18%;
+    flex-basis: 18%;
+  }
+
+  .logoFrame {
+    width: 13mm;
+    border-width: 0.6mm;
+    font-size: 5mm;
+  }
+
+  .logoFrame img {
+    padding: 0.6mm;
+  }
+
+  .schoolTitle {
+    font-size: 4mm;
+  }
+
+  .schoolSubtitle {
+    margin-top: 0.8mm;
+    font-size: 2mm;
+  }
+
+  .sideTitle {
+    font-size: 3.3mm;
+  }
+
+  .studentPortrait {
+    border-width: 0.8mm;
+    font-size: 5mm;
+  }
+
+  .studentName {
+    font-size: 3.2mm;
+  }
+
+  .classPill {
+    margin: 0.8mm 0 1.2mm;
+    border-radius: 1.5mm;
+    padding: 1mm 2mm;
+    font-size: 2.1mm;
+  }
+
+  .details {
+    gap: 1.2mm;
+    padding: 0.5mm;
+  }
+
+  .detail {
+    grid-template-columns: 3mm minmax(18mm, 38%) 1.5mm minmax(0, 1fr);
+    gap: 0.8mm;
+    font-size: 2.15mm;
+    line-height: 1.2;
+  }
+
+  .detailIcon {
+    width: 2.5mm;
+    height: 2.5mm;
+  }
+
+  .principalSignature {
+    font-size: 2mm;
+  }
+
+  .signatureLine {
+    height: 6mm;
+  }
+
+  .contactBand {
+    gap: 0.6mm;
+    padding: 1mm 8%;
+  }
+
+  .contactBand p {
+    gap: 1mm;
+    font-size: 1.9mm;
+  }
+
+  .contactBand svg {
+    width: 2mm;
+    height: 2mm;
+  }
+
+  .bottomRibbon {
+    height: 12%;
+  }
+
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
 }

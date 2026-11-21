@@ -72,13 +72,7 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
     firstName: students.firstName,
     lastName: students.lastName,
     admissionNumber: students.admissionNumber,
-    dateOfBirth: students.dateOfBirth,
     currentAddress: students.currentAddress,
-    fatherName: students.fatherName,
-    fatherPhone: students.fatherPhone,
-    motherName: students.motherName,
-    guardianName: students.guardianName,
-    guardianPhone: students.guardianPhone,
     phone: students.phone,
     additionalDetails: students.additionalDetails,
     className: classLevels.name,
@@ -105,18 +99,23 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
       publicId: row.publicId,
       name: `${row.firstName} ${row.lastName}`.trim(),
       admissionNumber: row.admissionNumber,
-      dateOfBirth: row.dateOfBirth,
       className: row.className,
       sectionName: row.sectionName,
       rollNumber: row.rollNumber,
       yearName: row.yearName,
-      fatherName: row.fatherName ?? row.guardianName,
-      motherName: row.motherName,
-      phone: row.phone ?? row.guardianPhone ?? row.fatherPhone,
+      phone: row.phone,
       address: row.currentAddress,
       photoUrl: photo?.objectKey ? `/api/admin/students/${row.publicId}/photo` : null,
     });
   }
+  const selectionKey = [
+    rawSearch,
+    branchId ?? "",
+    classId ?? "",
+    sectionId ?? "",
+    yearId ?? "",
+    status,
+  ].join(":");
 
   return (
     <main className={styles.page}>
@@ -137,6 +136,7 @@ export default async function StudentIdsPage({ searchParams }: { searchParams: S
       </SmartFilterForm>
 
       <StudentIdPrintRegister
+        key={selectionKey}
         records={records}
         schoolName={school?.name ?? context.schoolName}
         schoolEmail={school?.email ?? null}

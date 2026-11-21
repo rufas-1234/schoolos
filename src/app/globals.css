@@ -3,20 +3,45 @@
 :root {
   --background: #f7f7fa;
   --foreground: #20202a;
-  --primary: #7027b8;
+  --primary: #142967;
+  --accent: #812e2b;
   --muted: #85828d;
-  --report-brand: #4f46a5;
-  --report-accent: #0f766e;
+  --report-brand: #142967;
+  --report-accent: #812e2b;
   --report-ink: #1f2937;
   --report-muted: #64748b;
   --report-border: #cbd5e1;
-  --report-soft: #eef2ff;
+  --report-soft: #eff2fa;
+  --color-violet-50: #f0f3fb;
+  --color-violet-100: #e3e8f4;
+  --color-violet-200: #c9d2e8;
+  --color-violet-300: #a0b1d5;
+  --color-violet-400: #7188bc;
+  --color-violet-500: #4b659f;
+  --color-violet-600: #304b86;
+  --color-violet-700: #142967;
+  --color-violet-800: #132758;
+  --color-violet-900: #0f2049;
+  --color-violet-950: #091535;
   color-scheme: light;
 }
 
 .dark {
   --background: #0b1120;
   --foreground: #e2e8f0;
+  --primary: #9fb6ee;
+  --accent: #e3a09b;
+  --color-violet-50: #0c1734;
+  --color-violet-100: #12234a;
+  --color-violet-200: #1c3567;
+  --color-violet-300: #2e4d88;
+  --color-violet-400: #425d95;
+  --color-violet-500: #304b86;
+  --color-violet-600: #243c74;
+  --color-violet-700: #1a326c;
+  --color-violet-800: #132758;
+  --color-violet-900: #0f2049;
+  --color-violet-950: #091535;
   color-scheme: dark;
 }
 
@@ -36,24 +61,24 @@
 }
 
 .dark .admin-shell-sidebar {
-  border-color: #3b3150;
-  background-color: #1d1a29;
+  border-color: #29385d;
+  background-color: #101a36;
 }
 
 .dark .admin-shell-topbar {
-  border-color: #3b3150;
-  background-color: #211d2e;
-  color: #e9d5ff;
+  border-color: #29385d;
+  background-color: #142143;
+  color: #dbeafe;
 }
 
 .dark .admin-shell-sidebar [class*="text-violet-"],
 .dark .admin-shell-topbar [class*="text-violet-"] {
-  color: #e9d5ff;
+  color: #c0cff2;
 }
 
 .dark .admin-shell-sidebar [class*="border-violet-"],
 .dark .admin-shell-topbar [class*="border-violet-"] {
-  border-color: #514466;
+  border-color: #3b4e7e;
 }
 
 .dark .portal-shell-content > header {
@@ -77,7 +102,7 @@
 
 .dark .portal-shell-root > aside [class*="text-violet-"],
 .dark .portal-shell-content > header [class*="text-violet-"] {
-  color: #ddd6fe;
+  color: #c0cff2;
 }
 
 .dark .portal-shell-root > aside [class*="border-slate-"] {
@@ -132,7 +157,7 @@
 
 .dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
   :not(.exam-report-document):not(.exam-report-document *)[class~="bg-violet-50"] {
-  background-color: #312e4e;
+  background-color: #12234a;
 }
 
 .dark :is(.admin-shell-main, .portal-shell-content, .admin-shell-topbar, .admin-shell-sidebar)
@@ -517,12 +542,12 @@ h6 {
 }
 
 .exam-report-document {
-  --report-brand: #3f3a3a;
-  --report-accent: #3f3a3a;
-  --report-ink: #222;
-  --report-muted: #5f5a59;
-  --report-border: #c9c6c4;
-  --report-soft: #f1f0ef;
+  --report-brand: #142967;
+  --report-accent: #812e2b;
+  --report-ink: #172033;
+  --report-muted: #526174;
+  --report-border: #cbd6e8;
+  --report-soft: #eff2fa;
 }
 
 .exam-report-document .print-report-heading,
