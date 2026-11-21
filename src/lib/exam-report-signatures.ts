@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { examTeacherSignatures, staffMembers, teachers } from "@/db/schema";
+import { isDeputyHeadteacherJobTitle } from "@/lib/exam-report-signature-policy";
 
-export type ExamSignatureRole = "Class teacher" | "Subject teacher";
+export type ExamSignatureRole = "Class teacher" | "Subject teacher" | "Deputy headteacher";
 
 export type ExamTeacherSignature = {
   teacherId: number;
@@ -70,4 +71,26 @@ export async function getExamTeacherSignatures(
     });
   }
   return [...entries.values()];
+}
+
+export async function getDeputyHeadteacherSignatures(
+  schoolId: number,
+): Promise<ExamTeacherSignature[]> {
+  const staffRows = await db.select({
+    teacherId: teachers.id,
+    jobTitle: staffMembers.jobTitle,
+  }).from(teachers)
+    .innerJoin(staffMembers, and(
+      eq(staffMembers.id, teachers.staffMemberId!),
+      eq(staffMembers.schoolId, schoolId),
+      eq(staffMembers.status, "active"),
+    ))
+    .where(and(
+      eq(teachers.schoolId, schoolId),
+      eq(teachers.status, "active"),
+    ));
+  const assignments = staffRows
+    .filter((staff) => isDeputyHeadteacherJobTitle(staff.jobTitle))
+    .map((staff) => ({ teacherId: staff.teacherId, role: "Deputy headteacher" as const }));
+  return getExamTeacherSignatures(schoolId, assignments);
 }

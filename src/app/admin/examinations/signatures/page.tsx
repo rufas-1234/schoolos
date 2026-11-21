@@ -80,7 +80,7 @@ export default async function ExamReportSignaturesPage() {
     <header>
       <p className="text-sm font-semibold text-violet-700">Examinations</p>
       <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Report signatures</h1>
-      <p className="mt-1 max-w-2xl text-sm text-slate-600">Teachers upload their signature once. Reports select the assigned class or subject teacher automatically; replaced uploads remain available as prior versions.</p>
+      <p className="mt-1 max-w-2xl text-sm text-slate-600">Report cards show the headteacher and active teacher profiles whose linked staff job title identifies them as a deputy headteacher. Subject-specific reports may show the assigned teachers. Upload a deputy&apos;s signature from their teacher row; replaced uploads remain available as prior versions.</p>
     </header>
     {canManageAll && <section className="max-w-xl">
       <SignatureForm role={"headteacher" satisfies SignatureRole} version={headteacherSignature?.updatedAt.getTime()} />

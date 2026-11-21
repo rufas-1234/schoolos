@@ -31,7 +31,7 @@ import { PrintButton } from "@/components/print-button";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
-import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
+import { getDeputyHeadteacherSignatures } from "@/lib/exam-report-signatures";
 import {
   calculateWeightedAverage,
   canPreviewDraftTestReport,
@@ -252,10 +252,7 @@ export default async function ReportCardPage({
       draftPreview ? eq(examSubjects.status, "draft") : eq(examSubjects.status, "published"),
     ))
     .orderBy(asc(subjects.name));
-  const teacherSignatures = await getExamTeacherSignatures(context.schoolId, [
-    { teacherId: record.classTeacherId, role: "Class teacher" },
-    ...assessments.map((assessment) => ({ teacherId: assessment.teacherId, role: "Subject teacher" as const })),
-  ]);
+  const teacherSignatures = await getDeputyHeadteacherSignatures(context.schoolId);
   const assessmentIds = assessments.map((assessment) => assessment.id);
   const [markRows, attendanceRows] = assessmentIds.length
     ? await Promise.all([
@@ -438,22 +435,6 @@ export default async function ReportCardPage({
           <p><span className="font-semibold text-slate-500">Term</span><br />{record.termName ?? "Not specified"}</p>
           {record.allowRanking && <p><span className="font-semibold text-slate-500">Class position</span><br />{classRank ?? "—"} of {classSize}</p>}
         </section>
-        <section className="grid gap-3 sm:grid-cols-2">
-          <article className="rounded-xl bg-violet-800 p-4 text-white">
-            <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">Overall performance</p>
-            <p className="mt-1 text-3xl font-bold">{overall ? `${overall.percentage.toFixed(2)}%` : "—"}</p>
-            <p className="mt-1 text-sm text-violet-100">{overall
-              ? `${overall.totalMarks.toFixed(2)} of ${overall.maxMarks.toFixed(2)} · Grade ${overallGrade?.grade ?? "—"}${overallGrade?.description ? ` · ${overallGrade.description}` : ""}`
-              : "Incomplete or no numeric results"}</p>
-          </article>
-          {canViewFeeBalance && (
-            <article className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Outstanding fee balance</p>
-              <p className="mt-1 text-2xl font-bold text-slate-950">{record.schoolCurrency} {(feeBalanceMinor / 100).toFixed(2)}</p>
-              <p className="mt-1 text-xs text-slate-600">Includes applicable overdue fines and payments net of reversals.</p>
-            </article>
-          )}
-        </section>
         <section className="print-report-panel overflow-x-auto rounded-xl border border-slate-200">
           <table className="print-report-table w-full min-w-[640px] border-collapse text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-600"><tr><th className="p-3">Subject</th><th className="p-3">Marks</th><th className="p-3">Percentage</th><th className="p-3">Grade</th><th className="p-3">Teacher remark</th></tr></thead>
@@ -480,6 +461,22 @@ export default async function ReportCardPage({
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border p-4"><h3 className="font-bold">Class teacher&apos;s remarks</h3><p className="mt-2 text-sm">{classTeacherFeedback ?? "—"}</p></div>
           <div className="rounded-xl border p-4"><h3 className="font-bold">Headteacher&apos;s remarks</h3><p className="mt-2 text-sm">{headteacherFeedback ?? "—"}</p></div>
+        </section>
+        <section className="exam-report-summary-grid grid gap-2 sm:grid-cols-2">
+          <article className="exam-report-summary-card rounded-xl bg-violet-800 p-3 text-white">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-100">Overall performance</p>
+            <p className="mt-1 text-2xl font-bold">{overall ? `${overall.percentage.toFixed(2)}%` : "—"}</p>
+            <p className="mt-1 text-xs text-violet-100">{overall
+              ? `${overall.totalMarks.toFixed(2)} of ${overall.maxMarks.toFixed(2)} · Grade ${overallGrade?.grade ?? "—"}${overallGrade?.description ? ` · ${overallGrade.description}` : ""}`
+              : "Incomplete or no numeric results"}</p>
+          </article>
+          {canViewFeeBalance && (
+            <article className="exam-report-summary-card rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Outstanding fee balance</p>
+              <p className="mt-1 text-xl font-bold text-slate-950">{record.schoolCurrency} {(feeBalanceMinor / 100).toFixed(2)}</p>
+              <p className="mt-1 text-xs text-slate-600">Includes applicable overdue fines and payments net of reversals.</p>
+            </article>
+          )}
         </section>
         <ReportSignatureStrip signatures={signatureRows} teacherSignatures={teacherSignatures} />
         <footer className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-slate-500">

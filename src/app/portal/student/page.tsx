@@ -65,7 +65,7 @@ import {
   examRemarkVariantIndex,
   resolveExamReportRemark,
 } from "@/lib/exam-report-remarks";
-import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
+import { getDeputyHeadteacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { FamilyPortalShell } from "../family-portal-shell";
 
@@ -568,7 +568,7 @@ export default async function StudentPortalPage({
       }),
     };
   });
-  const [signatureRows, reportTeacherSignatures] = await Promise.all([
+  const [signatureRows, deputyHeadteacherSignatures] = await Promise.all([
     db.select({
       role: examReportSignatures.role,
       updatedAt: examReportSignatures.updatedAt,
@@ -576,10 +576,7 @@ export default async function StudentPortalPage({
       eq(examReportSignatures.schoolId, context.schoolId),
       eq(examReportSignatures.role, "headteacher"),
     )),
-    getExamTeacherSignatures(context.schoolId, completeReports.flatMap((report) => [
-      { teacherId: report.classTeacherId, role: "Class teacher" as const },
-      ...report.rows.map((row) => ({ teacherId: row.subjectTeacherId, role: "Subject teacher" as const })),
-    ])),
+    getDeputyHeadteacherSignatures(context.schoolId),
   ]);
   const annualProgressByStudentYear = new Map<string, {
     studentId: number;
@@ -1157,10 +1154,7 @@ export default async function StudentPortalPage({
                         </section>
                         <ReportSignatureStrip
                           signatures={signatureRows}
-                          teacherSignatures={reportTeacherSignatures.filter((signature) =>
-                            signature.role === "Subject teacher" ||
-                            signature.teacherId === report.classTeacherId,
-                          )}
+                          teacherSignatures={deputyHeadteacherSignatures}
                         />
                         <footer className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-slate-500">
                           <span>{context.schoolName}</span><span>{report.examName} · {report.yearName}</span>

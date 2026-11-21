@@ -31,7 +31,7 @@ import {
   examAssessmentResultState,
   hasCompleteExamResult,
 } from "@/lib/examination-policy";
-import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
+import { getDeputyHeadteacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { ReportSignatureStrip } from "@/app/admin/examinations/signatures/report-signature-strip";
 
@@ -265,7 +265,7 @@ function StudentProgressCard({
   yearName: string;
   className: string;
   signatures: Array<{ role: string; updatedAt: Date }>;
-  teacherSignatures: Awaited<ReturnType<typeof getExamTeacherSignatures>>;
+  teacherSignatures: Awaited<ReturnType<typeof getDeputyHeadteacherSignatures>>;
   last: boolean;
 }) {
   const logo = schoolLogoSource(schoolLogoUrl);
@@ -312,22 +312,6 @@ function StudentProgressCard({
             <h3>Annual performance profile</h3>
             <span>{examsWithResults} exams with results</span>
           </div>
-          <div className="academic-progress-overall">
-            <div className="academic-progress-overall-score">
-              <span>Annual average</span>
-              <strong>{percentageLabel(student.annualAverage)}</strong>
-              <span>Across examinations with published results</span>
-            </div>
-            <div className="academic-progress-grade">
-              <span>Change</span>
-              <strong>{student.change === null ? "—" : student.change > 0 ? "+" : student.change < 0 ? "−" : "="}</strong>
-            </div>
-          </div>
-          {student.annualAverage !== null && (
-            <div className="academic-progress-meter" role="progressbar" aria-label="Annual average" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, student.annualAverage))}>
-              <span style={{ width: `${Math.max(0, Math.min(100, student.annualAverage))}%` }} />
-            </div>
-          )}
           <div className="academic-progress-strengths">
             <h4>Subject performance profile</h4>
             {strongestSubjects.map((subject) => (
@@ -399,6 +383,18 @@ function StudentProgressCard({
         <article>
           <h3>Progress change</h3>
           <p>{changeLabel(student.change)} from first to last published exam.</p>
+        </article>
+      </section>
+      <section className="exam-report-summary-grid grid gap-2 sm:grid-cols-2">
+        <article className="exam-report-summary-card rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Annual average</p>
+          <strong className="mt-1 block text-xl text-slate-950">{percentageLabel(student.annualAverage)}</strong>
+          <p className="mt-1 text-xs text-slate-600">Across examinations with published results</p>
+        </article>
+        <article className="exam-report-summary-card rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress change</p>
+          <strong className="mt-1 block text-lg text-slate-950">{changeLabel(student.change)}</strong>
+          <p className="mt-1 text-xs text-slate-600">From first to last published examination</p>
         </article>
       </section>
       <ReportSignatureStrip signatures={signatures} teacherSignatures={teacherSignatures} />
@@ -596,11 +592,7 @@ export default async function AnnualProgressCardPage({
       ? `/api/admin/students/${row.studentPublicId}/photo`
       : null,
   }));
-  const teacherSignatures = await getExamTeacherSignatures(context.schoolId, [
-    ...rawRoster.map((row) => ({ teacherId: row.classTeacherId, role: "Class teacher" as const })),
-    ...assessments.map((assessment) => ({ teacherId: assessment.teacherId, role: "Subject teacher" as const })),
-    ...selectedClassRows.map((row) => ({ teacherId: row.classTeacherId, role: "Class teacher" as const })),
-  ]);
+  const teacherSignatures = await getDeputyHeadteacherSignatures(context.schoolId);
   const [markRows, attendanceRows] = assessments.length && rawRoster.length
     ? await Promise.all([
       db.select({
@@ -705,10 +697,7 @@ export default async function AnnualProgressCardPage({
               yearName={selectedYear.name}
               className={selectedClass.label}
               signatures={signatures}
-              teacherSignatures={teacherSignatures.filter((signature) =>
-                signature.role === "Subject teacher" ||
-                signature.teacherId === student.classTeacherId,
-              )}
+              teacherSignatures={teacherSignatures}
               last={index === visibleProgress.length - 1}
             />
           ))}

@@ -52,7 +52,7 @@ import {
   examRemarkVariantIndex,
   resolveExamReportRemark,
 } from "@/lib/exam-report-remarks";
-import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
+import { getDeputyHeadteacherSignatures, getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import type { ExamTeacherSignature } from "@/lib/exam-report-signatures";
 
 export const dynamic = "force-dynamic";
@@ -278,25 +278,9 @@ function ProgressCard({
 
         <div className="academic-progress-performance">
           <div className="academic-progress-section-title">
-            <h3>Overall performance profile</h3>
+            <h3>Class performance profile</h3>
             {exam.allowRanking && <span>Class position · {position ?? "—"}</span>}
           </div>
-          <div className="academic-progress-overall">
-            <div className="academic-progress-overall-score">
-              <span>Overall score</span>
-              <strong>{row.overall ? `${row.overall.percentage.toFixed(1)}%` : "Incomplete"}</strong>
-              <span>{row.overall ? `${row.overall.totalMarks.toFixed(1)} / ${row.overall.maxMarks.toFixed(1)} marks` : "Published marks are incomplete"}</span>
-            </div>
-            <div className="academic-progress-grade">
-              <span>Grade</span>
-              <strong>{overallGrade?.grade ?? "—"}</strong>
-            </div>
-          </div>
-          {row.overall && (
-            <div className="academic-progress-meter" role="progressbar" aria-label="Overall exam score" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, row.overall.percentage))}>
-              <span style={{ width: `${Math.max(0, Math.min(100, row.overall.percentage))}%` }} />
-            </div>
-          )}
           <div className="academic-progress-strengths">
             <h4>Subject performance profile</h4>
             {strongestSubjects.map(({ assessment, percentage, grade }) => (
@@ -365,7 +349,7 @@ function ProgressCard({
         </div>
       </section>
 
-      <section className={`academic-progress-comments${showFeeBalance ? " academic-progress-comments-with-fees" : ""}`}>
+      <section className="academic-progress-comments">
         <article>
           <h3>Teacher&apos;s feedback</h3>
           <p>{teacherFeedback || "No teacher comment recorded."}</p>
@@ -374,17 +358,30 @@ function ProgressCard({
           <h3>Performance description</h3>
           <p>{overallGrade?.description || "Review the subject results above for this examination."}</p>
         </article>
-        {showFeeBalance && (
-          <article>
-            <h3>Outstanding fee balance</h3>
-            <strong>{currency} {(feeBalanceMinor / 100).toFixed(2)}</strong>
-            <p>Includes overdue fines and payments net of reversals.</p>
-          </article>
-        )}
         <article>
           <h3>Headteacher&apos;s remarks</h3>
           <p>{headteacherFeedback || "No headteacher comment recorded."}</p>
         </article>
+      </section>
+      <section className="exam-report-summary-grid grid gap-2 sm:grid-cols-2">
+        <article className="exam-report-summary-card rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overall performance</p>
+          <strong className="mt-1 block text-xl text-slate-950">
+            {row.overall ? `${row.overall.percentage.toFixed(1)}%` : "Incomplete"}
+          </strong>
+          <p className="mt-1 text-xs text-slate-600">
+            {row.overall
+              ? `${row.overall.totalMarks.toFixed(1)} / ${row.overall.maxMarks.toFixed(1)} marks · Grade ${overallGrade?.grade ?? "—"}`
+              : "Published marks are incomplete"}
+          </p>
+        </article>
+        {showFeeBalance && (
+          <article className="exam-report-summary-card rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Outstanding fee balance</p>
+            <strong className="mt-1 block text-lg text-slate-950">{currency} {(feeBalanceMinor / 100).toFixed(2)}</strong>
+            <p className="mt-1 text-xs text-slate-600">Includes overdue fines and payments net of reversals.</p>
+          </article>
+        )}
       </section>
       <ReportSignatureStrip signatures={signatures} teacherSignatures={teacherSignatures} />
     </article>
@@ -656,6 +653,9 @@ export default async function ExaminationReportPage({
     ...resultRows.map((row) => ({ teacherId: row.classTeacherId, role: "Class teacher" as const })),
     ...assessments.map((assessment) => ({ teacherId: assessment.teacherId, role: "Subject teacher" as const })),
   ]);
+  const deputyHeadteacherSignatures = isProgressCard
+    ? await getDeputyHeadteacherSignatures(context.schoolId)
+    : [];
   const teacherSignaturesForStudent = (row: (typeof resultRows)[number]) =>
     reportTeacherSignatures.filter((signature) =>
      signature.role === "Subject teacher" ||
@@ -1127,7 +1127,7 @@ export default async function ExaminationReportPage({
                       schoolPhone={examDetails.schoolPhone}
                       schoolEmail={examDetails.schoolEmail}
                       signatures={configuredSignatures}
-                      teacherSignatures={teacherSignaturesForStudent(resultRows.find((row) => row.enrollmentId === activeResult.enrollmentId)!)}
+                      teacherSignatures={deputyHeadteacherSignatures}
                       currency={examDetails.schoolCurrency}
                       feeBalanceMinor={feeBalanceByStudent.get(activeResult.studentId) ?? 0}
                       showFeeBalance={showFeeBalance}
@@ -1152,7 +1152,7 @@ export default async function ExaminationReportPage({
                         schoolPhone={examDetails.schoolPhone}
                         schoolEmail={examDetails.schoolEmail}
                         signatures={configuredSignatures}
-                        teacherSignatures={teacherSignaturesForStudent(resultRows.find((resultRow) => resultRow.enrollmentId === row.enrollmentId)!)}
+                        teacherSignatures={deputyHeadteacherSignatures}
                         currency={examDetails.schoolCurrency}
                         feeBalanceMinor={feeBalanceByStudent.get(row.studentId) ?? 0}
                         showFeeBalance={showFeeBalance}
