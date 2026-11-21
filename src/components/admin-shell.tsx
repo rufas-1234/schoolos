@@ -57,21 +57,6 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
   {
-    href: "/admin/academics",
-    label: "Academics",
-    icon: CalendarDays,
-    permission: "academics.manage",
-    permissionAlternatives: ["school.settings.manage"],
-    children: [
-      ...academicSections.filter((section) => section.id !== "teachers").map((section) => ({
-        id: section.id,
-        label: section.label,
-        href: `/admin/academics?section=${section.id}`,
-        matchQuery: { key: "section", value: section.id },
-      })),
-    ],
-  },
-  {
     href: "/admin/students",
     label: "Student Info",
     icon: Users,
@@ -87,6 +72,21 @@ const navigation: NavigationItem[] = [
         permission: "students.view",
         permissionAlternatives: ["students.update", "academics.manage", "school.settings.manage"],
       },
+    ],
+  },
+  {
+    href: "/admin/academics",
+    label: "Academics",
+    icon: CalendarDays,
+    permission: "academics.manage",
+    permissionAlternatives: ["school.settings.manage"],
+    children: [
+      ...academicSections.filter((section) => section.id !== "teachers").map((section) => ({
+        id: section.id,
+        label: section.label,
+        href: `/admin/academics?section=${section.id}`,
+        matchQuery: { key: "section", value: section.id },
+      })),
     ],
   },
   {
@@ -106,34 +106,6 @@ const navigation: NavigationItem[] = [
       { id: "send-marks-sms", label: "Send Marks By SMS", href: "/admin/examinations?section=sms", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "sms" } },
       { id: "exam-reports", label: "Exams Reports", href: "/admin/examinations/report-center/exam-routine" },
       { id: "exam-analytics", label: "Exam Analytics", href: "/admin/exam-analytics", matchPath: "/admin/exam-analytics", permission: "examinations.create", permissionAlternatives: ["results.publish"] },
-    ],
-  },
-  {
-    href: "/admin/library",
-    label: "Library",
-    icon: BookMarked,
-    permission: "library.manage",
-    children: [
-      { id: "add-book", label: "Add Book", href: "/admin/library?section=add-book", matchQuery: { key: "section", value: "add-book" } },
-      { id: "books", label: "Book List", href: "/admin/library?section=books", matchQuery: { key: "section", value: "books" } },
-      { id: "categories", label: "Book Categories", href: "/admin/library?section=categories", matchQuery: { key: "section", value: "categories" } },
-      { id: "members", label: "Add Member", href: "/admin/library?section=members", matchQuery: { key: "section", value: "members" } },
-      { id: "issue", label: "Issue / Return Book", href: "/admin/library?section=issue", matchQuery: { key: "section", value: "issue" } },
-      { id: "issued", label: "All Issued Books", href: "/admin/library?section=issued", matchQuery: { key: "section", value: "issued" } },
-      { id: "subjects", label: "Subject", href: "/admin/library?section=subjects", matchQuery: { key: "section", value: "subjects" } },
-    ],
-  },
-  {
-    href: "/admin/dormitories",
-    label: "Dormitories",
-    icon: BedDouble,
-    permission: "dormitories.manage",
-    children: [
-      { id: "overview", label: "Dormitory overview", href: "/admin/dormitories?section=overview", matchQuery: { key: "section", value: "overview" } },
-      { id: "dormitories", label: "Dormitories", href: "/admin/dormitories?section=dormitories", matchQuery: { key: "section", value: "dormitories" } },
-      { id: "rooms", label: "Rooms & beds", href: "/admin/dormitories?section=rooms", matchQuery: { key: "section", value: "rooms" } },
-      { id: "residents", label: "Room assignments", href: "/admin/dormitories?section=residents", matchQuery: { key: "section", value: "residents" } },
-      { id: "reports", label: "Reports", href: "/admin/dormitories/reports", matchPath: "/admin/dormitories/reports" },
     ],
   },
   {
@@ -187,6 +159,34 @@ const navigation: NavigationItem[] = [
         permission: "payments.record",
         permissionAlternatives: ["fees.manage"],
       },
+    ],
+  },
+  {
+    href: "/admin/library",
+    label: "Library",
+    icon: BookMarked,
+    permission: "library.manage",
+    children: [
+      { id: "add-book", label: "Add Book", href: "/admin/library?section=add-book", matchQuery: { key: "section", value: "add-book" } },
+      { id: "books", label: "Book List", href: "/admin/library?section=books", matchQuery: { key: "section", value: "books" } },
+      { id: "categories", label: "Book Categories", href: "/admin/library?section=categories", matchQuery: { key: "section", value: "categories" } },
+      { id: "members", label: "Add Member", href: "/admin/library?section=members", matchQuery: { key: "section", value: "members" } },
+      { id: "issue", label: "Issue / Return Book", href: "/admin/library?section=issue", matchQuery: { key: "section", value: "issue" } },
+      { id: "issued", label: "All Issued Books", href: "/admin/library?section=issued", matchQuery: { key: "section", value: "issued" } },
+      { id: "subjects", label: "Subject", href: "/admin/library?section=subjects", matchQuery: { key: "section", value: "subjects" } },
+    ],
+  },
+  {
+    href: "/admin/dormitories",
+    label: "Dormitories",
+    icon: BedDouble,
+    permission: "dormitories.manage",
+    children: [
+      { id: "overview", label: "Dormitory overview", href: "/admin/dormitories?section=overview", matchQuery: { key: "section", value: "overview" } },
+      { id: "dormitories", label: "Dormitories", href: "/admin/dormitories?section=dormitories", matchQuery: { key: "section", value: "dormitories" } },
+      { id: "rooms", label: "Rooms & beds", href: "/admin/dormitories?section=rooms", matchQuery: { key: "section", value: "rooms" } },
+      { id: "residents", label: "Room assignments", href: "/admin/dormitories?section=residents", matchQuery: { key: "section", value: "residents" } },
+      { id: "reports", label: "Reports", href: "/admin/dormitories/reports", matchPath: "/admin/dormitories/reports" },
     ],
   },
   {
