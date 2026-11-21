@@ -2,8 +2,8 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { get, list } from "@vercel/blob";
 import { config } from "dotenv";
 
-config({ path: ".env.local" });
-config({ path: ".env" });
+config({ path: ".env", override: true });
+config({ path: ".env.local", override: true });
 
 const maxBlobBytes = 16 * 1024 * 1024;
 
@@ -45,17 +45,19 @@ function getTargetConfiguration() {
 
 async function main() {
   const sourceOptions = getSourceOptions();
-  const target = getTargetConfiguration();
   const execute = process.argv.includes("--execute");
-  const client = new S3Client({
-    endpoint: target.endpoint,
-    region: target.region,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: target.accessKeyId,
-      secretAccessKey: target.secretAccessKey,
-    },
-  });
+  const target = execute ? getTargetConfiguration() : null;
+  const client = target
+    ? new S3Client({
+        endpoint: target.endpoint,
+        region: target.region,
+        forcePathStyle: true,
+        credentials: {
+          accessKeyId: target.accessKeyId,
+          secretAccessKey: target.secretAccessKey,
+        },
+      })
+    : null;
 
   let cursor: string | undefined;
   let hasMore = true;
@@ -70,6 +72,7 @@ async function main() {
       totalBlobs += 1;
       totalBytes += blob.size;
       if (!execute) continue;
+      if (!target || !client) throw new MigrationError("R2 target configuration is unavailable.");
 
       try {
         if (blob.size > maxBlobBytes) {
