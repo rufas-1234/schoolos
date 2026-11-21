@@ -189,15 +189,15 @@
 }
 
 .idCard {
-  --card-ink: #18312d;
+  --card-ink: #fff;
   position: relative;
   width: 100%;
   max-width: 440px;
   aspect-ratio: 85.6 / 53.98;
-  border: 1px solid #dce8df;
+  border: 1px solid #258a78;
   border-radius: 16px;
-  background: #f3f8f4;
-  box-shadow: 0 8px 22px #18312d18;
+  background: #155b4c;
+  box-shadow: 0 8px 22px #18312d30;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
@@ -212,8 +212,7 @@
   overflow: hidden;
   border: 5px solid #fff;
   border-radius: inherit;
-  background:
-    radial-gradient(ellipse at 52% 46%, #fff 0 30%, #f8fcf9 69%, #edf6f0 100%);
+  background: radial-gradient(ellipse at 52% 46%, #1d7564 0, #155b4c 66%, #104b40 100%);
   padding: 3% 3.5%;
   color: var(--card-ink);
 }
@@ -223,18 +222,15 @@
   z-index: 0;
   inset: 0 0 auto;
   height: 39%;
-  background:
-    linear-gradient(144deg, #dcefe4 0 39%, #9bc9ad 39.4% 40.5%, transparent 41%),
-    linear-gradient(32deg, transparent 0 68%, #edf6f0 68.3% 73%, transparent 73.4%),
-    linear-gradient(157deg, transparent 0 43%, #155b4c 43.4% 73%, transparent 73.5%);
+  background: linear-gradient(135deg, #104b40 0%, #155b4c 58%, #1d7564 100%);
 }
 
 .cardTopArt::before {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(145deg, transparent 0 54%, #fff9 54.4% 57%, transparent 57.4%),
-    linear-gradient(22deg, transparent 0 73%, #c6df9d 73.4% 75%, transparent 75.4%);
+    linear-gradient(145deg, transparent 0 54%, #fff3 54.4% 57%, transparent 57.4%),
+    linear-gradient(22deg, transparent 0 73%, #a9cc6766 73.4% 75%, transparent 75.4%);
   content: "";
 }
 
@@ -244,7 +240,7 @@
   right: -7%;
   width: 37%;
   height: 100%;
-  background: linear-gradient(148deg, #155b4c 0 55%, #a9cc67 55.5% 58%, transparent 58.5%);
+  background: linear-gradient(148deg, #258a78 0 55%, #a9cc67 55.5% 58%, transparent 58.5%);
   clip-path: polygon(31% 0, 100% 0, 100% 100%, 0 13%);
   content: "";
 }
@@ -270,8 +266,8 @@
   overflow: hidden;
   border: 2px solid #fff;
   border-radius: 50%;
-  background: radial-gradient(circle, #e5f3d9 0 49%, #78a991 51% 57%, #fff 59%);
-  color: #155b4c;
+  background: radial-gradient(circle, #155b4c 0 49%, #a9cc67 51% 57%, #fff 59%);
+  color: #fff;
   font-size: clamp(16px, 4vw, 25px);
   font-weight: 800;
   box-shadow: 0 2px 8px #18312d30;
@@ -293,7 +289,7 @@
   display: -webkit-box;
   overflow: hidden;
   margin: 0;
-  color: #155b4c;
+  color: #fff;
   font-family: var(--font-display), Impact, sans-serif;
   font-size: clamp(13px, 3.6vw, 19px);
   font-weight: 900;
@@ -309,7 +305,7 @@
   display: -webkit-box;
   overflow: hidden;
   margin: 3px 0 0;
-  color: #258a78;
+  color: #f3f8f4;
   font-size: clamp(8px, 2vw, 10px);
   font-weight: 800;
   line-height: 1.15;
@@ -366,7 +362,7 @@
   border: 3px solid #fff;
   border-radius: 42% 42% 5px 5px;
   background: linear-gradient(150deg, #dcefe4, #eff8f3 72%);
-  color: #155b4c;
+  color: #20202a;
   font-size: clamp(18px, 5vw, 28px);
   font-weight: 800;
   box-shadow: 0 3px 10px #18312d22, 0 0 0 1px #dce8df;
@@ -386,7 +382,7 @@
   justify-content: center;
   gap: 4px;
   background: radial-gradient(circle at 50% 25%, #fff 0 18%, transparent 18.5%), linear-gradient(145deg, #dcefe4, #eff8f3 72%);
-  color: #258a78;
+  color: #20202a;
 }
 
 .avatarFallback span {
@@ -408,7 +404,7 @@
 .studentName {
   max-width: 100%;
   overflow: hidden;
-  color: #1d7564;
+  color: #fff;
   font-size: clamp(12px, 3.1vw, 17px);
   font-weight: 900;
   line-height: 1.1;
@@ -424,9 +420,9 @@
   align-self: flex-start;
   margin: 4px 0 5px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #104b40, #258a78 50%, #104b40);
+  background: #a9cc67;
   padding: 3px 10px;
-  color: #fff;
+  color: #20202a;
   font-size: 9px;
   font-weight: 850;
   line-height: 1.1;
@@ -434,7 +430,7 @@
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
-  box-shadow: 0 2px 3px #155b4c26;
+  box-shadow: 0 2px 3px #06292540;
 }
 
 .details {
@@ -453,21 +449,21 @@
   grid-template-columns: minmax(76px, 35%) 7px minmax(0, 1fr);
   align-items: start;
   gap: 4px;
-  color: #18312d;
+  color: #f3f8f4;
   font-size: clamp(7px, 1.8vw, 9px);
   line-height: 1.15;
 }
 
 .detail b {
   overflow: hidden;
-  color: #21463a;
+  color: #fff;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .detail span:nth-child(2) {
-  color: #258a78;
+  color: #f3f8f4;
   font-weight: 900;
 }
 
@@ -497,9 +493,9 @@
 
 .signature {
   min-width: 24%;
-  border-bottom: 1px solid #507468;
+  border-bottom: 1px solid #a9cc67;
   padding: 0 6px 3px;
-  color: #647a70;
+  color: #e4f2eb;
   font-family: cursive;
   font-size: 7px;
   line-height: 1.15;
@@ -509,7 +505,7 @@
 
 .signature b {
   display: block;
-  color: #18312d;
+  color: #fff;
   font-family: var(--font-body), sans-serif;
   font-size: 8px;
   font-weight: 800;
@@ -523,14 +519,14 @@
   overflow: hidden;
   border: 1px solid #a9cc67;
   border-radius: 15px;
-  background: linear-gradient(90deg, #1d7564, #258a78);
+  background: #a9cc67;
   padding: 3px 8px;
-  color: #fff;
+  color: #20202a;
   font-size: 9px;
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: 0 2px 4px #155b4c29;
+  box-shadow: 0 2px 4px #06292540;
 }
 
 .phoneBadge span {
@@ -540,8 +536,8 @@
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
-  background: #104b40;
-  color: #c5df8d;
+  background: #155b4c;
+  color: #fff;
   font-size: 9px;
 }
 
@@ -554,9 +550,9 @@
   width: 12%;
   aspect-ratio: 1;
   place-items: center;
-  border: 2px solid #6abda1;
+  border: 2px solid #a9cc67;
   border-radius: 50%;
-  color: #258a78;
+  color: #fff;
   opacity: 0.5;
   pointer-events: none;
 }
@@ -566,7 +562,7 @@
   position: absolute;
   width: 75%;
   height: 75%;
-  border: 1px solid #6abda1;
+  border: 1px solid #a9cc67;
   border-radius: 50%;
   content: "";
 }
@@ -587,7 +583,7 @@
   bottom: -1px;
   width: 42%;
   height: 13%;
-  background: linear-gradient(145deg, transparent 0 16%, #155b4c 16.5% 50%, #fff 50.5% 53%, #258a78 53.5% 100%);
+  background: linear-gradient(145deg, transparent 0 16%, #104b40 16.5% 50%, #fff 50.5% 53%, #258a78 53.5% 100%);
   clip-path: polygon(45% 0, 100% 0, 100% 100%, 0 100%);
   pointer-events: none;
 }
