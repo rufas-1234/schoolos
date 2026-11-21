@@ -171,6 +171,8 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 310px;
 }
 
 .cardSelect {
@@ -725,6 +727,8 @@
 
   .cardItem[data-selected="true"] {
     display: block !important;
+    content-visibility: visible;
+    contain-intrinsic-size: none;
     break-after: page;
     page-break-after: always;
   }

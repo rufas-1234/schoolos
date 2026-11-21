@@ -96,7 +96,7 @@ function StudentIdCard({ record, schoolName, schoolEmail, schoolLogo, schoolPhon
       <div className={styles.cardBorder}>
         <div className={styles.cardTopArt} />
         <div className={styles.cardHeader}>
-          <div className={styles.logoFrame}>{schoolLogo ? <Image src={schoolLogo} alt={`${schoolName} logo`} width={42} height={42} unoptimized /> : <span>{schoolName.slice(0, 1).toUpperCase()}</span>}</div>
+          <div className={styles.logoFrame}>{schoolLogo ? <Image src={schoolLogo} alt={`${schoolName} logo`} width={42} height={42} loading="lazy" fetchPriority="low" decoding="async" unoptimized /> : <span>{schoolName.slice(0, 1).toUpperCase()}</span>}</div>
           <div className={styles.schoolCopy}>
             <h2 className={styles.schoolTitle}>{schoolName}</h2>
             <p className={styles.schoolSubtitle}>{schoolAddress ?? "STUDENT IDENTIFICATION CARD"}</p>
@@ -112,7 +112,7 @@ function StudentIdCard({ record, schoolName, schoolEmail, schoolLogo, schoolPhon
         <div className={styles.cardBody}>
           <div className={styles.studentPortrait}>
             {photoUrl
-              ? <Image src={photoUrl} alt={`${record.name} portrait`} fill unoptimized sizes="120px" />
+              ? <Image src={photoUrl} alt={`${record.name} portrait`} fill loading="lazy" fetchPriority="low" decoding="async" unoptimized sizes="120px" />
               : <div className={styles.avatarFallback} role="img" aria-label={`${record.name} avatar`}>
                   <UserRound aria-hidden="true" size={44} strokeWidth={1.5} />
                   <span>{initials}</span>
