@@ -259,7 +259,7 @@ export function WorkspaceQuickSearch({
           : scope === "teaching"
             ? "Search your classes, exams, subjects..."
             : "Search students, staff, library, inventory, fees..."}
-        className={`admin-quick-search-input ${compactOnMobile || variant === "hero" ? "admin-quick-search-input-wide " : ""}w-full rounded-md border border-slate-300 bg-white pr-10 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${variant === "hero" ? "h-12 pl-11 text-base" : "h-10 pl-10 text-sm"}`}
+        className={`admin-quick-search-input cloudflare-search-input ${compactOnMobile || variant === "hero" ? "admin-quick-search-input-wide " : ""}w-full rounded-md border border-[#d9d9d9] bg-white pr-10 text-[13px] text-[#202124] outline-none transition placeholder:text-[#777] focus:border-[#a6a6a6] focus:ring-2 focus:ring-[#f3f3f3] ${variant === "hero" ? "h-12 pl-11 text-sm" : "h-10 pl-10 text-[13px]"}`}
       />
       {status === "searching" && normalizedQuery.length >= 2 && (
         <LoaderCircle
@@ -273,7 +273,7 @@ export function WorkspaceQuickSearch({
           id={`${instanceId}-results`}
           role="listbox"
           aria-label="Workspace search results"
-          className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(70vh,32rem)] overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-xl"
+          className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(70vh,32rem)] overflow-y-auto rounded-md border border-[#dedede] bg-white p-1.5 shadow-xl"
         >
           {(scope === "student" || normalizedQuery.length < 2) && suggestions.length > 0 ? (
             <>

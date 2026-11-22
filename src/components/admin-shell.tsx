@@ -284,6 +284,8 @@ export function AdminShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const [rightSidebarQuery, setRightSidebarQuery] = useState("");
+  const [leftSidebarQuery, setLeftSidebarQuery] = useState("");
+  const leftSidebarSearchRef = useRef<HTMLInputElement>(null);
   const mobileNavigationRef = useRef<HTMLDivElement>(null);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const closeNavigationRef = useRef<HTMLButtonElement>(null);
@@ -317,6 +319,21 @@ export function AdminShell({
   const [dormitoriesOpen, setDormitoriesOpen] = useState(() => pathname.startsWith("/admin/dormitories"));
   const [systemOpen, setSystemOpen] = useState(() => pathname.startsWith("/admin/system"));
   const router = useRouter();
+  useEffect(() => {
+    function focusSidebarSearch(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        if (window.matchMedia("(max-width: 1023px)").matches && !open) {
+          setOpen(true);
+          window.setTimeout(() => leftSidebarSearchRef.current?.focus(), 50);
+        } else {
+          leftSidebarSearchRef.current?.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", focusSidebarSearch);
+    return () => document.removeEventListener("keydown", focusSidebarSearch);
+  }, [open]);
   const visibleNavigation = navigation
     .filter((item) =>
       permissions.includes(item.permission) ||
@@ -511,7 +528,7 @@ export function AdminShell({
 
   const sidebar = (
     <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-200 bg-white px-4 py-5">
-      <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
+      <Link href={homeHref} className="mb-5 flex items-center gap-3 px-1">
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f38020] text-white shadow-sm">
           {schoolLogo
             ? <Image src={schoolLogo} unoptimized width={40} height={40} alt="" className="h-full w-full rounded-xl bg-white object-contain" />
@@ -523,9 +540,26 @@ export function AdminShell({
         </span>
       </Link>
 
+      <label className="relative mb-3 block">
+        <span className="sr-only">Quick search navigation</span>
+        <Search aria-hidden="true" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          ref={leftSidebarSearchRef}
+          type="search"
+          value={leftSidebarQuery}
+          onChange={(event) => setLeftSidebarQuery(event.target.value)}
+          placeholder="Quick search..."
+          className="cloudflare-search-input h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-14 text-[13px] text-slate-800 outline-none placeholder:text-slate-500 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+        />
+        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Ctrl K</kbd>
+      </label>
+
       <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
         {navigationGroups.map((group) => {
-          const groupItems = visibleNavigation.filter((item) => group.labels.includes(item.label));
+          const query = leftSidebarQuery.trim().toLocaleLowerCase();
+          const groupItems = visibleNavigation.filter((item) => group.labels.includes(item.label))
+            .filter((item) => !query || item.label.toLocaleLowerCase().includes(query) ||
+              item.children?.some((child) => child.label.toLocaleLowerCase().includes(query)));
           if (!groupItems.length) return null;
           return (
             <div key={group.label}>
@@ -576,7 +610,7 @@ export function AdminShell({
             const isFees = href === "/admin/fees/collection";
             const isExaminations = href === "/admin/examinations";
             const isSystem = label === "System";
-            const sectionOpen = isStudentInfo
+            const sectionOpen = leftSidebarQuery.trim() ? true : isStudentInfo
               ? studentInfoOpen
               : isUsers
                 ? usersOpen
@@ -660,7 +694,7 @@ export function AdminShell({
                 </button>
                 {sectionOpen && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3">
-                    {resolvedSections.map((section) => {
+                    {resolvedSections.filter((section) => !query || label.toLocaleLowerCase().includes(query) || section.label.toLocaleLowerCase().includes(query)).map((section) => {
                       if (!section.href) {
                         return (
                           <span
@@ -924,7 +958,7 @@ export function AdminShell({
             value={rightSidebarQuery}
             onChange={(event) => setRightSidebarQuery(event.target.value)}
             placeholder="Search pages..."
-            className="h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="cloudflare-search-input h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-500 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
           />
         </label>
         <nav aria-label="Workspace page links" className="admin-sidebar-nav min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pr-1">

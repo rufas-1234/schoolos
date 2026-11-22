@@ -124,7 +124,7 @@ export function SearchableSelect({
           setOpen(true);
           onValueChange?.("");
         }}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-10 text-slate-900 outline-none focus:border-violet-400 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="cloudflare-search-input w-full rounded-md border border-[#d9d9d9] bg-white px-3 py-2 pr-10 text-[13px] text-[#202124] outline-none placeholder:text-[#777] focus:border-[#a6a6a6] focus:ring-2 focus:ring-[#f3f3f3] disabled:cursor-not-allowed disabled:opacity-60"
       />
       <button
         type="button"
@@ -138,7 +138,7 @@ export function SearchableSelect({
           setActiveIndex(-1);
           inputRef.current?.focus();
         }}
-        className="absolute right-2 top-8 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="absolute right-2 top-8 inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ChevronDown size={16} aria-hidden="true" />
       </button>
@@ -147,7 +147,7 @@ export function SearchableSelect({
           id={listId}
           role="listbox"
           aria-label={`${label} options`}
-          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl"
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-md border border-[#dedede] bg-white p-1 shadow-lg"
         >
           {filteredOptions.length ? filteredOptions.map((option, index) => (
             <button
@@ -160,7 +160,7 @@ export function SearchableSelect({
               onMouseEnter={() => setActiveIndex(index)}
               onClick={() => choose(option)}
               className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                activeIndex === index || selectedValue === option.value ? "bg-violet-50 text-violet-900" : "text-slate-700 hover:bg-slate-50"
+                activeIndex === index || selectedValue === option.value ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"
               }`}
             >
               {option.label}
