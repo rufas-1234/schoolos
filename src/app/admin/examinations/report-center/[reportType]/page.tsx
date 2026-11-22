@@ -665,7 +665,9 @@ export default async function ExaminationReportPage({
     reportTeacherSignatures.filter((signature) =>
       signature.role === "Class teacher" && signature.teacherId === row.classTeacherId,
     );
-  const sectionSummary = [...new Set(resultRows.map((row) => row.sectionName))].join(", ");
+  const sectionSummary = [...new Set(resultRows
+    .filter((row) => !requestedEnrollmentId || row.enrollmentId === requestedEnrollmentId)
+    .map((row) => row.sectionName))].join(", ");
   const canViewPhotos = context.grantedPermissions.includes("students.view");
   const [markRows, attendanceRows, gradeRows, remarksRows] = resultRows.length && assessments.length
     ? await Promise.all([
@@ -768,7 +770,13 @@ export default async function ExaminationReportPage({
     ? rankScores(results.flatMap((row) => row.overall ? [{ id: row.enrollmentId, score: row.overall.percentage }] : []))
     : new Map<number, number>();
   const orderedResults = sortExamResultsByRank(results, ranking);
-  const meritResults = orderedResults.filter((row) => row.complete);
+  const reportResults = requestedEnrollmentId
+    ? results.filter((row) => row.enrollmentId === requestedEnrollmentId)
+    : results;
+  const reportOrderedResults = orderedResults.filter((row) =>
+    !requestedEnrollmentId || row.enrollmentId === requestedEnrollmentId,
+  );
+  const meritResults = reportOrderedResults.filter((row) => row.complete);
   if (!examDetails?.allowRanking) meritResults.sort((first, second) => first.name.localeCompare(second.name));
   const activeResult = results.find((row) => row.enrollmentId === requestedEnrollmentId) ?? null;
   const reportIsReady = !!examDetails && examDetails.status === "published";
@@ -940,7 +948,7 @@ export default async function ExaminationReportPage({
 
       <nav aria-label="Examination reports" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 print:hidden">
         {(Object.keys(reportDefinitions) as ReportType[]).map((type) => (
-          <Link key={type} href={reportUrl(type, { examId: exam?.id, classId: examClass?.id })} aria-current={type === reportType ? "page" : undefined} className={`rounded-xl border px-3 py-2 text-sm font-semibold ${type === reportType ? "border-violet-300 bg-violet-50 text-violet-900" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
+          <Link key={type} href={reportUrl(type, { examId: exam?.id, classId: examClass?.id, enrollmentId: activeResult?.enrollmentId })} aria-current={type === reportType ? "page" : undefined} className={`rounded-xl border px-3 py-2 text-sm font-semibold ${type === reportType ? "border-violet-300 bg-violet-50 text-violet-900" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
             {reportDefinitions[type].title}
           </Link>
         ))}
@@ -968,10 +976,10 @@ export default async function ExaminationReportPage({
                 options={[{ value: "", label: "Select a subject" }, ...assessments.map((item) => ({ value: String(item.id), label: item.name }))]}
                 placeholder="Search subjects..." />
             )}
-            {needsStudent && (
-              <SearchableSelect label="Student" name="enrollmentId" defaultValue={String(activeResult?.enrollmentId ?? "")} required
+            {hasResults && (
+              <SearchableSelect label="Student" name="enrollmentId" defaultValue={String(activeResult?.enrollmentId ?? "")} required={needsStudent} disabled={!results.length}
                 options={[{ value: "", label: "Select a student" }, ...results.map((row) => ({ value: String(row.enrollmentId), label: `${row.name}${row.admissionNumber ? ` · ${row.admissionNumber}` : ""}` }))]}
-                placeholder="Search students..." />
+                placeholder={results.length ? "Search students..." : "Select an exam and class first"} />
             )}
             <div className="flex items-end gap-2">
               <button className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Generate report</button>
@@ -1003,7 +1011,7 @@ export default async function ExaminationReportPage({
             <>
               {reportType === "merit-list" && (
                 <section id="exam-report-output" className="print-report-content space-y-4 rounded-2xl border border-slate-200 bg-white p-5 print:border-0 print:p-0">
-                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${examDetails.name} · Merit List`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.yearName} · ${results.filter((row) => row.complete).length} complete results`} />
+                  <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${examDetails.name} · Merit List`} subtitle={`${examClass.className} · Sections: ${sectionSummary || "—"} · ${examDetails.yearName} · ${reportResults.filter((row) => row.complete).length} complete results`} />
                   {!examDetails.allowRanking && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Ranking is disabled for this grading scale. Students are listed alphabetically.</p>}
                   <table className="print-report-table w-full border-collapse text-left text-sm">
                     <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th><th>Comments</th></tr></thead>
@@ -1074,7 +1082,7 @@ export default async function ExaminationReportPage({
                       <ReportHeading schoolName={examDetails.schoolName} schoolLogoUrl={examDetails.schoolLogoUrl} schoolAddress={examDetails.schoolAddress} schoolPhone={examDetails.schoolPhone} schoolEmail={examDetails.schoolEmail} title={`${selectedSubject.name} · Subject Marksheet`} subtitle={`${examDetails.name} · ${examClass.className} · Sections: ${sectionSummary || "—"} · Maximum ${selectedSubject.maxMarks}`} />
                       <table className="print-report-table w-full border-collapse text-left text-sm">
                         <thead><tr><th>Roll no.</th><th>Student</th><th>Section</th><th>Admission no.</th><th>Marks</th><th>Percentage</th><th>Grade</th></tr></thead>
-                        <tbody>{results.map((row) => {
+                        <tbody>{reportResults.map((row) => {
                           const mark = row.marks.get(selectedSubject.id);
                           const state = row.assessmentStates.get(selectedSubject.id);
                           const percentage = state === "scored" && typeof mark === "number"
@@ -1099,7 +1107,7 @@ export default async function ExaminationReportPage({
                   <div className="overflow-x-auto">
                     <table className="print-report-table w-full border-collapse text-left text-xs">
                       <thead><tr><th>Position</th><th>Student</th><th>Section</th><th>Admission no.</th>{assessments.map((item) => <th key={item.id}>{item.name} / {item.maxMarks}</th>)}<th>Total</th><th>Average</th><th>Grade</th></tr></thead>
-                      <tbody>{orderedResults.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => {
+                      <tbody>{reportOrderedResults.map((row) => <tr key={row.enrollmentId}><td>{examDetails.allowRanking ? ranking.get(row.enrollmentId) ?? "—" : "—"}</td><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{assessments.map((item) => {
                         const mark = row.marks.get(item.id);
                         const state = row.assessmentStates.get(item.id);
                         const label = state === "scored" && typeof mark === "number"
@@ -1142,7 +1150,7 @@ export default async function ExaminationReportPage({
                       last
                     />
                   ) : (
-                    results.filter((row) => row.complete).map((row, index, completeRows) => (
+                    reportResults.filter((row) => row.complete).map((row, index, completeRows) => (
                       <ProgressCard
                         key={row.enrollmentId}
                         row={row}
@@ -1171,11 +1179,11 @@ export default async function ExaminationReportPage({
                       />
                     ))
                   )}
-                  {results.length === 0 && <p className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500 print:hidden">No enrolled students are available for this class.</p>}
-                  {results.length > 0 && results.every((row) => !row.complete) && <p className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500 print:hidden">No complete result cards are available. Incomplete exam records are excluded.</p>}
+                  {reportResults.length === 0 && <p className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500 print:hidden">No enrolled students are available for this selection.</p>}
+                  {reportResults.length > 0 && reportResults.every((row) => !row.complete) && <p className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500 print:hidden">No complete result cards are available. Incomplete exam records are excluded.</p>}
                   <div className="print:hidden flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4">
                     <p className="w-full text-sm text-slate-600">Bulk printing includes only students with complete published marks. Choose a student for an individual card.</p>
-                    {results.filter((row) => row.complete).map((row) => (
+                    {reportResults.filter((row) => row.complete).map((row) => (
                       <Link key={row.enrollmentId} href={reportUrl(reportType, { examId: examDetails.id, classId: examClass.id, enrollmentId: row.enrollmentId })} className="rounded-lg border px-3 py-2 text-xs font-semibold text-violet-800">{row.name} · Print individually</Link>
                     ))}
                   </div>
@@ -1189,7 +1197,7 @@ export default async function ExaminationReportPage({
                     <div className="overflow-x-auto">
                       <table className="print-report-table w-full border-collapse text-left text-xs">
                         <thead><tr><th>Student</th><th>Section</th><th>Admission no.</th>{previousExams.map((item) => <th key={item.examId}>{item.name}<span className="block font-normal">{item.yearName}</span></th>)}</tr></thead>
-                        <tbody>{results.map((row) => <tr key={row.enrollmentId}><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{previousExams.map((item) => {
+                        <tbody>{reportResults.map((row) => <tr key={row.enrollmentId}><td>{row.name}</td><td>{row.sectionName}</td><td>{row.admissionNumber ?? "—"}</td>{previousExams.map((item) => {
                           const scores = previousScores.get(`${item.examId}:${row.studentId}`) ?? [];
                           const overall = scores.length === previousSubjectCounts.get(item.examId)
                             ? calculateWeightedAverage(scores)

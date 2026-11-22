@@ -118,9 +118,13 @@ const studentSuggestions: WorkspaceSearchResult[] = [
 export function WorkspaceQuickSearch({
   scope = "workspace",
   instanceId = "workspace-quick-search",
+  variant = "default",
+  compactOnMobile = false,
 }: {
   scope?: "workspace" | "teaching" | "student";
   instanceId?: string;
+  variant?: "default" | "hero";
+  compactOnMobile?: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -208,7 +212,11 @@ export function WorkspaceQuickSearch({
     <form
       role="search"
       onSubmit={submitSearch}
-      className="relative mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xl"
+      className={variant === "hero"
+        ? "relative w-full min-w-0"
+        : compactOnMobile
+          ? "relative order-last mx-0 basis-full min-w-0 sm:order-none sm:mx-4 sm:basis-auto sm:flex-1 sm:max-w-xl"
+          : "relative mx-2 min-w-0 flex-1 sm:mx-4 sm:max-w-xl"}
     >
       <label className="sr-only" htmlFor={instanceId}>
         {scope === "student"
@@ -219,8 +227,8 @@ export function WorkspaceQuickSearch({
       </label>
       <Search
         aria-hidden="true"
-        size={17}
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        size={variant === "hero" ? 18 : 17}
+        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-slate-400 ${variant === "hero" ? "left-4" : "left-3"}`}
       />
       <input
         id={instanceId}
@@ -251,7 +259,7 @@ export function WorkspaceQuickSearch({
           : scope === "teaching"
             ? "Search your classes, exams, subjects..."
             : "Search students, staff, library, inventory, fees..."}
-        className="admin-quick-search-input h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
+        className={`admin-quick-search-input ${compactOnMobile || variant === "hero" ? "admin-quick-search-input-wide " : ""}w-full rounded-md border border-slate-300 bg-white pr-10 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${variant === "hero" ? "h-12 pl-11 text-base" : "h-10 pl-10 text-sm"}`}
       />
       {status === "searching" && normalizedQuery.length >= 2 && (
         <LoaderCircle
@@ -265,7 +273,7 @@ export function WorkspaceQuickSearch({
           id={`${instanceId}-results`}
           role="listbox"
           aria-label="Workspace search results"
-          className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(70vh,32rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+          className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(70vh,32rem)] overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-xl"
         >
           {(scope === "student" || normalizedQuery.length < 2) && suggestions.length > 0 ? (
             <>
@@ -283,8 +291,8 @@ export function WorkspaceQuickSearch({
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => openResult(suggestion)}
                   className={`flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition ${
-                    activeIndex === index ? "bg-violet-50" : "hover:bg-violet-50"
-                  } focus-visible:bg-violet-50 focus-visible:outline-none`}
+                    activeIndex === index ? "bg-blue-50" : "hover:bg-blue-50"
+                  } focus-visible:bg-blue-50 focus-visible:outline-none`}
                 >
                   <span className="flex w-full items-center justify-between gap-3">
                     <span className="text-sm font-semibold text-slate-800">{suggestion.title}</span>

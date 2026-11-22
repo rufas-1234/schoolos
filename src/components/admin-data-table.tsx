@@ -481,7 +481,7 @@ export function AdminDataTable({
                 setPage(1);
               }}
               placeholder="Search records..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white sm:w-56"
+              className="w-full rounded-md border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:w-56"
             />
           </label>
           {filters.map((filter) => (

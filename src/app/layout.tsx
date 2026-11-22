@@ -1,18 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import Script from "next/script";
-import { Inter, Open_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 const bodyFont = Inter({
   subsets: ["latin"],
   variable: "--font-body",
-});
-
-const displayFont = Open_Sans({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-  variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -32,18 +26,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`h-full antialiased ${bodyFont.variable} ${displayFont.variable}`}
+      className={`h-full antialiased ${bodyFont.variable}`}
     >
       <body className="min-h-full flex flex-col">
-        <Script id="schoolos-theme-init" strategy="beforeInteractive">
-          {`try {
-  if (window.localStorage.getItem("schoolos-theme") === "dark") {
-    document.documentElement.classList.add("dark");
-  }
-} catch (error) {
-  console.error("Could not load the saved theme preference.", error);
-}`}
-        </Script>
+        <Script src="/schoolos-theme-init.js" strategy="beforeInteractive" />
         {children}
       </body>
     </html>

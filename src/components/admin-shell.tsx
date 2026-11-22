@@ -19,6 +19,7 @@ import {
   LogOut,
   Menu,
   PackageOpen,
+  Search,
   School,
   Settings,
   Users,
@@ -242,6 +243,14 @@ const navigation: NavigationItem[] = [
   },
 ];
 
+const navigationGroups = [
+  { label: "Home", labels: ["Overview"] },
+  { label: "Teaching & learning", labels: ["Academics", "Student Info", "Examinations"] },
+  { label: "People", labels: ["Human resources", "Users"] },
+  { label: "School operations", labels: ["Fees", "Inventory", "Library", "Dormitories"] },
+  { label: "Configuration", labels: ["System", "School profile"] },
+];
+
 export function AdminShell({
   children,
   schoolName,
@@ -274,6 +283,7 @@ export function AdminShell({
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const [rightSidebarQuery, setRightSidebarQuery] = useState("");
   const mobileNavigationRef = useRef<HTMLDivElement>(null);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const closeNavigationRef = useRef<HTMLButtonElement>(null);
@@ -315,6 +325,15 @@ export function AdminShell({
     .map((item) => item.label === "Inventory" && !permissions.includes("inventory.manage")
       ? { ...item, href: "/admin/accounts?section=profit" }
       : item);
+  const rightSidebarItems = visibleNavigation.map((item) => ({
+      ...item,
+      children: item.children?.filter((child) =>
+        (!child.permission || permissions.includes(child.permission)) ||
+        (child.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false),
+      ).map((child) => child.id === "inventory-reports" && !permissions.includes("inventory.manage")
+        ? { ...child, href: "/admin/accounts?section=reports" }
+        : child),
+    }));
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
   const homeHref = permissions.includes("dashboard.view")
     ? "/admin/dashboard"
@@ -491,24 +510,30 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-violet-900/15 bg-[#eadcf4] px-5 py-6">
+    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-200 bg-white px-4 py-5">
       <Link href={homeHref} className="mb-9 flex items-center gap-3 px-1">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/75 text-violet-900 shadow-sm">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f38020] text-white shadow-sm">
           {schoolLogo
-            ? <Image src={schoolLogo} unoptimized width={44} height={44} alt={`${schoolName} logo`} className="h-full w-full rounded-2xl bg-white object-contain" />
+            ? <Image src={schoolLogo} unoptimized width={40} height={40} alt="" className="h-full w-full rounded-xl bg-white object-contain" />
             : <GraduationCap size={24} />}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-bold text-violet-950">{schoolName}</span>
-          <span className="mt-0.5 block text-xs text-violet-900/75">School workspace</span>
+          <span className="block truncate text-sm font-semibold text-slate-900">{schoolName}</span>
+          <span className="mt-0.5 block text-xs text-slate-500">School workspace</span>
         </span>
       </Link>
 
-      <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-900/75">
-        Workspace
-      </p>
-      <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
-        {visibleNavigation.map(({ href, label, icon: Icon, children }) => {
+      <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
+        {navigationGroups.map((group) => {
+          const groupItems = visibleNavigation.filter((item) => group.labels.includes(item.label));
+          if (!groupItems.length) return null;
+          return (
+            <div key={group.label}>
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+        {groupItems.map(({ href, label, icon: Icon, children }) => {
           const nestedNavigationActive = visibleNavigation.some(
             (item) =>
               item.href.startsWith(`${href}/`) &&
@@ -620,10 +645,10 @@ export function AdminShell({
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition",
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition",
                     active
-                      ? "bg-white/85 text-violet-950 shadow-sm"
-                      : "text-violet-950/85 hover:bg-white/50 hover:text-violet-950",
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
                   )}
                 >
                   <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
@@ -634,7 +659,7 @@ export function AdminShell({
                   />
                 </button>
                 {sectionOpen && (
-                  <div className="ml-5 mt-1 space-y-1 border-l border-violet-900/20 pl-3">
+                  <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3">
                     {resolvedSections.map((section) => {
                       if (!section.href) {
                         return (
@@ -642,7 +667,7 @@ export function AdminShell({
                             key={section.id}
                             aria-disabled="true"
                             title={`${section.label} is not available yet`}
-                            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-violet-900/55"
+                            className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm text-slate-400"
                           >
                             {section.label}
                             <span className="text-[10px] font-semibold uppercase tracking-wide">
@@ -666,10 +691,10 @@ export function AdminShell({
                           }}
                           aria-current={sectionActive ? "page" : undefined}
                           className={cn(
-                            "block rounded-lg px-3 py-2 text-sm transition",
+                            "block rounded-md px-3 py-1.5 text-sm transition",
                             sectionActive
-                              ? "bg-white/85 font-semibold text-violet-950 shadow-sm"
-                              : "text-violet-950/85 hover:bg-white/50 hover:text-violet-950",
+                              ? "bg-blue-50 font-medium text-blue-700"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
                           )}
                         >
                           {section.label}
@@ -687,10 +712,10 @@ export function AdminShell({
               href={href}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
                 active
-                  ? "bg-white/85 text-violet-950 shadow-sm"
-                  : "text-violet-950/85 hover:bg-white/50 hover:text-violet-950",
+                  ? "bg-violet-50 text-violet-800"
+                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
               )}
             >
               <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
@@ -699,19 +724,23 @@ export function AdminShell({
             </Link>
           );
         })}
+              </div>
+            </div>
+          );
+        })}
       </nav>
 
       <Link
         href="/guide"
         onClick={() => setOpen(false)}
-        className="mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-violet-950/85 transition hover:bg-white/50 hover:text-violet-950"
+        className="mt-3 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
       >
         <CircleHelp size={18} strokeWidth={1.8} />
         User guide
       </Link>
 
-      <div className="mt-auto flex justify-center border-t border-violet-900/20 pt-4">
-        <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/75 text-xs font-bold text-violet-900" title={schoolName}>
+      <div className="mt-auto flex justify-center border-t border-slate-200 pt-4">
+        <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-xs font-bold text-slate-700" title={schoolName}>
           {schoolLogo
             ? <Image src={schoolLogo} unoptimized width={36} height={36} alt={`${schoolName} logo`} className="h-full w-full object-contain" />
             : schoolMonogram}
@@ -721,7 +750,7 @@ export function AdminShell({
   );
 
   return (
-    <div className="admin-shell-root min-h-dvh bg-[#f7f7fa]">
+    <div className="school-ui-shell admin-shell-root min-h-dvh bg-[#f6f7f9]">
       <header className="admin-print-header" aria-label={`${schoolName} letterhead`}>
         <div className="admin-print-crest" aria-hidden="true">
           {schoolLogo
@@ -770,31 +799,31 @@ export function AdminShell({
         </div>
       )}
 
-      <div className="admin-shell-content lg:pl-[260px]">
-        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-16 items-center justify-between border-b border-violet-900/15 bg-[#eadcf4] px-3 text-violet-950 shadow-sm shadow-violet-950/10 sm:px-5 md:h-[76px] md:px-8">
+      <div className="admin-shell-content lg:pl-[260px] 2xl:pr-[260px]">
+        <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-auto min-h-16 flex-wrap items-center justify-between gap-y-2 border-b border-slate-200 bg-white px-3 py-2 text-slate-900 sm:px-5 md:h-[76px] md:flex-nowrap md:gap-y-0 md:py-0 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
               ref={navigationTriggerRef}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-violet-900 hover:bg-white/50 lg:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 lg:hidden"
               onClick={() => setOpen(true)}
               aria-label="Open navigation"
             >
               <Menu size={20} />
             </button>
-            <div className="hidden items-center gap-2 text-sm text-violet-900/70 sm:flex">
+            <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
               <BookOpen size={16} />
               <span>Administration</span>
               <span>/</span>
-              <span className="font-semibold text-violet-950">{pageLabel}</span>
+              <span className="font-medium text-slate-900">{pageLabel}</span>
             </div>
-            <span className="text-sm font-semibold text-violet-950 sm:hidden">SchoolOS</span>
+            <span className="text-sm font-semibold text-slate-900 sm:hidden">SchoolOS</span>
           </div>
 
-          <WorkspaceQuickSearch />
+          <WorkspaceQuickSearch compactOnMobile />
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <div className="mx-1 hidden h-8 w-px bg-violet-900/15 sm:block" />
+            <div className="mx-1 hidden h-8 w-px bg-slate-200 sm:block" />
             <div className="relative">
               <button
                 className="flex items-center gap-2 rounded-xl p-1.5 pr-2 hover:bg-white/50"
@@ -802,14 +831,14 @@ export function AdminShell({
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-700 text-sm font-bold text-white">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-semibold text-white">
                   {userName.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="hidden max-w-36 text-left sm:block">
-                  <span className="block truncate text-sm font-semibold text-violet-950">{userName}</span>
-                  <span className="block truncate text-xs text-violet-900/70">{roleLabel}</span>
+                  <span className="block truncate text-sm font-medium text-slate-900">{userName}</span>
+                  <span className="block truncate text-xs text-slate-500">{roleLabel}</span>
                 </span>
-                <ChevronDown size={16} className="hidden text-violet-900/70 sm:block" />
+                <ChevronDown size={16} className="hidden text-slate-500 sm:block" />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-12 z-30 w-64 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl">
@@ -882,6 +911,80 @@ export function AdminShell({
         )}
         <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>
+      <aside className="print:hidden fixed inset-y-0 right-0 z-10 hidden w-[260px] flex-col border-l border-slate-200 bg-white px-4 pb-5 pt-[calc(76px+1.25rem)] 2xl:flex">
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-slate-900">Workspace pages</h2>
+          <p className="mt-1 text-xs text-slate-500">Search all available sections</p>
+        </div>
+        <label className="relative mb-4 block">
+          <span className="sr-only">Search quick links</span>
+          <Search aria-hidden="true" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={rightSidebarQuery}
+            onChange={(event) => setRightSidebarQuery(event.target.value)}
+            placeholder="Search pages..."
+            className="h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+        </label>
+        <nav aria-label="Workspace page links" className="admin-sidebar-nav min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pr-1">
+          {navigationGroups.map((group) => {
+            const query = rightSidebarQuery.trim().toLocaleLowerCase();
+            const items = rightSidebarItems
+              .filter((item) => group.labels.includes(item.label))
+              .map((item) => {
+                const parentMatches = !query || item.label.toLocaleLowerCase().includes(query);
+                const children = (item.children ?? []).filter((child) =>
+                  child.href && (!query || parentMatches || child.label.toLocaleLowerCase().includes(query)),
+                );
+                return { item, children, matches: parentMatches || children.length > 0 };
+              })
+              .filter((entry) => entry.matches);
+            if (items.length === 0) return null;
+            return (
+              <section key={group.label}>
+                <h3 className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                  {group.label}
+                </h3>
+                <div className="space-y-1">
+                  {items.map(({ item, children }) => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.label}>
+                        <Link href={item.href} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-950">
+                          <Icon size={15} />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                        {children.length > 0 && (
+                          <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2">
+                            {children.map((child) => (
+                              <Link
+                                key={child.id}
+                                href={child.href!}
+                                onClick={() => document.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach((dialog) => dialog.close())}
+                                className="block rounded-md px-2 py-1 text-xs text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
+                              >
+                                {child.label}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+          {rightSidebarItems.every((item) => {
+            const query = rightSidebarQuery.trim().toLocaleLowerCase();
+            return !item.label.toLocaleLowerCase().includes(query) &&
+              !(item.children ?? []).some((child) => child.label.toLocaleLowerCase().includes(query));
+          }) && (
+            <p className="px-2 py-3 text-xs text-slate-500">No matching links.</p>
+          )}
+        </nav>
+      </aside>
       <footer className="admin-print-footer">
         <span>{schoolName} <span aria-hidden="true">•</span> Official school record</span>
         <span>Handle student information confidentially</span>

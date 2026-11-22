@@ -27,6 +27,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
+import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 
 export default async function DashboardPage() {
   const context = await requireSchoolPermission("dashboard.view");
@@ -169,6 +170,10 @@ export default async function DashboardPage() {
           Configure school
           <ArrowUpRight size={16} />
         </Link>
+      </div>
+
+      <div className="mx-auto w-full max-w-5xl">
+        <WorkspaceQuickSearch instanceId="dashboard-center-search" variant="hero" />
       </div>
 
       {pendingStudentCount > 0 && (
