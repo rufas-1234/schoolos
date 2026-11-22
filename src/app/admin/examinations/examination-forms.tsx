@@ -247,7 +247,7 @@ export function CreateExamTypeForm({ branches }: { branches: Array<{ id: number;
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(createExamType, {});
   return (
     <form action={action} className="mx-auto w-full max-w-3xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-      <h2 className="text-center text-lg font-bold text-slate-900">Create exam type</h2>
+      <h2 className="text-lg font-bold text-slate-900">Create exam type</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <SearchableSelect label="Branch" name="branchId" defaultValue=""
           options={[{ value: "", label: "All branches" }, ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))]}

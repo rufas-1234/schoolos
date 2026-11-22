@@ -575,10 +575,10 @@ export default async function ExaminationsPage({
 
   return (
     <main className="mx-auto max-w-7xl space-y-8 p-6">
-      <header className="text-center">
+      <header>
         <p className="text-sm font-semibold text-violet-700">{context.schoolName} · Examinations</p>
         <h1 className="mt-1 text-3xl font-bold text-slate-950">{sectionTitles[section]}</h1>
-        <p className="mx-auto mt-2 max-w-3xl text-sm text-slate-600">
+        <p className="mt-2 max-w-3xl text-sm text-slate-600">
           {section === "setup"
             ? "Add an exam, set its mark distributions, and manage it from the exam list below."
             : "This section is separate from the other examination features. Choose another item from the Examinations menu on the left."}

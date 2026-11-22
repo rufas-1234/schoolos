@@ -470,6 +470,7 @@ export default async function FeeCollectionPage({
                     <Link href={`/admin/fees/invoices/print?invoiceId=${invoice.publicId}`}>Print invoice</Link>
                   )}
                   <Link href={`/admin/fees/invoices/print?studentId=${invoice.studentId}`}>Print student invoices</Link>
+                  <Link href={`/admin/fees/invoices/statement?studentId=${invoice.studentId}`}>Print consolidated statement</Link>
                   <AdminRecordDialog title={`Edit invoice ${invoice.invoiceNumber}`}>
                     <EditFeeInvoiceForm invoice={{
                       id: invoice.id,

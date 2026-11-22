@@ -1,12 +1,5 @@
 @import "tailwindcss";
 
-.admin-shell-main h1,
-.portal-shell-content h1 {
-  display: block;
-  width: 100%;
-  text-align: center;
-}
-
 :root {
   --background: #f7f7fa;
   --foreground: #20202a;
@@ -2264,6 +2257,76 @@ h6 {
     margin: 0 auto !important;
     padding: 5mm !important;
     color: #172033;
+  }
+
+  .fee-structure-print-page {
+    position: relative !important;
+    inset: auto !important;
+    width: 273mm !important;
+    max-width: 273mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    color: #172033;
+  }
+
+  .fee-structure-print-document {
+    background: white !important;
+  }
+
+  .fee-structure-print-group {
+    border-color: #cbd5e1 !important;
+  }
+
+  .fee-structure-print-group > header {
+    background: #f1f5f9 !important;
+    print-color-adjust: exact;
+  }
+
+  .fee-structure-print-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 8pt;
+  }
+
+  .fee-structure-print-table th,
+  .fee-structure-print-table td {
+    border-bottom: 1px solid #dbe0e9;
+    padding: 2.2mm 1.8mm;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+  }
+
+  .fee-structure-print-table thead {
+    display: table-header-group;
+    background: #ede9fe !important;
+    color: #312e81;
+    print-color-adjust: exact;
+  }
+
+  .fee-structure-print-table tr,
+  .fee-statement-items tbody tr {
+    break-inside: avoid;
+  }
+
+  .fee-statement-card {
+    border-color: #d8deea !important;
+    padding: 5mm !important;
+    box-shadow: none !important;
+  }
+
+  .fee-statement-items {
+    font-size: 8pt;
+  }
+
+  .fee-statement-items th,
+  .fee-statement-items td {
+    padding: 2mm 1.4mm;
+    vertical-align: top;
+  }
+
+  .fee-statement-totals {
+    break-inside: avoid;
   }
 
   .fee-receipt-page {

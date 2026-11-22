@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { db } from "@/db";
 import { AdminRecordDialog } from "@/components/admin-data-table";
 import { TablePagination } from "@/components/table-pagination";
@@ -446,8 +447,15 @@ export default async function FeesSetupPage({
           />
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5">
-            <h2 className="font-semibold text-slate-900">Created fee structures</h2>
-            <p className="mt-1 text-sm text-slate-500">Saved amounts and due dates by branch, class, and academic year.</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-900">Created fee structures</h2>
+                <p className="mt-1 text-sm text-slate-500">Saved amounts and due dates by branch, class, and academic year.</p>
+              </div>
+              <Link href="/admin/fees/structures/print" className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                Print fee structures
+              </Link>
+            </div>
           </div>
           {structures.length ? (
             <div className="divide-y divide-slate-100">
