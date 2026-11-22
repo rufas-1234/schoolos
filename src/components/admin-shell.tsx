@@ -911,7 +911,7 @@ export function AdminShell({
         )}
         <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>
-      <aside className="print:hidden fixed inset-y-0 right-0 z-10 hidden w-[260px] flex-col border-l border-slate-200 bg-white px-4 pb-5 pt-[calc(76px+1.25rem)] 2xl:flex">
+      <aside className="admin-shell-right-sidebar print:hidden fixed inset-y-0 right-0 z-10 hidden w-[260px] flex-col border-l border-slate-200 bg-white px-4 pb-5 pt-[calc(76px+1.25rem)] 2xl:flex">
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-slate-900">Workspace pages</h2>
           <p className="mt-1 text-xs text-slate-500">Search all available sections</p>

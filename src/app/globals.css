@@ -40,6 +40,48 @@
   background-color: #1d1a29;
 }
 
+.dark .admin-shell-right-sidebar {
+  border-color: #3b3150;
+  background-color: #1d1a29;
+  color: #e2e8f0;
+  color-scheme: dark;
+}
+
+.dark .admin-shell-right-sidebar [class*="text-slate-"] {
+  color: #cbd5e1;
+}
+
+.dark .admin-shell-right-sidebar [class~="text-slate-950"],
+.dark .admin-shell-right-sidebar [class~="text-slate-900"],
+.dark .admin-shell-right-sidebar [class~="text-slate-800"] {
+  color: #f1f5f9;
+}
+
+.dark .admin-shell-right-sidebar [class*="border-slate-"] {
+  border-color: #475569;
+}
+
+.dark .admin-shell-right-sidebar [class~="bg-white"],
+.dark .admin-shell-right-sidebar [class~="bg-slate-50"],
+.dark .admin-shell-right-sidebar [class~="bg-slate-100"] {
+  background-color: #1e293b;
+}
+
+.dark .admin-shell-right-sidebar a:hover {
+  background-color: #334155;
+  color: #f8fafc;
+}
+
+.dark .admin-shell-right-sidebar input {
+  border-color: #475569;
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+.dark .admin-shell-right-sidebar input::placeholder {
+  color: #94a3b8;
+}
+
 .dark .admin-shell-topbar {
   border-color: #3b3150;
   background-color: #211d2e;
