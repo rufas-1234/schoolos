@@ -846,7 +846,7 @@ export default async function StudentPortalPage({
                 <h2 className="font-bold text-slate-950">Outstanding fees</h2>
                 <p className="mt-2 text-2xl font-bold text-slate-900">{outstandingByCurrency}</p>
                 <Link href="/portal/student?section=fees" className="mt-3 inline-flex text-sm font-semibold text-violet-700 hover:text-violet-900">
-                  View invoices
+                  View fee statement and invoices
                 </Link>
               </article>
               <nav aria-label="Student portal shortcuts" className="grid gap-2 sm:grid-cols-2 lg:col-span-2">
@@ -1173,6 +1173,58 @@ export default async function StudentPortalPage({
                   Total outstanding: {outstandingByCurrency}
                 </p>
               </div>
+              {linkedStudents.map((student) => {
+                const studentInvoices = invoiceRows.filter((invoice) => invoice.studentId === student.id);
+                if (studentInvoices.length === 0) return null;
+                const totals = new Map<string, { invoiced: number; paid: number; balance: number }>();
+                for (const invoice of studentInvoices) {
+                  const current = totals.get(invoice.currency) ?? { invoiced: 0, paid: 0, balance: 0 };
+                  current.invoiced += Math.max(0, invoice.amountMinor - invoice.discountMinor + invoice.fineMinor);
+                  current.paid += invoice.paidMinor;
+                  current.balance += invoice.balanceMinor;
+                  totals.set(invoice.currency, current);
+                }
+                const printId = `student-fee-statement-${student.id}`;
+                return (
+                  <article key={student.id} id={printId} className="portal-fee-statement space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm sm:p-5">
+                    <header className="flex flex-col gap-4 border-b-2 border-violet-800 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Consolidated fee statement</p>
+                        <h2 className="mt-1 text-xl font-bold text-slate-950">{student.firstName} {student.lastName}</h2>
+                        <p className="mt-1 text-sm text-slate-600">Admission number {student.admissionNumber || "—"} · {studentInvoices.length} generated invoice{studentInvoices.length === 1 ? "" : "s"}</p>
+                        <p className="mt-1 text-xs text-slate-500">{[schoolDetails[0]?.name ?? context.schoolName, schoolDetails[0]?.address, schoolDetails[0]?.phone, schoolDetails[0]?.email].filter(Boolean).join(" · ")}</p>
+                      </div>
+                      <PrintButton targetId={printId} label="Print consolidated statement" pageOrientation="landscape" pageMargin="12mm" />
+                    </header>
+                    <div className="overflow-x-auto">
+                      <table className="portal-fee-statement-table w-full min-w-[760px] border-collapse text-left text-sm">
+                        <thead><tr><th>Invoice / due</th><th>Academic period</th><th>Fee</th><th className="text-right">Invoiced</th><th className="text-right">Paid</th><th className="text-right">Balance</th><th>Status</th></tr></thead>
+                        <tbody>{studentInvoices.map((invoice) => (
+                          <tr key={invoice.id}>
+                            <td><span className="font-semibold">{invoice.invoiceNumber}</span><span className="block text-xs text-slate-500">Due {invoice.dueDate}</span></td>
+                            <td>{invoice.yearName}<span className="block text-xs text-slate-500">{invoice.termName ?? "Full year"} · {invoice.branchName} · {invoice.className} ({invoice.sectionName})</span></td>
+                            <td>{feeDisplayName(invoice.groupName)}<span className="block text-xs text-slate-500">{feeDisplayName(invoice.typeName)}{invoice.discountMinor > 0 ? ` · discount ${invoice.currency} ${(invoice.discountMinor / 100).toFixed(2)}` : ""}{invoice.fineMinor > 0 ? ` · late fine ${invoice.currency} ${(invoice.fineMinor / 100).toFixed(2)}` : ""}</span></td>
+                            <td className="text-right">{invoice.currency} {((invoice.amountMinor - invoice.discountMinor + invoice.fineMinor) / 100).toFixed(2)}</td>
+                            <td className="text-right">{invoice.currency} {(invoice.paidMinor / 100).toFixed(2)}</td>
+                            <td className="text-right font-semibold">{invoice.currency} {(invoice.balanceMinor / 100).toFixed(2)}</td>
+                            <td className="capitalize">{feeInvoiceStatus(invoice.amountMinor - invoice.discountMinor + invoice.fineMinor, invoice.paidMinor) ?? "unpaid"}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                    <section className="portal-fee-statement-totals ml-auto grid max-w-xl grid-cols-[1fr_auto_auto_auto] gap-x-4 gap-y-2 border-t border-slate-200 pt-3 text-right text-xs sm:text-sm">
+                      <span className="text-left font-semibold text-slate-500">Currency</span><span className="font-semibold text-slate-500">Invoiced</span><span className="font-semibold text-slate-500">Paid</span><span className="font-semibold text-slate-500">Balance</span>
+                      {[...totals].map(([currency, values]) => <div key={currency} className="contents">
+                        <span className="text-left font-semibold text-slate-900">{currency}</span>
+                        <span>{currency} {(values.invoiced / 100).toFixed(2)}</span>
+                        <span>{currency} {(values.paid / 100).toFixed(2)}</span>
+                        <strong className="text-slate-950">{currency} {(values.balance / 100).toFixed(2)}</strong>
+                      </div>)}
+                    </section>
+                    <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500">This statement includes generated school invoices and recorded payments. Contact the school office if you believe an entry is incorrect.</footer>
+                  </article>
+                );
+              })}
               <FilterForm
                 name="fees"
                 value={feeFilter}

@@ -2329,6 +2329,49 @@ h6 {
     break-inside: avoid;
   }
 
+  .portal-fee-statement {
+    box-sizing: border-box !important;
+    width: 273mm !important;
+    max-width: 273mm !important;
+    margin: 0 auto !important;
+    border: 0 !important;
+    padding: 5mm !important;
+    background: white !important;
+    box-shadow: none !important;
+    color: #172033;
+  }
+
+  .portal-fee-statement > header {
+    break-inside: avoid;
+  }
+
+  .portal-fee-statement-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 8pt;
+  }
+
+  .portal-fee-statement-table th,
+  .portal-fee-statement-table td {
+    border-bottom: 1px solid #dbe0e9;
+    padding: 2mm 1.5mm;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+  }
+
+  .portal-fee-statement-table thead {
+    display: table-header-group;
+    background: #ede9fe !important;
+    color: #312e81;
+    print-color-adjust: exact;
+  }
+
+  .portal-fee-statement-table tr,
+  .portal-fee-statement-totals {
+    break-inside: avoid;
+  }
+
   .fee-receipt-page {
     position: relative !important;
     inset: auto !important;
