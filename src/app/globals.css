@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+.admin-shell-main h1,
+.portal-shell-content h1 {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
 :root {
   --background: #f7f7fa;
   --foreground: #20202a;

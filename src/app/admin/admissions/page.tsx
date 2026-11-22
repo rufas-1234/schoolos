@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { StudentStatusForm } from "@/app/admin/students/student-status-form";
+import { BulkAdmissionApprovalForm } from "@/app/admin/students/bulk-admission-approval-form";
 
 function uniqueOptions(options: Array<{ value: string; label: string }>) {
   return [...new Map(options.map((option) => [option.value, option])).values()];
@@ -78,6 +79,7 @@ export default async function AdmissionDeskPage() {
     }))),
   }];
   const publicFormPath = `/admission/${context.schoolPublicId}`;
+  const pendingApplicationCount = new Set(records.map((record) => record.publicId)).size;
 
   return (
     <div className="space-y-6">
@@ -152,6 +154,7 @@ export default async function AdmissionDeskPage() {
           };
         })}
         filters={filters}
+        toolbarActions={<BulkAdmissionApprovalForm pendingCount={pendingApplicationCount} />}
         requireSearchCriteria
         emptyMessage="There are no pending admissions to review."
       />

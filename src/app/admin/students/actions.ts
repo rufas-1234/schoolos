@@ -142,6 +142,9 @@ export type StudentActionState = {
   error?: string;
   success?: boolean;
   setupUrls?: string[];
+  message?: string;
+  completed?: number;
+  failures?: string[];
 }
 
 function revalidateStudentPages() {
@@ -1086,6 +1089,60 @@ export async function transitionStudentStatusAction(
   formData: FormData,
 ): Promise<StudentActionState> {
   return transitionStudentStatus(formData);
+}
+
+export async function approveAllPendingAdmissions(
+  _previousState: StudentActionState,
+  _formData: FormData,
+): Promise<StudentActionState> {
+  void _previousState;
+  void _formData;
+  const context = await requireSchoolPermission("students.update");
+  const pendingStudentRows = await db.select({
+    publicId: students.publicId,
+    firstName: students.firstName,
+    lastName: students.lastName,
+  }).from(students).innerJoin(studentEnrollments, and(
+    eq(studentEnrollments.studentId, students.id),
+    eq(studentEnrollments.schoolId, context.schoolId),
+    eq(studentEnrollments.status, "pending"),
+  )).where(and(
+    eq(students.schoolId, context.schoolId),
+    eq(students.status, "pending"),
+  ));
+  const pendingStudents = [...new Map(pendingStudentRows.map((student) => [student.publicId, student])).values()];
+  if (pendingStudents.length === 0) {
+    return { success: true, message: "There are no pending student applications to approve.", completed: 0 };
+  }
+
+  let completed = 0;
+  const failures: string[] = [];
+  const setupUrls: string[] = [];
+  for (const student of pendingStudents) {
+    const formData = new FormData();
+    formData.set("publicId", student.publicId);
+    formData.set("nextStatus", "admitted");
+    const name = `${student.firstName} ${student.lastName}`;
+    try {
+      const result = await transitionStudentStatus(formData);
+      if (!result.success) {
+        failures.push(`${name}: ${result.error ?? "Could not approve this application."}`);
+        continue;
+      }
+      completed += 1;
+      setupUrls.push(...(result.setupUrls ?? []));
+    } catch (error) {
+      failures.push(`${name}: ${error instanceof Error ? error.message : "Could not approve this application."}`);
+    }
+  }
+
+  return {
+    success: completed > 0,
+    completed,
+    failures: failures.slice(0, 20),
+    setupUrls,
+    message: `Approved ${completed} of ${pendingStudents.length} pending student applications.${failures.length > 20 ? ` ${failures.length - 20} more errors were not listed.` : ""}`,
+  };
 }
 
 export async function transitionStudentStatusDirect(formData: FormData): Promise<void> {

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { AdminActionDialog } from "@/components/admin-data-table";
 import { AccountSetupLink } from "@/components/account-setup-link";
 import {
+  approveAllPendingStaffApplications,
   reviewPublicStaffApplication,
   type StaffActionState,
 } from "@/app/admin/staff/actions";
@@ -85,6 +86,40 @@ export function StaffApplicationReviewActions({
           {status === "pending" && <ReviewDecisionForm publicId={publicId} decision="reject" label="Reject" />}
         </>
       )}
+    </div>
+  );
+}
+
+export function BulkStaffApplicationApprovalForm({ pendingCount }: { pendingCount: number }) {
+  const [state, action, pending] = useActionState<StaffActionState, FormData>(
+    approveAllPendingStaffApplications,
+    {},
+  );
+  return (
+    <div className="min-w-48 space-y-2">
+      <form action={action} onSubmit={(event) => {
+        if (!window.confirm(`Approve all ${pendingCount} pending staff applications and add those applicants to the staff directory?`)) {
+          event.preventDefault();
+        }
+      }}>
+        <button type="submit" disabled={pending || pendingCount === 0}
+          className="inline-flex w-full items-center justify-center border border-emerald-700 bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
+          {pending ? "Approving staff..." : `Approve all pending (${pendingCount})`}
+        </button>
+      </form>
+      {state.message && <p role="status" className="max-w-80 text-xs text-slate-600">{state.message}</p>}
+      {state.failures?.map((failure) => <p key={failure} role="alert" className="max-w-80 text-xs text-rose-700">{failure}</p>)}
+      {state.setupLinks?.length ? (
+        <div className="space-y-2 border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold text-amber-950">Save and share these one-time staff setup links securely.</p>
+          {state.setupLinks.map(({ applicantName, url }) => (
+            <div key={url} className="space-y-1">
+              <p className="text-xs font-medium text-amber-950">{applicantName}</p>
+              <AccountSetupLink url={url} />
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

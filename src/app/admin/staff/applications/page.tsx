@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { staffApplications } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { staffSettingFields } from "@/lib/staff-settings";
-import { StaffApplicationReviewActions } from "./review-actions";
+import { BulkStaffApplicationApprovalForm, StaffApplicationReviewActions } from "./review-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +95,7 @@ export default async function StaffApplicationsPage({
           { key: "submitted", label: "Submitted" },
         ]}
         rows={rows}
+        toolbarActions={<BulkStaffApplicationApprovalForm pendingCount={applications.filter((application) => application.status === "pending").length} />}
         initialQuery={typeof search === "string" ? search.slice(0, 200) : ""}
         filters={[{
           key: "status",

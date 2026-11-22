@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -52,7 +52,15 @@ import {
   staffStatuses,
 } from "@/lib/staff-policy";
 
-export type StaffActionState = { error?: string; success?: boolean; message?: string; setupUrl?: string };
+export type StaffActionState = {
+  error?: string;
+  success?: boolean;
+  message?: string;
+  setupUrl?: string;
+  completed?: number;
+  failures?: string[];
+  setupLinks?: { applicantName: string; url: string }[];
+};
 
 type StaffTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type TeacherStaffData = {
@@ -1290,6 +1298,56 @@ export async function reviewPublicStaffApplication(
     success: true,
     message: created.message,
     ...(created.setupUrl ? { setupUrl: created.setupUrl } : {}),
+  };
+}
+
+export async function approveAllPendingStaffApplications(
+  _previousState: StaffActionState,
+  _formData: FormData,
+): Promise<StaffActionState> {
+  void _previousState;
+  void _formData;
+  const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const applications = await db.select({
+    publicId: staffApplications.publicId,
+    applicationData: staffApplications.applicationData,
+  }).from(staffApplications).where(and(
+    eq(staffApplications.schoolId, context.schoolId),
+    eq(staffApplications.status, "pending"),
+  )).orderBy(asc(staffApplications.id));
+
+  if (applications.length === 0) {
+    return { success: true, completed: 0, message: "There are no pending staff applications to approve." };
+  }
+
+  let completed = 0;
+  const failures: string[] = [];
+  const setupLinks: { applicantName: string; url: string }[] = [];
+  for (const application of applications) {
+    const applicantName = [application.applicationData.firstName, application.applicationData.lastName]
+      .filter(Boolean).join(" ") || "Applicant";
+    const formData = new FormData();
+    formData.set("applicationPublicId", application.publicId);
+    formData.set("decision", "approve");
+    try {
+      const result = await reviewPublicStaffApplication({}, formData);
+      if (!result.success) {
+        failures.push(`${applicantName}: ${result.error ?? "Could not approve this application."}`);
+        continue;
+      }
+      completed += 1;
+      if (result.setupUrl) setupLinks.push({ applicantName, url: result.setupUrl });
+    } catch (error) {
+      failures.push(`${applicantName}: ${error instanceof Error ? error.message : "Could not approve this application."}`);
+    }
+  }
+
+  return {
+    success: completed > 0,
+    completed,
+    failures: failures.slice(0, 20),
+    setupLinks,
+    message: `Approved ${completed} of ${applications.length} pending staff applications.${failures.length > 20 ? ` ${failures.length - 20} more errors were not listed.` : ""}`,
   };
 }
 
