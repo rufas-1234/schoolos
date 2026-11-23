@@ -1,6 +1,6 @@
 "use server";
 
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -76,16 +76,12 @@ export async function createSchoolAccount(
     return { error: "One or more selected roles are unavailable for this school." };
   }
 
-  const temporaryPassword = parsed.data.personType === "student"
-    ? randomBytes(12).toString("base64url")
-    : undefined;
-  const passwordHash = parsed.data.personType === "parent"
-    ? await hashPassword(parsed.data.password!)
-    : temporaryPassword
-      ? await hashPassword(temporaryPassword)
-      : null;
-  let setupUrl: string | undefined;
+  let temporaryPassword: string | undefined;
   let temporaryUsername: string | undefined;
+  let passwordHash = parsed.data.personType === "parent"
+    ? await hashPassword(parsed.data.password!)
+    : null;
+  let setupUrl: string | undefined;
   let phoneIdentifierUnavailable = false;
   try {
     const outcome = await db.transaction(async (tx) => {
@@ -93,6 +89,7 @@ export async function createSchoolAccount(
       let email = "";
       let identifier: string | null = null;
       let identifierKind = "";
+      let additionalPhoneIdentifier: string | null = null;
       let linkedStaffId: number | null = null;
       let linkedStudentIds: number[] = [];
 
@@ -103,6 +100,7 @@ export async function createSchoolAccount(
           lastName: staffMembers.lastName,
           email: staffMembers.email,
           phone: staffMembers.phone,
+          employeeCode: staffMembers.employeeCode,
           linkedUserId: staffMembers.linkedUserId,
         }).from(staffMembers)
           .where(and(
@@ -115,13 +113,17 @@ export async function createSchoolAccount(
         if (!staff) return "profile-not-found";
         if (staff.linkedUserId) return "profile-linked";
         if (!staff.email?.trim()) return "email-required";
+        if (!staff.employeeCode?.trim()) return "staff-number-required";
         name = `${staff.firstName} ${staff.lastName}`;
         email = staff.email.trim().toLowerCase();
         linkedStaffId = staff.id;
+        identifier = staff.employeeCode.trim().toLocaleUpperCase();
+        temporaryUsername = identifier;
+        temporaryPassword = `Staff@${identifier}`;
+        identifierKind = "staff_employee_code";
         if (staff.phone?.trim()) {
-          identifier = normalizePhoneIdentifier(staff.phone);
-          if (!identifier) return "invalid-phone";
-          identifierKind = "staff_phone";
+          additionalPhoneIdentifier = normalizePhoneIdentifier(staff.phone);
+          if (!additionalPhoneIdentifier) return "invalid-phone";
         }
       } else if (parsed.data.personType === "student") {
         const [student] = await tx.select({
@@ -143,6 +145,7 @@ export async function createSchoolAccount(
         email = generatedAccountEmail("student", context.schoolId, student.id);
         identifier = student.admissionNumber.trim().toLocaleUpperCase();
         temporaryUsername = identifier;
+        temporaryPassword = `Student@${identifier}`;
         identifierKind = "student_admission";
         linkedStudentIds = [student.id];
       } else {
@@ -227,13 +230,15 @@ export async function createSchoolAccount(
         .limit(1);
       if (existingEmail) return "email-in-use";
 
+      if (temporaryPassword) passwordHash = await hashPassword(temporaryPassword);
+
       const userId = randomUUID();
       await tx.insert(user).values({
         id: userId,
         name,
         email,
         emailVerified: false,
-        isActive: parsed.data.personType === "parent",
+        isActive: parsed.data.personType === "parent" || Boolean(temporaryPassword),
         mustChangePassword: Boolean(temporaryPassword),
       });
       if (passwordHash) {
@@ -269,6 +274,25 @@ export async function createSchoolAccount(
           kind: identifierKind,
           identifier,
         });
+      }
+      if (additionalPhoneIdentifier) {
+        const [phoneOwner] = await tx.select({ userId: userLoginIdentifiers.userId })
+          .from(userLoginIdentifiers)
+          .where(and(
+            eq(userLoginIdentifiers.schoolId, context.schoolId),
+            eq(userLoginIdentifiers.identifier, additionalPhoneIdentifier),
+          ))
+          .limit(1);
+        if (!phoneOwner) {
+          await tx.insert(userLoginIdentifiers).values({
+            schoolId: context.schoolId,
+            userId,
+            kind: "staff_phone",
+            identifier: additionalPhoneIdentifier,
+          });
+        } else if (phoneOwner.userId !== userId) {
+          phoneIdentifierUnavailable = true;
+        }
       }
       if (linkedStaffId !== null) {
         await tx.update(staffMembers)
@@ -311,6 +335,7 @@ export async function createSchoolAccount(
     if (outcome === "profile-linked") return { error: "That staff profile is already linked to a login account." };
     if (outcome === "email-required") return { error: "Add an email address to the staff profile before creating its login." };
     if (outcome === "admission-required") return { error: "Add an admission number to the student profile before creating its login." };
+    if (outcome === "staff-number-required") return { error: "Add a staff number to this profile before creating its login." };
     if (outcome === "parent-contact-required") return { error: "The selected parent login method is not available on this student profile." };
     if (outcome === "invalid-phone") return { error: "The profile phone number must include 7–15 digits to be used for login." };
     if (outcome === "student-account-exists") {
@@ -342,16 +367,16 @@ export async function createSchoolAccount(
   return {
     success: true,
     ...(temporaryPassword
-      ? { message: "Student account created. Share this temporary password privately; the student must change it at first sign-in." }
+      ? { message: `Account created. Share this temporary password privately; the ${parsed.data.personType} must change it at first sign-in.` }
       : {}),
     ...(setupUrl ? { setupUrl } : {}),
     ...(temporaryPassword ? { temporaryPassword } : {}),
-    ...(temporaryPassword && parsed.data.personType === "student"
+    ...(temporaryPassword
       ? { temporaryUsername }
       : {}),
     ...(phoneIdentifierUnavailable
       ? {
-        message: "Account created and linked. The phone number is already used by another login, so this staff account must sign in with its profile email.",
+        message: "Account created and linked. The phone number is already used by another login, so this staff member should sign in with their staff number or email.",
       }
       : {}),
   };

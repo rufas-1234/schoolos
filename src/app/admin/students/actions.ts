@@ -1,6 +1,6 @@
 "use server";
 
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -975,7 +975,7 @@ export async function transitionStudentStatus(formData: FormData): Promise<Stude
         if (existingEmail) return "account-conflict";
 
         const userId = randomUUID();
-        const temporaryPassword = randomBytes(12).toString("base64url");
+        const temporaryPassword = `Student@${admissionIdentifier}`;
         const passwordHash = await hashPassword(temporaryPassword);
         await tx.insert(user).values({
           id: userId,

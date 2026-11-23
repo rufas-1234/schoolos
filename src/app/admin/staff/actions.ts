@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { and, asc, count, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -57,9 +58,11 @@ export type StaffActionState = {
   success?: boolean;
   message?: string;
   setupUrl?: string;
+  temporaryPassword?: string;
+  temporaryUsername?: string;
   completed?: number;
   failures?: string[];
-  setupLinks?: { applicantName: string; url: string }[];
+  temporaryCredentials?: { applicantName: string; staffNumber: string; password: string }[];
 };
 
 type StaffTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -334,6 +337,7 @@ type StaffLoginResult = {
   emailChanged: boolean;
   passwordChanged: boolean;
   setupUrl: string | null;
+  temporaryPassword: string | null;
 };
 
 async function applyStaffLoginAccess(
@@ -390,6 +394,7 @@ async function applyStaffLoginAccess(
       emailChanged,
       passwordChanged: false,
       setupUrl: null,
+      temporaryPassword: null,
     };
   }
 
@@ -427,17 +432,28 @@ async function applyStaffLoginAccess(
   const emailChanged = Boolean(accountUser && email && accountUser.email.toLowerCase() !== email);
   let passwordChanged = false;
   let setupUrl: string | null = null;
+  let temporaryPassword: string | null = null;
   if (!userId) {
     if (!email) throw new StaffLoginError("Enter an email before creating a staff login this way.");
+    const staffNumber = normalizeAdmissionIdentifier(staff.employeeCode);
+    if (!staffNumber) throw new StaffLoginError("A staff number is required before creating a login.");
+    temporaryPassword = `Staff@${staffNumber}`;
     userId = randomUUID();
     await tx.insert(user).values({
       id: userId,
       name: `${staff.firstName} ${staff.lastName}`,
       email,
       emailVerified: false,
-      isActive: false,
+      isActive: true,
+      mustChangePassword: true,
     });
-    setupUrl = await issuePasswordSetupLink(tx, userId);
+    await tx.insert(authAccount).values({
+      id: randomUUID(),
+      accountId: userId,
+      providerId: "credential",
+      userId,
+      password: await hashPassword(temporaryPassword),
+    });
     passwordChanged = true;
   } else {
     const [credentialAccount] = await tx.select({ id: authAccount.id })
@@ -448,8 +464,21 @@ async function applyStaffLoginAccess(
       ))
       .for("update")
       .limit(1);
-    if (staff.issuePasswordSetup || !credentialAccount) {
+    if (staff.issuePasswordSetup) {
       setupUrl = await issuePasswordSetupLink(tx, userId);
+      passwordChanged = true;
+    } else if (!credentialAccount) {
+      const staffNumber = normalizeAdmissionIdentifier(staff.employeeCode);
+      if (!staffNumber) throw new StaffLoginError("A staff number is required before creating a login.");
+      temporaryPassword = `Staff@${staffNumber}`;
+      await tx.insert(authAccount).values({
+        id: randomUUID(),
+        accountId: userId,
+        providerId: "credential",
+        userId,
+        password: await hashPassword(temporaryPassword),
+      });
+      await tx.update(user).set({ isActive: true, mustChangePassword: true }).where(eq(user.id, userId));
       passwordChanged = true;
     }
   }
@@ -546,6 +575,7 @@ async function applyStaffLoginAccess(
     emailChanged,
     passwordChanged,
     setupUrl,
+    temporaryPassword,
   };
 }
 
@@ -606,6 +636,7 @@ async function ensureStaffAccount(
   const email = staff.email?.trim().toLowerCase() || `staff-${schoolId}-${staff.id}@accounts.schoolos.invalid`;
   let userId = accountUser?.id;
   let setupUrl: string | null = null;
+  let temporaryPassword: string | null = null;
   if (!userId) {
     const [emailOwner] = await tx.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1);
     if (emailOwner) throw new StaffLoginError("The email assigned to this staff member is already attached to another account.");
@@ -615,7 +646,8 @@ async function ensureStaffAccount(
       name: `${staff.firstName} ${staff.lastName}`,
       email,
       emailVerified: false,
-      isActive: false,
+      isActive: true,
+      mustChangePassword: true,
     });
   }
 
@@ -624,7 +656,17 @@ async function ensureStaffAccount(
     .where(and(eq(authAccount.userId, userId), eq(authAccount.providerId, "credential")))
     .for("update")
     .limit(1);
-  if (!credential) setupUrl = await issuePasswordSetupLink(tx, userId);
+  if (!credential) {
+    temporaryPassword = `Staff@${identifier}`;
+    await tx.insert(authAccount).values({
+      id: randomUUID(),
+      accountId: userId,
+      providerId: "credential",
+      userId,
+      password: await hashPassword(temporaryPassword),
+    });
+    await tx.update(user).set({ isActive: true, mustChangePassword: true }).where(eq(user.id, userId));
+  }
 
   const [otherSchoolMembership] = await tx.select({ id: schoolMemberships.id })
     .from(schoolMemberships)
@@ -688,17 +730,17 @@ async function ensureStaffAccount(
   await tx.update(staffMembers)
     .set({ linkedUserId: userId })
     .where(and(eq(staffMembers.id, staff.id), eq(staffMembers.schoolId, schoolId)));
-  if (setupUrl) {
+  if (setupUrl || temporaryPassword) {
     await tx.insert(auditLogs).values({
       schoolId,
       actorUserId,
       action: "staff.login_access.automatically_enabled",
       resourceType: "staff_member",
       resourcePublicId: staff.publicId,
-      changedFields: ["linkedUserId", "schoolMembership.status", "credential.password", "user.isActive", "staffEmployeeCode"],
+      changedFields: ["linkedUserId", "schoolMembership.status", "credential.password", "user.isActive", "user.mustChangePassword", "staffEmployeeCode"],
     });
   }
-  return setupUrl;
+  return { setupUrl, temporaryPassword };
 }
 
 async function syncStaffNumberIdentifier(
@@ -994,14 +1036,14 @@ export async function createStaffMember(
   }
   const publicId = applicationPublicId ?? randomUUID();
   const employeeCode = staff.employeeCode || `STF-${publicId.slice(0, 8).toLocaleUpperCase()}`;
-  let accountOutcome: { setupUrl: string | null } = { setupUrl: null };
+  let accountOutcome: { setupUrl: string | null; temporaryPassword: string | null } = { setupUrl: null, temporaryPassword: null };
   try {
     accountOutcome = await db.transaction(async (tx) => {
       const loginResult = await applyStaffLoginAccess(
         tx,
         context.schoolId,
         context.user.id,
-        staff,
+        { ...staff, employeeCode },
         null,
       );
       await tx.insert(staffMembers).values({
@@ -1054,7 +1096,7 @@ export async function createStaffMember(
         .where(and(eq(staffMembers.schoolId, context.schoolId), eq(staffMembers.publicId, publicId)))
         .limit(1);
       if (!createdStaff) throw new Error("Unable to load the newly created staff record.");
-      const generatedSetupUrl = await ensureStaffAccount(tx, context.schoolId, context.user.id, {
+      const ensuredAccount = await ensureStaffAccount(tx, context.schoolId, context.user.id, {
         id: createdStaff.id,
         publicId: createdStaff.publicId,
         employeeCode,
@@ -1133,7 +1175,10 @@ export async function createStaffMember(
         publicId,
         loginResult,
       );
-      return { setupUrl: loginResult.setupUrl ?? generatedSetupUrl };
+      return {
+        setupUrl: loginResult.setupUrl ?? ensuredAccount.setupUrl,
+        temporaryPassword: loginResult.temporaryPassword ?? ensuredAccount.temporaryPassword,
+      };
     });
   } catch (error) {
     if (error instanceof TeacherSyncError) return { error: error.message };
@@ -1162,8 +1207,11 @@ export async function createStaffMember(
     : `Generated staff number: ${employeeCode}.`;
   return {
     success: true,
-    message: `${accountText} Sign-in username: ${employeeCode}.`,
+    message: `${accountText} Sign-in username: ${employeeCode}.${accountOutcome.temporaryPassword ? " Share the temporary password privately; they must change it at first sign-in." : ""}`,
     ...(accountOutcome.setupUrl ? { setupUrl: accountOutcome.setupUrl } : {}),
+    ...(accountOutcome.temporaryPassword
+      ? { temporaryPassword: accountOutcome.temporaryPassword, temporaryUsername: employeeCode }
+      : {}),
   };
 }
 
@@ -1298,6 +1346,9 @@ export async function reviewPublicStaffApplication(
     success: true,
     message: created.message,
     ...(created.setupUrl ? { setupUrl: created.setupUrl } : {}),
+    ...(created.temporaryPassword
+      ? { temporaryPassword: created.temporaryPassword, temporaryUsername: created.temporaryUsername }
+      : {}),
   };
 }
 
@@ -1322,7 +1373,7 @@ export async function approveAllPendingStaffApplications(
 
   let completed = 0;
   const failures: string[] = [];
-  const setupLinks: { applicantName: string; url: string }[] = [];
+  const temporaryCredentials: { applicantName: string; staffNumber: string; password: string }[] = [];
   for (const application of applications) {
     const applicantName = [application.applicationData.firstName, application.applicationData.lastName]
       .filter(Boolean).join(" ") || "Applicant";
@@ -1336,7 +1387,13 @@ export async function approveAllPendingStaffApplications(
         continue;
       }
       completed += 1;
-      if (result.setupUrl) setupLinks.push({ applicantName, url: result.setupUrl });
+      if (result.temporaryPassword && result.temporaryUsername) {
+        temporaryCredentials.push({
+          applicantName,
+          staffNumber: result.temporaryUsername,
+          password: result.temporaryPassword,
+        });
+      }
     } catch (error) {
       failures.push(`${applicantName}: ${error instanceof Error ? error.message : "Could not approve this application."}`);
     }
@@ -1346,7 +1403,7 @@ export async function approveAllPendingStaffApplications(
     success: completed > 0,
     completed,
     failures: failures.slice(0, 20),
-    setupLinks,
+    temporaryCredentials,
     message: `Approved ${completed} of ${applications.length} pending staff applications.${failures.length > 20 ? ` ${failures.length - 20} more errors were not listed.` : ""}`,
   };
 }
@@ -1377,6 +1434,8 @@ export async function updateStaffMember(
     return { error: "Select an active account belonging to this school." };
   }
   let setupUrl: string | null = null;
+  let temporaryPassword: string | null = null;
+  let temporaryUsername: string | null = null;
   try {
     const outcome = await db.transaction(async (tx) => {
       const [existing] = await tx
@@ -1396,14 +1455,14 @@ export async function updateStaffMember(
         .for("update")
         .limit(1);
       if (!existing) return false;
+      const employeeCode = staff.employeeCode || existing.employeeCode || `STF-${publicId.data.slice(0, 8).toLocaleUpperCase()}`;
       const loginResult = await applyStaffLoginAccess(
         tx,
         context.schoolId,
         context.user.id,
-        staff,
+        { ...staff, employeeCode },
         existing.linkedUserId,
       );
-      const employeeCode = staff.employeeCode || existing.employeeCode || `STF-${publicId.data.slice(0, 8).toLocaleUpperCase()}`;
       if (loginResult.linkedUserId) {
         await syncStaffNumberIdentifier(
           tx,
@@ -1529,11 +1588,13 @@ export async function updateStaffMember(
         publicId.data,
         loginResult,
       );
-      return loginResult.setupUrl;
+      return { ...loginResult, employeeCode };
     });
 
     if (outcome === false) return { error: "Staff record was not found in this school." };
-    setupUrl = outcome;
+    setupUrl = outcome.setupUrl;
+    temporaryPassword = outcome.temporaryPassword;
+    temporaryUsername = outcome.employeeCode;
   } catch (error) {
     if (error instanceof TeacherSyncError) return { error: error.message };
     if (error instanceof StaffLoginError) return { error: error.message };
@@ -1559,6 +1620,9 @@ export async function updateStaffMember(
   return {
     success: true,
     ...(setupUrl ? { setupUrl } : {}),
+    ...(temporaryPassword
+      ? { temporaryPassword, temporaryUsername: temporaryUsername ?? undefined }
+      : {}),
   };
 }
 

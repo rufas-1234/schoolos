@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { AdminActionDialog } from "@/components/admin-data-table";
 import { AccountSetupLink } from "@/components/account-setup-link";
+import { AccountTemporaryPassword } from "@/components/account-temporary-password";
 import {
   approveAllPendingStaffApplications,
   reviewPublicStaffApplication,
@@ -40,6 +41,7 @@ function ReviewDecisionForm({
           <p role="status" className="break-words text-xs text-slate-600">
             {state.message ?? `Application ${decision === "approve" ? "approved" : "rejected"}.`}
           </p>
+          {state.temporaryPassword && <AccountTemporaryPassword accountType="staff" username={state.temporaryUsername} password={state.temporaryPassword} />}
           {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
         </div>
       )}
@@ -109,13 +111,13 @@ export function BulkStaffApplicationApprovalForm({ pendingCount }: { pendingCoun
       </form>
       {state.message && <p role="status" className="max-w-80 text-xs text-slate-600">{state.message}</p>}
       {state.failures?.map((failure) => <p key={failure} role="alert" className="max-w-80 text-xs text-rose-700">{failure}</p>)}
-      {state.setupLinks?.length ? (
+      {state.temporaryCredentials?.length ? (
         <div className="space-y-2 border border-amber-200 bg-amber-50 p-3">
-          <p className="text-xs font-semibold text-amber-950">Save and share these one-time staff setup links securely.</p>
-          {state.setupLinks.map(({ applicantName, url }) => (
-            <div key={url} className="space-y-1">
+          <p className="text-xs font-semibold text-amber-950">Share each staff number and temporary password privately. They must change the password at first sign-in.</p>
+          {state.temporaryCredentials.map(({ applicantName, staffNumber, password }) => (
+            <div key={staffNumber} className="space-y-1">
               <p className="text-xs font-medium text-amber-950">{applicantName}</p>
-              <AccountSetupLink url={url} />
+              <AccountTemporaryPassword accountType="staff" username={staffNumber} password={password} />
             </div>
           ))}
         </div>

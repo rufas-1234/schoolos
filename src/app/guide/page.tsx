@@ -64,7 +64,7 @@ export default function GuidePage() {
             </div>
 
             <GuideSection id="start" title="1. Start here">
-              <p>SchoolOS is organized around a school workspace. Sign in at <Link className="font-semibold text-violet-700 underline" href="/login">the login page</Link> with your email, phone number, or (for some school accounts) admission or staff identifier and password. Your landing page is chosen from your role and linked profile: administrators see the administration workspace; teachers, students, and parents may be directed to their portal.</p>
+              <p>SchoolOS is organized around a school workspace. Sign in at <Link className="font-semibold text-violet-700 underline" href="/login">the login page</Link> with your email, phone number, admission number, or staff number and password. New students receive a temporary password in the form <strong>Student@admission-number</strong>; new staff receive <strong>Staff@staff-number</strong>. Change it at first sign-in. Your landing page is chosen from your role and linked profile: administrators see the administration workspace; teachers, students, and parents may be directed to their portal.</p>
               <ol className="space-y-3">
                 <Step n={1}>Ask your school administrator to create your login and tell you which identifier to use.</Step>
                 <Step n={2}>Sign in. If you belong to more than one school, choose the correct school workspace from the account menu.</Step>

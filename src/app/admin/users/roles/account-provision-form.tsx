@@ -12,6 +12,7 @@ type ProfileOption = {
   email?: string | null;
   phone?: string | null;
   admissionNumber?: string | null;
+  employeeCode?: string | null;
   childName?: string;
 };
 
@@ -53,7 +54,7 @@ export function AccountProvisionForm({
       <div>
         <h2 className="font-semibold text-slate-900">Create a login account</h2>
         <p className="mt-1 text-sm leading-5 text-slate-500">
-          Select an existing school profile and assign its school roles. Student accounts receive a temporary password; staff receive a one-time setup link.
+          Select an existing school profile and assign its school roles. New student and staff accounts receive a temporary password based on their school number.
         </p>
       </div>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
@@ -113,12 +114,12 @@ export function AccountProvisionForm({
       </label>
       {personType === "staff" && (
         <p className="rounded-xl bg-violet-50 px-3 py-2.5 text-xs leading-5 text-violet-900">
-          Staff sign in with profile email or phone. Teachers also need the Teacher role and teaching assignments.
+          Staff sign in with their staff number and the temporary password Staff@staff-number. They must change it at first sign-in. Teachers also need the Teacher role and teaching assignments.
         </p>
       )}
       {personType === "student" && (
         <p className="rounded-xl bg-violet-50 px-3 py-2.5 text-xs leading-5 text-violet-900">
-          Students sign in with their admission number; portal access links to the selected record.
+          Students sign in with their admission number and temporary password Student@admission-number. They must change it at first sign-in; portal access links to the selected record.
         </p>
       )}
       {personType === "parent" && (
@@ -208,7 +209,7 @@ export function AccountProvisionForm({
       )}
       {state.error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{state.error}</p>}
       {state.success && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{state.message ?? "Account created and linked successfully."}</p>}
-      {state.temporaryPassword && <AccountTemporaryPassword password={state.temporaryPassword} username={state.temporaryUsername} />}
+      {state.temporaryPassword && <AccountTemporaryPassword accountType={personType === "staff" ? "staff" : "student"} password={state.temporaryPassword} username={state.temporaryUsername} />}
       {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
       <button
         disabled={pending || roles.length === 0 || profiles.length === 0}

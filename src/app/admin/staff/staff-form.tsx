@@ -12,6 +12,7 @@ import {
 } from "react";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 import { AccountSetupLink } from "@/components/account-setup-link";
+import { AccountTemporaryPassword } from "@/components/account-temporary-password";
 import { createStaffMember, updateStaffMember, type StaffActionState } from "./actions";
 import type { StaffCustomField, StaffDocuments, StaffStoredFile } from "@/db/schema";
 import { employmentTypes, staffContractTypes, staffGenders, staffMaritalStatuses, staffRoles } from "@/lib/staff-policy";
@@ -212,7 +213,7 @@ export function StaffForm({
               <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/70 p-4 text-sm text-slate-700">
                 <p className="font-semibold text-slate-900">A staff login is created automatically</p>
                 <p className="mt-1 leading-6">
-                  Username: staff number (generated if blank). A one-time password setup link will appear after saving.
+                  Username: staff number (generated if blank). Temporary password: Staff@staff-number. It is shown after saving and must be changed at first sign-in.
                 </p>
               </div>
             ) : (
@@ -367,6 +368,9 @@ export function StaffForm({
             <p role="status" className="text-sm font-medium text-emerald-700">
               {state.message ?? `Staff profile saved.${loginAccessEnabled ? " Assign the school role under User Roles before the staff member signs in." : ""}`}
             </p>
+            {state.temporaryPassword && (
+              <AccountTemporaryPassword accountType="staff" username={state.temporaryUsername} password={state.temporaryPassword} />
+            )}
             {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
           </div>
         )}

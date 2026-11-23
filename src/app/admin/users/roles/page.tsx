@@ -93,6 +93,7 @@ export default async function UserRolesPage({
       lastName: staffMembers.lastName,
       email: staffMembers.email,
       phone: staffMembers.phone,
+      employeeCode: staffMembers.employeeCode,
     }).from(staffMembers)
       .where(and(
         eq(staffMembers.schoolId, context.schoolId),
