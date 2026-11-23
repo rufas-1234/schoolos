@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, LockKeyhole, Mail } from "lucide-react";
+import { KeyRound, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getSignedInWorkspacePath } from "./actions";
@@ -14,9 +14,6 @@ export function LoginForm() {
   const emailRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [emailCodeMode, setEmailCodeMode] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
-  const [codeEmail, setCodeEmail] = useState("");
 
   async function finishSignIn() {
     try {
@@ -53,58 +50,8 @@ export function LoginForm() {
     }
   }
 
-  async function handleSendCode(formData: FormData) {
-    setPending(true);
-    setError("");
-    const email = String(formData.get("email") ?? "").trim().toLowerCase();
-
-    try {
-      const response = await fetch("/api/auth/email-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", email }),
-      });
-      if (!response.ok) {
-        const result = await response.json().catch(() => null) as { error?: string } | null;
-        setError(result?.error ?? "The sign-in code could not be sent. Try again in a moment.");
-        return;
-      }
-      setCodeEmail(email);
-      setCodeSent(true);
-    } catch {
-      setError("The sign-in code could not be sent. Check your connection and try again.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function handleVerifyCode(formData: FormData) {
-    setPending(true);
-    setError("");
-    const email = String(formData.get("email") ?? "").trim().toLowerCase();
-    const token = String(formData.get("token") ?? "").trim();
-
-    try {
-      const response = await fetch("/api/auth/email-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", email, token }),
-      });
-      if (!response.ok) {
-        const result = await response.json().catch(() => null) as { error?: string } | null;
-        setError(result?.error ?? "That code is invalid or expired. Request a new code and try again.");
-        return;
-      }
-      await finishSignIn();
-    } catch {
-      setError("That code could not be verified. Request a new code and try again.");
-    } finally {
-      setPending(false);
-    }
-  }
-
   async function handleGoogleSignIn() {
-    const email = (emailRef.current?.value || codeEmail).trim().toLowerCase();
+    const email = (emailRef.current?.value ?? "").trim().toLowerCase();
     if (!email.includes("@")) {
       setError("Enter your SchoolOS account email first, then continue with Google.");
       return;
@@ -155,7 +102,7 @@ export function LoginForm() {
       )}
       {reason === "oauth-failed" && (
         <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          Google sign-in could not be completed. Try again or use an email sign-in option.
+          Google sign-in could not be completed. Try again or sign in with your password.
         </p>
       )}
       {reason === "reset-link-expired" && (
@@ -169,120 +116,46 @@ export function LoginForm() {
         </p>
       )}
 
-      {emailCodeMode ? (
-        codeSent ? (
-          <form action={handleVerifyCode} className="space-y-4">
-            <p className="text-sm leading-6 text-slate-600">Enter the sign-in code sent to your email address.</p>
-            <input type="hidden" name="email" value={codeEmail} />
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Email code</span>
-              <input
-                autoComplete="one-time-code"
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-center text-lg tracking-[0.35em] outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
-                name="token"
-                inputMode="numeric"
-                maxLength={10}
-                pattern="[0-9]{6,10}"
-                placeholder="000000"
-                required
-                type="text"
-              />
-            </label>
-            <Button className="h-12 w-full rounded-xl" disabled={pending} type="submit">
-              {pending ? "Checking code..." : "Verify code and sign in"}
-            </Button>
-            <button
-              className="w-full text-sm font-medium text-violet-700 underline underline-offset-4"
-              disabled={pending}
-              onClick={() => setCodeSent(false)}
-              type="button"
-            >
-              Send another code
-            </button>
-          </form>
-        ) : (
-          <form action={handleSendCode} className="space-y-4">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">SchoolOS email</span>
-              <span className="relative block">
-                <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  autoComplete="email"
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
-                  name="email"
-                  placeholder="you@school.org"
-                  defaultValue={codeEmail}
-                  ref={emailRef}
-                  required
-                  type="email"
-                />
-              </span>
-            </label>
-            <Button className="h-12 w-full rounded-xl" disabled={pending} type="submit">
-              {pending ? "Sending code..." : "Email me a sign-in code"}
-            </Button>
-          </form>
-        )
-      ) : (
-        <form action={handlePasswordSubmit} className="space-y-5">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">Email, phone number, or admission number</span>
-            <span className="relative block">
-              <KeyRound size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                autoComplete="username"
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
-                name="identifier"
-                placeholder="Email, phone, or admission number"
-                defaultValue={codeEmail}
-                ref={emailRef}
-                required
-                type="text"
-              />
-            </span>
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
-            <span className="relative block">
-              <LockKeyhole size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                autoComplete="current-password"
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
-                name="password"
-                placeholder="Enter your password"
-                required
-                type="password"
-              />
-            </span>
-          </label>
-          <Button className="h-12 w-full rounded-xl" disabled={pending} type="submit">
-            {pending ? "Signing in..." : "Sign in with password"}
-          </Button>
-        </form>
-      )}
+      <form action={handlePasswordSubmit} className="space-y-5">
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">Email, phone number, or admission number</span>
+          <span className="relative block">
+            <KeyRound size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              autoComplete="username"
+              className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+              name="identifier"
+              placeholder="Email, phone, or admission number"
+              ref={emailRef}
+              required
+              type="text"
+            />
+          </span>
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
+          <span className="relative block">
+            <LockKeyhole size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              autoComplete="current-password"
+              className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+              name="password"
+              placeholder="Enter your password"
+              required
+              type="password"
+            />
+          </span>
+        </label>
+        <Button className="h-12 w-full rounded-xl" disabled={pending} type="submit">
+          {pending ? "Signing in..." : "Sign in with password"}
+        </Button>
+      </form>
 
-      <button
-        className="w-full text-sm font-medium text-violet-700 underline underline-offset-4"
-        disabled={pending}
-        onClick={() => {
-          setError("");
-          const currentEmail = emailRef.current?.value.trim() ?? "";
-          if (!emailCodeMode && currentEmail.includes("@")) setCodeEmail(currentEmail);
-          setEmailCodeMode((current) => !current);
-          setCodeSent(false);
-        }}
-        type="button"
-      >
-        {emailCodeMode ? "Use password instead" : "Email me a verification code instead"}
-      </button>
-
-      {!emailCodeMode && (
-        <p className="text-center text-sm">
-          <Link href="/forgot-password" className="font-medium text-violet-700 underline underline-offset-4">
-            Forgot password?
-          </Link>
-        </p>
-      )}
+      <p className="text-center text-sm">
+        <Link href="/forgot-password" className="font-medium text-violet-700 underline underline-offset-4">
+          Forgot password?
+        </Link>
+      </p>
 
       <div className="flex items-center gap-3" aria-hidden="true">
         <span className="h-px flex-1 bg-slate-200" />
