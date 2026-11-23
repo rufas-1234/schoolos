@@ -105,7 +105,7 @@ export async function createBehaviorRecord(
 ): Promise<BehaviorActionState> {
   const context = await requireSchoolPermission("students.update");
   const parsed = readBehaviorFields(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Review the behaviour record and try again." };
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Review the student behaviour record and try again." };
 
   const [student] = await db.select({ id: students.id })
     .from(students)
@@ -119,7 +119,7 @@ export async function createBehaviorRecord(
     hasBehaviorOption(context.schoolId, "category", parsed.data.category),
     hasBehaviorOption(context.schoolId, "action", parsed.data.actionTaken),
   ]);
-  if (!categoryAllowed || !actionAllowed) return { error: "Choose a behaviour category and action available to this school." };
+  if (!categoryAllowed || !actionAllowed) return { error: "Choose a student behaviour category and action available to this school." };
 
   const publicId = randomUUID();
   try {
@@ -146,9 +146,9 @@ export async function createBehaviorRecord(
       });
     });
   } catch (error) {
-    if (isDuplicateEntryError(error)) return { error: "That behaviour record could not be saved because of a conflicting record." };
+    if (isDuplicateEntryError(error)) return { error: "That student behaviour record could not be saved because of a conflicting record." };
     console.error("Student behaviour record could not be saved; transaction rolled back.", error);
-    return { error: "The behaviour record could not be saved. No changes were made; try again." };
+    return { error: "The student behaviour record could not be saved. No changes were made; try again." };
   }
 
   revalidatePath("/admin/students/behavior");
@@ -164,13 +164,13 @@ export async function updateBehaviorRecord(
   const publicId = z.string().uuid().safeParse(readValue(formData, "publicId"));
   const parsed = readBehaviorFields(formData);
   if (!publicId.success || !parsed.success) {
-    return { error: parsed.success ? "This behaviour record is invalid." : parsed.error.issues[0]?.message ?? "Review the behaviour record and try again." };
+    return { error: parsed.success ? "This student behaviour record is invalid." : parsed.error.issues[0]?.message ?? "Review the student behaviour record and try again." };
   }
   const [categoryAllowed, actionAllowed] = await Promise.all([
     hasBehaviorOption(context.schoolId, "category", parsed.data.category),
     hasBehaviorOption(context.schoolId, "action", parsed.data.actionTaken),
   ]);
-  if (!categoryAllowed || !actionAllowed) return { error: "Choose a behaviour category and action available to this school." };
+  if (!categoryAllowed || !actionAllowed) return { error: "Choose a student behaviour category and action available to this school." };
 
   const outcome = await db.transaction(async (tx) => {
     const [record] = await tx.select({ id: studentBehaviorRecords.id })
@@ -214,7 +214,7 @@ export async function updateBehaviorRecord(
     return "updated";
   });
 
-  if (outcome === "record-not-found") return { error: "That behaviour record was not found in this school." };
+  if (outcome === "record-not-found") return { error: "That student behaviour record was not found in this school." };
   if (outcome === "student-not-found") return { error: "That student could not be found in this school." };
   revalidatePath("/admin/students/behavior");
   revalidatePath("/admin/students");

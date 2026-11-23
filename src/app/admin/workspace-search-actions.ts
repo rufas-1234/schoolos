@@ -1024,7 +1024,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     const studentName = `${record.firstName} ${record.lastName}`;
     results.push({
       id: `student-behavior-${record.publicId}`,
-      title: `Behaviour record · ${studentName}`,
+      title: `Student behaviour record · ${studentName}`,
       description: `${record.category.replaceAll("_", " ")} · ${record.severity} · ${record.incidentDate} · ${record.admissionNumber ?? "Student"}`,
       href: `/admin/students/behavior?search=${encodeURIComponent(query)}`,
       category: "Students",

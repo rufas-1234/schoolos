@@ -29,7 +29,7 @@ const tabs: { id: ProfileTab; label: string; emptyMessage?: string }[] = [
   { id: "custom", label: "Custom Field", emptyMessage: "No custom student fields are configured." },
   { id: "exams", label: "Exam Results", emptyMessage: "No published exam results are attached to this student." },
   { id: "library", label: "Library", emptyMessage: "No library borrowing history is recorded." },
-  { id: "behaviour", label: "Behaviour", emptyMessage: "No behaviour records have been recorded for this student." },
+  { id: "behaviour", label: "Student Behaviours", emptyMessage: "No student behaviour records have been recorded for this student." },
   { id: "dormitory", label: "Dormitory", emptyMessage: "No active dormitory assignment is recorded for this student." },
 ];
 
@@ -163,7 +163,7 @@ export function StudentProfileDetails({
         )}
         {behaviourHistory.length > 0 && (
           <section className="student-profile-print-section">
-            <h4>Behaviour history</h4>
+            <h4>Student behaviour history</h4>
             <ul>{behaviourHistory.map((record) => (
               <li key={record.id}>
                 {record.incidentDate} Â· {record.category.replaceAll("_", " ")} Â· {record.severity.replaceAll("_", " ")} Â· {record.details} Â· Action: {record.actionTaken.replaceAll("_", " ")}

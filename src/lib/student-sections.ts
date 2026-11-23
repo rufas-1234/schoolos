@@ -55,13 +55,13 @@ export const studentSections = [
   },
   {
     id: "behavior",
-    label: "Student Behaviour",
+    label: "Student Behaviours",
     href: "/admin/students/behavior",
     permission: "students.update",
   },
   {
     id: "behavior-settings",
-    label: "Behaviour Categories & Actions",
+    label: "Student Behaviours · Categories & Actions",
     href: "/admin/students/behavior/settings",
     permission: "students.update",
   },

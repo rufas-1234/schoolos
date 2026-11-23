@@ -96,7 +96,7 @@ export default function GuidePage() {
                 <Step n={1}>Open <strong>School profile</strong> from the account menu. Review the school name and contact details, logo, timezone, and currency.</Step>
                 <Step n={2}>In <strong>Academics</strong>, create or confirm branches, academic years, terms, classes, sections, classrooms, and subjects.</Step>
                 <Step n={3}>Add staff and teachers, then configure teacher assignments and class routines.</Step>
-                <Step n={4}>Configure student fields, categories, and behaviour options; admit or add students and place them in the correct year and section.</Step>
+                <Step n={4}>Configure student fields and categories. Use Student Behaviours to manage behaviour categories and actions, then admit students into the correct year and section.</Step>
                 <Step n={5}>Set up fees, grading scales, examinations, library, dormitories, and finance records as needed.</Step>
                 <Step n={6}>Create named user accounts and assign only the roles needed for each person.</Step>
               </ol>
@@ -114,14 +114,14 @@ export default function GuidePage() {
             </GuideSection>
 
             <GuideSection id="students" title="4. Students and admissions">
-              <p><strong>Student Info</strong> contains student records, categories, admission desk, student groups, behaviour, status tools, student ID cards, reports, and settings. Use searchable tables and filters to locate records.</p>
+              <p><strong>Student Info</strong> contains student records, categories, admission desk, student groups, Student Behaviours, status tools, student ID cards, reports, and settings. Use searchable tables and filters to locate records.</p>
               <ol className="space-y-3">
                 <Step n={1}>Set student categories and configurable student fields first if your school uses them.</Step>
                 <Step n={2}>Choose <strong>Add Student</strong> and enter the student identity, admission number and date, contact and guardian details, and any configured fields. Add a photo or permitted documents if needed.</Step>
                 <Step n={3}>Save the record, then place the student in a branch, academic year, class, and section through enrollment.</Step>
                 <Step n={4}>Use <strong>Admission Desk</strong> to review pending admissions and approve, reject, or otherwise update their student status as appropriate.</Step>
                 <Step n={5}>Open a student profile to review details and history. Update status when a student becomes active, inactive, disabled, or leaves according to the available transitions.</Step>
-                <Step n={6}>Use groups for student cohorts, behaviour records for incidents/actions, and student reports or exports for authorized reporting.</Step>
+                <Step n={6}>Use groups for student cohorts, Student Behaviours for conduct or incident records and follow-up actions, and student reports or exports for authorized reporting.</Step>
                 <Step n={7}>Use Student ID Cards to prepare printable cards. Use Promote to record progression at year end; review the target year and section before confirming.</Step>
               </ol>
               <h3 className="font-semibold text-slate-900">Admissions and enrollment</h3>
@@ -132,7 +132,7 @@ export default function GuidePage() {
                 <Step n={4}>Use <strong>Unassigned Student</strong> to find students who still need a class/section placement. Use <strong>Multi Class Student</strong> only when the student legitimately needs additional class enrollments.</Step>
                 <Step n={5}>At year end, use <strong>Student Promote</strong> to move eligible enrollments to the next active year. Check the source year, destination year, class, and section before confirming.</Step>
               </ol>
-              <p><strong>Other student tools:</strong> Student Categories group records; Student Groups organize cohorts; Student Behaviour records positive conduct or incidents with follow-up dates; Behaviour Categories &amp; Actions adds school-specific choices. Student Reports filter and print student information, while Student ID Cards prepare printable IDs. Student Settings controls the fields used on student profiles.</p>
+              <p><strong>Other student tools:</strong> Student Categories group records; Student Groups organize cohorts; Student Behaviours tracks positive conduct or incidents with follow-up dates, and its Categories &amp; Actions section manages the available choices. Student Reports filter and print student information, while Student ID Cards prepare printable IDs. Student Settings controls the fields used on student profiles.</p>
               <p><strong>Status and history:</strong> Use the disabled-students view and available status transitions instead of deleting records when a student leaves. Permanent record deletion is permission-restricted and can remove history; check the selected student and school policy before using it.</p>
               <p><strong>Public admissions:</strong> When enabled, the school’s public admission form accepts applications through a school-specific link. Share it only through school-approved channels. Public submission does not replace checking the application and confirming the correct enrollment.</p>
             </GuideSection>

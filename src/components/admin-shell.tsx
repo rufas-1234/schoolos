@@ -81,7 +81,7 @@ const navigation: NavigationItem[] = [
     permission: "students.view",
     permissionAlternatives: ["students.update"],
     children: [
-      ...studentSections,
+      ...studentSections.filter((section) => section.id !== "behavior-settings"),
       {
         id: "attendance-reports",
         label: "Student attendance reports",

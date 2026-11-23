@@ -8,7 +8,7 @@ export function BehaviorOptionForm() {
   return <form action={formAction} className="space-y-4">
     <label className="block space-y-1.5 text-sm font-medium text-slate-700">Option type
       <select name="kind" required defaultValue="category" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-        <option value="category">Behaviour category</option><option value="action">Action taken</option>
+        <option value="category">Student behaviour category</option><option value="action">Action taken</option>
       </select>
     </label>
     <label className="block space-y-1.5 text-sm font-medium text-slate-700">Name
