@@ -1,4 +1,4 @@
-import { and, asc, count, countDistinct, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
 import Link from "next/link";
 import { ArrowUpRight, BriefcaseBusiness, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import type { ReactNode } from "react";
@@ -38,8 +38,7 @@ export default async function HumanResourcesPage({
     eq(staffMembers.schoolId, context.schoolId),
     ...(selectedBranch ? [eq(staffMembers.branchId, selectedBranch.id)] : []),
   );
-  const roleCategory = sql<string>`coalesce(nullif(trim(${staffMembers.personnelRole}), ''), 'unassigned')`;
-  const [statusCounts, departments, employmentTypes, [roleCategoryCountRow], recentHires] = await Promise.all([
+  const [statusCounts, departments, employmentTypes, roleCountsByValue, recentHires] = await Promise.all([
     db
       .select({ status: staffMembers.status, total: count() })
       .from(staffMembers)
@@ -58,9 +57,11 @@ export default async function HumanResourcesPage({
       .groupBy(staffMembers.employmentType)
       .orderBy(asc(staffMembers.employmentType)),
     db
-      .select({ total: countDistinct(roleCategory) })
+      .select({ role: staffMembers.personnelRole, total: count() })
       .from(staffMembers)
-      .where(staffFilter),
+      .where(staffFilter)
+      .groupBy(staffMembers.personnelRole)
+      .orderBy(asc(staffMembers.personnelRole)),
     db
       .select({
         publicId: staffMembers.publicId,
@@ -78,6 +79,13 @@ export default async function HumanResourcesPage({
   const activeCount = statusCounts.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = statusCounts.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = statusCounts.reduce((sum, item) => sum + item.total, 0);
+  const roleCounts = new Map<string, number>();
+  for (const item of roleCountsByValue) {
+    const role = item.role?.trim() || "unassigned";
+    roleCounts.set(role, (roleCounts.get(role) ?? 0) + item.total);
+  }
+  const allRoleBreakdown = Array.from(roleCounts, ([role, total]) => ({ role, total }))
+    .sort((left, right) => left.role.localeCompare(right.role));
   const parsedRolePage = typeof params.rolePage === "string" && /^\d+$/.test(params.rolePage)
     ? Number(params.rolePage)
     : 1;
@@ -85,17 +93,13 @@ export default async function HumanResourcesPage({
     ? parsedRolePage
     : 1;
   const { page: rolePage, pageCount: rolePageCount } = getStaffRolePagination(
-    Number(roleCategoryCountRow?.total ?? 0),
+    allRoleBreakdown.length,
     requestedRolePage,
   );
-  const roleBreakdown = await db
-    .select({ role: roleCategory, total: count() })
-    .from(staffMembers)
-    .where(staffFilter)
-    .groupBy(roleCategory)
-    .orderBy(asc(roleCategory))
-    .limit(staffRolePageSize)
-    .offset((rolePage - 1) * staffRolePageSize);
+  const roleBreakdown = allRoleBreakdown.slice(
+    (rolePage - 1) * staffRolePageSize,
+    rolePage * staffRolePageSize,
+  );
   const staffHref = (options: {
     search?: string;
     profile?: string;
