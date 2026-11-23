@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, count, countDistinct, desc, eq, isNotNull, sql } from "drizzle-orm";
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, Users } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { db } from "@/db";
 import { schoolBranches, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { getStaffRolePagination, staffRolePageSize } from "@/lib/staff-policy";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 
@@ -18,7 +19,7 @@ const employmentTypeLabels: Record<string, string> = {
 export default async function HumanResourcesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ branchId?: string | string[] }>;
+  searchParams: Promise<{ branchId?: string | string[]; rolePage?: string | string[] }>;
 }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const [branches, params] = await Promise.all([
@@ -37,7 +38,8 @@ export default async function HumanResourcesPage({
     eq(staffMembers.schoolId, context.schoolId),
     ...(selectedBranch ? [eq(staffMembers.branchId, selectedBranch.id)] : []),
   );
-  const [statusCounts, departments, employmentTypes, recentHires] = await Promise.all([
+  const roleCategory = sql<string>`coalesce(nullif(trim(${staffMembers.personnelRole}), ''), 'unassigned')`;
+  const [statusCounts, departments, employmentTypes, [roleCategoryCountRow], recentHires] = await Promise.all([
     db
       .select({ status: staffMembers.status, total: count() })
       .from(staffMembers)
@@ -56,6 +58,10 @@ export default async function HumanResourcesPage({
       .groupBy(staffMembers.employmentType)
       .orderBy(asc(staffMembers.employmentType)),
     db
+      .select({ total: countDistinct(roleCategory) })
+      .from(staffMembers)
+      .where(staffFilter),
+    db
       .select({
         publicId: staffMembers.publicId,
         firstName: staffMembers.firstName,
@@ -72,20 +78,45 @@ export default async function HumanResourcesPage({
   const activeCount = statusCounts.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = statusCounts.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = statusCounts.reduce((sum, item) => sum + item.total, 0);
+  const parsedRolePage = typeof params.rolePage === "string" && /^\d+$/.test(params.rolePage)
+    ? Number(params.rolePage)
+    : 1;
+  const requestedRolePage = Number.isSafeInteger(parsedRolePage) && parsedRolePage > 0
+    ? parsedRolePage
+    : 1;
+  const { page: rolePage, pageCount: rolePageCount } = getStaffRolePagination(
+    Number(roleCategoryCountRow?.total ?? 0),
+    requestedRolePage,
+  );
+  const roleBreakdown = await db
+    .select({ role: roleCategory, total: count() })
+    .from(staffMembers)
+    .where(staffFilter)
+    .groupBy(roleCategory)
+    .orderBy(asc(roleCategory))
+    .limit(staffRolePageSize)
+    .offset((rolePage - 1) * staffRolePageSize);
   const staffHref = (options: {
     search?: string;
     profile?: string;
     showAll?: boolean;
     action?: string;
+    rolePage?: number;
+    role?: string;
   } = {}) => {
     const query = new URLSearchParams();
     if (options.search) query.set("search", options.search);
     if (options.profile) query.set("profile", options.profile);
     if (options.action) query.set("action", options.action);
     if (options.showAll) query.set("showAll", "1");
+    if (options.rolePage) query.set("rolePage", String(options.rolePage));
+    if (options.role) query.set("role", options.role);
     if (selectedBranch) query.set("branchId", String(selectedBranch.id));
     return `/admin/staff?${query.toString()}`;
   };
+  const roleLabel = (role: string) => role === "unassigned"
+    ? "Unassigned"
+    : role.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 
   return (
     <div className="space-y-6">
@@ -250,6 +281,67 @@ export default async function HumanResourcesPage({
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-700">
+              <Users size={19} />
+            </span>
+            <div>
+              <h2 className="font-semibold text-slate-900">Staff by role</h2>
+              <p className="text-sm text-slate-500">Directory headcount by assigned role</p>
+            </div>
+          </div>
+          {roleBreakdown.length === 0 ? (
+            <EmptyMessage message="Add staff records to see role totals." />
+          ) : (
+            <>
+              <ul className="mt-5 divide-y divide-slate-100">
+                {roleBreakdown.map((item) => (
+                  <li key={item.role}>
+                    <Link
+                      href={staffHref({ role: item.role, showAll: true })}
+                      className="group flex items-center justify-between gap-4 rounded-xl px-2 py-3 transition hover:bg-orange-50/70 first:pt-0 last:pb-0"
+                    >
+                      <span className="truncate text-sm font-medium text-slate-700 group-hover:text-orange-800">
+                        {roleLabel(item.role)}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                          {item.total}
+                        </span>
+                        <ArrowUpRight size={15} className="text-orange-600 opacity-0 transition group-hover:opacity-100" />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {rolePageCount > 1 && (
+                <nav aria-label="Staff role pages" className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                  <Link
+                    href={staffHref({ rolePage: rolePage - 1 })}
+                    aria-disabled={rolePage === 1}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium ${rolePage === 1 ? "pointer-events-none text-slate-300" : "text-violet-700 hover:bg-violet-50"}`}
+                    tabIndex={rolePage === 1 ? -1 : undefined}
+                  >
+                    <ChevronLeft size={16} aria-hidden="true" />
+                    Previous
+                  </Link>
+                  <span className="text-xs text-slate-500">Page {rolePage} of {rolePageCount}</span>
+                  <Link
+                    href={staffHref({ rolePage: rolePage + 1 })}
+                    aria-disabled={rolePage === rolePageCount}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium ${rolePage === rolePageCount ? "pointer-events-none text-slate-300" : "text-violet-700 hover:bg-violet-50"}`}
+                    tabIndex={rolePage === rolePageCount ? -1 : undefined}
+                  >
+                    Next
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </Link>
+                </nav>
+              )}
+            </>
           )}
         </section>
 

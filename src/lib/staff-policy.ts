@@ -7,6 +7,7 @@ export const employmentTypes = ["full_time", "part_time", "contract", "temporary
 export type EmploymentType = (typeof employmentTypes)[number];
 
 export const staffRoles = ["accountant", "admin", "driver", "librarian", "receptionist", "teacher"] as const;
+export const staffRolePageSize = 8;
 export const staffGenders = ["female", "male", "other"] as const;
 export const staffMaritalStatuses = ["married", "unmarried"] as const;
 export const staffContractTypes = ["permanent", "contract"] as const;
@@ -22,4 +23,12 @@ export function getStaffLoginPasswordError(password: string, confirmation: strin
 
 export function canTransitionStaffStatus(current: string, next: StaffStatus): boolean {
   return staffStatuses.includes(current as StaffStatus) && current !== next;
+}
+
+export function getStaffRolePagination(totalRoles: number, requestedPage: number) {
+  const pageCount = Math.max(1, Math.ceil(Math.max(0, totalRoles) / staffRolePageSize));
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
+    ? Math.min(requestedPage, pageCount)
+    : 1;
+  return { page, pageCount };
 }

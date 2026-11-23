@@ -931,7 +931,11 @@ export function AdminShell({
         </div>
       )}
 
-      <div className="admin-shell-content lg:pl-[68px] 2xl:pr-[68px]">
+      <div className={cn(
+        "admin-shell-content transition-[padding] duration-200 ease-out motion-reduce:transition-none",
+        desktopSidebarExpanded ? "lg:pl-[260px]" : "lg:pl-[68px]",
+        desktopRightSidebarExpanded ? "2xl:pr-[260px]" : "2xl:pr-[68px]",
+      )}>
         <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-auto min-h-16 flex-wrap items-center justify-between gap-y-2 border-b border-slate-200 bg-white px-3 py-2 text-slate-900 sm:px-5 md:h-[76px] md:flex-nowrap md:gap-y-0 md:py-0 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button

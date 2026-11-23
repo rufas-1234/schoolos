@@ -10,6 +10,7 @@ import {
   Layers3,
   MapPinned,
   Sun,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ import {
   studentEnrollments,
   students,
   subjects,
+  teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
@@ -55,6 +57,7 @@ export default async function AcademicOverviewPage() {
     [subjectCountRow],
     [subjectAssignmentCountRow],
     [classroomCountRow],
+    [teacherCountRow],
   ] = await Promise.all([
     db
       .select({ total: count() })
@@ -87,12 +90,17 @@ export default async function AcademicOverviewPage() {
       .select({ total: count() })
       .from(classRooms)
       .where(eq(classRooms.schoolId, context.schoolId)),
+    db
+      .select({ total: count() })
+      .from(teachers)
+      .where(eq(teachers.schoolId, context.schoolId)),
   ]);
   const branchCount = branchCountRow?.total ?? 0;
   const activeClassCount = activeClassCountRow?.total ?? 0;
   const subjectCount = subjectCountRow?.total ?? 0;
   const subjectAssignmentCount = subjectAssignmentCountRow?.total ?? 0;
   const classroomCount = classroomCountRow?.total ?? 0;
+  const teacherCount = teacherCountRow?.total ?? 0;
   let classSectionCount = 0;
   let enrollmentCounts: Array<{ status: string; total: number }> = [];
   let terms: TermSummary[] = [];
@@ -187,6 +195,14 @@ export default async function AcademicOverviewPage() {
         : "Set an academic year to view its sections",
       icon: Layers3,
       tone: "sky" as const,
+    },
+    {
+      href: "/admin/academics?section=teachers",
+      label: "Total teachers",
+      value: teacherCount,
+      detail: "In the school teacher directory",
+      icon: Users,
+      tone: "violet" as const,
     },
     {
       href: "/admin/academics?section=subjects",
@@ -316,7 +332,7 @@ export default async function AcademicOverviewPage() {
         </div>
       </header>
 
-      <section aria-label="Academic metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-5">
+      <section aria-label="Academic metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
         {metrics.map((metric) => (
           <MetricCard key={metric.label} {...metric} />
         ))}

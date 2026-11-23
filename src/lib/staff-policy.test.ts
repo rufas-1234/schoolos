@@ -3,6 +3,7 @@ import {
   canTransitionStaffStatus,
   employmentTypes,
   getStaffLoginPasswordError,
+  getStaffRolePagination,
   staffContractTypes,
   staffGenders,
   staffLoginPasswordMinLength,
@@ -33,6 +34,12 @@ describe("staff directory policies", () => {
     expect(canTransitionStaffStatus("active", "active")).toBe(false);
     expect(canTransitionStaffStatus("inactive", "inactive")).toBe(false);
     expect(canTransitionStaffStatus("pending", "active")).toBe(false);
+  });
+
+  it("bounds staff role pagination for empty, invalid, and out-of-range pages", () => {
+    expect(getStaffRolePagination(0, 5)).toEqual({ page: 1, pageCount: 1 });
+    expect(getStaffRolePagination(17, 0)).toEqual({ page: 1, pageCount: 3 });
+    expect(getStaffRolePagination(17, 99)).toEqual({ page: 3, pageCount: 3 });
   });
 
   it("allows blank password fields for existing accounts and validates supplied passwords", () => {

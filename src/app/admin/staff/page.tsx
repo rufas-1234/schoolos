@@ -46,9 +46,10 @@ export default async function StaffDirectoryPage({
     search?: string | string[];
     showAll?: string | string[];
     branchId?: string | string[];
+    role?: string | string[];
   }>;
 }) {
-  const { profile, search, showAll, branchId } = await searchParams;
+  const { profile, search, showAll, branchId, role } = await searchParams;
   const profilePublicId = typeof profile === "string" && profile.length <= 36 ? profile : "";
   const initialSearch = typeof search === "string" ? search.slice(0, 120) : "";
   const showAllRecords = showAll === "1";
@@ -161,6 +162,10 @@ export default async function StaffDirectoryPage({
   const initialFilters: Record<string, string> = selectedBranch
     ? { branch: selectedBranch.name }
     : {};
+  const selectedRole = typeof role === "string" && role.length <= 40 ? role : "";
+  if (selectedRole) {
+    initialFilters.personnelRole = selectedRole === "unassigned" ? "Unassigned" : selectedRole;
+  }
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
