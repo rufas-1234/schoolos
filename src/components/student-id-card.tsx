@@ -39,8 +39,8 @@ export function StudentIdCard({
   const classLabel = [record.className, record.sectionName].filter(Boolean).join(" · ") || "Student";
   const initials = record.name.split(/\s+/).filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
   return (
-    <div className={styles.idCard}>
-      <div className={styles.cardBorder}>
+    <div className={styles.idCard} data-print-qr-card="student-id">
+      <div className={styles.cardBorder} data-print-qr-host>
         <div className={styles.cardTopArt} />
         <div className={styles.cardHeader}>
           <div className={styles.logoFrame}>
@@ -83,7 +83,7 @@ export function StudentIdCard({
             </div>
           </div>
         </div>
-        <div className={styles.cardFooter}>
+        <div className={styles.cardFooter} data-print-qr-footer>
           <div className={styles.signature}><span>Authorized signature</span><b>Principal</b></div>
           <div className={styles.phoneBadge}><span aria-hidden="true">☎</span>{record.phone ?? schoolPhone ?? "Student ID"}</div>
         </div>

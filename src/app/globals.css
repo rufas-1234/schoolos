@@ -3065,4 +3065,72 @@ h6 {
   .admin-shell-content {
     padding-left: 0 !important;
   }
+
+  body.print-target-active .print-qr-stamp {
+    display: flex !important;
+    width: fit-content;
+    align-items: center;
+    gap: 2mm;
+    margin: 4mm 0 0 auto;
+    border: 0.25mm solid #cbd5e1;
+    border-radius: 1mm;
+    background: #fff !important;
+    padding: 1mm;
+    color: #334155 !important;
+    font-size: 7pt;
+    line-height: 1.2;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.print-target-active .print-qr-stamp img {
+    display: block !important;
+    width: 16mm;
+    height: 16mm;
+    flex: 0 0 16mm;
+    object-fit: contain;
+  }
+
+  body.print-target-active[data-print-page-size="ID-1"] [data-print-qr-host] > .print-qr-stamp {
+    position: absolute !important;
+    z-index: 4;
+    right: 2mm;
+    bottom: 1.5mm;
+    display: grid !important;
+    width: 15mm;
+    height: 15mm;
+    place-items: center;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: #fff !important;
+    padding: 0.5mm;
+  }
+
+  body.print-target-active[data-print-page-size="ID-1"] [data-print-qr-host] > .print-qr-stamp img {
+    width: 14mm;
+    height: 14mm;
+    flex-basis: 14mm;
+  }
+
+  body.print-target-active[data-print-page-size="ID-1"] [data-print-qr-host] > .print-qr-stamp span {
+    display: none !important;
+  }
+
+  body.print-target-active[data-print-page-size="ID-1"] [data-print-qr-card="student-id"] [data-print-qr-footer],
+  body.print-target-active[data-print-page-size="ID-1"] [data-print-qr-card="exam-access"] [data-print-qr-footer] {
+    right: 18mm !important;
+  }
+
+  body.print-target-active [data-print-qr-document].fee-invoice-card {
+    position: relative;
+    padding-bottom: 24mm !important;
+  }
+
+  body.print-target-active [data-print-qr-document].fee-invoice-card > .print-qr-stamp {
+    position: absolute;
+    right: 4mm;
+    bottom: 4mm;
+    margin: 0;
+  }
 }

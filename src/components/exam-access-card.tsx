@@ -40,7 +40,7 @@ export function ExamAccessCard({
 }) {
   const isException = record.eligibility === "approved-exception";
   return (
-    <div className={styles.examCard}>
+    <div className={styles.examCard} data-print-qr-card="exam-access" data-print-qr-host>
       <div className={styles.cardTop}>
         <div className={styles.logoFrame}>
           {schoolLogo
@@ -72,7 +72,7 @@ export function ExamAccessCard({
           </div>
         </div>
       </div>
-      <div className={styles.cardFooter}>
+      <div className={styles.cardFooter} data-print-qr-footer>
         <div>
           <span>Exam dates</span>
           <b>{displayDate(examStartDate)} – {displayDate(examEndDate)}</b>

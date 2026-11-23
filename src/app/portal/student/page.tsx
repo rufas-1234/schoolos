@@ -1240,6 +1240,7 @@ export default async function StudentPortalPage({
                     <article
                       key={invoice.id}
                       id={`student-invoice-${invoice.id}`}
+                      data-print-qr-document
                       className="fee-invoice-page fee-invoice-card mx-auto w-full min-w-0 max-w-[210mm] space-y-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 text-slate-900 shadow-sm min-[400px]:p-4 sm:space-y-5 sm:p-6 print:overflow-visible"
                     >
                       <header className="fee-invoice-title-row flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row sm:gap-5">

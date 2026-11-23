@@ -1,5 +1,7 @@
 "use client";
 
+import QRCode from "qrcode";
+
 type PrintOptions = {
   title?: string;
   targetId?: string;
@@ -12,7 +14,7 @@ const printHiddenAttribute = "data-print-hidden";
 const printStructureAttribute = "data-print-structure";
 const printTargetAttribute = "data-print-target";
 
-export function printCurrentPage({
+export async function printCurrentPage({
   title,
   targetId,
   pageOrientation = "portrait",
@@ -31,6 +33,46 @@ export function printCurrentPage({
   }
   if (!target) {
     window.alert("Printable report content could not be found. Refresh the page and try again.");
+    return;
+  }
+
+  const qrValue = new URL(window.location.pathname, window.location.origin).toString();
+  let qrDataUrl: string;
+  try {
+    qrDataUrl = await QRCode.toDataURL(qrValue, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 256,
+    });
+  } catch (error) {
+    console.error("Could not generate the print QR code.", error);
+    window.alert("The QR code could not be generated, so this report was not printed. Please try again.");
+    return;
+  }
+  const qrStamps: HTMLElement[] = [];
+  const qrImages: HTMLImageElement[] = [];
+  for (const qrTarget of getQrTargets(target, pageSize)) {
+    const stamp = document.createElement("div");
+    stamp.className = "print-qr-stamp";
+    const image = document.createElement("img");
+    image.src = qrDataUrl;
+    image.alt = "QR code to open this school record online";
+    stamp.append(image);
+    if (pageSize !== "ID-1") {
+      const label = document.createElement("span");
+      label.textContent = "Scan to open online";
+      stamp.append(label);
+    }
+    qrTarget.append(stamp);
+    qrStamps.push(stamp);
+    qrImages.push(image);
+  }
+  try {
+    await Promise.all(qrImages.map((image) => image.decode()));
+  } catch (error) {
+    for (const stamp of qrStamps) stamp.remove();
+    console.error("Could not load the generated print QR code.", error);
+    window.alert("The QR code could not be loaded, so this report was not printed. Please try again.");
     return;
   }
 
@@ -108,6 +150,7 @@ export function printCurrentPage({
 
   const restore = () => {
     window.removeEventListener("afterprint", restore);
+    for (const stamp of qrStamps) stamp.remove();
     for (const change of changedAttributes) {
       if (change.hidden === null) change.element.removeAttribute(printHiddenAttribute);
       else change.element.setAttribute(printHiddenAttribute, change.hidden);
@@ -130,6 +173,22 @@ export function printCurrentPage({
 
   window.addEventListener("afterprint", restore);
   window.print();
+}
+
+function getQrTargets(target: HTMLElement, pageSize: "A4" | "ID-1"): HTMLElement[] {
+  if (pageSize === "ID-1") {
+    const cardHosts = [
+      ...(target.matches("[data-print-qr-host]") ? [target] : []),
+      ...target.querySelectorAll<HTMLElement>("[data-print-qr-host]"),
+    ];
+    return cardHosts.length ? cardHosts : [target];
+  }
+
+  const documentTargets = [
+    ...(target.matches("[data-print-qr-document]") ? [target] : []),
+    ...target.querySelectorAll<HTMLElement>("[data-print-qr-document]"),
+  ];
+  return documentTargets.length ? documentTargets : [target];
 }
 
 export function printElementById(
