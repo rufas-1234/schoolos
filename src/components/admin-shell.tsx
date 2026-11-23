@@ -31,6 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { setSelectedAcademicYear } from "@/app/admin/academic-year-actions";
 import { academicSections } from "@/lib/academic-sections";
 import { studentSections } from "@/lib/student-sections";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,12 @@ const navigation: NavigationItem[] = [
         href: `/admin/academics?section=${section.id}`,
         matchQuery: { key: "section", value: section.id },
       })),
+      {
+        id: "certificates",
+        label: "Certificates",
+        href: "/admin/academics/certificates",
+        matchPath: "/admin/academics/certificates",
+      },
     ],
   },
   {
@@ -289,6 +296,8 @@ export function AdminShell({
   schoolChoices,
   multiSchoolEnabled,
   isPlatformAdmin,
+  academicYears,
+  selectedAcademicYearId,
 }: {
   children: ReactNode;
   schoolName: string;
@@ -303,6 +312,8 @@ export function AdminShell({
   schoolChoices: { schoolPublicId: string; schoolName: string }[];
   multiSchoolEnabled: boolean;
   isPlatformAdmin: boolean;
+  academicYears: { id: number; name: string }[];
+  selectedAcademicYearId: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(false);
@@ -466,6 +477,8 @@ export function AdminShell({
   const pageLabel = pathname.startsWith("/admin/academics")
     ? pathname.startsWith("/admin/academics/attendance-reports")
       ? "Student attendance reports"
+      : pathname.startsWith("/admin/academics/certificates")
+        ? "Certificates"
       : pathname === "/admin/academics/overview"
         ? "Academic Overview"
       : activeSection?.label ?? "Academics"
@@ -942,6 +955,43 @@ export function AdminShell({
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            {permissions.some((permission) => [
+              "academics.manage",
+              "school.settings.manage",
+              "students.view",
+              "students.update",
+              "examinations.create",
+              "results.enter",
+              "results.publish",
+              "fees.manage",
+              "payments.record",
+              "accounts.manage",
+            ].includes(permission)) && (
+              <form action={setSelectedAcademicYear} className="relative min-w-0">
+                <label htmlFor="admin-academic-year" className="sr-only">Academic year</label>
+                <select
+                  key={selectedAcademicYearId ?? "no-year"}
+                  id="admin-academic-year"
+                  name="academicYearId"
+                  aria-label="Academic year for year-based records"
+                  title="Academic year for year-based records"
+                  defaultValue={selectedAcademicYearId === null ? "" : String(selectedAcademicYearId)}
+                  disabled={academicYears.length === 0}
+                  onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                  className="h-9 w-32 max-w-[34vw] appearance-none rounded-lg border border-slate-200 bg-white px-2 pr-7 text-xs font-medium text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:text-slate-400 sm:w-40 sm:max-w-none sm:px-3 sm:text-sm"
+                >
+                  {academicYears.map((year) => (
+                    <option key={year.id} value={year.id}>{year.name}</option>
+                  ))}
+                  {academicYears.length === 0 && <option value="">No academic years</option>}
+                </select>
+                <CalendarDays
+                  aria-hidden="true"
+                  size={14}
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+              </form>
+            )}
             <div className="mx-1 hidden h-8 w-px bg-slate-200 sm:block" />
             <div className="relative">
               <button

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getFuzzySearchNgrams, rankWorkspaceSearchResults, studentIdWorkspaceResult } from "./workspace-search-policy";
+import {
+  getFuzzySearchNgrams,
+  rankWorkspaceSearchResults,
+  studentCertificateWorkspaceResult,
+  studentIdWorkspaceResult,
+} from "./workspace-search-policy";
 
 const results = [
   { id: "attendance", title: "Student Attendance Report", description: "Daily attendance by class and date", href: "/attendance", category: "Pages" },
@@ -61,5 +66,25 @@ describe("workspace search policy", () => {
         category: "Students",
         searchTerms: expect.arrayContaining(["Radhika Shriwastav", "S-104", "ID card"]),
       });
+  });
+
+  it("links a certificate search result to its print view with its academic year preserved", () => {
+    expect(studentCertificateWorkspaceResult({
+      publicId: "certificate-public-id",
+      certificateNumber: "CERT-2026-1234ABCD",
+      category: "Leadership",
+      title: "Prefect Service",
+      issuedAt: "2026-05-14",
+      academicYearId: 42,
+      academicYearName: "2026",
+      firstName: "Radhika",
+      lastName: "Shriwastav",
+      admissionNumber: "S-104",
+    })).toMatchObject({
+      id: "student-certificate-certificate-public-id",
+      href: "/admin/academics/certificates/certificate-public-id/print?academicYearId=42",
+      category: "Academics",
+      searchTerms: expect.arrayContaining(["Leadership", "CERT-2026-1234ABCD", "2026"]),
+    });
   });
 });

@@ -24,6 +24,43 @@ export function studentIdWorkspaceResult(student: {
   };
 }
 
+export function studentCertificateWorkspaceResult(certificate: {
+  publicId: string;
+  certificateNumber: string;
+  category: string;
+  title: string;
+  issuedAt: string;
+  academicYearId: number;
+  academicYearName: string;
+  firstName: string;
+  lastName: string;
+  admissionNumber: string | null;
+}): Omit<RankedWorkspaceSearchResult, "category"> & { category: "Academics" } {
+  const studentName = `${certificate.firstName} ${certificate.lastName}`;
+  return {
+    id: `student-certificate-${certificate.publicId}`,
+    title: `${certificate.title} · ${studentName}`,
+    description: [
+      certificate.category,
+      certificate.certificateNumber,
+      certificate.admissionNumber,
+      certificate.academicYearName,
+      certificate.issuedAt,
+    ].filter(Boolean).join(" · "),
+    href: `/admin/academics/certificates/${encodeURIComponent(certificate.publicId)}/print?academicYearId=${certificate.academicYearId}`,
+    category: "Academics",
+    searchTerms: [
+      studentName,
+      certificate.admissionNumber ?? "",
+      certificate.category,
+      certificate.title,
+      certificate.certificateNumber,
+      certificate.academicYearName,
+      "certificate award print",
+    ],
+  };
+}
+
 function normalize(value: string): string {
   return value.toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ");
 }

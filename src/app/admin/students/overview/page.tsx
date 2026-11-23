@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import {
   ArrowUpRight,
   BookOpenCheck,
@@ -12,12 +12,12 @@ import {
 import Link from "next/link";
 import { db } from "@/db";
 import {
-  academicYears,
   studentCategories,
   studentEnrollments,
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 
 type OverviewTone = "violet" | "emerald" | "amber" | "sky";
 
@@ -30,27 +30,18 @@ const toneStyles: Record<OverviewTone, { icon: string; hover: string }> = {
 
 export default async function StudentOverviewPage() {
   const context = await requireSchoolPermission("students.view");
-  const [studentStatusCounts, activeYears, [categoryCount]] = await Promise.all([
+  const { selectedYear: activeYear } = await getSchoolAcademicYearSelection(context.schoolId);
+  const [studentStatusCounts, [categoryCount]] = await Promise.all([
     db
       .select({ status: students.status, total: count() })
       .from(students)
       .where(eq(students.schoolId, context.schoolId))
       .groupBy(students.status),
     db
-      .select({ id: academicYears.id, name: academicYears.name })
-      .from(academicYears)
-      .where(and(
-        eq(academicYears.schoolId, context.schoolId),
-        eq(academicYears.status, "active"),
-      ))
-      .orderBy(asc(academicYears.startDate))
-      .limit(1),
-    db
       .select({ total: count() })
       .from(studentCategories)
       .where(eq(studentCategories.schoolId, context.schoolId)),
   ]);
-  const activeYear = activeYears[0];
   const totalCount = studentStatusCounts.reduce((sum, item) => sum + item.total, 0);
   const activeCount = studentStatusCounts.find((item) => item.status === "active")?.total ?? 0;
   const pendingCount = studentStatusCounts.find((item) => item.status === "pending")?.total ?? 0;
@@ -206,7 +197,7 @@ export default async function StudentOverviewPage() {
         </div>
       </header>
 
-      <section aria-label="Student metrics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Student metrics" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metrics.map((metric) => (
           <MetricCard key={metric.label} {...metric} />
         ))}

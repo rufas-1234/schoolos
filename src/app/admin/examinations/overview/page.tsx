@@ -21,6 +21,7 @@ import {
   schoolBranches,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 
 type OverviewTone = "violet" | "emerald" | "amber" | "sky" | "orange";
 const toneStyles: Record<OverviewTone, { icon: string; hover: string }> = {
@@ -34,19 +35,7 @@ const toneStyles: Record<OverviewTone, { icon: string; hover: string }> = {
 export default async function ExaminationsOverviewPage() {
   const context = await requireSchoolPermission(["examinations.create", "results.publish"]);
   const canCreateExams = context.grantedPermissions.includes("examinations.create");
-  const activeYears = await db
-    .select({
-      id: academicYears.id,
-      name: academicYears.name,
-    })
-    .from(academicYears)
-    .where(and(
-      eq(academicYears.schoolId, context.schoolId),
-      eq(academicYears.status, "active"),
-    ))
-    .orderBy(asc(academicYears.startDate))
-    .limit(1);
-  const activeYear = activeYears[0];
+  const { selectedYear: activeYear } = await getSchoolAcademicYearSelection(context.schoolId);
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: context.schoolTimezone,
   }).format(new Date());
@@ -239,7 +228,7 @@ export default async function ExaminationsOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-950 p-6 text-white shadow-sm sm:p-8">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-orange-800 p-6 text-white shadow-sm sm:p-8">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[28px] border-white/5"
@@ -255,7 +244,7 @@ export default async function ExaminationsOverviewPage() {
             </p>
             {activeYear && (
               <p className="mt-4 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white">
-                Active year · {activeYear.name}
+                Selected year · {activeYear.name}
               </p>
             )}
           </div>
@@ -271,7 +260,7 @@ export default async function ExaminationsOverviewPage() {
         </div>
       </header>
 
-      <section aria-label="Exam metrics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Exam metrics" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metrics.map((metric) => (
           <MetricCard key={metric.label} {...metric} />
         ))}

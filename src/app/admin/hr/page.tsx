@@ -89,7 +89,7 @@ export default async function HumanResourcesPage({
 
   return (
     <div className="space-y-6">
-      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-950 p-6 text-white shadow-sm sm:p-8">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-orange-800 p-6 text-white shadow-sm sm:p-8">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[28px] border-white/5"
@@ -128,7 +128,7 @@ export default async function HumanResourcesPage({
         </div>
       </header>
 
-      <section aria-label="Staff summary" className="grid gap-3 sm:grid-cols-3">
+      <section aria-label="Staff summary" className="grid grid-cols-2 gap-3">
         <SummaryCard
           href={staffHref({ showAll: true })}
           label="All staff"

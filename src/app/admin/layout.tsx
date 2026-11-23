@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin-shell";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     "students.create",
     "students.update",
   ]);
+  const academicYearSelection = await getSchoolAcademicYearSelection(context.schoolId);
   return (
     <AdminShell
       schoolName={context.schoolName}
@@ -44,6 +46,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       schoolChoices={context.schoolChoices}
       multiSchoolEnabled={context.multiSchoolEnabled}
       isPlatformAdmin={isPlatformAdminEmail(context.user.email)}
+      academicYears={academicYearSelection.years.map(({ id, name }) => ({ id, name }))}
+      selectedAcademicYearId={academicYearSelection.selectedYear?.id ?? null}
     >
       {children}
     </AdminShell>

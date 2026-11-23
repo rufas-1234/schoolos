@@ -37,12 +37,18 @@ import {
   teachers,
   schoolMemberships,
   staffApplications,
+  studentCertificates,
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { academicSections } from "@/lib/academic-sections";
 import { studentSections } from "@/lib/student-sections";
-import { getFuzzySearchNgrams, rankWorkspaceSearchResults, studentIdWorkspaceResult } from "@/lib/workspace-search-policy";
+import {
+  getFuzzySearchNgrams,
+  rankWorkspaceSearchResults,
+  studentCertificateWorkspaceResult,
+  studentIdWorkspaceResult,
+} from "@/lib/workspace-search-policy";
 
 const querySchema = z.string().trim().min(2).max(120);
 const workspacePermissions = [
@@ -137,6 +143,13 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       "Academic year, student enrollment, classes, subjects, and term schedule",
       "/admin/academics/overview",
       ["academic dashboard", "academics overview"],
+    );
+    addPage(
+      "academic-certificates",
+      "Student certificates",
+      "Issue and review certificates for academic, leadership, sports, and other achievements",
+      "/admin/academics/certificates",
+      ["awards", "prefect certificate", "sports certificate", "achievement"],
     );
     for (const section of academicSections) {
       addPage(
@@ -293,6 +306,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     staffRows,
     staffApplicationRows,
     academicRows,
+    certificateRows,
     examRows,
     libraryRows,
     libraryMemberRows,
@@ -659,6 +673,51 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
           .limit(20),
       ])
       : Promise.resolve([[], [], []] as const),
+    canManageAcademics
+      ? db.select({
+        publicId: studentCertificates.publicId,
+        certificateNumber: studentCertificates.certificateNumber,
+        category: studentCertificates.category,
+        title: studentCertificates.title,
+        issuedAt: studentCertificates.issuedAt,
+        academicYearId: studentCertificates.academicYearId,
+        academicYearName: academicYears.name,
+        firstName: students.firstName,
+        lastName: students.lastName,
+        admissionNumber: students.admissionNumber,
+      }).from(studentCertificates)
+        .innerJoin(students, and(
+          eq(students.id, studentCertificates.studentId),
+          eq(students.schoolId, context.schoolId),
+        ))
+        .innerJoin(academicYears, and(
+          eq(academicYears.id, studentCertificates.academicYearId),
+          eq(academicYears.schoolId, context.schoolId),
+        ))
+        .where(and(
+          eq(studentCertificates.schoolId, context.schoolId),
+          or(
+            tokenMatch(studentCertificates.certificateNumber),
+            tokenMatch(studentCertificates.category),
+            tokenMatch(studentCertificates.title),
+            tokenMatch(students.firstName),
+            tokenMatch(students.lastName),
+            tokenMatch(students.admissionNumber),
+            tokenMatch(academicYears.name),
+            fuzzyTextMatch(queryTokens,
+              studentCertificates.certificateNumber,
+              studentCertificates.category,
+              studentCertificates.title,
+              students.firstName,
+              students.lastName,
+              students.admissionNumber,
+              academicYears.name,
+            ),
+          ),
+        ))
+        .orderBy(desc(studentCertificates.issuedAt), desc(studentCertificates.id))
+        .limit(20)
+      : Promise.resolve([]),
     canManageExaminations
       ? db.select({
         id: examinations.id,
@@ -1166,6 +1225,9 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       href: `/admin/academics?section=subjects&search=${encodeURIComponent(subject.name)}`,
       category: "Academics",
     });
+  }
+  for (const certificate of certificateRows) {
+    results.push(studentCertificateWorkspaceResult(certificate));
   }
   for (const exam of examRows) {
     results.push({

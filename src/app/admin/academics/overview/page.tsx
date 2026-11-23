@@ -16,7 +16,6 @@ import Link from "next/link";
 import { db } from "@/db";
 import {
   academicTerms,
-  academicYears,
   classLevels,
   classRooms,
   classSections,
@@ -27,6 +26,7 @@ import {
   subjects,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 
 type OverviewTone = "violet" | "emerald" | "amber" | "sky" | "orange";
 type TermSummary = {
@@ -48,28 +48,14 @@ const toneStyles: Record<OverviewTone, { icon: string; hover: string }> = {
 
 export default async function AcademicOverviewPage() {
   const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
+  const { selectedYear: activeYear } = await getSchoolAcademicYearSelection(context.schoolId);
   const [
-    activeYears,
     [branchCountRow],
     [activeClassCountRow],
     [subjectCountRow],
     [subjectAssignmentCountRow],
     [classroomCountRow],
   ] = await Promise.all([
-    db
-      .select({
-        id: academicYears.id,
-        name: academicYears.name,
-        startDate: academicYears.startDate,
-        endDate: academicYears.endDate,
-      })
-      .from(academicYears)
-      .where(and(
-        eq(academicYears.schoolId, context.schoolId),
-        eq(academicYears.status, "active"),
-      ))
-      .orderBy(asc(academicYears.startDate))
-      .limit(1),
     db
       .select({ total: count() })
       .from(schoolBranches)
@@ -102,7 +88,6 @@ export default async function AcademicOverviewPage() {
       .from(classRooms)
       .where(eq(classRooms.schoolId, context.schoolId)),
   ]);
-  const activeYear = activeYears[0];
   const branchCount = branchCountRow?.total ?? 0;
   const activeClassCount = activeClassCountRow?.total ?? 0;
   const subjectCount = subjectCountRow?.total ?? 0;
@@ -169,7 +154,7 @@ export default async function AcademicOverviewPage() {
   const metrics = [
     {
       href: "/admin/academics?section=years",
-      label: "Active academic year",
+      label: "Selected academic year",
       value: activeYear?.name ?? "Not set",
       detail: activeYear
         ? `${formatDate(activeYear.startDate)} – ${formatDate(activeYear.endDate)}`
@@ -199,7 +184,7 @@ export default async function AcademicOverviewPage() {
       value: classSectionCount,
       detail: activeYear
         ? `${activeClassCount} active classes · ${branchCount} active branches`
-        : "Set an active year to view its sections",
+        : "Set an academic year to view its sections",
       icon: Layers3,
       tone: "sky" as const,
     },
@@ -301,7 +286,7 @@ export default async function AcademicOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-950 p-6 text-white shadow-sm sm:p-8">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-950 via-violet-900 to-orange-800 p-6 text-white shadow-sm sm:p-8">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[28px] border-white/5"
@@ -317,7 +302,7 @@ export default async function AcademicOverviewPage() {
             </p>
             {activeYear && (
               <p className="mt-4 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white">
-                Active year · {activeYear.name}
+                Selected year · {activeYear.name}
               </p>
             )}
           </div>
@@ -331,7 +316,7 @@ export default async function AcademicOverviewPage() {
         </div>
       </header>
 
-      <section aria-label="Academic metrics" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      <section aria-label="Academic metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-5">
         {metrics.map((metric) => (
           <MetricCard key={metric.label} {...metric} />
         ))}

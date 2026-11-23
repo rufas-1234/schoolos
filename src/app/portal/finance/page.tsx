@@ -30,6 +30,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 import {
   buildFinanceTrend,
   getFinanceMonthKeys,
@@ -78,6 +79,7 @@ export default async function FinancePortalPage() {
   const canManageFees = permissions.has("fees.manage") || permissions.has("payments.record");
   const canManageAccounts = permissions.has("accounts.manage");
   const canManageInventory = permissions.has("inventory.manage");
+  const academicYearSelection = await getSchoolAcademicYearSelection(context.schoolId);
   const [school] = await db.select({
     currency: schools.currency,
     timezone: schools.timezone,
@@ -495,6 +497,8 @@ export default async function FinancePortalPage() {
       schoolChoices={context.schoolChoices}
       multiSchoolEnabled={context.multiSchoolEnabled}
       isPlatformAdmin={isPlatformAdminEmail(context.user.email)}
+      academicYears={academicYearSelection.years.map(({ id, name }) => ({ id, name }))}
+      selectedAcademicYearId={academicYearSelection.selectedYear?.id ?? null}
     >
       <main className="print-report-page min-w-0 space-y-6 p-4 sm:p-6 lg:p-8">
         <header className="print:hidden flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -538,7 +542,7 @@ export default async function FinancePortalPage() {
               <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
                 {summary.code} · {summary.name}
               </h3>
-              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-3">
                 {canManageFees && <>
                   <SummaryCard href={`/admin/fees/reports?from=${monthStart}&to=${today}`} label="Net fee collections · month to date" value={currencyAmount(summary.netFees, summary.code)} icon={<CreditCard size={19} />} />
                   <SummaryCard href="/admin/fees/collection?status=outstanding" label={`Outstanding fees · ${summary.outstandingCount} invoices`} value={currencyAmount(summary.outstandingBalance, summary.code)} icon={<CircleAlert size={19} />} alert={summary.outstandingBalance > BigInt(0)} />
@@ -564,7 +568,7 @@ export default async function FinancePortalPage() {
               <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">Inventory snapshot</h3>
               <p className="mt-1 text-xs text-slate-500">Active stock valued at average cost; assets shown at acquisition cost.</p>
             </div>
-            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
               <SummaryCard href="/admin/inventory?view=register" label="Active stock items" value={String(activeStockCount)} icon={<PackageOpen size={19} />} />
               <SummaryCard href="/admin/inventory?view=register" label="Stock value" value={currencyAmount(stockValue, currency)} icon={<PackageOpen size={19} />} />
               <SummaryCard href="/admin/inventory?view=register" label="Items at or below reorder level" value={String(lowStockCount)} icon={<CircleAlert size={19} />} alert={lowStockCount > 0} />

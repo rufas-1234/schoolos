@@ -1,4 +1,4 @@
-import { and, asc, countDistinct, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { db } from "@/db";
@@ -12,8 +12,6 @@ import {
   type AdminTableFilter,
   type AdminTableRow,
 } from "@/components/admin-data-table";
-import { SearchableSelect } from "@/components/searchable-select";
-import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
   academicHolidays,
   academicTerms,
@@ -69,6 +67,7 @@ import {
 } from "./management-forms";
 import { AttendanceWorkspace } from "./attendance-workspace";
 import { isAttendanceStatus } from "@/lib/attendance-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 
 export default async function AcademicStructurePage({
   searchParams,
@@ -78,7 +77,6 @@ export default async function AcademicStructurePage({
     search?: string | string[];
     attendanceSectionId?: string | string[];
     attendanceDate?: string | string[];
-    teacherYearId?: string | string[];
     notice?: string | string[];
   }>;
 }) {
@@ -87,7 +85,6 @@ export default async function AcademicStructurePage({
     search: requestedSearch,
     attendanceSectionId: requestedAttendanceSectionId,
     attendanceDate: requestedAttendanceDate,
-    teacherYearId: requestedTeacherYearId,
     notice: requestedNotice,
   } = await searchParams;
   const sectionId =
@@ -114,9 +111,11 @@ export default async function AcademicStructurePage({
     typeof requestedAttendanceSectionId === "string" && /^\d+$/.test(requestedAttendanceSectionId)
       ? Number(requestedAttendanceSectionId)
       : null;
+  const academicYearSelection = await getSchoolAcademicYearSelection(context.schoolId);
+  const years = academicYearSelection.years;
+  const selectedAcademicYear = academicYearSelection.selectedYear;
   const [
     branches,
-    years,
     terms,
     classes,
     classStudentCounts,
@@ -147,11 +146,6 @@ export default async function AcademicStructurePage({
       .where(eq(schoolBranches.schoolId, context.schoolId))
       .orderBy(asc(schoolBranches.name)),
     db
-      .select()
-      .from(academicYears)
-      .where(eq(academicYears.schoolId, context.schoolId))
-      .orderBy(asc(academicYears.startDate)),
-    db
       .select({
         id: academicTerms.id,
         academicYearId: academicTerms.academicYearId,
@@ -164,7 +158,10 @@ export default async function AcademicStructurePage({
       })
       .from(academicTerms)
       .innerJoin(academicYears, eq(academicTerms.academicYearId, academicYears.id))
-      .where(eq(academicTerms.schoolId, context.schoolId))
+      .where(and(
+        eq(academicTerms.schoolId, context.schoolId),
+        eq(academicTerms.academicYearId, selectedAcademicYear?.id ?? 0),
+      ))
       .orderBy(asc(academicTerms.startDate)),
     db
       .select({
@@ -201,7 +198,7 @@ export default async function AcademicStructurePage({
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.status, "enrolled"),
-        eq(academicYears.status, "active"),
+        eq(academicYears.id, selectedAcademicYear?.id ?? 0),
         ne(students.status, "disabled"),
       ))
       .groupBy(classSections.classLevelId),
@@ -227,6 +224,7 @@ export default async function AcademicStructurePage({
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.status, "enrolled"),
+        eq(academicYears.id, selectedAcademicYear?.id ?? 0),
         ne(students.status, "disabled"),
       ))
       .groupBy(classSections.id),
@@ -252,7 +250,10 @@ export default async function AcademicStructurePage({
       .innerJoin(classLevels, eq(classSections.classLevelId, classLevels.id))
       .innerJoin(schoolBranches, eq(classLevels.branchId, schoolBranches.id))
       .leftJoin(teachers, eq(classSections.classTeacherId, teachers.id))
-      .where(eq(classSections.schoolId, context.schoolId))
+      .where(and(
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.academicYearId, selectedAcademicYear?.id ?? 0),
+      ))
       .orderBy(asc(academicYears.startDate), asc(schoolBranches.name), asc(classLevels.name), asc(classSections.name)),
     db
       .select({
@@ -351,7 +352,11 @@ export default async function AcademicStructurePage({
       .innerJoin(subjects, eq(classSubjects.subjectId, subjects.id))
       .leftJoin(teachers, eq(classSubjects.teacherId, teachers.id))
       .leftJoin(classRooms, eq(classRoutines.classRoomId, classRooms.id))
-      .where(and(eq(classRoutines.schoolId, context.schoolId), eq(classLevels.schoolId, context.schoolId)))
+      .where(and(
+        eq(classRoutines.schoolId, context.schoolId),
+        eq(classLevels.schoolId, context.schoolId),
+        eq(classSections.academicYearId, selectedAcademicYear?.id ?? 0),
+      ))
       .orderBy(asc(classRoutines.dayOfWeek), asc(classRoutines.startsAt)),
     db
       .select({
@@ -367,7 +372,10 @@ export default async function AcademicStructurePage({
       .from(academicHolidays)
       .innerJoin(academicYears, eq(academicHolidays.academicYearId, academicYears.id))
       .leftJoin(academicTerms, eq(academicHolidays.academicTermId, academicTerms.id))
-      .where(eq(academicHolidays.schoolId, context.schoolId))
+      .where(and(
+        eq(academicHolidays.schoolId, context.schoolId),
+        eq(academicHolidays.academicYearId, selectedAcademicYear?.id ?? 0),
+      ))
       .orderBy(asc(academicHolidays.startDate)),
     canManageEnrollments
       ? db
@@ -405,7 +413,10 @@ export default async function AcademicStructurePage({
           .innerJoin(academicYears, eq(studentEnrollments.academicYearId, academicYears.id))
           .innerJoin(classSections, eq(studentEnrollments.classSectionId, classSections.id))
           .innerJoin(classLevels, eq(classSections.classLevelId, classLevels.id))
-          .where(eq(studentEnrollments.schoolId, context.schoolId))
+          .where(and(
+            eq(studentEnrollments.schoolId, context.schoolId),
+            eq(studentEnrollments.academicYearId, selectedAcademicYear?.id ?? 0),
+          ))
           .orderBy(desc(studentEnrollments.enrolledAt))
           .limit(100)
       : Promise.resolve([]),
@@ -424,7 +435,16 @@ export default async function AcademicStructurePage({
           })
           .from(studentAcademicEvents)
           .innerJoin(students, eq(studentAcademicEvents.studentId, students.id))
-          .where(eq(studentAcademicEvents.schoolId, context.schoolId))
+          .where(selectedAcademicYear
+            ? and(
+              eq(studentAcademicEvents.schoolId, context.schoolId),
+              gte(studentAcademicEvents.eventDate, selectedAcademicYear.startDate),
+              lte(studentAcademicEvents.eventDate, selectedAcademicYear.endDate),
+            )
+            : and(
+              eq(studentAcademicEvents.schoolId, context.schoolId),
+              eq(studentAcademicEvents.id, 0),
+            ))
           .orderBy(desc(studentAcademicEvents.eventDate), desc(studentAcademicEvents.id))
           .limit(30)
       : Promise.resolve([]),
@@ -433,7 +453,7 @@ export default async function AcademicStructurePage({
   const activeAttendanceSection = sections.find(
     (section) =>
       section.id === requestedAttendanceSection &&
-      section.yearStatus === "active",
+      section.academicYearId === selectedAcademicYear?.id,
   );
   const studentCountByClass = new Map(
     classStudentCounts.map((entry) => [entry.classLevelId, entry.studentCount]),
@@ -441,12 +461,8 @@ export default async function AcademicStructurePage({
   const studentCountBySection = new Map(
     sectionStudentCounts.map((entry) => [entry.classSectionId, entry.studentCount]),
   );
-  const activeAcademicYear = years.find((year) => year.status === "active");
-  const parsedTeacherYearId = typeof requestedTeacherYearId === "string" && /^\d+$/.test(requestedTeacherYearId)
-    ? Number(requestedTeacherYearId)
-    : null;
-  const teacherAcademicYear = years.find((year) => year.id === parsedTeacherYearId) ?? activeAcademicYear ?? null;
-  const teacherYearSections = sections.filter((section) => section.academicYearId === teacherAcademicYear?.id);
+  const teacherAcademicYear = selectedAcademicYear;
+  const teacherYearSections = sections;
   const teacherYearClassIds = new Set(teacherYearSections.map((section) => section.classLevelId));
   const teacherYearSubjectAssignments = subjectAssignments.filter((assignment) =>
     assignment.teacherId !== null && teacherYearClassIds.has(assignment.classLevelId),
@@ -510,10 +526,6 @@ export default async function AcademicStructurePage({
     .filter((year) => year.status !== "archived")
     .map((year) => ({ id: year.id, label: `${year.name} · ${year.status}` }));
   const allYearOptions = years.map((year) => ({ id: year.id, label: `${year.name} · ${year.status}` }));
-  const teacherYearOptions = years.map((year) => ({
-    value: String(year.id),
-    label: `${year.name} · ${year.status}`,
-  }));
   const classOptions = classes.filter((classLevel) => classLevel.status === "active").map((classLevel) => ({
     id: classLevel.id,
     branchId: classLevel.branchId,
@@ -898,9 +910,9 @@ export default async function AcademicStructurePage({
                   },
                   actions: (
                     <>
-                      {activeAcademicYear && (
+                      {selectedAcademicYear && (
                         <Link
-                          href={`/admin/academics/rosters/print?classLevelId=${classLevel.id}&academicYearId=${activeAcademicYear.id}`}
+                          href={`/admin/academics/rosters/print?classLevelId=${classLevel.id}&academicYearId=${selectedAcademicYear.id}`}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           Print roster
@@ -1186,22 +1198,11 @@ export default async function AcademicStructurePage({
             )}
             {sectionId === "teachers" && (
               <div className="space-y-4">
-                <SmartFilterForm method="get" action="/admin/academics" className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <input type="hidden" name="section" value="teachers" />
-                  <div className="min-w-64 flex-1">
-                    <SearchableSelect
-                      label="Assignment year"
-                      name="teacherYearId"
-                      options={teacherYearOptions}
-                      defaultValue={teacherAcademicYear ? String(teacherAcademicYear.id) : ""}
-                      placeholder="Search academic years"
-                      disabled={teacherYearOptions.length === 0}
-                    />
-                  </div>
-                  <p className="pb-2 text-xs text-slate-500">
-                    Roles and assignments reflect classes, sections, and subjects for this year.
-                  </p>
-                </SmartFilterForm>
+                <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  {teacherAcademicYear
+                    ? <>Teaching roles and assignments reflect {teacherAcademicYear.name}. Use the academic year selector in the workspace header to change the records shown.</>
+                    : "Create an academic year to review teaching roles and assignments."}
+                </p>
                 <RecordList
                   title="Teachers"
                   columns={[

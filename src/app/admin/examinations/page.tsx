@@ -25,6 +25,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { canViewExamSubject } from "@/lib/examination-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
@@ -53,6 +54,7 @@ export default async function ExaminationsPage({
   }>;
 }) {
   const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
+  const academicYearSelection = await getSchoolAcademicYearSelection(context.schoolId);
   const {
     section: requestedSection,
     branchId: rawBranchId,
@@ -90,14 +92,7 @@ export default async function ExaminationsPage({
   const today = new Date().toISOString().slice(0, 10);
   const [years, terms, branches, classes, scales, examTypesList] = await Promise.all([
     canConfigure
-      ? db.select({
-        id: academicYears.id,
-        name: academicYears.name,
-        status: academicYears.status,
-        startDate: academicYears.startDate,
-        endDate: academicYears.endDate,
-      }).from(academicYears)
-        .where(eq(academicYears.schoolId, context.schoolId)).orderBy(asc(academicYears.startDate))
+      ? Promise.resolve(academicYearSelection.years)
       : Promise.resolve([]),
     canConfigure
       ? db.select({
@@ -106,7 +101,10 @@ export default async function ExaminationsPage({
         name: academicTerms.name,
         startDate: academicTerms.startDate,
         endDate: academicTerms.endDate,
-      }).from(academicTerms).where(eq(academicTerms.schoolId, context.schoolId)).orderBy(asc(academicTerms.startDate))
+      }).from(academicTerms).where(and(
+        eq(academicTerms.schoolId, context.schoolId),
+        eq(academicTerms.academicYearId, academicYearSelection.selectedYear?.id ?? 0),
+      )).orderBy(asc(academicTerms.startDate))
       : Promise.resolve([]),
     db.select({ id: schoolBranches.id, name: schoolBranches.name }).from(schoolBranches)
       .where(and(eq(schoolBranches.schoolId, context.schoolId), eq(schoolBranches.status, "active")))
@@ -200,7 +198,12 @@ export default async function ExaminationsPage({
         eq(schoolBranches.id, examinations.branchId!),
         eq(schoolBranches.schoolId, context.schoolId),
       ))
-      .where(eq(examinations.schoolId, context.schoolId))
+      .where(and(
+        eq(examinations.schoolId, context.schoolId),
+        academicYearSelection.selectedYear
+          ? eq(examinations.academicYearId, academicYearSelection.selectedYear.id)
+          : undefined,
+      ))
       .orderBy(asc(academicYears.startDate), asc(examinations.startDate));
   } else {
     const assignments = await db.select({ examId: examinations.id }).from(examSubjects)
@@ -223,7 +226,12 @@ export default async function ExaminationsPage({
         eq(staffMembers.schoolId, context.schoolId),
         eq(staffMembers.linkedUserId, context.user.id),
       ))
-      .where(eq(staffMembers.status, "active"));
+      .where(and(
+        eq(staffMembers.status, "active"),
+        academicYearSelection.selectedYear
+          ? eq(examinations.academicYearId, academicYearSelection.selectedYear.id)
+          : undefined,
+      ));
     const classTeacherAssignments = userTeacherIds.length
       ? await db.selectDistinct({ examId: examinations.id }).from(classSections)
         .innerJoin(examClasses, and(
@@ -238,6 +246,9 @@ export default async function ExaminationsPage({
         .where(and(
           eq(classSections.schoolId, context.schoolId),
           inArray(classSections.classTeacherId, userTeacherIds),
+          academicYearSelection.selectedYear
+            ? eq(examinations.academicYearId, academicYearSelection.selectedYear.id)
+            : undefined,
         ))
       : [];
     const ids = [...new Set([

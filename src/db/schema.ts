@@ -1185,6 +1185,36 @@ export const studentEnrollments = mysqlTable(
   ],
 );
 
+export const studentCertificates = mysqlTable(
+  "student_certificates",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    academicYearId: bigint("academicYearId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => academicYears.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => students.id),
+    certificateNumber: varchar("certificateNumber", { length: 48 }).notNull(),
+    category: varchar("category", { length: 120 }).notNull(),
+    title: varchar("title", { length: 160 }).notNull(),
+    achievement: varchar("achievement", { length: 2000 }).notNull(),
+    issuedAt: date("issuedAt", { mode: "string" }).notNull(),
+    issuedBy: varchar("issuedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("student_certificates_school_number_uq").on(table.schoolId, table.certificateNumber),
+    index("student_certificates_school_year_issued_idx").on(table.schoolId, table.academicYearId, table.issuedAt),
+    index("student_certificates_school_student_year_idx").on(table.schoolId, table.studentId, table.academicYearId),
+    index("student_certificates_school_category_idx").on(table.schoolId, table.category),
+  ],
+);
+
 export const studentSettings = mysqlTable(
   "student_settings",
   {

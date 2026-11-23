@@ -28,9 +28,11 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 
 export default async function DashboardPage() {
   const context = await requireSchoolPermission("dashboard.view");
+  const { selectedYear } = await getSchoolAcademicYearSelection(context.schoolId);
   const [
     membersResult,
     studentsResult,
@@ -53,17 +55,20 @@ export default async function DashboardPage() {
       .select({ value: count() })
       .from(students)
       .where(and(eq(students.schoolId, context.schoolId), eq(students.status, "pending"))),
-    db
-      .select({ value: count() })
-      .from(studentEnrollments)
-      .innerJoin(academicYears, eq(studentEnrollments.academicYearId, academicYears.id))
-      .where(
-        and(
+    selectedYear
+      ? db
+        .select({ value: count() })
+        .from(studentEnrollments)
+        .innerJoin(academicYears, and(
+          eq(studentEnrollments.academicYearId, academicYears.id),
+          eq(academicYears.schoolId, context.schoolId),
+        ))
+        .where(and(
           eq(studentEnrollments.schoolId, context.schoolId),
+          eq(studentEnrollments.academicYearId, selectedYear.id),
           eq(studentEnrollments.status, "enrolled"),
-          eq(academicYears.status, "active"),
-        ),
-      ),
+        ))
+      : Promise.resolve([{ value: 0 }]),
     db
       .select({ value: count() })
       .from(teachers)
@@ -265,7 +270,7 @@ export default async function DashboardPage() {
         <MetricCard
           title="Current enrollments"
           value={enrollmentCount}
-          detail="In the active academic year"
+          detail={selectedYear ? `In ${selectedYear.name}` : "No academic year available"}
           icon={<CalendarDays size={19} />}
           color="blue"
           href="/admin/academics?section=enrollment"
