@@ -1,5 +1,11 @@
 export const studentSections = [
   {
+    id: "overview",
+    label: "Student Overview",
+    href: "/admin/students/overview",
+    permission: "students.view",
+  },
+  {
     id: "category",
     label: "Student Category",
     href: "/admin/students/categories",

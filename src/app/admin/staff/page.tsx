@@ -41,11 +41,25 @@ const employmentTypeLabels: Record<string, string> = {
 export default async function StaffDirectoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ profile?: string | string[] }>;
+  searchParams: Promise<{
+    profile?: string | string[];
+    search?: string | string[];
+    showAll?: string | string[];
+    branchId?: string | string[];
+  }>;
 }) {
-  const { profile } = await searchParams;
+  const { profile, search, showAll, branchId } = await searchParams;
   const profilePublicId = typeof profile === "string" && profile.length <= 36 ? profile : "";
+  const initialSearch = typeof search === "string" ? search.slice(0, 120) : "";
+  const showAllRecords = showAll === "1";
+  const requestedBranchId = typeof branchId === "string" ? Number(branchId) : NaN;
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const staffScope = and(
+    eq(staffMembers.schoolId, context.schoolId),
+    ...(Number.isSafeInteger(requestedBranchId) && requestedBranchId > 0
+      ? [eq(staffMembers.branchId, requestedBranchId)]
+      : []),
+  );
 
   const [records, totals, accounts, branches, departments, designations, settings] = await Promise.all([
     db
@@ -94,12 +108,12 @@ export default async function StaffDirectoryPage({
         startDate: staffMembers.startDate,
       })
       .from(staffMembers)
-      .where(eq(staffMembers.schoolId, context.schoolId))
+      .where(staffScope)
       .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db
       .select({ status: staffMembers.status, total: count() })
       .from(staffMembers)
-      .where(eq(staffMembers.schoolId, context.schoolId))
+      .where(staffScope)
       .groupBy(staffMembers.status),
     db.select({
       id: user.id,
@@ -143,6 +157,10 @@ export default async function StaffDirectoryPage({
   ]);
   const requiredFields = normalizeRequiredStaffFields(settings[0]?.requiredFields ?? defaultRequiredStaffFields);
   const visibleFields = normalizeVisibleStaffFields(settings[0]?.visibleFields ?? defaultVisibleStaffFields);
+  const selectedBranch = branches.find((branch) => branch.id === requestedBranchId);
+  const initialFilters: Record<string, string> = selectedBranch
+    ? { branch: selectedBranch.name }
+    : {};
   const activeCount = totals.find((item) => item.status === "active")?.total ?? 0;
   const inactiveCount = totals.find((item) => item.status === "inactive")?.total ?? 0;
   const totalCount = totals.reduce((sum, item) => sum + item.total, 0);
@@ -239,6 +257,7 @@ export default async function StaffDirectoryPage({
 
       <div className="space-y-4 print:block">
         <AdminDataTable
+          key={`${initialSearch}:${selectedBranch?.id ?? ""}:${showAllRecords}`}
           title="Staff directory"
           columns={[
             { key: "employeeCode", label: "Employee ID" },
@@ -254,10 +273,16 @@ export default async function StaffDirectoryPage({
             { key: "status", label: "Status" },
           ]}
           filters={filters}
-          requireSearchCriteria
+          requireSearchCriteria={!showAllRecords}
+          initialQuery={initialSearch}
+          initialFilters={initialFilters}
           showActionLabels
           toolbarActions={
-            <AdminActionDialog label="Add staff member" title="Add staff member">
+            <AdminActionDialog
+              label="Add staff member"
+              title="Add staff member"
+              openWhenSearchParam={{ name: "action", value: "add" }}
+            >
               <StaffForm
                 accounts={accounts}
                 branches={branches}
@@ -270,6 +295,7 @@ export default async function StaffDirectoryPage({
           }
           rows={records.map((record) => ({
             id: record.id,
+            searchableText: `status:${record.status}`,
             clickableColumns: ["name"],
             values: {
               employeeCode: record.employeeCode ?? "",

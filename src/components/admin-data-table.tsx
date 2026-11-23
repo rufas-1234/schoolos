@@ -331,6 +331,7 @@ export function AdminDataTable({
   searchCriteriaSelected,
   showAllRecordsLabel,
   initialQuery = "",
+  initialFilters = {},
   emptyMessage,
   hideDefaultView = false,
   showRowNumber = true,
@@ -347,6 +348,7 @@ export function AdminDataTable({
   searchCriteriaSelected?: boolean;
   showAllRecordsLabel?: string;
   initialQuery?: string;
+  initialFilters?: Record<string, string>;
   emptyMessage: string;
   hideDefaultView?: boolean;
   showRowNumber?: boolean;
@@ -359,7 +361,7 @@ export function AdminDataTable({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
-  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [filterValues, setFilterValues] = useState<Record<string, string>>(initialFilters);
   const [printAll, setPrintAll] = useState(false);
   const [showAllRecords, setShowAllRecords] = useState(false);
   const printTargetId = useId();

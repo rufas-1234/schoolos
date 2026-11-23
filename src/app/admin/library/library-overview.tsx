@@ -36,8 +36,12 @@ export async function LibraryOverview({ schoolId }: { schoolId: number }) {
   const monthDates = Array.from({ length: 6 }, (_, index) =>
     new Date(Date.UTC(firstMonth.getUTCFullYear(), firstMonth.getUTCMonth() + index, 1)),
   );
-  const issuedMonth = sql<string>`DATE_FORMAT(${libraryLoans.issuedAt}, '%Y-%m')`;
-  const returnedMonth = sql<string>`DATE_FORMAT(${libraryLoans.returnedAt}, '%Y-%m')`;
+  const issuedMonth = sql<string>`DATE_FORMAT(MIN(${libraryLoans.issuedAt}), '%Y-%m')`;
+  const issuedYear = sql<number>`YEAR(${libraryLoans.issuedAt})`;
+  const issuedMonthNumber = sql<number>`MONTH(${libraryLoans.issuedAt})`;
+  const returnedMonth = sql<string>`DATE_FORMAT(MIN(${libraryLoans.returnedAt}), '%Y-%m')`;
+  const returnedYear = sql<number>`YEAR(${libraryLoans.returnedAt})`;
+  const returnedMonthNumber = sql<number>`MONTH(${libraryLoans.returnedAt})`;
   const issuedCount = count();
 
   const [
@@ -109,7 +113,7 @@ export async function LibraryOverview({ schoolId }: { schoolId: number }) {
       eq(libraryLoans.schoolId, schoolId),
       gte(libraryLoans.issuedAt, rangeStart),
       lte(libraryLoans.issuedAt, today),
-    )).groupBy(issuedMonth).orderBy(asc(issuedMonth)),
+    )).groupBy(issuedYear, issuedMonthNumber).orderBy(asc(issuedMonth)),
     db.select({
       month: returnedMonth,
       value: count(),
@@ -119,7 +123,7 @@ export async function LibraryOverview({ schoolId }: { schoolId: number }) {
       isNotNull(libraryLoans.returnedAt),
       gte(libraryLoans.returnedAt, rangeStart),
       lte(libraryLoans.returnedAt, today),
-    )).groupBy(returnedMonth).orderBy(asc(returnedMonth)),
+    )).groupBy(returnedYear, returnedMonthNumber).orderBy(asc(returnedMonth)),
     db.select({
       id: libraryBooks.id,
       title: libraryBooks.title,

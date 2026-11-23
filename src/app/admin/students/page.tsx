@@ -62,6 +62,7 @@ export default async function StudentsPage({
   const { action, search, profile } = await searchParams;
   const openAddStudent = action === "add";
   const exportMode = action === "export";
+  const showAllStudents = action === "all";
   const initialSearch = typeof search === "string" ? search.slice(0, 120) : "";
   const profilePublicId = typeof profile === "string" && profile.length <= 36 ? profile : "";
   const context = await requireSchoolPermission("students.view");
@@ -529,7 +530,7 @@ export default async function StudentsPage({
             { key: "phone", label: "Phone" },
           ]}
           filters={filters}
-          requireSearchCriteria
+          requireSearchCriteria={!showAllStudents}
           initialQuery={tableInitialSearch}
           showAllRecordsLabel="Show all sections"
           hideDefaultView
@@ -554,6 +555,7 @@ export default async function StudentsPage({
           ) : null}
           rows={records.map((record) => ({
             id: record.id,
+            searchableText: `status:${record.status}`,
             clickableColumns: ["name"],
             values: {
               studentId: record.publicId,
