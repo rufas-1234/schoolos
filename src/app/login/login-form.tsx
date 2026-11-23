@@ -1,17 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getSignedInWorkspacePath } from "./actions";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const emailRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -50,42 +48,6 @@ export function LoginForm() {
     }
   }
 
-  async function handleGoogleSignIn() {
-    const email = (emailRef.current?.value ?? "").trim().toLowerCase();
-    if (!email.includes("@")) {
-      setError("Enter your SchoolOS account email first, then continue with Google.");
-      return;
-    }
-
-    setPending(true);
-    setError("");
-    try {
-      const eligibility = await fetch("/api/auth/google/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!eligibility.ok) {
-        const result = await eligibility.json().catch(() => null) as { error?: string } | null;
-        setError(result?.error ?? "Google sign-in is unavailable for this account.");
-        return;
-      }
-
-      const { error: oauthError } = await createSupabaseBrowserClient().auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: { login_hint: email },
-        },
-      });
-      if (oauthError) setError("Google sign-in could not start. Check that Google is enabled in Supabase Auth.");
-    } catch {
-      setError("Google sign-in could not start. Check your connection and Supabase Auth settings.");
-    } finally {
-      setPending(false);
-    }
-  }
-
   const reason = searchParams.get("reason");
 
   return (
@@ -93,16 +55,6 @@ export function LoginForm() {
       {reason === "account-disabled" && (
         <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
           This account is inactive. Contact your school administrator.
-        </p>
-      )}
-      {reason === "account-not-found" && (
-        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          This Google account is not linked to an active SchoolOS account. Check the email or contact your administrator.
-        </p>
-      )}
-      {reason === "oauth-failed" && (
-        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          Google sign-in could not be completed. Try again or sign in with your password.
         </p>
       )}
       {reason === "reset-link-expired" && (
@@ -126,7 +78,6 @@ export function LoginForm() {
               className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
               name="identifier"
               placeholder="Email, phone, or admission number"
-              ref={emailRef}
               required
               type="text"
             />
@@ -157,16 +108,6 @@ export function LoginForm() {
         </Link>
       </p>
 
-      <div className="flex items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">or</span>
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <Button className="h-12 w-full rounded-xl" disabled={pending} onClick={handleGoogleSignIn} type="button" variant="outline">
-        <span aria-hidden="true" className="text-base font-bold text-blue-600">G</span>
-        {pending ? "Connecting to Google..." : "Continue with Google"}
-      </Button>
     </div>
   );
 }
