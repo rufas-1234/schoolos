@@ -19,6 +19,7 @@ import {
   LogOut,
   Menu,
   PackageOpen,
+  PanelRight,
   Search,
   School,
   Settings,
@@ -281,11 +282,15 @@ export function AdminShell({
   isPlatformAdmin: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(false);
+  const [desktopRightSidebarExpanded, setDesktopRightSidebarExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const [rightSidebarQuery, setRightSidebarQuery] = useState("");
   const [leftSidebarQuery, setLeftSidebarQuery] = useState("");
   const leftSidebarSearchRef = useRef<HTMLInputElement>(null);
+  const desktopSidebarRef = useRef<HTMLDivElement>(null);
+  const desktopRightSidebarRef = useRef<HTMLDivElement>(null);
   const mobileNavigationRef = useRef<HTMLDivElement>(null);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const closeNavigationRef = useRef<HTMLButtonElement>(null);
@@ -326,6 +331,9 @@ export function AdminShell({
         if (window.matchMedia("(max-width: 1023px)").matches && !open) {
           setOpen(true);
           window.setTimeout(() => leftSidebarSearchRef.current?.focus(), 50);
+        } else if (!desktopSidebarExpanded) {
+          setDesktopSidebarExpanded(true);
+          window.setTimeout(() => leftSidebarSearchRef.current?.focus(), 50);
         } else {
           leftSidebarSearchRef.current?.focus();
         }
@@ -333,7 +341,7 @@ export function AdminShell({
     }
     document.addEventListener("keydown", focusSidebarSearch);
     return () => document.removeEventListener("keydown", focusSidebarSearch);
-  }, [open]);
+  }, [desktopSidebarExpanded, open]);
   const visibleNavigation = navigation
     .filter((item) =>
       permissions.includes(item.permission) ||
@@ -526,21 +534,37 @@ export function AdminShell({
     }
   }
 
-  const sidebar = (
-    <aside className="admin-shell-sidebar print:hidden flex h-full w-[260px] flex-col overflow-hidden border-r border-slate-200 bg-white px-4 py-5">
-      <Link href={homeHref} className="mb-5 flex items-center gap-3 px-1">
+  const sidebar = (compact = false) => (
+    <aside className={cn(
+      "admin-shell-sidebar print:hidden flex h-full flex-col overflow-hidden border-r border-slate-200 bg-white py-5 transition-[padding] duration-200 motion-reduce:transition-none",
+      compact ? "w-[68px] items-center px-2" : "w-[260px] px-4",
+    )}>
+      <Link href={homeHref} aria-label={compact ? `${schoolName} home` : undefined} title={compact ? schoolName : undefined} className={cn("mb-5 flex items-center gap-3 px-1", compact && "justify-center")}>
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f38020] text-white shadow-sm">
           {schoolLogo
             ? <Image src={schoolLogo} unoptimized width={40} height={40} alt="" className="h-full w-full rounded-xl bg-white object-contain" />
             : <GraduationCap size={24} />}
         </span>
-        <span className="min-w-0">
+        <span className={cn("min-w-0", compact && "hidden")}>
           <span className="block truncate text-sm font-semibold text-slate-900">{schoolName}</span>
           <span className="mt-0.5 block text-xs text-slate-500">School workspace</span>
         </span>
       </Link>
 
-      <label className="relative mb-3 block">
+      {compact ? (
+        <button
+          type="button"
+          title="Search navigation"
+          aria-label="Expand navigation and search"
+          onClick={() => {
+            setDesktopSidebarExpanded(true);
+            window.setTimeout(() => leftSidebarSearchRef.current?.focus(), 40);
+          }}
+          className="mb-3 flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+        >
+          <Search aria-hidden="true" size={17} />
+        </button>
+      ) : <label className="relative mb-3 block">
         <span className="sr-only">Quick search navigation</span>
         <Search aria-hidden="true" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -552,9 +576,9 @@ export function AdminShell({
           className="cloudflare-search-input h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-14 text-[13px] text-slate-800 outline-none placeholder:text-slate-500 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
         />
         <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Ctrl K</kbd>
-      </label>
+      </label>}
 
-      <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
+      <nav aria-label="Main navigation" className="admin-sidebar-nav min-h-0 w-full flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
         {navigationGroups.map((group) => {
           const query = leftSidebarQuery.trim().toLocaleLowerCase();
           const groupItems = visibleNavigation.filter((item) => group.labels.includes(item.label))
@@ -563,9 +587,9 @@ export function AdminShell({
           if (!groupItems.length) return null;
           return (
             <div key={group.label}>
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              {!compact && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 {group.label}
-              </p>
+              </p>}
               <div className="space-y-0.5">
         {groupItems.map(({ href, label, icon: Icon, children }) => {
           const nestedNavigationActive = visibleNavigation.some(
@@ -669,9 +693,12 @@ export function AdminShell({
               <div key={href}>
                 <button
                   type="button"
-                  aria-expanded={sectionOpen}
+                  aria-expanded={compact ? undefined : sectionOpen}
+                  title={compact ? label : undefined}
                   onClick={() => {
-                    if (active) {
+                    if (compact) {
+                      setDesktopSidebarExpanded(true);
+                    } else if (active) {
                       setSectionOpen((value) => !value);
                     } else {
                       setSectionOpen(true);
@@ -679,20 +706,21 @@ export function AdminShell({
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition",
+                    "flex w-full items-center gap-3 rounded-lg py-2 text-left text-sm font-medium transition",
+                    compact ? "justify-center px-0" : "px-3",
                     active
                       ? "bg-blue-50 text-blue-700"
                       : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
                   )}
                 >
                   <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
-                  {label}
-                  <ChevronDown
+                  {!compact && label}
+                  {!compact && <ChevronDown
                     size={16}
                     className={cn("ml-auto transition-transform", sectionOpen && "rotate-180")}
-                  />
+                  />}
                 </button>
-                {sectionOpen && (
+                {!compact && sectionOpen && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3">
                     {resolvedSections.filter((section) => !query || label.toLocaleLowerCase().includes(query) || section.label.toLocaleLowerCase().includes(query)).map((section) => {
                       if (!section.href) {
@@ -745,16 +773,18 @@ export function AdminShell({
               key={href}
               href={href}
               onClick={() => setOpen(false)}
+              title={compact ? label : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
+                "flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition",
+                compact ? "justify-center px-0" : "px-3",
                 active
                   ? "bg-violet-50 text-violet-800"
                   : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
               )}
             >
               <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
-              {label}
-              {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-violet-600" />}
+              {!compact && label}
+              {active && !compact && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-violet-600" />}
             </Link>
           );
         })}
@@ -767,10 +797,11 @@ export function AdminShell({
       <Link
         href="/guide"
         onClick={() => setOpen(false)}
-        className="mt-3 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+        title={compact ? "User guide" : undefined}
+        className={cn("mt-3 flex items-center gap-3 rounded-lg py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950", compact ? "justify-center px-0" : "px-3")}
       >
         <CircleHelp size={18} strokeWidth={1.8} />
-        User guide
+        {!compact && "User guide"}
       </Link>
 
       <div className="mt-auto flex justify-center border-t border-slate-200 pt-4">
@@ -806,7 +837,23 @@ export function AdminShell({
         </div>
         <div className="admin-print-seal" aria-hidden="true">SCHOOL</div>
       </header>
-      <div className="print:hidden fixed inset-y-0 left-0 z-30 hidden lg:block">{sidebar}</div>
+      <div
+        ref={desktopSidebarRef}
+        className={cn(
+          "print:hidden fixed inset-y-0 left-0 z-30 hidden overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none lg:block",
+          desktopSidebarExpanded ? "w-[260px]" : "w-[68px]",
+        )}
+        onMouseEnter={() => setDesktopSidebarExpanded(true)}
+        onMouseLeave={() => {
+          if (!desktopSidebarRef.current?.contains(document.activeElement)) setDesktopSidebarExpanded(false);
+        }}
+        onFocusCapture={() => setDesktopSidebarExpanded(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDesktopSidebarExpanded(false);
+        }}
+      >
+        {sidebar(!desktopSidebarExpanded)}
+      </div>
       {open && (
         <div
           ref={mobileNavigationRef}
@@ -821,7 +868,7 @@ export function AdminShell({
             className="absolute inset-0 bg-slate-950/30"
             onClick={() => setOpen(false)}
           />
-          <div className="relative h-dvh w-[min(280px,86vw)]">{sidebar}</div>
+          <div className="relative h-dvh w-[min(280px,86vw)]">{sidebar()}</div>
           <button
             ref={closeNavigationRef}
             className="admin-mobile-navigation-close print:hidden fixed z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-600 shadow-lg lg:hidden"
@@ -833,7 +880,7 @@ export function AdminShell({
         </div>
       )}
 
-      <div className="admin-shell-content lg:pl-[260px] 2xl:pr-[260px]">
+      <div className="admin-shell-content lg:pl-[68px] 2xl:pr-[68px]">
         <header className="admin-shell-topbar print:hidden sticky top-0 z-20 flex h-auto min-h-16 flex-wrap items-center justify-between gap-y-2 border-b border-slate-200 bg-white px-3 py-2 text-slate-900 sm:px-5 md:h-[76px] md:flex-nowrap md:gap-y-0 md:py-0 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -945,7 +992,22 @@ export function AdminShell({
         )}
         <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>
-      <aside className="admin-shell-right-sidebar print:hidden fixed inset-y-0 right-0 z-10 hidden w-[260px] flex-col border-l border-slate-200 bg-white px-4 pb-5 pt-[calc(76px+1.25rem)] 2xl:flex">
+      <div
+        ref={desktopRightSidebarRef}
+        className={cn(
+          "print:hidden fixed inset-y-0 right-0 z-10 hidden overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none 2xl:block",
+          desktopRightSidebarExpanded ? "w-[260px]" : "w-[68px]",
+        )}
+        onMouseEnter={() => setDesktopRightSidebarExpanded(true)}
+        onMouseLeave={() => {
+          if (!desktopRightSidebarRef.current?.contains(document.activeElement)) setDesktopRightSidebarExpanded(false);
+        }}
+        onFocusCapture={() => setDesktopRightSidebarExpanded(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDesktopRightSidebarExpanded(false);
+        }}
+      >
+      {desktopRightSidebarExpanded ? <aside className="admin-shell-right-sidebar print:hidden flex h-full w-[260px] flex-col border-l border-slate-200 bg-white px-4 pb-5 pt-[calc(76px+1.25rem)]">
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-slate-900">Workspace pages</h2>
           <p className="mt-1 text-xs text-slate-500">Search all available sections</p>
@@ -1018,7 +1080,18 @@ export function AdminShell({
             <p className="px-2 py-3 text-xs text-slate-500">No matching links.</p>
           )}
         </nav>
-      </aside>
+      </aside> : <aside className="admin-shell-right-sidebar print:hidden flex h-full w-[68px] flex-col items-center border-l border-slate-200 bg-white pt-[calc(76px+1.25rem)]">
+        <button
+          type="button"
+          title="Show workspace pages"
+          aria-label="Show workspace pages"
+          onClick={() => setDesktopRightSidebarExpanded(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+        >
+          <PanelRight size={18} />
+        </button>
+      </aside>}
+      </div>
       <footer className="admin-print-footer">
         <span>{schoolName} <span aria-hidden="true">•</span> Official school record</span>
         <span>Handle student information confidentially</span>

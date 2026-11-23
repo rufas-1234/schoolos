@@ -23,6 +23,8 @@
     "@aws-sdk/client-s3": "^3.1163.0",
     "@aws-sdk/s3-request-presigner": "^3.1163.0",
     "@radix-ui/react-slot": "^1.5.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
     "@vercel/blob": "^2.8.2",
     "better-auth": "^1.7.18",
     "class-variance-authority": "^0.7.1",

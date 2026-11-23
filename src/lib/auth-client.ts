@@ -1,5 +1,10 @@
 "use client";
 
-import { createAuthClient } from "better-auth/react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-export const authClient = createAuthClient();
+export const authClient = {
+  async signOut() {
+    const { error } = await createSupabaseBrowserClient().auth.signOut();
+    return { error };
+  },
+};

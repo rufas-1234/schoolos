@@ -1,80 +1,37 @@
-import { randomBytes } from "node:crypto";
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import * as schema from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
+import { user } from "@/db/schema";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const secret =
-  process.env.BETTER_AUTH_SECRET ??
-  (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build"
-    ? undefined
-    : randomBytes(32).toString("base64url"));
+export type AppAuthUser = { id: string; email: string; name: string; image: string | null };
 
-if (!secret) {
-  throw new Error("BETTER_AUTH_SECRET must be configured before starting the production server.");
+async function getAppAuthUser(): Promise<AppAuthUser | null> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user: authUser }, error } = await supabase.auth.getUser();
+    if (error || !authUser?.email) return null;
+    const localUserId = typeof authUser.app_metadata?.schoolos_user_id === "string"
+      ? authUser.app_metadata.schoolos_user_id
+      : null;
+    const [localUser] = await db.select({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+    }).from(user).where(localUserId ? eq(user.id, localUserId) : eq(user.email, authUser.email.toLowerCase())).limit(1);
+    if (!localUser) return null;
+    return localUser;
+  } catch {
+    return null;
+  }
 }
 
-const baseURL =
-  process.env.BETTER_AUTH_URL ??
-  (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build"
-    ? undefined
-    : "http://localhost:3000");
-
-if (!baseURL) {
-  throw new Error("BETTER_AUTH_URL must be configured before starting the production server.");
-}
-
-export const auth = betterAuth({
-  appName: process.env.NEXT_PUBLIC_APP_NAME ?? "SchoolOS",
-  baseURL,
-  secret,
-  database: drizzleAdapter(db, {
-    provider: "mysql",
-    schema: {
-      user: schema.user,
-      session: schema.session,
-      account: schema.account,
-      verification: schema.verification,
-      rateLimit: schema.rateLimit,
-    },
-    camelCase: true,
-  }),
-  emailAndPassword: {
-    enabled: true,
-    disableSignUp: true,
-    requireEmailVerification: false,
-    minPasswordLength: 6,
-    maxPasswordLength: 128,
-  },
-  rateLimit: {
-    enabled: true,
-    storage: "database",
-    customRules: {
-      "/sign-in/email": { window: 60, max: 5 },
+// Keep the existing app-facing session API stable while Supabase owns the session.
+export const auth = {
+  api: {
+    async getSession(_input?: { headers?: Headers }) {
+      const signedInUser = await getAppAuthUser();
+      return signedInUser ? { user: signedInUser, session: { userId: signedInUser.id } } : null;
     },
   },
-  session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
-    cookieCache: { enabled: true, maxAge: 60 * 5 },
-  },
-  advanced: {
-    useSecureCookies: process.env.NODE_ENV === "production",
-  },
-  user: {
-    additionalFields: {
-      isActive: {
-        type: "boolean",
-        required: false,
-        defaultValue: true,
-        input: false,
-      },
-      mustChangePassword: {
-        type: "boolean",
-        required: false,
-        defaultValue: false,
-        input: false,
-      },
-    },
-  },
-});
+};

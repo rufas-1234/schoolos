@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
+import { verifySupabasePassword } from "@/lib/supabase/password";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -69,10 +70,11 @@ export async function signupSchool(
           ))
           .for("update")
           .limit(1);
-        if (!credentialAccount?.password || !(await verifyPassword({
-          hash: credentialAccount.password,
+        const verifiedAgainstLegacyHash = Boolean(credentialAccount?.password) && await verifyPassword({
+          hash: credentialAccount!.password!,
           password: values.password,
-        }))) {
+        });
+        if (!verifiedAgainstLegacyHash && !(await verifySupabasePassword(email, values.password))) {
           throw new SchoolSignupError("We couldn't verify the administrator account. Check the email and password, or contact support.");
         }
       } else {

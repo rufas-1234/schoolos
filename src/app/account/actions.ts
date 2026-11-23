@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+import { changeSupabasePassword } from "@/lib/supabase/password";
 import { requireSchoolMember } from "@/lib/access-control";
 import { getPasswordStrengthError } from "@/lib/password-policy";
 import { db } from "@/db";
-import { user } from "@/db/schema";
+import { account, user } from "@/db/schema";
 import { getSignedInWorkspacePath } from "@/app/login/actions";
 
 export type AccountPasswordState = { error?: string; success?: boolean; message?: string; redirectTo?: string };
@@ -21,7 +22,7 @@ export async function changeAccountPassword(
   _previousState: AccountPasswordState,
   formData: FormData,
 ): Promise<AccountPasswordState> {
-  await requireSchoolMember();
+  const context = await requireSchoolMember();
   const currentPassword = readPassword(formData, "currentPassword");
   const newPassword = readPassword(formData, "newPassword");
   const passwordConfirmation = readPassword(formData, "passwordConfirmation");
@@ -32,14 +33,11 @@ export async function changeAccountPassword(
   if (newPassword !== passwordConfirmation) return { error: "The new passwords do not match." };
   if (newPassword === currentPassword) return { error: "Choose a password different from your current password." };
 
-  try {
-    await auth.api.changePassword({
-      body: { currentPassword, newPassword, revokeOtherSessions: false },
-      headers: await headers(),
-    });
-  } catch {
+  if (!(await changeSupabasePassword(currentPassword, newPassword))) {
     return { error: "The current password is incorrect, or this account cannot change its password. Check it and try again." };
   }
+  await db.update(account).set({ password: null })
+    .where(and(eq(account.userId, context.user.id), eq(account.providerId, "credential")));
 
   revalidatePath("/account/security");
   return { success: true, message: "Your password has been changed." };
@@ -71,15 +69,12 @@ export async function changeTemporaryPassword(
   if (newPassword !== passwordConfirmation) return { error: "The new passwords do not match." };
   if (newPassword === currentPassword) return { error: "Choose a password different from the temporary password." };
 
-  try {
-    await auth.api.changePassword({
-      body: { currentPassword, newPassword, revokeOtherSessions: true },
-      headers: requestHeaders,
-    });
-  } catch {
+  if (!(await changeSupabasePassword(currentPassword, newPassword))) {
     return { error: "The temporary password is incorrect. Check it and try again." };
   }
 
+  await db.update(account).set({ password: null })
+    .where(and(eq(account.userId, session.user.id), eq(account.providerId, "credential")));
   await db.update(user)
     .set({ mustChangePassword: false })
     .where(eq(user.id, session.user.id));
