@@ -20,6 +20,7 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import {
   calculateFineMinorUnits,
   feeDisplayName,
@@ -71,9 +72,7 @@ export default async function FeeCollectionPage({
   const statusFilter = typeof params.status === "string" &&
     ["unpaid", "partial", "paid", "outstanding"].includes(params.status) ? params.status : "";
   const overdueOnly = params.overdue === "true";
-  const requestedBranch = typeof params.branchId === "string" && /^\d+$/.test(params.branchId)
-    ? Number(params.branchId)
-    : null;
+  const requestedBranchValue = typeof params.branchId === "string" ? params.branchId : undefined;
   const requestedClass = typeof params.classLevelId === "string" && /^\d+$/.test(params.classLevelId)
     ? Number(params.classLevelId)
     : null;
@@ -88,6 +87,10 @@ export default async function FeeCollectionPage({
   const currency = school?.currency ?? "";
   const currencyRows = await db.select({ code: schoolCurrencies.code, name: schoolCurrencies.name, symbol: schoolCurrencies.symbol })
     .from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId));
+  const branches = await db.select({ id: schoolBranches.id, name: schoolBranches.name })
+    .from(schoolBranches).where(eq(schoolBranches.schoolId, context.schoolId))
+    .orderBy(asc(schoolBranches.name));
+  const requestedBranch = resolveBranchFilterId(branches, requestedBranchValue);
   const requestedCurrency = typeof params.currency === "string" ? params.currency : "";
   const selectedCurrency = currencyRows.some((item) => item.code === requestedCurrency)
     ? requestedCurrency
@@ -212,7 +215,7 @@ export default async function FeeCollectionPage({
     : statusFilter
       ? eq(matchingInvoices.status, statusFilter)
       : undefined;
-  const [countResult, bulkSummary, branches, classes, sections] = await Promise.all([
+  const [countResult, bulkSummary, classes, sections] = await Promise.all([
     db.select({ total: count() }).from(matchingInvoices).where(statusFilterCondition),
     db.select({
       count: count(),
@@ -221,9 +224,6 @@ export default async function FeeCollectionPage({
       statusFilterCondition,
       inArray(matchingInvoices.status, ["unpaid", "partial"]),
     )),
-    db.select({ id: schoolBranches.id, name: schoolBranches.name })
-      .from(schoolBranches).where(eq(schoolBranches.schoolId, context.schoolId))
-      .orderBy(asc(schoolBranches.name)),
     db.select({ id: classLevels.id, name: classLevels.name, branchName: schoolBranches.name })
       .from(classLevels)
       .innerJoin(schoolBranches, and(
@@ -334,6 +334,7 @@ export default async function FeeCollectionPage({
     if (statusFilter) query.set("status", statusFilter);
     if (overdueOnly) query.set("overdue", "true");
     if (requestedBranch !== null) query.set("branchId", String(requestedBranch));
+    else if (params.branchId === "") query.set("branchId", "");
     if (requestedClass !== null) query.set("classLevelId", String(requestedClass));
     if (requestedSection !== null) query.set("sectionId", String(requestedSection));
     query.set("currency", selectedCurrency);
@@ -397,6 +398,7 @@ export default async function FeeCollectionPage({
           ...(statusFilter ? { status: statusFilter } : {}),
           ...(overdueOnly ? { overdue: "true" } : {}),
           ...(requestedBranch !== null ? { branchId: String(requestedBranch) } : {}),
+          ...(params.branchId === "" ? { branchId: "" } : {}),
           ...(requestedClass !== null ? { classLevelId: String(requestedClass) } : {}),
           ...(requestedSection !== null ? { sectionId: String(requestedSection) } : {}),
           currency: selectedCurrency,

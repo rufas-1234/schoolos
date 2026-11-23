@@ -21,6 +21,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { calculateFineMinorUnits, feeDisplayName, feeInvoiceStatus, parseMoneyToMinorUnits } from "@/lib/fees-policy";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 
 type SearchParams = {
   invoiceId?: string | string[];
@@ -70,7 +71,7 @@ export default async function FeeInvoicePrintPage({
   const status = typeof params.status === "string" &&
     ["unpaid", "partial", "paid", "outstanding"].includes(params.status) ? params.status : "";
   const overdueOnly = params.overdue === "true";
-  const branchId = parseId(params.branchId);
+  const requestedBranchId = parseId(params.branchId);
   const classLevelId = parseId(params.classLevelId);
   const sectionId = parseId(params.sectionId);
   const requestedCurrency = typeof params.currency === "string" ? params.currency : "";
@@ -87,7 +88,7 @@ export default async function FeeInvoicePrintPage({
     (params.status !== undefined && (typeof params.status !== "string" ||
       !["unpaid", "partial", "paid", "outstanding"].includes(params.status))) ||
     (params.overdue !== undefined && params.overdue !== "true") ||
-    (params.branchId !== undefined && !branchId) ||
+    (params.branchId !== undefined && params.branchId !== "" && !requestedBranchId) ||
     (params.classLevelId !== undefined && !classLevelId) ||
     (params.sectionId !== undefined && !sectionId)
   ) notFound();
@@ -102,6 +103,12 @@ export default async function FeeInvoicePrintPage({
   })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
   if (!school) notFound();
+  const branches = await db.select({ id: schoolBranches.id, name: schoolBranches.name })
+    .from(schoolBranches).where(eq(schoolBranches.schoolId, context.schoolId))
+    .orderBy(asc(schoolBranches.name));
+  const branchId = invoiceId || studentId
+    ? null
+    : resolveBranchFilterId(branches, typeof params.branchId === "string" ? params.branchId : undefined);
   if (requestedCurrency) {
     const [configuredCurrency] = await db.select({ code: schoolCurrencies.code })
       .from(schoolCurrencies).where(and(

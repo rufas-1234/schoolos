@@ -10,6 +10,8 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { attendanceStatuses } from "@/lib/attendance-policy";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -31,6 +33,7 @@ export default async function StudentAttendanceReportsPage({
     start?: string | string[];
     end?: string | string[];
     branchId?: string | string[];
+    yearId?: string | string[];
     sectionId?: string | string[];
     status?: string | string[];
     search?: string | string[];
@@ -42,7 +45,7 @@ export default async function StudentAttendanceReportsPage({
     "students.view",
     "students.update",
   ]);
-  const [schoolRows, branches, sections, params] = await Promise.all([
+  const [schoolRows, branches, sections, params, academicYearSelection] = await Promise.all([
     db.select({ timezone: schools.timezone }).from(schools)
       .where(eq(schools.id, context.schoolId)).limit(1),
     db.select({
@@ -55,6 +58,7 @@ export default async function StudentAttendanceReportsPage({
     db.select({
       id: classSections.id,
       branchId: classLevels.branchId,
+      academicYearId: classSections.academicYearId,
       label: classLevels.name,
       sectionName: classSections.name,
       yearName: academicYears.name,
@@ -70,20 +74,39 @@ export default async function StudentAttendanceReportsPage({
       .where(eq(classSections.schoolId, context.schoolId))
       .orderBy(asc(classLevels.name), asc(classSections.name), asc(academicYears.startDate)),
     searchParams,
+    getSchoolAcademicYearSelection(context.schoolId),
   ]);
   const school = schoolRows[0];
   if (!school) throw new Error("School settings could not be loaded.");
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: school.timezone }).format(new Date());
-  const defaultStart = `${today.slice(0, 7)}-01`;
+  const requestedYearValue = typeof params.yearId === "string" ? params.yearId : undefined;
+  const selectedYear = requestedYearValue === ""
+    ? null
+    : requestedYearValue === undefined
+      ? academicYearSelection.selectedYear
+      : academicYearSelection.years.find((year) => year.id === Number(requestedYearValue))
+        ?? academicYearSelection.selectedYear;
+  const defaultStart = selectedYear?.startDate ?? `${today.slice(0, 7)}-01`;
+  const defaultEnd = selectedYear
+    ? today < selectedYear.startDate
+      ? selectedYear.endDate
+      : today > selectedYear.endDate
+        ? selectedYear.endDate
+        : today
+    : today;
   const candidateStart = typeof params.start === "string" ? params.start : "";
   const candidateEnd = typeof params.end === "string" ? params.end : "";
   const rangeValid = isValidRange(candidateStart, candidateEnd);
   const startDate = rangeValid ? candidateStart : defaultStart;
-  const endDate = rangeValid ? candidateEnd : today;
-  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
-  const selectedBranch = branches.find((branch) => branch.id === requestedBranchId) ?? branches[0];
+  const endDate = rangeValid ? candidateEnd : defaultEnd;
+  const selectedBranchId = resolveBranchFilterId(
+    branches,
+    typeof params.branchId === "string" ? params.branchId : undefined,
+  );
+  const selectedBranch = branches.find((branch) => branch.id === selectedBranchId);
   const branchSections = sections.filter((section) =>
-    !selectedBranch || section.branchId === selectedBranch.id,
+    (!selectedBranch || section.branchId === selectedBranch.id) &&
+    (!selectedYear || section.academicYearId === selectedYear.id),
   );
   const requestedSectionId = typeof params.sectionId === "string" ? Number(params.sectionId) : NaN;
   const selectedSection = branchSections.find((section) => section.id === requestedSectionId);
@@ -98,6 +121,7 @@ export default async function StudentAttendanceReportsPage({
   ];
   if (selectedSection) conditions.push(eq(studentAttendance.classSectionId, selectedSection.id));
   if (selectedBranch) conditions.push(eq(classLevels.branchId, selectedBranch.id));
+  if (selectedYear) conditions.push(eq(classSections.academicYearId, selectedYear.id));
   if (selectedStatus) conditions.push(eq(studentAttendance.status, selectedStatus));
   if (search) {
     const pattern = `%${search}%`;
@@ -164,9 +188,19 @@ export default async function StudentAttendanceReportsPage({
 
       <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <SearchableSelect label="Branch" name="branchId"
-          options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
+          options={[
+            { value: "", label: "All branches" },
+            ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+          ]}
           defaultValue={selectedBranch ? String(selectedBranch.id) : ""}
           placeholder="Search branches..." disabled={!branches.length} />
+        <SearchableSelect label="Academic year" name="yearId"
+          options={[
+            { value: "", label: "All academic years" },
+            ...academicYearSelection.years.map((year) => ({ value: String(year.id), label: year.name })),
+          ]}
+          defaultValue={selectedYear ? String(selectedYear.id) : ""}
+          placeholder="Search academic years..." disabled={!academicYearSelection.years.length} />
         <SearchableSelect label="Class section" name="sectionId"
           options={[{ value: "", label: "All class sections" }, ...branchSections.map((section) => ({
             value: String(section.id),
@@ -197,7 +231,7 @@ export default async function StudentAttendanceReportsPage({
         </label>
         <button className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">View report</button>
         {!rangeValid && (candidateStart || candidateEnd) && (
-          <p role="status" className="basis-full text-sm text-amber-700">Choose a valid date range of up to 367 days.</p>
+          <p role="status" className="basis-full text-sm text-amber-700">Choose a valid date range of up to 366 days.</p>
         )}
       </SmartFilterForm>
 
@@ -206,7 +240,7 @@ export default async function StudentAttendanceReportsPage({
           <p className="print-report-kicker">Academics · Attendance</p>
           <h2>Student attendance by day</h2>
           <p>
-            {selectedBranch ? `${selectedBranch.name} · ` : ""}{startDate} through {endDate}
+            {selectedBranch ? `${selectedBranch.name} · ` : ""}{selectedYear ? `${selectedYear.name} · ` : ""}{startDate} through {endDate}
             {selectedSection ? ` · ${selectedSection.label} ${selectedSection.sectionName} · ${selectedSection.yearName}` : " · All class sections"}
             {selectedStatus ? ` · ${selectedStatus}` : ""}
             {search ? ` · Search: ${search}` : ""}

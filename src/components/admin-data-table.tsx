@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import { SearchableSelect } from "@/components/searchable-select";
 import { printCurrentPage } from "@/components/print-button";
 import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
+import { getDefaultBranchFilterValue } from "@/lib/branch-selection-policy";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
@@ -361,7 +362,13 @@ export function AdminDataTable({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
-  const [filterValues, setFilterValues] = useState<Record<string, string>>(initialFilters);
+  const defaultBranchFilters = Object.fromEntries(filters
+    .filter((filter) => filter.key.toLocaleLowerCase().includes("branch"))
+    .map((filter) => [filter.key, getDefaultBranchFilterValue(filter.options)]));
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({
+    ...defaultBranchFilters,
+    ...initialFilters,
+  });
   const [printAll, setPrintAll] = useState(false);
   const [showAllRecords, setShowAllRecords] = useState(false);
   const printTargetId = useId();

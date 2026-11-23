@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
+import { getDefaultBranchId } from "@/lib/branch-selection-policy";
 import { PublicPlatformShell } from "@/components/public-platform-shell";
 import {
   defaultRequiredStaffFields,
@@ -49,7 +50,11 @@ export default async function PublicStaffRegistrationPage({
       visibleFields: staffSettings.visibleFields,
     }).from(staffSettings).where(eq(staffSettings.schoolId, school.id)).limit(1)
       .then((rows) => rows[0]),
-    db.select({ id: schoolBranches.id, label: schoolBranches.name })
+    db.select({
+      id: schoolBranches.id,
+      label: schoolBranches.name,
+      code: schoolBranches.code,
+    })
       .from(schoolBranches).where(and(
         eq(schoolBranches.schoolId, school.id),
         eq(schoolBranches.status, "active"),
@@ -78,6 +83,7 @@ export default async function PublicStaffRegistrationPage({
     departments.some((department) => department.branchId === null || department.branchId === branch.id) &&
     designations.some((designation) => designation.branchId === null || designation.branchId === branch.id),
   );
+  const defaultBranchId = getDefaultBranchId(availableBranches);
   const schoolLogo = schoolLogoSource(school.logoUrl);
 
   return (
@@ -110,6 +116,7 @@ export default async function PublicStaffRegistrationPage({
         {availableBranches.length ? (
           <PublicStaffRegistrationForm
             schoolPublicId={school.publicId}
+            defaultBranchId={defaultBranchId}
             visibleFields={visibleFields}
             requiredFields={requiredFields}
             fieldDefinitions={staffSettingFields}

@@ -17,6 +17,8 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { feeDisplayName } from "@/lib/fees-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 
 type SearchParams = {
   sort?: string | string[];
@@ -71,31 +73,37 @@ export default async function FeeStructurePrintPage({
     requireSchoolPermission("fees.manage"),
     searchParams,
   ]);
+  const academicYearSelection = await getSchoolAcademicYearSelection(context.schoolId);
   const sortBy = typeof params.sort === "string" && ["class", "student"].includes(params.sort)
     ? params.sort
     : "class";
-  const branchId = parseId(params.branchId);
-  const yearId = parseId(params.yearId);
+  const requestedBranchValue = typeof params.branchId === "string" ? params.branchId : undefined;
+  const requestedYearValue = typeof params.yearId === "string" ? params.yearId : undefined;
   const termId = parseId(params.termId);
   const classLevelId = parseId(params.classLevelId);
   if ((params.sort !== undefined && typeof params.sort !== "string") ||
-      (params.branchId !== undefined && !branchId) ||
-      (params.yearId !== undefined && !yearId) ||
-      (params.termId !== undefined && !termId) ||
-      (params.classLevelId !== undefined && !classLevelId)) notFound();
+      (params.branchId !== undefined && params.branchId !== "" && parseId(params.branchId) === null) ||
+      (params.yearId !== undefined && params.yearId !== "" && parseId(params.yearId) === null) ||
+      (params.termId !== undefined && params.termId !== "" && termId === null) ||
+      (params.classLevelId !== undefined && params.classLevelId !== "" && classLevelId === null)) notFound();
 
-  const [school, branches, years, terms, classes] = await Promise.all([
+  const [school, branches, terms, classes] = await Promise.all([
     db.select({ name: schools.name, address: schools.address, email: schools.email, phone: schools.phone })
       .from(schools).where(eq(schools.id, context.schoolId)).limit(1).then((rows) => rows[0]),
     db.select({ id: schoolBranches.id, name: schoolBranches.name }).from(schoolBranches)
       .where(eq(schoolBranches.schoolId, context.schoolId)).orderBy(asc(schoolBranches.name)),
-    db.select({ id: academicYears.id, name: academicYears.name }).from(academicYears)
-      .where(eq(academicYears.schoolId, context.schoolId)).orderBy(asc(academicYears.startDate)),
     db.select({ id: academicTerms.id, name: academicTerms.name, academicYearId: academicTerms.academicYearId })
       .from(academicTerms).where(eq(academicTerms.schoolId, context.schoolId)).orderBy(asc(academicTerms.startDate)),
     db.select({ id: classLevels.id, name: classLevels.name, branchId: classLevels.branchId })
       .from(classLevels).where(eq(classLevels.schoolId, context.schoolId)).orderBy(asc(classLevels.name)),
   ]);
+  const years = academicYearSelection.years;
+  const branchId = resolveBranchFilterId(branches, requestedBranchValue);
+  const yearId = params.yearId === undefined
+    ? academicYearSelection.selectedYear?.id ?? null
+    : requestedYearValue === ""
+      ? null
+      : parseId(params.yearId);
   if (!school) notFound();
   if ((branchId !== null && !branches.some((item) => item.id === branchId)) ||
       (yearId !== null && !years.some((item) => item.id === yearId)) ||

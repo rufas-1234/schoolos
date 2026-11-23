@@ -15,6 +15,7 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import {
   DormitoryForm,
   DormitoryRoomForm,
@@ -65,7 +66,8 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
     ? requestedSection as (typeof sections)[number]
     : "overview";
   const search = (first(query.search) ?? "").trim().slice(0, 120);
-  const branchId = first(query.branchId) ?? "";
+  const requestedBranchId = first(query.branchId);
+  const showAllBranches = requestedBranchId === "";
   const dormitoryId = first(query.dormitoryId) ?? "";
   const genderPolicy = first(query.genderPolicy) ?? "";
   const requestedOccupancy = first(query.occupancy);
@@ -148,7 +150,9 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
   const occupiedBedCount = occupancyRows.reduce((total, row) => total + Number(row.occupied), 0);
 
   const searchPattern = `%${search}%`;
-  const validBranchId = parseIdFilter(branchId);
+  const selectedBranchId = resolveBranchFilterId(branchRows, requestedBranchId);
+  const branchId = selectedBranchId === null ? "" : String(selectedBranchId);
+  const validBranchId = selectedBranchId ?? undefined;
   const validDormitoryId = parseIdFilter(dormitoryId);
   let visibleRows: AdminTableRow[] = [];
   let totalRows = 0;
@@ -321,6 +325,7 @@ export default async function DormitoriesPage({ searchParams }: { searchParams: 
     const params = new URLSearchParams({ section, page: String(nextPage), pageSize: String(pageSize) });
     if (search) params.set("search", search);
     if (branchId) params.set("branchId", branchId);
+    else if (showAllBranches) params.set("branchId", "");
     if (dormitoryId) params.set("dormitoryId", dormitoryId);
     if (genderPolicy) params.set("genderPolicy", genderPolicy);
     if (occupancy) params.set("occupancy", occupancy);

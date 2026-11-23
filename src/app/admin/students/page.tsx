@@ -436,10 +436,12 @@ export default async function StudentsPage({
     {
       key: "branchFilter",
       label: "branch",
-      options: uniqueOptions(records.map((record) => ({
-        value: record.branchId === null ? "__unassigned__" : String(record.branchId),
-        label: record.branchName ?? "Unassigned",
-      }))),
+      options: uniqueOptions([
+        ...branchOptions.map((branch) => ({ value: String(branch.id), label: branch.label })),
+        ...(records.some((record) => record.branchId === null)
+          ? [{ value: "__unassigned__", label: "Unassigned" }]
+          : []),
+      ]),
     },
     {
       key: "classFilter",

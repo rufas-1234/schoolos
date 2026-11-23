@@ -63,13 +63,20 @@ export default async function AdmissionDeskPage() {
     ))
     .where(and(eq(students.schoolId, context.schoolId), eq(students.status, "pending")))
     .orderBy(asc(students.createdAt), asc(students.lastName), asc(students.firstName));
+  const branches = await db.select({ id: schoolBranches.id, name: schoolBranches.name })
+    .from(schoolBranches).where(and(
+      eq(schoolBranches.schoolId, context.schoolId),
+      eq(schoolBranches.status, "active"),
+    )).orderBy(asc(schoolBranches.name));
   const filters: AdminTableFilter[] = [{
     key: "branchFilter",
     label: "branch",
-    options: uniqueOptions(records.map((record) => ({
-      value: String(record.branchId ?? "__unassigned__"),
-      label: record.branchName ?? "Unassigned",
-    }))),
+    options: uniqueOptions([
+      ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+      ...(records.some((record) => record.branchId === null)
+        ? [{ value: "__unassigned__", label: "Unassigned" }]
+        : []),
+    ]),
   }, {
     key: "classFilter",
     label: "class",

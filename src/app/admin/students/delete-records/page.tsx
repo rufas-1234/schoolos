@@ -42,8 +42,13 @@ export default async function DeleteStudentRecordsPage() {
     )
     .where(eq(students.schoolId, context.schoolId))
     .orderBy(asc(students.lastName), asc(students.firstName));
+  const branches = await db.select({ id: schoolBranches.id, name: schoolBranches.name })
+    .from(schoolBranches).where(and(
+      eq(schoolBranches.schoolId, context.schoolId),
+      eq(schoolBranches.status, "active"),
+    )).orderBy(asc(schoolBranches.name));
 
-  const branchOptions = new Map<number, string>();
+  const branchOptions = new Map(branches.map((branch) => [branch.id, branch.name]));
   for (const record of records) {
     if (record.branchId !== null && record.branchName) {
       branchOptions.set(record.branchId, record.branchName);

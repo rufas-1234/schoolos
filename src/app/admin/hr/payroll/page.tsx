@@ -3,6 +3,7 @@ import { and, asc, desc, eq, like, or } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, schoolCurrencies, schools, staffMembers, staffPayrollRecords } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { AdminRecordDialog } from "@/components/admin-data-table";
 import {
   parsePayrollMoneyToMinorUnits,
@@ -52,9 +53,11 @@ export default async function StaffPayrollPage({
   ]);
   const school = schoolResult[0];
   if (!school) throw new Error("School settings could not be loaded.");
-  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
-  const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
-  const branchId = branch?.id;
+  const branchId = resolveBranchFilterId(
+    branches,
+    typeof params.branchId === "string" ? params.branchId : undefined,
+  );
+  const branch = branches.find((item) => item.id === branchId);
   const currentPeriod = new Intl.DateTimeFormat("en-CA", { timeZone: school.timezone })
     .format(new Date()).slice(0, 7);
   const payPeriod = typeof params.period === "string" && isPayPeriod(params.period)
@@ -71,12 +74,13 @@ export default async function StaffPayrollPage({
       .where(and(
         eq(staffMembers.schoolId, context.schoolId),
         eq(staffMembers.status, "active"),
-        eq(staffMembers.branchId, branchId ?? 0),
+        ...(branchId !== null ? [eq(staffMembers.branchId, branchId)] : []),
       ))
       .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName)),
     db.select({
       publicId: staffPayrollRecords.publicId,
       staffId: staffPayrollRecords.staffId,
+      staffBranchId: staffMembers.branchId,
       staffName: staffMembers.firstName,
       staffLastName: staffMembers.lastName,
       employeeCode: staffMembers.employeeCode,
@@ -97,7 +101,7 @@ export default async function StaffPayrollPage({
       .where(and(
         eq(staffPayrollRecords.schoolId, context.schoolId),
         eq(staffPayrollRecords.payPeriod, payPeriod),
-        eq(staffMembers.branchId, branchId ?? 0),
+        ...(branchId !== null ? [eq(staffMembers.branchId, branchId)] : []),
         ...(selectedStatus === "all" ? [] : [eq(staffPayrollRecords.status, selectedStatus)]),
         ...(staffSearch ? [or(
           like(staffMembers.firstName, `%${staffSearch}%`),
@@ -160,8 +164,10 @@ export default async function StaffPayrollPage({
         <SearchableSelect
           label="Branch"
           name="branchId"
-          options={branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` }))}
-          required
+          options={[
+            { value: "", label: "All branches" },
+            ...branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` })),
+          ]}
           defaultValue={branchId?.toString() ?? ""}
           placeholder="Search branches..."
           disabled={!branches.length}
@@ -196,7 +202,9 @@ export default async function StaffPayrollPage({
             payPeriod={payPeriod}
           />
         ) : (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Create an active branch before recording payroll.</p>
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            {branches.length ? "Select a branch before recording payroll." : "Create an active branch before recording payroll."}
+          </p>
         )}
       </div>
 
@@ -280,17 +288,19 @@ export default async function StaffPayrollPage({
                               <PayrollDetail label="Notes">{record.notes ?? "—"}</PayrollDetail>
                             </dl>
                           </AdminRecordDialog>
-                          <AdminRecordDialog title={`Edit payroll for ${record.staffName} ${record.staffLastName}`} wide>
-                            <PayrollForm
-                              branchId={branchId ?? 0}
-                              branchName={branch?.name ?? ""}
-                              staffOptions={staffOptionsForEditing}
-                              currencies={currencies}
-                              defaultCurrency={defaultCurrency}
-                              payPeriod={payPeriod}
-                              record={record}
-                            />
-                          </AdminRecordDialog>
+                          {record.staffBranchId !== null && (
+                            <AdminRecordDialog title={`Edit payroll for ${record.staffName} ${record.staffLastName}`} wide>
+                              <PayrollForm
+                                branchId={record.staffBranchId}
+                                branchName={branches.find((item) => item.id === record.staffBranchId)?.name ?? ""}
+                                staffOptions={staffOptionsForEditing}
+                                currencies={currencies}
+                                defaultCurrency={defaultCurrency}
+                                payPeriod={payPeriod}
+                                record={record}
+                              />
+                            </AdminRecordDialog>
+                          )}
                           <PayrollRecordPrintButton
                             publicId={record.publicId}
                             schoolName={context.schoolName}

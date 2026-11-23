@@ -22,6 +22,7 @@ import {
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import {
   defaultVisibleStaffFields,
   defaultRequiredStaffFields,
@@ -53,16 +54,26 @@ export default async function StaffDirectoryPage({
   const profilePublicId = typeof profile === "string" && profile.length <= 36 ? profile : "";
   const initialSearch = typeof search === "string" ? search.slice(0, 120) : "";
   const showAllRecords = showAll === "1";
-  const requestedBranchId = typeof branchId === "string" ? Number(branchId) : NaN;
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const branches = await db.select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
+    .from(schoolBranches)
+    .where(and(
+      eq(schoolBranches.schoolId, context.schoolId),
+      eq(schoolBranches.status, "active"),
+    ))
+    .orderBy(asc(schoolBranches.name));
+  const selectedBranchId = resolveBranchFilterId(
+    branches,
+    typeof branchId === "string" ? branchId : undefined,
+  );
   const staffScope = and(
     eq(staffMembers.schoolId, context.schoolId),
-    ...(Number.isSafeInteger(requestedBranchId) && requestedBranchId > 0
-      ? [eq(staffMembers.branchId, requestedBranchId)]
+    ...(selectedBranchId !== null
+      ? [eq(staffMembers.branchId, selectedBranchId)]
       : []),
   );
 
-  const [records, totals, accounts, branches, departments, designations, settings] = await Promise.all([
+  const [records, totals, accounts, departments, designations, settings] = await Promise.all([
     db
       .select({
         id: staffMembers.id,
@@ -129,13 +140,6 @@ export default async function StaffDirectoryPage({
         eq(user.isActive, true),
       ))
       .orderBy(asc(user.name)),
-    db.select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
-      .from(schoolBranches)
-      .where(and(
-        eq(schoolBranches.schoolId, context.schoolId),
-        eq(schoolBranches.status, "active"),
-      ))
-      .orderBy(asc(schoolBranches.name)),
     db.select({
       id: staffDepartments.id,
       name: staffDepartments.name,
@@ -158,10 +162,12 @@ export default async function StaffDirectoryPage({
   ]);
   const requiredFields = normalizeRequiredStaffFields(settings[0]?.requiredFields ?? defaultRequiredStaffFields);
   const visibleFields = normalizeVisibleStaffFields(settings[0]?.visibleFields ?? defaultVisibleStaffFields);
-  const selectedBranch = branches.find((branch) => branch.id === requestedBranchId);
+  const selectedBranch = branches.find((branch) => branch.id === selectedBranchId);
   const initialFilters: Record<string, string> = selectedBranch
     ? { branch: selectedBranch.name }
-    : {};
+    : branchId === ""
+      ? { branch: "" }
+      : {};
   const selectedRole = typeof role === "string" && role.length <= 40 ? role : "";
   if (selectedRole) {
     initialFilters.personnelRole = selectedRole === "unassigned" ? "Unassigned" : selectedRole;

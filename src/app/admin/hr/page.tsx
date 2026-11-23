@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { db } from "@/db";
 import { schoolBranches, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { getStaffRolePagination, staffRolePageSize } from "@/lib/staff-policy";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
@@ -32,8 +33,11 @@ export default async function HumanResourcesPage({
       .orderBy(asc(schoolBranches.name)),
     searchParams,
   ]);
-  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
-  const selectedBranch = branches.find((branch) => branch.id === requestedBranchId);
+  const selectedBranchId = resolveBranchFilterId(
+    branches,
+    typeof params.branchId === "string" ? params.branchId : undefined,
+  );
+  const selectedBranch = branches.find((branch) => branch.id === selectedBranchId);
   const staffFilter = and(
     eq(staffMembers.schoolId, context.schoolId),
     ...(selectedBranch ? [eq(staffMembers.branchId, selectedBranch.id)] : []),

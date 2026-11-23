@@ -24,6 +24,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { canViewExamSubject } from "@/lib/examination-policy";
 import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -68,7 +69,6 @@ export default async function ExaminationsPage({
   } = await searchParams;
   const search = rawSearch?.trim().slice(0, 120) ?? "";
   const normalizedSearch = search.toLocaleLowerCase();
-  const branchFilter = rawBranchId && /^\d+$/.test(rawBranchId) ? Number(rawBranchId) : null;
   const examFilter = rawExamId && /^\d+$/.test(rawExamId) ? Number(rawExamId) : null;
   const editExamId = rawEditExamId && /^\d+$/.test(rawEditExamId) ? Number(rawEditExamId) : null;
   const classFilter = rawClassLevelId && /^\d+$/.test(rawClassLevelId) ? Number(rawClassLevelId) : null;
@@ -143,6 +143,7 @@ export default async function ExaminationsPage({
         .leftJoin(schoolBranches, and(eq(schoolBranches.id, examTypes.branchId!), eq(schoolBranches.schoolId, context.schoolId)))
         .where(eq(examTypes.schoolId, context.schoolId)).orderBy(asc(examTypes.name))
   ]);
+  const branchFilter = resolveBranchFilterId(branches, rawBranchId);
   const isManager = canConfigure || canPublish;
   const userTeacherIds = !isManager
     ? (await db.select({ id: teachers.id }).from(teachers)

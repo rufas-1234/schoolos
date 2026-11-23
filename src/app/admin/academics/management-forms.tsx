@@ -1218,6 +1218,7 @@ export function AcademicEventList({
 export function EnrollmentRecordList({
   enrollments,
   toolbarActions,
+  selectedAcademicYear,
 }: {
   enrollments: {
     id: number;
@@ -1229,6 +1230,7 @@ export function EnrollmentRecordList({
     enrolledAt: string;
   }[];
   toolbarActions?: ReactNode;
+  selectedAcademicYear?: string;
 }) {
   return (
     <AdminDataTable
@@ -1272,6 +1274,7 @@ export function EnrollmentRecordList({
           options: uniqueValues(enrollments.map((enrollment) => enrollment.status)),
         },
       ]}
+      initialFilters={selectedAcademicYear ? { yearFilter: selectedAcademicYear } : {}}
       requireSearchCriteria
       emptyMessage="No student enrollments yet."
       toolbarActions={toolbarActions}

@@ -712,7 +712,8 @@ export async function createPublicStudentAdmissionApplication(
     if (isDuplicateEntryError(error)) {
       return { error: "We could not assign a unique admission number. Please submit again." };
     }
-    throw error;
+    console.error("Public student admission application could not be saved.", error);
+    return { error: "Your registration could not be saved. Please try again later." };
   }
 
   revalidatePath("/admin/admissions");

@@ -3,6 +3,7 @@ import { and, asc, eq, gte, isNull, like, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, schools, staffAttendance, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { isValidStaffReportRange, parseStaffRoleFilter, staffAttendanceStatuses } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
 import { PrintReportButton } from "./print-report-button";
@@ -33,9 +34,11 @@ export default async function StaffReportsPage({
   if (!school) throw new Error("School settings could not be loaded.");
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: school.timezone }).format(new Date());
   const defaultStart = `${today.slice(0, 7)}-01`;
-  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
-  const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
-  const branchId = branch?.id;
+  const branchId = resolveBranchFilterId(
+    branches,
+    typeof params.branchId === "string" ? params.branchId : undefined,
+  );
+  const branch = branches.find((item) => item.id === branchId);
   const requestedRole = typeof params.role === "string" ? params.role : "";
   const selectedRole = parseStaffRoleFilter(requestedRole);
   const staffSearch = typeof params.search === "string" ? params.search.trim().slice(0, 120) : "";
@@ -47,13 +50,13 @@ export default async function StaffReportsPage({
 
   const staffConditions = [
     eq(staffMembers.schoolId, context.schoolId),
-    eq(staffMembers.branchId, branchId ?? 0),
+    ...(branchId !== null ? [eq(staffMembers.branchId, branchId)] : []),
   ];
   const markConditions = [
     eq(staffAttendance.schoolId, context.schoolId),
     gte(staffAttendance.attendanceDate, startDate),
     lte(staffAttendance.attendanceDate, endDate),
-    eq(staffMembers.branchId, branchId ?? 0),
+    ...(branchId !== null ? [eq(staffMembers.branchId, branchId)] : []),
   ];
   if (selectedRole === "unassigned") {
     staffConditions.push(isNull(staffMembers.personnelRole));
@@ -149,8 +152,10 @@ export default async function StaffReportsPage({
         <SearchableSelect
           label="Branch"
           name="branchId"
-          options={branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` }))}
-          required
+          options={[
+            { value: "", label: "All branches" },
+            ...branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` })),
+          ]}
           defaultValue={branchId?.toString() ?? ""}
           placeholder="Search branches..."
           disabled={!branches.length}

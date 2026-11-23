@@ -23,6 +23,7 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import {
   calculateFineMinorUnits,
   feeDisplayName,
@@ -142,9 +143,10 @@ export default async function FeeReportsPage({
     typeof params.to === "string" ? params.to : undefined,
     today,
   );
-  const requestedBranch = typeof params.branchId === "string" && /^\d+$/.test(params.branchId)
-    ? Number(params.branchId)
-    : null;
+  const requestedBranch = resolveBranchFilterId(
+    branches,
+    typeof params.branchId === "string" ? params.branchId : undefined,
+  );
   const requestedClass = typeof params.classLevelId === "string" && /^\d+$/.test(params.classLevelId)
     ? Number(params.classLevelId)
     : null;
@@ -559,6 +561,7 @@ export default async function FeeReportsPage({
       from,
       to,
       ...(requestedBranch ? { branchId: String(requestedBranch) } : {}),
+      ...(params.branchId === "" ? { branchId: "" } : {}),
       ...(requestedClass ? { classLevelId: String(requestedClass) } : {}),
       ...(requestedSection ? { sectionId: String(requestedSection) } : {}),
       ...(requestedFeeTypeId ? { feeTypeId: String(requestedFeeTypeId) } : {}),

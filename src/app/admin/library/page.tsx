@@ -12,6 +12,7 @@ import {
   students,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { getDefaultLoanDueDate } from "@/lib/library-policy";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
@@ -101,13 +102,22 @@ export default async function LibraryPage({
   const selectedStatus = ["active", "returned", "all"].includes(queryParams.status ?? "")
     ? queryParams.status!
     : "all";
-  const branchId = validId(queryParams.branchId);
   const bookId = validId(queryParams.bookId);
   const subjectId = validId(queryParams.subjectId);
   const sortBy = validBookSort(queryParams.sortBy);
   const sortDirection = queryParams.sortDirection === "desc" ? "desc" : "asc";
   const requestedPage = validPage(queryParams.page);
   const schoolId = context.schoolId;
+  const branchRows = await db.select({ id: schoolBranches.id, name: schoolBranches.name })
+    .from(schoolBranches)
+    .where(and(eq(schoolBranches.schoolId, schoolId), eq(schoolBranches.status, "active")))
+    .orderBy(asc(schoolBranches.name))
+    .limit(200);
+  const loanSection = section === "issue" || section === "issued";
+  const selectedBranchId = loanSection
+    ? resolveBranchFilterId(branchRows, queryParams.branchId)
+    : validId(queryParams.branchId) ?? null;
+  const branchId = selectedBranchId ?? undefined;
   const today = dateToday();
   const dueDate = getDefaultLoanDueDate(today) ?? today;
   const searchBook = query
@@ -206,7 +216,15 @@ export default async function LibraryPage({
   const pageHref = (nextPage: number) => {
     const params = new URLSearchParams({ section });
     for (const key of ["q", "status", "branchId", "memberType", "bookId", "subjectId", "sortBy", "sortDirection"] as const) {
-      const value = queryParams[key];
+      if (key === "branchId" && loanSection && queryParams.branchId === "") {
+        params.set(key, "");
+        continue;
+      }
+      const value = key === "branchId" && loanSection
+        ? branchId === undefined
+          ? queryParams.branchId
+          : String(branchId)
+        : queryParams[key];
       if (value) params.set(key, value);
     }
     params.set("page", String(nextPage));
@@ -217,7 +235,6 @@ export default async function LibraryPage({
     bookRows,
     categoryRows,
     subjectRows,
-    branchRows,
     studentRows,
     staffRows,
     memberRows,
@@ -238,9 +255,6 @@ export default async function LibraryPage({
       .orderBy(asc(librarySubjects.name))
       .limit(section === "subjects" ? PAGE_SIZE : 500)
       .offset(section === "subjects" ? offset : 0),
-    db.select({ id: schoolBranches.id, name: schoolBranches.name }).from(schoolBranches)
-      .where(and(eq(schoolBranches.schoolId, schoolId), eq(schoolBranches.status, "active")))
-      .orderBy(asc(schoolBranches.name)).limit(200),
     db.select({
       id: students.id,
       firstName: students.firstName,

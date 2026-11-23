@@ -8,6 +8,7 @@ import {
   staffMembers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { LeaveBalanceForm, LeaveRequestForm, LeaveReviewForm, LeaveTypeForm } from "../hr-forms";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
@@ -35,9 +36,11 @@ export default async function StaffLeavePage({
       .orderBy(asc(schoolBranches.name)),
     searchParams,
   ]);
-  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
-  const branch = branches.find((item) => item.id === requestedBranchId) ?? branches[0];
-  const branchId = branch?.id;
+  const branchId = resolveBranchFilterId(
+    branches,
+    typeof params.branchId === "string" ? params.branchId : undefined,
+  );
+  const branch = branches.find((item) => item.id === branchId);
   const branchName = branch?.name ?? "No active branch";
   const search = typeof params.search === "string" ? params.search.trim().slice(0, 120) : "";
   const staffId = parsePositiveId(params.staffId);
@@ -188,8 +191,10 @@ export default async function StaffLeavePage({
         <SearchableSelect
           label="Branch"
           name="branchId"
-          options={branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` }))}
-          required
+          options={[
+            { value: "", label: "All branches" },
+            ...branches.map((item) => ({ value: String(item.id), label: `${item.name} (${item.code})` })),
+          ]}
           defaultValue={branchId?.toString() ?? ""}
           placeholder="Search branches..."
           disabled={!branches.length}
@@ -237,7 +242,8 @@ export default async function StaffLeavePage({
         </label>
       </SmartFilterForm>
 
-      {!branch && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Create an active branch before managing leave.</p>}
+      {!branches.length && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Create an active branch before managing leave.</p>}
+      {branches.length > 0 && !branch && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Select a branch to manage leave.</p>}
       {branch && (
         <section className="grid gap-5 lg:grid-cols-3">
           <LeaveTypeForm branches={branches} branchId={branch.id} />

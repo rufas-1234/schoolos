@@ -856,6 +856,7 @@ export default async function AcademicStructurePage({
                 ]}
                 empty="No terms yet."
                 filters={yearFilters}
+                initialFilters={selectedAcademicYear ? { academicYearId: String(selectedAcademicYear.id) } : {}}
                 toolbarActions={
                   <AdminActionDialog label="Add term" title="Add academic term">
                     <AcademicTermForm years={yearOptions} />
@@ -1026,6 +1027,7 @@ export default async function AcademicStructurePage({
                     })),
                   },
                 ]}
+                initialFilters={selectedAcademicYear ? { academicYearId: String(selectedAcademicYear.id) } : {}}
                 initialQuery={academicSearch}
               />
             )}
@@ -1293,6 +1295,7 @@ export default async function AcademicStructurePage({
                 ]}
                 empty="No holidays have been recorded."
                 filters={yearFilters}
+                initialFilters={selectedAcademicYear ? { academicYearId: String(selectedAcademicYear.id) } : {}}
                 toolbarActions={
                   <AdminActionDialog label="Add holiday" title="Add school holiday">
                     <AcademicHolidayForm
@@ -1324,6 +1327,7 @@ export default async function AcademicStructurePage({
             {sectionId === "enrollment" && canViewEnrollmentHistory && (
               <>
                 <EnrollmentRecordList
+                  selectedAcademicYear={selectedAcademicYear?.name}
                   toolbarActions={
                     <>
                       {canManageEnrollments && (
@@ -1416,6 +1420,7 @@ function RecordList({
   records,
   filters,
   toolbarActions,
+  initialFilters = {},
   initialQuery = "",
 }: {
   title: string;
@@ -1424,6 +1429,7 @@ function RecordList({
   records: (AdminTableRow & { editForm?: ReactNode; deleteForm?: ReactNode })[];
   filters?: AdminTableFilter[];
   toolbarActions?: ReactNode;
+  initialFilters?: Record<string, string>;
   initialQuery?: string;
 }) {
   return (
@@ -1432,6 +1438,7 @@ function RecordList({
       columns={columns}
       emptyMessage={empty}
       filters={filters}
+      initialFilters={initialFilters}
       initialQuery={initialQuery}
       requireSearchCriteria={Boolean(filters?.length)}
       toolbarActions={toolbarActions}

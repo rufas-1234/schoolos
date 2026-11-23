@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, like, or } from "drizzle-orm";
 import { db } from "@/db";
 import { schoolBranches, schools, staffAttendance, staffMembers } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { parseStaffRoleFilter } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
@@ -34,10 +35,10 @@ export default async function StaffAttendancePage({
   const schoolSettings = school[0];
   if (!schoolSettings) throw new Error("School settings could not be loaded.");
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: schoolSettings.timezone }).format(new Date());
-  const requestedBranchId = typeof params.branchId === "string" ? Number(params.branchId) : NaN;
-  const branchId = branches.some((branch) => branch.id === requestedBranchId)
-    ? requestedBranchId
-    : branches[0]?.id;
+  const branchId = resolveBranchFilterId(
+    branches,
+    typeof params.branchId === "string" ? params.branchId : undefined,
+  );
   const requestedRole = typeof params.role === "string" ? params.role : "";
   const selectedRole = parseStaffRoleFilter(requestedRole);
   const staffSearch = typeof params.search === "string" ? params.search.trim().slice(0, 120) : "";
@@ -118,8 +119,10 @@ export default async function StaffAttendancePage({
         <SearchableSelect
           label="Branch"
           name="branchId"
-          options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
-          required
+          options={[
+            { value: "", label: "All branches" },
+            ...branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+          ]}
           defaultValue={branchId?.toString() ?? ""}
           placeholder="Search branches..."
           disabled={!branches.length}

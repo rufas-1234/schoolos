@@ -31,6 +31,8 @@ const bloodGroupOptions = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export function PublicAdmissionForm({
   schoolPublicId,
+  defaultBranchId,
+  defaultAcademicYearId,
   fields,
   fieldDefinitions,
   branches,
@@ -40,6 +42,8 @@ export function PublicAdmissionForm({
   categories,
 }: {
   schoolPublicId: string;
+  defaultBranchId: number | null;
+  defaultAcademicYearId: number | null;
   fields: StudentFieldSettings;
   fieldDefinitions: typeof studentSettingFields;
   branches: Option[];
@@ -52,8 +56,8 @@ export function PublicAdmissionForm({
     createPublicStudentAdmissionApplication,
     {},
   );
-  const [branchId, setBranchId] = useState("");
-  const [yearId, setYearId] = useState("");
+  const [branchId, setBranchId] = useState(String(defaultBranchId ?? ""));
+  const [yearId, setYearId] = useState(String(defaultAcademicYearId ?? ""));
   const [classLevelId, setClassLevelId] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
   const [documents, setDocuments] = useState<Record<number, UploadedFile | null>>({});

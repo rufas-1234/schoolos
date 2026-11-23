@@ -14,6 +14,7 @@ import {
 import { normalizeStudentFieldSettings, studentSettingFields } from "@/lib/student-settings";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
+import { getDefaultBranchId } from "@/lib/branch-selection-policy";
 import { PublicPlatformShell } from "@/components/public-platform-shell";
 import { PublicAdmissionForm } from "./public-admission-form";
 
@@ -43,13 +44,18 @@ export default async function PublicAdmissionPage({
   const [savedSettings, branches, years] = await Promise.all([
     db.select({ fields: studentSettings.fields }).from(studentSettings)
       .where(eq(studentSettings.schoolId, school.id)).limit(1).then((rows) => rows[0]),
-    db.select({ id: schoolBranches.id, label: schoolBranches.name }).from(schoolBranches)
+    db.select({
+      id: schoolBranches.id,
+      label: schoolBranches.name,
+      code: schoolBranches.code,
+    }).from(schoolBranches)
       .where(and(eq(schoolBranches.schoolId, school.id), eq(schoolBranches.status, "active")))
       .orderBy(asc(schoolBranches.name)),
     db.select({ id: academicYears.id, label: academicYears.name }).from(academicYears)
       .where(and(eq(academicYears.schoolId, school.id), eq(academicYears.status, "active")))
       .orderBy(desc(academicYears.startDate)),
   ]);
+  const defaultBranchId = getDefaultBranchId(branches);
   const fields = normalizeStudentFieldSettings(savedSettings?.fields);
   const branchIds = branches.map((branch) => branch.id);
   const [classes, sections, categories] = branchIds.length
@@ -123,6 +129,8 @@ export default async function PublicAdmissionPage({
         {branches.length && years.length && classes.length && sections.length ? (
           <PublicAdmissionForm
             schoolPublicId={school.publicId}
+            defaultBranchId={defaultBranchId}
+            defaultAcademicYearId={years[0]?.id ?? null}
             fields={fields}
             fieldDefinitions={studentSettingFields}
             branches={branches}

@@ -42,6 +42,7 @@ function humanize(value: string) {
 
 export function PublicStaffRegistrationForm({
   schoolPublicId,
+  defaultBranchId,
   visibleFields,
   requiredFields,
   fieldDefinitions,
@@ -50,6 +51,7 @@ export function PublicStaffRegistrationForm({
   designations,
 }: {
   schoolPublicId: string;
+  defaultBranchId: number | null;
   visibleFields: string[];
   requiredFields: string[];
   fieldDefinitions: readonly StaffSettingField[];
@@ -61,7 +63,7 @@ export function PublicStaffRegistrationForm({
     createPublicStaffApplication,
     {},
   );
-  const [branchId, setBranchId] = useState("");
+  const [branchId, setBranchId] = useState(String(defaultBranchId ?? ""));
   const [uploads, setUploads] = useState<Record<string, UploadedFile | null>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [uploadError, setUploadError] = useState("");
