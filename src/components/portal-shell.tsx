@@ -4,8 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { CircleHelp, GraduationCap, KeyRound, LogOut, Menu, X, type LucideIcon } from "lucide-react";
+import { CalendarDays, CircleHelp, GraduationCap, KeyRound, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { setSelectedAcademicYear } from "@/app/admin/academic-year-actions";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { schoolLogoSource } from "@/lib/school-logo";
@@ -28,6 +29,8 @@ export function PortalShell({
   portalLabel,
   navigation,
   searchScope,
+  academicYears,
+  selectedAcademicYearId,
 }: {
   children: ReactNode;
   schoolName: string;
@@ -39,6 +42,8 @@ export function PortalShell({
   portalLabel: string;
   navigation: PortalNavigationItem[];
   searchScope?: "teaching" | "student";
+  academicYears?: { id: number; name: string }[];
+  selectedAcademicYearId?: number | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -198,6 +203,32 @@ export function PortalShell({
               </div>
             )}
             <div className="flex items-center gap-3">
+              {academicYears && (
+                <form action={setSelectedAcademicYear} className="relative min-w-0">
+                  <label htmlFor="portal-academic-year" className="sr-only">Academic year</label>
+                  <select
+                    key={selectedAcademicYearId ?? "no-year"}
+                    id="portal-academic-year"
+                    name="academicYearId"
+                    aria-label="Academic year for year-based records"
+                    title="Academic year for year-based records"
+                    defaultValue={selectedAcademicYearId == null ? "" : String(selectedAcademicYearId)}
+                    disabled={academicYears.length === 0}
+                    onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                    className="h-9 w-32 max-w-[34vw] appearance-none rounded-lg border border-slate-200 bg-white px-2 pr-7 text-xs font-medium text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:text-slate-400 sm:w-40 sm:max-w-none sm:px-3 sm:text-sm"
+                  >
+                    {academicYears.map((year) => (
+                      <option key={year.id} value={year.id}>{year.name}</option>
+                    ))}
+                    {academicYears.length === 0 && <option value="">No academic years</option>}
+                  </select>
+                  <CalendarDays
+                    aria-hidden="true"
+                    size={14}
+                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                </form>
+              )}
               <ThemeToggle />
               <span className="hidden max-w-56 truncate text-sm font-medium text-slate-700 sm:inline">
                 {userName}

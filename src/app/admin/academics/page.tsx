@@ -488,7 +488,7 @@ export default async function AcademicStructurePage({
             studentId: students.id,
             firstName: students.firstName,
             lastName: students.lastName,
-            publicId: students.publicId,
+            admissionNumber: students.admissionNumber,
             status: studentAttendance.status,
             note: studentAttendance.note,
           })

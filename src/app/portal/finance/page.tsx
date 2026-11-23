@@ -11,7 +11,7 @@ import {
   PackageOpen,
   ReceiptText,
 } from "lucide-react";
-import { AdminShell } from "@/components/admin-shell";
+import { ManagementPortalShell } from "@/app/portal/management-portal-shell";
 import { PrintButton } from "@/components/print-button";
 import { db } from "@/db";
 import {
@@ -29,7 +29,6 @@ import {
   studentFeeInvoices,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
-import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 import {
   buildFinanceTrend,
@@ -79,7 +78,21 @@ export default async function FinancePortalPage() {
   const canManageFees = permissions.has("fees.manage") || permissions.has("payments.record");
   const canManageAccounts = permissions.has("accounts.manage");
   const canManageInventory = permissions.has("inventory.manage");
-  const academicYearSelection = await getSchoolAcademicYearSelection(context.schoolId);
+  const canSelectAcademicYear = context.grantedPermissions.some((permission) => [
+    "academics.manage",
+    "school.settings.manage",
+    "students.view",
+    "students.update",
+    "examinations.create",
+    "results.enter",
+    "results.publish",
+    "fees.manage",
+    "payments.record",
+    "accounts.manage",
+  ].includes(permission));
+  const academicYearSelection = canSelectAcademicYear
+    ? await getSchoolAcademicYearSelection(context.schoolId)
+    : null;
   const [school] = await db.select({
     currency: schools.currency,
     timezone: schools.timezone,
@@ -484,21 +497,17 @@ export default async function FinancePortalPage() {
   const assetValue = minorUnits(assetCounts[0]?.assetValue);
 
   return (
-    <AdminShell
+    <ManagementPortalShell
       schoolName={context.schoolName}
       schoolLogoUrl={context.schoolLogoUrl}
       schoolEmail={context.schoolEmail}
       schoolPhone={context.schoolPhone}
       schoolAddress={context.schoolAddress}
       userName={context.user.name}
-      roleNames={context.roleNames}
+      portalType="finance"
       permissions={context.grantedPermissions}
-      activeSchoolPublicId={context.schoolPublicId}
-      schoolChoices={context.schoolChoices}
-      multiSchoolEnabled={context.multiSchoolEnabled}
-      isPlatformAdmin={isPlatformAdminEmail(context.user.email)}
-      academicYears={academicYearSelection.years.map(({ id, name }) => ({ id, name }))}
-      selectedAcademicYearId={academicYearSelection.selectedYear?.id ?? null}
+      academicYears={academicYearSelection?.years.map(({ id, name }) => ({ id, name }))}
+      selectedAcademicYearId={academicYearSelection?.selectedYear?.id ?? null}
     >
       <main className="print-report-page min-w-0 space-y-6 p-4 sm:p-6 lg:p-8">
         <header className="print:hidden flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -696,7 +705,7 @@ export default async function FinancePortalPage() {
           </ActivityCard>}
         </section>}
       </main>
-    </AdminShell>
+    </ManagementPortalShell>
   );
 }
 

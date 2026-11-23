@@ -7,6 +7,7 @@ import {
   ClipboardList,
   CircleDollarSign,
   LayoutDashboard,
+  PackageOpen,
   ReceiptText,
   UsersRound,
 } from "lucide-react";
@@ -34,6 +35,7 @@ const financeOverview = { href: "/portal/finance", label: "Overview", icon: Layo
 function financeNavigation(permissions: readonly string[]) {
   const canManageFees = permissions.includes("fees.manage") || permissions.includes("payments.record");
   const canManageAccounts = permissions.includes("accounts.manage");
+  const canManageInventory = permissions.includes("inventory.manage");
   return [
     financeOverview,
     ...(canManageFees
@@ -51,6 +53,9 @@ function financeNavigation(permissions: readonly string[]) {
         { href: "/admin/accounts?section=reports", label: "Accounts reports", icon: BookMarked },
       ]
       : []),
+    ...(canManageInventory
+      ? [{ href: "/admin/inventory", label: "Inventory & assets", icon: PackageOpen }]
+      : []),
   ];
 }
 
@@ -64,6 +69,8 @@ export function ManagementPortalShell({
   userName,
   portalType,
   permissions = [],
+  academicYears,
+  selectedAcademicYearId,
 }: {
   children: React.ReactNode;
   schoolName: string;
@@ -74,6 +81,8 @@ export function ManagementPortalShell({
   userName: string;
   portalType: "library" | "dormitory" | "finance";
   permissions?: readonly string[];
+  academicYears?: { id: number; name: string }[];
+  selectedAcademicYearId?: number | null;
 }) {
   const portalLabel = {
     library: "Library Portal",
@@ -96,6 +105,8 @@ export function ManagementPortalShell({
       userName={userName}
       portalLabel={portalLabel}
       navigation={navigation}
+      academicYears={academicYears}
+      selectedAcademicYearId={selectedAcademicYearId}
     >
       {children}
     </PortalShell>

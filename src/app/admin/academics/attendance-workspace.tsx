@@ -13,7 +13,7 @@ type AttendanceRecord = {
   studentId: number;
   firstName: string;
   lastName: string;
-  publicId: string;
+  admissionNumber: string | null;
   status: AttendanceStatus | null;
   note: string | null;
 };
@@ -145,7 +145,7 @@ export function AttendanceWorkspace({
                     <tr>
                       <th scope="col" className="px-4 py-3 font-semibold">No.</th>
                       <th scope="col" className="px-4 py-3 font-semibold">Student</th>
-                      <th scope="col" className="px-4 py-3 font-semibold">Student ID</th>
+                      <th scope="col" className="px-4 py-3 font-semibold">Admission number</th>
                       <th scope="col" className="px-4 py-3 font-semibold">Status</th>
                       <th scope="col" className="px-4 py-3 font-semibold">Note</th>
                     </tr>
@@ -174,7 +174,7 @@ export function AttendanceWorkspace({
                         <td className="px-4 py-3 font-medium text-slate-800">
                           {student.firstName} {student.lastName}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{student.publicId}</td>
+                        <td className="px-4 py-3 text-slate-600">{student.admissionNumber ?? "—"}</td>
                         <td className="px-4 py-3">
                           <select
                             name={`status_${student.studentId}`}
@@ -264,7 +264,7 @@ export function AttendanceWorkspace({
                 <tr>
                   <th>No.</th>
                   <th>Student</th>
-                  <th>Student ID</th>
+                  <th>Admission number</th>
                   <th>Status</th>
                   <th>Note</th>
                 </tr>
@@ -274,7 +274,7 @@ export function AttendanceWorkspace({
                   <tr key={student.studentId}>
                     <td>{index + 1}</td>
                     <td>{student.firstName} {student.lastName}</td>
-                    <td>{student.publicId}</td>
+                    <td>{student.admissionNumber ?? "—"}</td>
                     <td>{student.status ? statusLabels[student.status] : "Not marked"}</td>
                     <td>{student.note ?? "—"}</td>
                   </tr>
