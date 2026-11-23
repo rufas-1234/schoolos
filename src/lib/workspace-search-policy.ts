@@ -81,6 +81,23 @@ function resultScore(query: string, result: RankedWorkspaceSearchResult): number
   return scores.reduce((total, score) => total + score, 0) / scores.length;
 }
 
+function categoryPriority(category: string): number {
+  switch (category) {
+    case "Students":
+      return 4;
+    case "Staff":
+      return 3;
+    case "Pages":
+    case "Academics":
+    case "Examinations":
+      return 2;
+    case "Users":
+      return 0;
+    default:
+      return 1;
+  }
+}
+
 export function rankWorkspaceSearchResults<T extends RankedWorkspaceSearchResult>(
   query: string,
   results: T[],
@@ -89,7 +106,11 @@ export function rankWorkspaceSearchResults<T extends RankedWorkspaceSearchResult
   return results
     .map((result, index) => ({ result, index, score: resultScore(query, result) }))
     .filter((entry) => entry.score >= 0.62)
-    .sort((first, second) => second.score - first.score || first.index - second.index)
+    .sort((first, second) =>
+      second.score - first.score ||
+      categoryPriority(second.result.category) - categoryPriority(first.result.category) ||
+      first.index - second.index
+    )
     .slice(0, limit)
     .map(({ result }) => result);
 }

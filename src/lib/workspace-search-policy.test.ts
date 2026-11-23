@@ -24,6 +24,31 @@ describe("workspace search policy", () => {
       .toEqual(["student"]);
   });
 
+  it("prioritizes student and staff profiles and core pages over matching user emails", () => {
+    const matches = [
+      { id: "email", title: "Rufas Lubang", description: "School user · rufaslubang3@gmail.com", href: "/users", category: "Users" },
+      { id: "page", title: "Rufas", description: "Core school functionality", href: "/page", category: "Pages" },
+      { id: "staff", title: "Rufas Lubang", description: "Staff profile", href: "/staff", category: "Staff" },
+      { id: "student", title: "Rufas Lubang", description: "Student profile", href: "/student", category: "Students" },
+    ];
+
+    expect(rankWorkspaceSearchResults("rufas", matches).map((result) => result.id))
+      .toEqual(["student", "staff", "page", "email"]);
+  });
+
+  it("still finds user accounts when searching by their email address", () => {
+    const user = {
+      id: "email",
+      title: "Rufas Lubang",
+      description: "School user · rufaslubang3@gmail.com",
+      href: "/users",
+      category: "Users",
+    };
+
+    expect(rankWorkspaceSearchResults("rufaslubang3@gmail.com", [user]))
+      .toEqual([user]);
+  });
+
   it("does not return unrelated results for a weak match", () => {
     expect(rankWorkspaceSearchResults("zzzzqx", results)).toEqual([]);
   });
