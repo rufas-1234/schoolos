@@ -593,7 +593,7 @@ h6 {
 .admin-dialog-content form > div:last-child:has(> button[type="submit"]),
 .admin-dialog-content form > div:last-child:has(> button[type="button"]) {
   position: sticky;
-  bottom: -1.75rem;
+  bottom: 0;
   z-index: 10;
   margin: 0 -1.75rem -1.75rem;
   border-top: 1px solid #e2e8f0;
@@ -635,7 +635,7 @@ h6 {
   .admin-dialog-form-actions,
   .admin-dialog-content form > div:last-child:has(> button[type="submit"]),
   .admin-dialog-content form > div:last-child:has(> button[type="button"]) {
-    bottom: -1.25rem;
+    bottom: 0;
     margin: 0 -1.25rem -1.25rem;
     padding: 0.75rem 1.25rem max(0.75rem, env(safe-area-inset-bottom));
   }

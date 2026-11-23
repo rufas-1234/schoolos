@@ -621,8 +621,8 @@ export function StudentForm({
               {hasPendingUploads ? "Uploading documents..." : pending ? "Saving..." : "Save changes"}
             </button>
           : <AdminConfirmSubmitButton
-              label="Submit student admission and class placement"
-              buttonText={hasPendingUploads ? "Uploading documents..." : pending ? "Saving..." : "Submit admission and class placement"}
+              label="Submit student admission"
+              buttonText={hasPendingUploads ? "Uploading documents..." : pending ? "Saving..." : "Submit admission"}
               confirmationTitle="Confirm student admission"
               confirmationMessage="Submit this student’s admission and class placement for review?"
               disabled={pending || hasPendingUploads}
