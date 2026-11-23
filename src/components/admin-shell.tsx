@@ -66,6 +66,12 @@ const navigation: NavigationItem[] = [
     permission: "academics.manage",
     permissionAlternatives: ["school.settings.manage"],
     children: [
+      {
+        id: "overview",
+        label: "Academic Overview",
+        href: "/admin/academics/overview",
+        matchPath: "/admin/academics/overview",
+      },
       ...academicSections.filter((section) => section.id !== "teachers").map((section) => ({
         id: section.id,
         label: section.label,
@@ -453,6 +459,8 @@ export function AdminShell({
   const pageLabel = pathname.startsWith("/admin/academics")
     ? pathname.startsWith("/admin/academics/attendance-reports")
       ? "Student attendance reports"
+      : pathname === "/admin/academics/overview"
+        ? "Academic Overview"
       : activeSection?.label ?? "Academics"
     : pathname.startsWith("/admin/system")
       ? pathname.endsWith("/user-logs") ? "User Logs" : "System Settings"

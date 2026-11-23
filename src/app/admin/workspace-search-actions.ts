@@ -131,6 +131,13 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("teacher-portal", "Teacher portal", "Teacher class lists, attendance, and marks entry", "/portal/teacher", ["teacher", "my classes", "class portal"]);
   }
   if (canManageAcademics) {
+    addPage(
+      "academics-overview",
+      "Academic overview",
+      "Academic year, student enrollment, classes, subjects, and term schedule",
+      "/admin/academics/overview",
+      ["academic dashboard", "academics overview"],
+    );
     for (const section of academicSections) {
       addPage(
         `academics-${section.id}`,
