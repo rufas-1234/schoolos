@@ -1,10 +1,14 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getStaffLoginPasswordError } from "@/lib/staff-policy";
 import { db } from "@/db";
 import {
+  account as authAccount,
   auditLogs,
   schoolMemberships,
   session,
@@ -27,17 +31,28 @@ export async function updatePlatformAccountCredentials(
   const parsed = z.object({
     userId: z.string().uuid(),
     email: z.string().trim().email().max(320).transform((email) => email.toLowerCase()),
+    password: z.string().max(128),
+    passwordConfirmation: z.string().max(128),
     issuePasswordSetup: z.string().transform((value) => value === "true"),
   }).safeParse({
     userId: formData.get("userId"),
     email: formData.get("email"),
+    password: formData.get("password") ?? "",
+    passwordConfirmation: formData.get("passwordConfirmation") ?? "",
     issuePasswordSetup: formData.get("issuePasswordSetup") ?? "",
   });
   if (!parsed.success) return { error: "Enter a valid email address and account." };
-  const { userId, email, issuePasswordSetup } = parsed.data;
+  const { userId, email, password, passwordConfirmation, issuePasswordSetup } = parsed.data;
+  const passwordError = getStaffLoginPasswordError(password, passwordConfirmation);
+  if (passwordError) return { error: passwordError };
+  if (issuePasswordSetup && password) {
+    return { error: "Choose either a temporary password or a one-time setup link, not both." };
+  }
+  if (!password && passwordConfirmation) return { error: "Enter a temporary password to confirm." };
   let setupUrl: string | undefined;
 
   try {
+    const passwordHash = password ? await hashPassword(password) : null;
     const outcome = await db.transaction(async (tx) => {
       const [target] = await tx.select({ email: user.email }).from(user)
         .where(eq(user.id, userId))
@@ -52,7 +67,12 @@ export async function updatePlatformAccountCredentials(
       if (!memberships.length) return "account-not-found" as const;
 
       const emailChanged = target.email.toLowerCase() !== email;
-      if (emailChanged) await tx.update(user).set({ email }).where(eq(user.id, userId));
+      if (emailChanged || passwordHash) {
+        await tx.update(user).set({
+          ...(emailChanged ? { email } : {}),
+          ...(passwordHash ? { isActive: true, mustChangePassword: true } : {}),
+        }).where(eq(user.id, userId));
+      }
 
       if (emailChanged) {
         await tx.update(staffMembers).set({ email }).where(eq(staffMembers.linkedUserId, userId));
@@ -71,12 +91,36 @@ export async function updatePlatformAccountCredentials(
         }
       }
 
+      if (passwordHash) {
+        const [credentialAccount] = await tx.select({ id: authAccount.id })
+          .from(authAccount)
+          .where(and(
+            eq(authAccount.userId, userId),
+            eq(authAccount.providerId, "credential"),
+          ))
+          .for("update")
+          .limit(1);
+        if (credentialAccount) {
+          await tx.update(authAccount).set({ password: passwordHash })
+            .where(eq(authAccount.id, credentialAccount.id));
+        } else {
+          await tx.insert(authAccount).values({
+            id: randomUUID(),
+            accountId: userId,
+            providerId: "credential",
+            userId,
+            password: passwordHash,
+          });
+        }
+      }
+
       if (issuePasswordSetup) setupUrl = await issuePasswordSetupLink(tx, userId);
 
-      if (emailChanged || issuePasswordSetup) {
+      if (emailChanged || passwordHash || issuePasswordSetup) {
         await tx.delete(session).where(eq(session.userId, userId));
         const changedFields = [
           ...(emailChanged ? ["credential.email"] : []),
+          ...(passwordHash ? ["credential.password", "user.mustChangePassword"] : []),
           ...(issuePasswordSetup ? ["credential.password", "user.isActive"] : []),
         ];
         for (const membership of memberships) {
@@ -105,7 +149,11 @@ export async function updatePlatformAccountCredentials(
   revalidatePath("/admin/students");
   revalidatePath("/admin/staff");
   return {
-    success: "Account updated.",
+    success: password
+      ? "Account updated. The recipient must change the temporary password before accessing the workspace; share it securely."
+      : issuePasswordSetup
+        ? "Account updated. Copy the one-time setup link below and share it securely."
+        : "Account updated.",
     ...(setupUrl ? { setupUrl } : {}),
   };
 }

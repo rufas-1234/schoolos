@@ -278,6 +278,14 @@ export default async function ExaminationDetailPage({
           <h1 className="mt-1 text-3xl font-bold text-slate-950">{exam.name}</h1>
           <p className="mt-2 text-sm text-slate-600">{exam.examTypeName ? `${exam.examTypeName} · ` : ""}{exam.branchName ?? "All branches"} · {exam.examSystem === "multi" ? "Multi Exam" : "Single Exam"} · {exam.startDate} – {exam.endDate} · {overallStatus}</p>
         </div>
+        {(canConfigure || context.grantedPermissions.includes("fees.manage")) && (
+          <Link
+            href={`/admin/examinations/${exam.id}/cards`}
+            className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-100"
+          >
+            Issue exam cards
+          </Link>
+        )}
       </header>
 
       <section aria-label="Exam workflow" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

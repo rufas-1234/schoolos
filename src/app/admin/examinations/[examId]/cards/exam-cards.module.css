@@ -1,0 +1,694 @@
+.page {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+}
+
+.heading h1 {
+  margin: 5px 0;
+  color: #0f172a;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.heading p:last-child {
+  max-width: 760px;
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #6d28d9;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #6d28d9;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary > div {
+  display: flex;
+  min-height: 68px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 15px;
+}
+
+.summary strong {
+  color: #0f172a;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.summary span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(140px, 220px));
+  align-items: end;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+}
+
+.filters label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.filters input,
+.filters select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 10px;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.register {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.registerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #fff;
+  padding: 12px 15px;
+}
+
+.resultCount {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.selectedCount {
+  display: block;
+  margin: 3px 0 0 23px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.registerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selectButton,
+.printButton {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.selectButton {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.printButton {
+  border: 1px solid #5b21b6;
+  background: #6d28d9;
+  color: #fff;
+}
+
+.selectButton:disabled,
+.printButton:disabled,
+.exceptionForm button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  align-items: start;
+  gap: 18px;
+}
+
+.cardItem {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+.cardSelect {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.cardSelect input {
+  accent-color: #6d28d9;
+}
+
+.examCard {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 85.6 / 53.98;
+  overflow: hidden;
+  border: 1px solid #7c3aed;
+  border-radius: 14px;
+  background: linear-gradient(140deg, #1e1b4b, #312e81 58%, #4338ca);
+  box-shadow: 0 7px 20px #1e1b4b2b;
+  color: #fff;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.examCard::before,
+.examCard::after {
+  position: absolute;
+  right: -14%;
+  bottom: -27%;
+  width: 68%;
+  aspect-ratio: 1;
+  border: 1px solid #c4b5fd66;
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.examCard::after {
+  right: -4%;
+  bottom: -39%;
+  width: 66%;
+  border-color: #a5b4fc40;
+}
+
+.cardTop {
+  position: relative;
+  display: flex;
+  height: 23%;
+  align-items: center;
+  gap: 2.5%;
+  padding: 3% 4% 1%;
+  background: #1e1b4bdd;
+}
+
+.logoFrame {
+  display: grid;
+  width: 11%;
+  flex: 0 0 11%;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1.5px solid #c4b5fd;
+  border-radius: 50%;
+  background: #fff;
+  color: #312e81;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.logoFrame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 2px;
+}
+
+.schoolCopy {
+  min-width: 0;
+  padding-right: 17%;
+}
+
+.schoolCopy h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(12px, 3.2vw, 17px);
+  font-weight: 900;
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.schoolCopy p {
+  overflow: hidden;
+  margin: 3px 0 0;
+  color: #ddd6fe;
+  font-size: clamp(7px, 1.8vw, 9px);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.yearTag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-bottom-left-radius: 7px;
+  background: #c4b5fd;
+  padding: 4px 7px;
+  color: #1e1b4b;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.cardTitle {
+  position: relative;
+  display: flex;
+  height: 16%;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4%;
+  border-bottom: 1px solid #c4b5fd55;
+}
+
+.cardTitle span {
+  color: #c4b5fd;
+  font-size: clamp(7px, 1.8vw, 9px);
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+.cardTitle strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: clamp(12px, 3vw, 16px);
+  font-weight: 850;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studentBody {
+  position: relative;
+  display: grid;
+  height: 43%;
+  grid-template-columns: 24% minmax(0, 1fr);
+  align-items: center;
+  gap: 4%;
+  padding: 2% 4%;
+}
+
+.portrait {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 88%;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid #e0e7ff;
+  border-radius: 9px;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.portrait img {
+  object-fit: cover;
+  object-position: center 28%;
+}
+
+.studentCopy {
+  min-width: 0;
+}
+
+.studentCopy h3 {
+  overflow: hidden;
+  margin: 0 0 3px;
+  color: #fff;
+  font-size: clamp(11px, 2.8vw, 15px);
+  font-weight: 900;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.studentCopy > p {
+  overflow: hidden;
+  margin: 0;
+  color: #ddd6fe;
+  font-size: clamp(8px, 2vw, 10px);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studentDetails {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  color: #c7d2fe;
+  font-size: clamp(7px, 1.8vw, 9px);
+}
+
+.studentDetails span {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.studentDetails b {
+  overflow: hidden;
+  color: #fff;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardFooter {
+  position: absolute;
+  right: 4%;
+  bottom: 4%;
+  left: 4%;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.cardFooter > div {
+  display: grid;
+  gap: 2px;
+  color: #c7d2fe;
+  font-size: clamp(6px, 1.6vw, 8px);
+}
+
+.cardFooter > div b {
+  color: #fff;
+  font-size: clamp(7px, 1.8vw, 9px);
+}
+
+.clearedBadge,
+.exceptionBadge {
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: clamp(6px, 1.7vw, 8px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.clearedBadge {
+  background: #bbf7d0;
+  color: #14532d;
+}
+
+.exceptionBadge {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.blockedLabel {
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.blockedCard {
+  display: grid;
+  width: 100%;
+  max-width: 440px;
+  gap: 12px;
+  border: 1px solid #fecaca;
+  border-radius: 13px;
+  background: #fff;
+  padding: 14px;
+}
+
+.blockedIdentity {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.blockedPortrait {
+  position: relative;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.blockedPortrait img {
+  object-fit: cover;
+}
+
+.blockedIdentity h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.blockedIdentity p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.balanceNotice {
+  margin: 0;
+  color: #991b1b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.exceptionForm {
+  display: grid;
+  width: 100%;
+  max-width: 440px;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+
+.exceptionForm label {
+  display: grid;
+  gap: 5px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.exceptionForm textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+  color: #0f172a;
+  font-size: 12px;
+}
+
+.exceptionHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.exceptionForm button {
+  justify-self: start;
+  border: 0;
+  border-radius: 8px;
+  background: #6d28d9;
+  padding: 8px 11px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.formError,
+.formSuccess {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.formError {
+  color: #b91c1c;
+}
+
+.formSuccess {
+  color: #047857;
+}
+
+.emptyState,
+.limitNotice {
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  padding: 15px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+@page {
+  size: 85.6mm 53.98mm;
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .page {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .registerBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .registerActions {
+    width: 100%;
+  }
+
+  .selectButton,
+  .printButton {
+    flex: 1;
+  }
+
+  .cardGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media print {
+  .page {
+    display: block;
+    width: 85.6mm;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .heading,
+  .summary,
+  .filters,
+  .registerBar,
+  .cardSelect,
+  .blockedLabel,
+  .blockedCard,
+  .exceptionForm,
+  .limitNotice,
+  .emptyState {
+    display: none !important;
+  }
+
+  .register,
+  .cardGrid {
+    display: block;
+    width: 85.6mm;
+    margin: 0;
+    padding: 0;
+  }
+
+  .cardItem {
+    display: none !important;
+    width: 85.6mm;
+    height: 53.98mm;
+    margin: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .cardItem[data-selected="true"] {
+    display: block !important;
+    content-visibility: visible;
+    contain-intrinsic-size: none;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .cardItem[data-selected="true"][data-last-selected="true"] {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .examCard {
+    width: 85.6mm;
+    height: 53.98mm;
+    max-width: none;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}

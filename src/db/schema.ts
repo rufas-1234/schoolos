@@ -1553,6 +1553,35 @@ export const examAttendance = mysqlTable(
   ],
 );
 
+export const examFeeClearances = mysqlTable(
+  "exam_fee_clearances",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    examinationId: bigint("examinationId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => examinations.id, { onDelete: "cascade" }),
+    enrollmentId: bigint("enrollmentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => studentEnrollments.id, { onDelete: "cascade" }),
+    reason: varchar("reason", { length: 1000 }).notNull(),
+    approvedBy: varchar("approvedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_fee_clearances_school_exam_enrollment_uq").on(
+      table.schoolId,
+      table.examinationId,
+      table.enrollmentId,
+    ),
+    index("exam_fee_clearances_school_exam_idx").on(table.schoolId, table.examinationId),
+  ],
+);
+
 export const examStudentRemarks = mysqlTable(
   "exam_student_remarks",
   {

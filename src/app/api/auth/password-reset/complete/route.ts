@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { data: { claims } } = await supabase.auth.getClaims();
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+    if (claimsError) {
+      return NextResponse.json({ error: "The reset link could not be verified. Request a new link and try again." }, { status: 500 });
+    }
+    const claims = claimsData?.claims;
     const authenticationMethods = claims?.amr;
     const isRecoverySession = Array.isArray(authenticationMethods) && authenticationMethods.some(
       (entry) => typeof entry === "object" && entry !== null && "method" in entry && entry.method === "recovery",
