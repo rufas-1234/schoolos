@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
+import { and, asc, eq, inArray, like, lt, or, sql, sum } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/print-button";
 import { db } from "@/db";
@@ -27,6 +27,7 @@ type SearchParams = {
   studentId?: string | string[];
   search?: string | string[];
   status?: string | string[];
+  overdue?: string | string[];
   branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
@@ -67,23 +68,25 @@ export default async function FeeInvoicePrintPage({
   const studentId = parseId(params.studentId);
   const search = typeof params.search === "string" ? params.search.trim().slice(0, 100) : "";
   const status = typeof params.status === "string" &&
-    ["unpaid", "partial", "paid"].includes(params.status) ? params.status : "";
+    ["unpaid", "partial", "paid", "outstanding"].includes(params.status) ? params.status : "";
+  const overdueOnly = params.overdue === "true";
   const branchId = parseId(params.branchId);
   const classLevelId = parseId(params.classLevelId);
   const sectionId = parseId(params.sectionId);
   const requestedCurrency = typeof params.currency === "string" ? params.currency : "";
   const invalidDirectSelector =
     (params.invoiceId !== undefined && (!invoiceId || params.studentId !== undefined ||
-      params.search !== undefined || params.status !== undefined || params.branchId !== undefined ||
+      params.search !== undefined || params.status !== undefined || params.overdue !== undefined || params.branchId !== undefined ||
       params.classLevelId !== undefined || params.sectionId !== undefined)) ||
     (params.studentId !== undefined && (!studentId || params.invoiceId !== undefined ||
-      params.search !== undefined || params.status !== undefined || params.branchId !== undefined ||
+      params.search !== undefined || params.status !== undefined || params.overdue !== undefined || params.branchId !== undefined ||
       params.classLevelId !== undefined || params.sectionId !== undefined));
   if (
     invalidDirectSelector ||
     (params.search !== undefined && typeof params.search !== "string") ||
     (params.status !== undefined && (typeof params.status !== "string" ||
-      !["unpaid", "partial", "paid"].includes(params.status))) ||
+      !["unpaid", "partial", "paid", "outstanding"].includes(params.status))) ||
+    (params.overdue !== undefined && params.overdue !== "true") ||
     (params.branchId !== undefined && !branchId) ||
     (params.classLevelId !== undefined && !classLevelId) ||
     (params.sectionId !== undefined && !sectionId)
@@ -202,6 +205,7 @@ export default async function FeeInvoicePrintPage({
     .leftJoin(paymentTotalsForFilter, eq(paymentTotalsForFilter.invoiceId, studentFeeInvoices.id))
     .where(and(
       eq(studentFeeInvoices.schoolId, context.schoolId),
+      ...(overdueOnly ? [lt(studentFeeInvoices.dueDate, today)] : []),
       ...(requestedCurrency ? [eq(studentFeeInvoices.currency, requestedCurrency)] : []),
       ...(invoiceId ? [eq(studentFeeInvoices.publicId, invoiceId)] : []),
       ...(studentId ? [eq(students.id, studentId)] : []),
@@ -218,7 +222,11 @@ export default async function FeeInvoicePrintPage({
         like(students.phone, `%${search}%`),
         like(students.publicId, `%${search}%`),
       )!] : []),
-      ...(status ? [eq(filterStatus, status)] : []),
+      ...(status === "outstanding"
+        ? [inArray(filterStatus, ["unpaid", "partial"])]
+        : status
+          ? [eq(filterStatus, status)]
+          : []),
     ))
     .orderBy(asc(students.lastName), asc(students.firstName), asc(studentFeeInvoices.dueDate))
     .limit(501);

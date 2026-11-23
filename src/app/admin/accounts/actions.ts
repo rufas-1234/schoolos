@@ -43,6 +43,7 @@ async function writeAudit(
 
 function revalidateAccounts() {
   revalidatePath("/admin/accounts");
+  revalidatePath("/portal/finance");
 }
 
 export async function createChartAccount(_state: AccountActionState, formData: FormData): Promise<AccountActionState> {
@@ -83,7 +84,8 @@ export async function createChartAccount(_state: AccountActionState, formData: F
 export async function createSchoolBankAccount(_state: AccountActionState, formData: FormData): Promise<AccountActionState> {
   const context = await requireSchoolPermission("accounts.manage");
   const parsed = z.object({
-    chartAccountId: idField,
+    chartAccountId: z.union([z.literal(""), idField]).transform((value) => value === "" ? null : value),
+    newAssetAccountName: z.string().trim().max(160).transform((value) => value || null),
     currency: z.string().regex(/^[A-Z]{3}$/),
     bankName: nameField,
     accountName: nameField,
@@ -91,6 +93,7 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
     openingBalance: z.string().trim(),
   }).safeParse({
     chartAccountId: value(formData, "chartAccountId"),
+    newAssetAccountName: value(formData, "newAssetAccountName"),
     currency: value(formData, "currency"),
     bankName: value(formData, "bankName"),
     accountName: value(formData, "accountName"),
@@ -103,28 +106,92 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
       (parsed.data.accountNumber && !/^[0-9 -]{4,80}$/.test(parsed.data.accountNumber))) {
     return { error: "Enter valid bank details and a non-negative opening balance." };
   }
+  const hasExistingAssetAccount = parsed.data.chartAccountId !== null;
+  const hasNewAssetAccount = parsed.data.newAssetAccountName !== null;
+  if (hasExistingAssetAccount === hasNewAssetAccount) {
+    return { error: "Choose an existing asset account or enter a new account name, but not both." };
+  }
   const [currency] = await db.select({ code: schoolCurrencies.code }).from(schoolCurrencies)
     .where(and(
       eq(schoolCurrencies.schoolId, context.schoolId),
       eq(schoolCurrencies.code, parsed.data.currency),
     )).limit(1);
   if (!currency) return { error: "Choose a currency configured for this school." };
-  const [chartAccount] = await db.select({ id: chartOfAccounts.id, accountType: chartOfAccounts.accountType })
-    .from(chartOfAccounts).where(and(
-      eq(chartOfAccounts.id, parsed.data.chartAccountId),
-      eq(chartOfAccounts.schoolId, context.schoolId),
-      eq(chartOfAccounts.status, "active"),
-    )).limit(1);
-  if (!chartAccount || chartAccount.accountType !== "asset") {
-    return { error: "Choose an active asset account from this school’s chart of accounts." };
+    let chartAccount: { id: number; accountType: string; status: string } | null = null;
+    if (parsed.data.chartAccountId !== null) {
+      const [existingAccount] = await db.select({
+        id: chartOfAccounts.id,
+        accountType: chartOfAccounts.accountType,
+        status: chartOfAccounts.status,
+      }).from(chartOfAccounts).where(and(
+        eq(chartOfAccounts.id, parsed.data.chartAccountId),
+        eq(chartOfAccounts.schoolId, context.schoolId),
+      )).limit(1);
+      chartAccount = existingAccount ?? null;
   }
+    let matchingNewAssetAccount: { id: number; accountType: string; status: string } | null = null;
+    if (parsed.data.newAssetAccountName) {
+      const [existingAccount] = await db.select({
+        id: chartOfAccounts.id,
+        accountType: chartOfAccounts.accountType,
+        status: chartOfAccounts.status,
+      }).from(chartOfAccounts).where(and(
+        eq(chartOfAccounts.schoolId, context.schoolId),
+        eq(chartOfAccounts.name, parsed.data.newAssetAccountName),
+      )).limit(1);
+      if (existingAccount) {
+        if (existingAccount.accountType !== "asset") {
+          return { error: "A chart category with this name already exists with a different account type." };
+        }
+        if (existingAccount.status !== "active") {
+          return { error: "This account is inactive. Reactivate it from the chart of accounts or choose another name." };
+        }
+        matchingNewAssetAccount = existingAccount;
+      }
+    }
+    if ((parsed.data.chartAccountId !== null &&
+          (!chartAccount || chartAccount.accountType !== "asset" || chartAccount.status !== "active"))) {
+      return { error: "Choose an active asset account belonging to this school." };
+    }
   const publicId = randomUUID();
+    const createdAssetAccountPublicId = parsed.data.newAssetAccountName && !matchingNewAssetAccount ? randomUUID() : null;
+    const generatedAssetAccountCode = `AUTO-ASSET-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
   try {
     await db.transaction(async (tx) => {
+        let chartAccountId = chartAccount?.id ?? matchingNewAssetAccount?.id;
+        if (chartAccountId === undefined) {
+          if (!parsed.data.newAssetAccountName || !createdAssetAccountPublicId) {
+            throw new Error("A linked asset account was not selected or created.");
+          }
+          await tx.insert(chartOfAccounts).values({
+            publicId: createdAssetAccountPublicId,
+            schoolId: context.schoolId,
+            code: generatedAssetAccountCode,
+            name: parsed.data.newAssetAccountName,
+            accountType: "asset",
+            description: "Created while registering a bank or cash account.",
+          });
+          const [createdAccount] = await tx.select({ id: chartOfAccounts.id }).from(chartOfAccounts)
+            .where(and(
+              eq(chartOfAccounts.publicId, createdAssetAccountPublicId),
+              eq(chartOfAccounts.schoolId, context.schoolId),
+            )).limit(1);
+          if (!createdAccount) throw new Error("The new linked asset account could not be loaded.");
+          chartAccountId = createdAccount.id;
+          await writeAudit(
+            tx,
+            context.schoolId,
+            context.user.id,
+            "chart_account.created",
+            "chart_of_account",
+            createdAssetAccountPublicId,
+            ["code", "name", "accountType", "description"],
+          );
+        }
       await tx.insert(schoolBankAccounts).values({
         publicId,
         schoolId: context.schoolId,
-        chartAccountId: chartAccount.id,
+          chartAccountId,
         currency: parsed.data.currency,
         bankName: parsed.data.bankName,
         accountName: parsed.data.accountName,
@@ -145,7 +212,10 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
     throw error;
   }
   revalidateAccounts();
-  return { success: true };
+  return {
+    success: true,
+    message: `Bank or cash account saved.${createdAssetAccountPublicId ? " A new asset account was added to the chart." : ""}`,
+  };
 }
 
 export async function createAccountTransaction(
@@ -156,7 +226,8 @@ export async function createAccountTransaction(
   const parsed = z.object({
     transactionType: z.enum(["income", "expense"]),
     currency: z.string().regex(/^[A-Z]{3}$/),
-    categoryAccountId: idField,
+    categoryAccountId: z.union([z.literal(""), idField]).transform((value) => value === "" ? null : value),
+    newCategoryName: z.string().trim().max(160).transform((value) => value || null),
     bankAccountId: z.union([z.literal(""), idField]).transform((value) => value === "" ? null : value),
     transactionDate: z.string().refine(isCalendarDate),
     amount: z.string().trim(),
@@ -167,6 +238,7 @@ export async function createAccountTransaction(
     transactionType: value(formData, "transactionType"),
     currency: value(formData, "currency"),
     categoryAccountId: value(formData, "categoryAccountId"),
+    newCategoryName: value(formData, "newCategoryName"),
     bankAccountId: value(formData, "bankAccountId"),
     transactionDate: value(formData, "transactionDate"),
     amount: value(formData, "amount"),
@@ -178,20 +250,52 @@ export async function createAccountTransaction(
   if (!parsed.success || amount === null || amount === BigInt(0)) {
     return { error: "Enter a valid date, category, description, and positive amount." };
   }
+  const hasExistingCategory = parsed.data.categoryAccountId !== null;
+  const hasNewCategory = parsed.data.newCategoryName !== null;
+  if (hasExistingCategory === hasNewCategory) {
+    return { error: "Choose an existing category or enter a new category, but not both." };
+  }
   const expectedType = parsed.data.transactionType;
-  const [category] = await db.select({ id: chartOfAccounts.id, accountType: chartOfAccounts.accountType })
-    .from(chartOfAccounts).where(and(
+  let category: { id: number; accountType: string; status: string } | null = null;
+  if (parsed.data.categoryAccountId !== null) {
+    const [existingCategory] = await db.select({
+      id: chartOfAccounts.id,
+      accountType: chartOfAccounts.accountType,
+      status: chartOfAccounts.status,
+    }).from(chartOfAccounts).where(and(
       eq(chartOfAccounts.id, parsed.data.categoryAccountId),
       eq(chartOfAccounts.schoolId, context.schoolId),
-      eq(chartOfAccounts.status, "active"),
     )).limit(1);
+    category = existingCategory ?? null;
+  }
+  let matchingNewCategory: { id: number; accountType: string; status: string } | null = null;
+  if (parsed.data.newCategoryName) {
+    const [existingCategory] = await db.select({
+      id: chartOfAccounts.id,
+      accountType: chartOfAccounts.accountType,
+      status: chartOfAccounts.status,
+    }).from(chartOfAccounts).where(and(
+      eq(chartOfAccounts.schoolId, context.schoolId),
+      eq(chartOfAccounts.name, parsed.data.newCategoryName),
+    )).limit(1);
+    if (existingCategory) {
+      if (existingCategory.accountType !== expectedType) {
+        return { error: "A chart category with this name already exists with a different account type." };
+      }
+      if (existingCategory.status !== "active") {
+        return { error: "This category is inactive. Reactivate it from the chart of accounts or choose another name." };
+      }
+      matchingNewCategory = existingCategory;
+    }
+  }
   const [bankAccount] = parsed.data.bankAccountId === null ? [null] : await db.select({ id: schoolBankAccounts.id })
     .from(schoolBankAccounts).where(and(
       eq(schoolBankAccounts.id, parsed.data.bankAccountId),
       eq(schoolBankAccounts.schoolId, context.schoolId),
       eq(schoolBankAccounts.status, "active"),
     )).limit(1);
-  if (!category || category.accountType !== expectedType ||
+  if ((parsed.data.categoryAccountId !== null &&
+        (!category || category.accountType !== expectedType || category.status !== "active")) ||
       (parsed.data.bankAccountId !== null && !bankAccount)) {
     return { error: `Choose an active ${expectedType} category and bank account belonging to this school.` };
   }
@@ -213,12 +317,44 @@ export async function createAccountTransaction(
     if (!currency) return { error: "Choose a currency configured for this school." };
   }
   const publicId = randomUUID();
+  const createdCategoryPublicId = parsed.data.newCategoryName && !matchingNewCategory ? randomUUID() : null;
+  const createdCategoryCode = `AUTO-${expectedType === "income" ? "INCOME" : "EXPENSE"}-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
   await db.transaction(async (tx) => {
+    let categoryAccountId = category?.id ?? matchingNewCategory?.id;
+    if (categoryAccountId === undefined) {
+      if (!parsed.data.newCategoryName || !createdCategoryPublicId) {
+        throw new Error("A transaction category was not selected or created.");
+      }
+      await tx.insert(chartOfAccounts).values({
+        publicId: createdCategoryPublicId,
+        schoolId: context.schoolId,
+        code: createdCategoryCode,
+        name: parsed.data.newCategoryName,
+        accountType: expectedType,
+        description: `Created while recording ${expectedType}.`,
+      });
+      const [createdCategory] = await tx.select({ id: chartOfAccounts.id }).from(chartOfAccounts)
+        .where(and(
+          eq(chartOfAccounts.publicId, createdCategoryPublicId),
+          eq(chartOfAccounts.schoolId, context.schoolId),
+        )).limit(1);
+      if (!createdCategory) throw new Error("The new transaction category could not be loaded.");
+      categoryAccountId = createdCategory.id;
+      await writeAudit(
+        tx,
+        context.schoolId,
+        context.user.id,
+        "chart_account.created",
+        "chart_of_account",
+        createdCategoryPublicId,
+        ["code", "name", "accountType", "description"],
+      );
+    }
     await tx.insert(accountTransactions).values({
       publicId,
       schoolId: context.schoolId,
       transactionType: expectedType,
-      categoryAccountId: category.id,
+      categoryAccountId,
       bankAccountId: bankAccount?.id ?? null,
       currency: parsed.data.currency,
       transactionDate: parsed.data.transactionDate,
@@ -239,7 +375,10 @@ export async function createAccountTransaction(
     });
   });
   revalidateAccounts();
-  return { success: true, message: `${expectedType === "income" ? "Income" : "Expense"} submitted for approval.` };
+  return {
+    success: true,
+    message: `${expectedType === "income" ? "Income" : "Expense"} submitted for approval.${createdCategoryPublicId ? " A new category was added to the chart." : ""}`,
+  };
 }
 
 export async function reviewAccountTransaction(

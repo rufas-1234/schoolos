@@ -140,7 +140,7 @@ export function AccountForms({
           <TextField label="Bank or provider" name="bankName" />
           <TextField label="Account display name" name="accountName" placeholder="School operating account" />
           <TextField label="Account number (only last 4 are stored)" name="accountNumber" required={false} />
-          <SelectField label="Linked asset account" name="chartAccountId" options={assetAccounts} />
+          <CategoryField type="asset" options={assetAccounts} />
           <CurrencyField currencies={currencies} defaultValue={defaultCurrency} />
           <TextField label="Opening balance" name="openingBalance" type="number" defaultValue="0" />
         </div>
@@ -149,7 +149,7 @@ export function AccountForms({
       {section === "income" && <ActionForm action={createAccountTransaction} title="Record income">
         <input type="hidden" name="transactionType" value="income" />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SelectField label="Income category" name="categoryAccountId" options={incomeAccounts} />
+          <CategoryField type="income" options={incomeAccounts} />
           <SelectField label="Deposit to bank / cash" name="bankAccountId" options={banks} required={false} />
           <CurrencyField currencies={currencies} defaultValue={defaultCurrency} />
           <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
@@ -163,7 +163,7 @@ export function AccountForms({
       {section === "expenses" && <ActionForm action={createAccountTransaction} title="Record expense">
         <input type="hidden" name="transactionType" value="expense" />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SelectField label="Expense category" name="categoryAccountId" options={expenseAccounts} />
+          <CategoryField type="expense" options={expenseAccounts} />
           <SelectField label="Paid from bank / cash" name="bankAccountId" options={banks} required={false} />
           <CurrencyField currencies={currencies} defaultValue={defaultCurrency} />
           <TextField label="Date" name="transactionDate" type="date" defaultValue={currentDate} />
@@ -184,6 +184,37 @@ export function AccountForms({
           <TextField label="Note" name="note" required={false} />
         </div>
       </ActionForm>}
+    </div>
+  );
+}
+
+function CategoryField({
+  type,
+  options,
+}: {
+  type: "asset" | "income" | "expense";
+  options: AccountOption[];
+}) {
+  const label = type === "asset" ? "asset" : type;
+  const existingFieldName = type === "asset" ? "chartAccountId" : "categoryAccountId";
+  const newFieldName = type === "asset" ? "newAssetAccountName" : "newCategoryName";
+  return (
+    <div className="space-y-2">
+      <SelectField
+        label={type === "asset" ? "Linked asset account" : `Existing ${label} category`}
+        name={existingFieldName}
+        options={options}
+        required={false}
+      />
+      <TextField
+        label={`Or create ${label} ${type === "asset" ? "account" : "category"}`}
+        name={newFieldName}
+        required={false}
+        placeholder={type === "income" ? "Donations, grants..." : type === "expense" ? "Utilities, supplies..." : "Cash, operating account..."}
+      />
+      <p className="text-xs leading-5 text-slate-500">
+        A new {type === "asset" ? "account" : "category"} is added to the chart automatically. Choose an existing one or enter a new one.
+      </p>
     </div>
   );
 }

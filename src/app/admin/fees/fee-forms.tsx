@@ -491,6 +491,7 @@ export function ApplyFeeAdvanceCreditForm({
 export function BulkFeePaymentForm({
   search,
   status,
+  overdue,
   branchId,
   classLevelId,
   sectionId,
@@ -500,6 +501,7 @@ export function BulkFeePaymentForm({
 }: {
   search: string;
   status: string;
+  overdue: string;
   branchId: string;
   classLevelId: string;
   sectionId: string;
@@ -524,6 +526,7 @@ export function BulkFeePaymentForm({
       )}
       <input type="hidden" name="search" value={search} />
       <input type="hidden" name="status" value={status} />
+      <input type="hidden" name="overdue" value={overdue} />
       <input type="hidden" name="branchId" value={branchId} />
       <input type="hidden" name="classLevelId" value={classLevelId} />
       <input type="hidden" name="sectionId" value={sectionId} />

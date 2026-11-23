@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Children } from "react";
 import { and, count, desc, eq, gt, gte, lte, sql } from "drizzle-orm";
 import {
+  ArrowUpRight,
   Banknote,
   ChartNoAxesCombined,
   CircleAlert,
@@ -496,7 +497,25 @@ export default async function FinancePortalPage() {
               A single view of fee collections, account activity, and school stock and assets.
             </p>
           </div>
-          <PrintButton targetId="finance-overview-report" label="Print finance summary" />
+          <div className="flex flex-wrap gap-2">
+            {canManageAccounts && <>
+              <Link href="/admin/accounts?section=income" className="inline-flex items-center gap-1 rounded-xl bg-violet-700 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-800">
+                Add income <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+              <Link href="/admin/accounts?section=expenses" className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Add expense <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+              <Link href="/admin/accounts?section=bank" className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Add bank account <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+            </>}
+            {canManageInventory && (
+              <Link href="/admin/inventory?view=assets" className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Register asset <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+            )}
+            <PrintButton targetId="finance-overview-report" label="Print finance summary" />
+          </div>
         </header>
 
         <section id="finance-overview-report" className="print-report-content space-y-5 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 print:rounded-none print:border-0 print:p-0">
@@ -513,17 +532,17 @@ export default async function FinancePortalPage() {
               </h3>
               <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {canManageFees && <>
-                  <SummaryCard label="Net fee collections · month to date" value={currencyAmount(summary.netFees, summary.code)} icon={<CreditCard size={19} />} />
-                  <SummaryCard label={`Outstanding fees · ${summary.outstandingCount} invoices`} value={currencyAmount(summary.outstandingBalance, summary.code)} icon={<CircleAlert size={19} />} alert={summary.outstandingBalance > BigInt(0)} />
-                  <SummaryCard label={`Overdue fees · ${summary.overdueCount} invoices`} value={currencyAmount(summary.overdueBalance, summary.code)} icon={<CircleAlert size={19} />} alert={summary.overdueBalance > BigInt(0)} />
+                  <SummaryCard href={`/admin/fees/reports?from=${monthStart}&to=${today}`} label="Net fee collections · month to date" value={currencyAmount(summary.netFees, summary.code)} icon={<CreditCard size={19} />} />
+                  <SummaryCard href="/admin/fees/collection?status=outstanding" label={`Outstanding fees · ${summary.outstandingCount} invoices`} value={currencyAmount(summary.outstandingBalance, summary.code)} icon={<CircleAlert size={19} />} alert={summary.outstandingBalance > BigInt(0)} />
+                  <SummaryCard href="/admin/fees/collection?status=outstanding&overdue=true" label={`Overdue fees · ${summary.overdueCount} invoices`} value={currencyAmount(summary.overdueBalance, summary.code)} icon={<CircleAlert size={19} />} alert={summary.overdueBalance > BigInt(0)} />
                 </>}
                 {canManageAccounts && <>
-                  {canManageFees && <SummaryCard label="Total operating income · month to date" value={currencyAmount(summary.totalIncome, summary.code)} icon={<Banknote size={19} />} />}
-                  <SummaryCard label="Other approved income · month to date" value={currencyAmount(summary.otherIncome, summary.code)} icon={<Banknote size={19} />} />
-                  <SummaryCard label="Approved expenses · month to date" value={currencyAmount(summary.expenses, summary.code)} icon={<ReceiptText size={19} />} />
-                  {canManageFees && <SummaryCard label="Operating surplus / (deficit) · month to date" value={currencyAmount(summary.netSurplus, summary.code)} icon={<ChartNoAxesCombined size={19} />} alert={summary.netSurplus < BigInt(0)} />}
-                  <SummaryCard label={`Awaiting review · ${summary.pendingCount} transactions`} value={currencyAmount(summary.pendingAmount, summary.code)} icon={<CircleAlert size={19} />} alert={summary.pendingCount > 0} />
-                  <SummaryCard label={`Cash & bank · ${summary.bankAccountCount} active accounts`} value={currencyAmount(summary.bankBalance, summary.code)} icon={<Landmark size={19} />} alert={summary.bankBalance < BigInt(0)} />
+                  {canManageFees && <SummaryCard href={`/admin/accounts?section=profit&from=${monthStart}&to=${today}`} label="Total operating income · month to date" value={currencyAmount(summary.totalIncome, summary.code)} icon={<Banknote size={19} />} />}
+                  <SummaryCard href="/admin/accounts?section=income" label="Other approved income · month to date" value={currencyAmount(summary.otherIncome, summary.code)} icon={<Banknote size={19} />} />
+                  <SummaryCard href="/admin/accounts?section=expenses" label="Approved expenses · month to date" value={currencyAmount(summary.expenses, summary.code)} icon={<ReceiptText size={19} />} />
+                  {canManageFees && <SummaryCard href={`/admin/accounts?section=profit&from=${monthStart}&to=${today}`} label="Operating surplus / (deficit) · month to date" value={currencyAmount(summary.netSurplus, summary.code)} icon={<ChartNoAxesCombined size={19} />} alert={summary.netSurplus < BigInt(0)} />}
+                  <SummaryCard href="/admin/accounts?section=reports&status=pending" label={`Awaiting review · ${summary.pendingCount} transactions`} value={currencyAmount(summary.pendingAmount, summary.code)} icon={<CircleAlert size={19} />} alert={summary.pendingCount > 0} />
+                  <SummaryCard href="/admin/accounts?section=bank" label={`Cash & bank · ${summary.bankAccountCount} active accounts`} value={currencyAmount(summary.bankBalance, summary.code)} icon={<Landmark size={19} />} alert={summary.bankBalance < BigInt(0)} />
                 </>}
               </div>
               {(canManageFees || canManageAccounts) && (
@@ -538,10 +557,10 @@ export default async function FinancePortalPage() {
               <p className="mt-1 text-xs text-slate-500">Active stock valued at average cost; assets shown at acquisition cost.</p>
             </div>
             <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard label="Active stock items" value={String(activeStockCount)} icon={<PackageOpen size={19} />} />
-              <SummaryCard label="Stock value" value={currencyAmount(stockValue, currency)} icon={<PackageOpen size={19} />} />
-              <SummaryCard label="Items at or below reorder level" value={String(lowStockCount)} icon={<CircleAlert size={19} />} alert={lowStockCount > 0} />
-              <SummaryCard label={`Active assets · ${activeAssetCount}`} value={currencyAmount(assetValue, currency)} icon={<Banknote size={19} />} />
+              <SummaryCard href="/admin/inventory?view=register" label="Active stock items" value={String(activeStockCount)} icon={<PackageOpen size={19} />} />
+              <SummaryCard href="/admin/inventory?view=register" label="Stock value" value={currencyAmount(stockValue, currency)} icon={<PackageOpen size={19} />} />
+              <SummaryCard href="/admin/inventory?view=register" label="Items at or below reorder level" value={String(lowStockCount)} icon={<CircleAlert size={19} />} alert={lowStockCount > 0} />
+              <SummaryCard href="/admin/inventory?view=assets" label={`Active assets · ${activeAssetCount}`} value={currencyAmount(assetValue, currency)} icon={<Banknote size={19} />} />
             </div>
           </section>}
 
@@ -594,6 +613,7 @@ export default async function FinancePortalPage() {
             {permissions.has("fees.manage") && <ShortcutCard href="/admin/fees" title="Fee setup" description="Manage fee structures, discounts, and scholarships." />}
           </>}
           {canManageAccounts && <>
+            <ShortcutCard href="/admin/accounts?section=income" title="Income" description="Record income and review transaction status." />
             <ShortcutCard href="/admin/accounts?section=profit" title="Profit & loss" description="Review income and expense totals for a selected period." />
             <ShortcutCard href="/admin/accounts?section=expenses" title="Expenses" description="Record expenses and review approval status." />
             <ShortcutCard href="/admin/accounts?section=bank" title="Bank accounts" description="Review school cash and bank account balances." />
@@ -601,7 +621,7 @@ export default async function FinancePortalPage() {
           </>}
           {canManageInventory && <>
             <ShortcutCard href="/admin/inventory" title="Inventory" description="Open stock levels, items, and recent movements." />
-            <ShortcutCard href="/admin/inventory?view=assets" title="Assets" description="Review registered assets, value, and locations." />
+            <ShortcutCard href="/admin/inventory?view=assets" title="Assets" description="Register school property and review asset value and locations." />
           </>}
         </section>
 
@@ -673,19 +693,24 @@ function SummaryCard({
   value,
   icon,
   alert = false,
+  href,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   alert?: boolean;
+  href: string;
 }) {
-  return <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+  return <Link href={href} className="group block min-w-0 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 sm:p-5">
     <div className="flex items-start justify-between gap-3">
       <p className="min-w-0 text-sm font-medium leading-snug text-slate-600">{label}</p>
-      <span className={alert ? "shrink-0 text-rose-600" : "shrink-0 text-violet-700"}>{icon}</span>
+      <span className={`shrink-0 ${alert ? "text-rose-600" : "text-violet-700"}`}>{icon}</span>
     </div>
     <p className={`mt-3 break-words text-xl font-bold tabular-nums sm:text-2xl ${alert ? "text-rose-700" : "text-slate-950"}`}>{value}</p>
-  </article>;
+    <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-violet-700 transition group-hover:text-violet-900 print:hidden">
+      View details <ArrowUpRight size={13} aria-hidden="true" />
+    </span>
+  </Link>;
 }
 
 function FinanceTrendChart({

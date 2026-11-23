@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, like, or, sql, sum } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, lt, or, sql, sum } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { AdminActionDialog, AdminRecordDialog } from "@/components/admin-data-table";
 import Link from "next/link";
@@ -35,6 +35,7 @@ import { parsePageSize } from "@/components/pagination-utils";
 type SearchParams = {
   search?: string | string[];
   status?: string | string[];
+  overdue?: string | string[];
   branchId?: string | string[];
   classLevelId?: string | string[];
   sectionId?: string | string[];
@@ -68,7 +69,8 @@ export default async function FeeCollectionPage({
   const pageSize = parsePageSize(params.pageSize);
   const search = typeof params.search === "string" ? params.search.trim().slice(0, 100) : "";
   const statusFilter = typeof params.status === "string" &&
-    ["unpaid", "partial", "paid"].includes(params.status) ? params.status : "";
+    ["unpaid", "partial", "paid", "outstanding"].includes(params.status) ? params.status : "";
+  const overdueOnly = params.overdue === "true";
   const requestedBranch = typeof params.branchId === "string" && /^\d+$/.test(params.branchId)
     ? Number(params.branchId)
     : null;
@@ -121,6 +123,7 @@ export default async function FeeCollectionPage({
   const invoiceFilters = [
     eq(studentFeeInvoices.schoolId, context.schoolId),
     eq(studentFeeInvoices.currency, selectedCurrency),
+    ...(overdueOnly ? [lt(studentFeeInvoices.dueDate, today)] : []),
     ...(requestedBranch ? [eq(schoolBranches.id, requestedBranch)] : []),
     ...(requestedClass ? [eq(classLevels.id, requestedClass)] : []),
     ...(requestedSection ? [eq(classSections.id, requestedSection)] : []),
@@ -204,9 +207,11 @@ export default async function FeeCollectionPage({
     .leftJoin(paymentTotals, eq(paymentTotals.invoiceId, studentFeeInvoices.id))
     .where(and(...invoiceFilters))
     .as("matching_invoices");
-  const statusFilterCondition = statusFilter
-    ? eq(matchingInvoices.status, statusFilter)
-    : undefined;
+  const statusFilterCondition = statusFilter === "outstanding"
+    ? inArray(matchingInvoices.status, ["unpaid", "partial"])
+    : statusFilter
+      ? eq(matchingInvoices.status, statusFilter)
+      : undefined;
   const [countResult, bulkSummary, branches, classes, sections] = await Promise.all([
     db.select({ total: count() }).from(matchingInvoices).where(statusFilterCondition),
     db.select({
@@ -327,6 +332,7 @@ export default async function FeeCollectionPage({
     const query = new URLSearchParams();
     if (search) query.set("search", search);
     if (statusFilter) query.set("status", statusFilter);
+    if (overdueOnly) query.set("overdue", "true");
     if (requestedBranch !== null) query.set("branchId", String(requestedBranch));
     if (requestedClass !== null) query.set("classLevelId", String(requestedClass));
     if (requestedSection !== null) query.set("sectionId", String(requestedSection));
@@ -363,6 +369,7 @@ export default async function FeeCollectionPage({
           selectedClass={requestedClass === null ? "" : String(requestedClass)}
           selectedSection={requestedSection === null ? "" : String(requestedSection)}
           selectedStatus={statusFilter}
+          overdueOnly={overdueOnly}
           selectedCurrency={selectedCurrency}
         />
         <AdminActionDialog label="Quick add payment" title="Quick add payment">
@@ -376,6 +383,7 @@ export default async function FeeCollectionPage({
       <BulkFeePaymentForm
         search={search}
         status={statusFilter}
+        overdue={overdueOnly ? "true" : ""}
         branchId={requestedBranch === null ? "" : String(requestedBranch)}
         classLevelId={requestedClass === null ? "" : String(requestedClass)}
         sectionId={requestedSection === null ? "" : String(requestedSection)}
@@ -387,6 +395,7 @@ export default async function FeeCollectionPage({
         href={`/admin/fees/invoices/print?${new URLSearchParams({
           ...(search ? { search } : {}),
           ...(statusFilter ? { status: statusFilter } : {}),
+          ...(overdueOnly ? { overdue: "true" } : {}),
           ...(requestedBranch !== null ? { branchId: String(requestedBranch) } : {}),
           ...(requestedClass !== null ? { classLevelId: String(requestedClass) } : {}),
           ...(requestedSection !== null ? { sectionId: String(requestedSection) } : {}),

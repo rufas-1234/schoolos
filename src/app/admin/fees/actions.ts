@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull, like, ne, or, sql, sum } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, like, lt, ne, or, sql, sum } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -108,7 +108,8 @@ const applyAdvanceCreditSchema = z.object({
 const bulkPaymentSchema = z.object({
   search: z.string().trim().max(100),
   currency: currencyField,
-  status: z.enum(["", "unpaid", "partial", "paid"]),
+  status: z.enum(["", "unpaid", "partial", "paid", "outstanding"]),
+  overdue: z.enum(["", "true"]),
   branchId: z.union([z.literal(""), idField]),
   classLevelId: z.union([z.literal(""), idField]),
   sectionId: z.union([z.literal(""), idField]),
@@ -1340,6 +1341,7 @@ export async function recordBulkFeePayments(
     search: value(formData, "search"),
     currency: value(formData, "currency"),
     status: value(formData, "status"),
+    overdue: value(formData, "overdue"),
     branchId: value(formData, "branchId"),
     classLevelId: value(formData, "classLevelId"),
     sectionId: value(formData, "sectionId"),
@@ -1349,7 +1351,7 @@ export async function recordBulkFeePayments(
   });
   if (!result.success) return { error: "Review the invoice filters and payment details, then try again." };
 
-  const { search, currency, status, branchId, classLevelId, sectionId } = result.data;
+  const { search, currency, status, overdue, branchId, classLevelId, sectionId } = result.data;
   const searchTerm = search.toLocaleLowerCase();
   const today = await db.select({ timezone: schools.timezone })
     .from(schools).where(eq(schools.id, context.schoolId)).limit(1);
@@ -1407,6 +1409,7 @@ export async function recordBulkFeePayments(
       .where(and(
         eq(studentFeeInvoices.schoolId, context.schoolId),
         eq(studentFeeInvoices.currency, currency),
+        ...(overdue === "true" ? [lt(studentFeeInvoices.dueDate, paidDate)] : []),
         ...(branchId ? [eq(schoolBranches.id, branchId)] : []),
         ...(classLevelId ? [eq(classLevels.id, classLevelId)] : []),
         ...(sectionId ? [eq(classSections.id, sectionId)] : []),
@@ -1421,7 +1424,7 @@ export async function recordBulkFeePayments(
           like(students.phone, `%${search}%`),
           like(students.publicId, `%${search}%`),
         )!] : []),
-        ...(status ? [eq(computedStatus, status)] : []),
+        ...(status && status !== "outstanding" ? [eq(computedStatus, status)] : []),
       ))
       .orderBy(asc(studentFeeInvoices.id))
       .limit(501);
