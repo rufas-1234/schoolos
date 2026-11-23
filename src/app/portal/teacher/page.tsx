@@ -681,6 +681,9 @@ export default async function TeacherPortalPage({
     <TeacherPortalShell
       schoolName={context.schoolName}
       schoolLogoUrl={context.schoolLogoUrl}
+      schoolAddress={context.schoolAddress}
+      schoolPhone={context.schoolPhone}
+      schoolEmail={context.schoolEmail}
       teacherName={teacherName}
     >
       <main id="teacher-portal-print" className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">

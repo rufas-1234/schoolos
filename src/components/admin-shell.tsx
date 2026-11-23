@@ -836,13 +836,10 @@ export function AdminShell({
           <p className="admin-print-eyebrow">Official school record</p>
           <h1>{schoolName}</h1>
           <div className="admin-print-contact">
-            <div>Address: {schoolAddress || "Not configured"}</div>
-            <div>
-              {[
-                schoolPhone ? `Phone: ${schoolPhone}` : "Phone: Not configured",
-                schoolEmail ? `Email: ${schoolEmail}` : "Email: Not configured",
-              ].join("  •  ")}
-            </div>
+            {schoolAddress && <div>{schoolAddress}</div>}
+            {[schoolPhone, schoolEmail].filter(Boolean).join("  •  ") && (
+              <div>{[schoolPhone, schoolEmail].filter(Boolean).join("  •  ")}</div>
+            )}
           </div>
         </div>
         <div className="admin-print-seal" aria-hidden="true">SCHOOL</div>
@@ -1103,8 +1100,16 @@ export function AdminShell({
       </aside>}
       </div>
       <footer className="admin-print-footer">
-        <span>{schoolName} <span aria-hidden="true">•</span> Official school record</span>
-        <span>Handle student information confidentially</span>
+        <span className="admin-print-footer-crest" aria-hidden="true">
+          {schoolLogo
+            ? <Image src={schoolLogo} unoptimized width={24} height={24} alt="" className="h-full w-full object-contain" />
+            : schoolMonogram}
+        </span>
+        <span className="admin-print-footer-contact">
+          <strong>{schoolName}</strong>
+          <span>{[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join("  •  ") || "School contact details not configured"}</span>
+        </span>
+        <span className="admin-print-footer-note">Official school record<br />Handle confidentially</span>
       </footer>
     </div>
   );

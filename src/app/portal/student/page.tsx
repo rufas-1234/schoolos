@@ -792,6 +792,9 @@ export default async function StudentPortalPage({
     <FamilyPortalShell
       schoolName={context.schoolName}
       schoolLogoUrl={context.schoolLogoUrl}
+      schoolAddress={context.schoolAddress}
+      schoolPhone={context.schoolPhone}
+      schoolEmail={context.schoolEmail}
       userName={context.user.name}
       portalType="student"
     >
@@ -1241,9 +1244,10 @@ export default async function StudentPortalPage({
                       key={invoice.id}
                       id={`student-invoice-${invoice.id}`}
                       data-print-qr-document
+                      data-print-item-count={1 + Number(invoice.discountMinor > 0) + Number(invoice.fineMinor > 0)}
                       className="fee-invoice-page fee-invoice-card mx-auto w-full min-w-0 max-w-[210mm] space-y-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 text-slate-900 shadow-sm min-[400px]:p-4 sm:space-y-5 sm:p-6 print:overflow-visible"
                     >
-                      <header className="fee-invoice-title-row flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row sm:gap-5">
+                      <header className="fee-invoice-title-row flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row sm:gap-5" data-print-qr-header>
                         <div className="min-w-0">
                           <h2 className="fee-invoice-title">INVOICE</h2>
                           <p className="mt-2 break-words text-base font-bold text-slate-900">{schoolDetails[0]?.name ?? context.schoolName}</p>
@@ -1364,8 +1368,14 @@ export default async function StudentPortalPage({
                     const net = amount - reversed;
                     const paymentReversals = reversalsByPayment.get(payment.id) ?? [];
                     return (
-                      <article key={payment.id} id={`student-receipt-${payment.id}`} className="fee-receipt-page mx-auto w-full max-w-[148mm] space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm sm:p-5">
-                        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+                      <article
+                        key={payment.id}
+                        id={`student-receipt-${payment.id}`}
+                        data-print-qr-document
+                        data-print-item-count={paymentReversals.length}
+                        className="fee-receipt-page mx-auto w-full max-w-[148mm] space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm sm:p-5"
+                      >
+                        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5" data-print-qr-header>
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Official payment receipt</p>
                             <h2 className="mt-1 text-2xl font-bold">{schoolDetails[0]?.name ?? context.schoolName}</h2>

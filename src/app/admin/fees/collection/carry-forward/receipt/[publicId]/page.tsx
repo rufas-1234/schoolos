@@ -43,8 +43,12 @@ export default async function FeeAdvanceReceiptPage({
   if (amountMinor === null) throw new Error("Stored advance receipt amount is invalid.");
 
   return (
-    <main className="mx-auto w-full max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 sm:p-6 print:border-0 print:p-0">
-      <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
+    <main
+      className="fee-receipt-page mx-auto w-full max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 sm:p-6 print:border-0 print:p-0"
+      data-print-qr-document
+      data-print-item-count="1"
+    >
+      <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between" data-print-qr-header>
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Advance fee receipt</p>
           <h1 className="mt-1 break-words text-2xl font-bold">{receipt.schoolName}</h1>

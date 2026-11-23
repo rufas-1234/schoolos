@@ -21,6 +21,9 @@ export function PortalShell({
   children,
   schoolName,
   schoolLogoUrl,
+  schoolAddress,
+  schoolPhone,
+  schoolEmail,
   userName,
   portalLabel,
   navigation,
@@ -29,6 +32,9 @@ export function PortalShell({
   children: ReactNode;
   schoolName: string;
   schoolLogoUrl: string | null;
+  schoolAddress?: string | null;
+  schoolPhone?: string | null;
+  schoolEmail?: string | null;
   userName: string;
   portalLabel: string;
   navigation: PortalNavigationItem[];
@@ -41,6 +47,7 @@ export function PortalShell({
   const [signOutError, setSignOutError] = useState("");
   const [activeAnchor, setActiveAnchor] = useState("");
   const logo = schoolLogoSource(schoolLogoUrl);
+  const schoolMonogram = schoolName.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "S";
 
   async function signOut() {
     setSignOutError("");
@@ -228,12 +235,35 @@ export function PortalShell({
           {signOutError && <p role="alert" className="px-6 pb-3 text-sm text-rose-700">{signOutError}</p>}
         </header>
         <div className="admin-print-header" aria-label={`${schoolName} letterhead`}>
+          <div className="admin-print-crest" aria-hidden="true">
+            {logo
+              ? <Image src={logo} unoptimized width={40} height={40} alt="" className="h-full w-full rounded-full bg-white object-contain" />
+              : <span>{schoolMonogram}</span>}
+          </div>
           <div className="admin-print-identity">
-            <p className="admin-print-eyebrow">{portalLabel}</p>
+            <p className="admin-print-eyebrow">Official school record</p>
             <h1>{schoolName}</h1>
+            <div className="admin-print-contact">
+              {schoolAddress && <div>{schoolAddress}</div>}
+              {[schoolPhone, schoolEmail].filter(Boolean).join("  •  ") && (
+                <div>{[schoolPhone, schoolEmail].filter(Boolean).join("  •  ")}</div>
+              )}
+            </div>
           </div>
         </div>
         {children}
+        <footer className="admin-print-footer">
+          <span className="admin-print-footer-crest" aria-hidden="true">
+            {logo
+              ? <Image src={logo} unoptimized width={24} height={24} alt="" className="h-full w-full object-contain" />
+              : schoolMonogram}
+          </span>
+          <span className="admin-print-footer-contact">
+            <strong>{schoolName}</strong>
+            <span>{[schoolAddress, schoolPhone, schoolEmail].filter(Boolean).join("  •  ") || "School contact details not configured"}</span>
+          </span>
+          <span className="admin-print-footer-note">Official school record<br />Handle confidentially</span>
+        </footer>
       </div>
     </div>
   );

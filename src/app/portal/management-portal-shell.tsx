@@ -58,6 +58,9 @@ export function ManagementPortalShell({
   children,
   schoolName,
   schoolLogoUrl,
+  schoolAddress,
+  schoolPhone,
+  schoolEmail,
   userName,
   portalType,
   permissions = [],
@@ -65,6 +68,9 @@ export function ManagementPortalShell({
   children: React.ReactNode;
   schoolName: string;
   schoolLogoUrl: string | null;
+  schoolAddress: string | null;
+  schoolPhone: string | null;
+  schoolEmail: string | null;
   userName: string;
   portalType: "library" | "dormitory" | "finance";
   permissions?: readonly string[];
@@ -84,6 +90,9 @@ export function ManagementPortalShell({
     <PortalShell
       schoolName={schoolName}
       schoolLogoUrl={schoolLogoUrl}
+      schoolAddress={schoolAddress}
+      schoolPhone={schoolPhone}
+      schoolEmail={schoolEmail}
       userName={userName}
       portalLabel={portalLabel}
       navigation={navigation}

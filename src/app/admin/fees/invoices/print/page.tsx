@@ -297,8 +297,13 @@ export default async function FeeInvoicePrintPage({
         const billToName = invoice.guardianName || invoice.fatherName || `${invoice.studentName} ${invoice.studentLastName}`;
         const billToPhone = invoice.guardianPhone || invoice.fatherPhone;
         return (
-          <article key={invoice.id} data-print-qr-document className="fee-invoice-card space-y-5 rounded-2xl border border-slate-200 bg-white p-7">
-            <header className="fee-invoice-title-row flex flex-wrap items-start justify-between gap-5">
+          <article
+            key={invoice.id}
+            data-print-qr-document
+            data-print-item-count={1 + Number(discount > 0) + Number(fine > 0)}
+            className="fee-invoice-card space-y-5 rounded-2xl border border-slate-200 bg-white p-7"
+          >
+            <header className="fee-invoice-title-row flex flex-wrap items-start justify-between gap-5" data-print-qr-header>
               <div>
                 <h2 className="fee-invoice-title">INVOICE</h2>
                 <p className="mt-2 text-base font-bold text-slate-900">{school.name}</p>

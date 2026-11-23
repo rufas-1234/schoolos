@@ -37,12 +37,18 @@ export function FamilyPortalShell({
   children,
   schoolName,
   schoolLogoUrl,
+  schoolAddress,
+  schoolPhone,
+  schoolEmail,
   userName,
   portalType,
 }: {
   children: React.ReactNode;
   schoolName: string;
   schoolLogoUrl: string | null;
+  schoolAddress: string | null;
+  schoolPhone: string | null;
+  schoolEmail: string | null;
   userName: string;
   portalType: "student" | "parent";
 }) {
@@ -52,6 +58,9 @@ export function FamilyPortalShell({
     <PortalShell
       schoolName={schoolName}
       schoolLogoUrl={schoolLogoUrl}
+      schoolAddress={schoolAddress}
+      schoolPhone={schoolPhone}
+      schoolEmail={schoolEmail}
       userName={userName}
       portalLabel={isStudent ? "Student Portal" : "Parent Portal"}
       navigation={isStudent ? studentNavigation : parentNavigation}

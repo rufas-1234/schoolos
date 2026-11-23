@@ -1598,7 +1598,7 @@ h6 {
 
   .admin-print-header {
     position: fixed;
-    top: -22mm;
+    top: -25mm;
     right: 0;
     left: 0;
     z-index: 1;
@@ -1606,11 +1606,11 @@ h6 {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1mm;
-    min-height: 20mm;
+    gap: 0.6mm;
+    min-height: 23mm;
     margin: 0;
-    padding-bottom: 2mm;
-    border-bottom: 2px solid var(--report-brand);
+    padding: 0 2mm 1.5mm;
+    border-bottom: 0.45mm solid #334155;
     background: white;
     text-align: center;
     break-inside: avoid;
@@ -1621,27 +1621,28 @@ h6 {
   }
 
   .admin-print-header .admin-print-contact {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr;
     justify-content: center;
-    gap: 0 4mm;
+    gap: 0.3mm;
   }
 
   .admin-print-crest {
     display: flex;
-    width: 10mm;
-    height: 10mm;
+    width: 9mm;
+    height: 9mm;
     flex: none;
     align-items: center;
     justify-content: center;
-    border: 1.5px solid var(--report-brand);
+    border: 0.35mm solid #334155;
     border-radius: 50%;
-    color: var(--report-brand);
+    background: #fff;
+    color: #334155;
   }
 
   .admin-print-crest span {
     font-family: var(--font-body), Arial, sans-serif;
-    font-size: 11pt;
+    font-size: 8pt;
     font-weight: 700;
     letter-spacing: -0.06em;
   }
@@ -1652,11 +1653,11 @@ h6 {
   }
 
   .admin-print-eyebrow {
-    margin: 0;
-    color: #6d28d9;
-    font-size: 7pt;
+    margin: 0 0 0.3mm;
+    color: #475569;
+    font-size: 5.5pt;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
@@ -1664,16 +1665,18 @@ h6 {
     margin: 0;
     color: #172033;
     font-family: var(--font-body), Arial, sans-serif;
-    font-size: 15pt;
+    font-size: 11pt;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.05;
   }
 
   .admin-print-contact {
-    margin-top: 1mm;
+    display: grid;
+    gap: 0.3mm;
+    margin-top: 0.5mm;
     color: #596579;
-    font-size: 8pt;
-    line-height: 1.25;
+    font-size: 6.5pt;
+    line-height: 1.1;
   }
 
   .admin-print-seal {
@@ -1690,17 +1693,54 @@ h6 {
   .admin-print-footer {
     position: fixed;
     right: 0;
-    bottom: -15mm;
+    bottom: -16mm;
     left: 0;
     z-index: 1;
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    gap: 2mm;
     margin: 0;
-    border-top: 1px solid #d8deea;
-    padding-top: 2mm;
+    border-top: 0.35mm solid #334155;
+    padding-top: 1.2mm;
     color: #596579;
-    font-size: 7pt;
+    font-size: 6pt;
     break-inside: avoid;
+  }
+
+  .admin-print-footer-crest {
+    display: flex;
+    width: 7mm;
+    height: 7mm;
+    flex: 0 0 7mm;
+    align-items: center;
+    justify-content: center;
+    border: 0.25mm solid #cbd5e1;
+    border-radius: 50%;
+    color: #334155;
+    font-size: 6pt;
+    font-weight: 700;
+  }
+
+  .admin-print-footer-contact {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    gap: 0.4mm;
+  }
+
+  .admin-print-footer-contact strong {
+    color: #172033;
+    font-size: 6.5pt;
+  }
+
+  .admin-print-footer-contact span {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-print-footer-note {
+    flex: none;
+    color: #475569;
+    text-align: right;
   }
 
   body.print-target-active [data-print-hidden] {
@@ -2426,13 +2466,121 @@ h6 {
   }
 
   .fee-receipt-page {
+    box-sizing: border-box !important;
     position: relative !important;
     inset: auto !important;
     width: 100% !important;
     max-width: 148mm !important;
     margin: 0 auto !important;
-    padding: 5mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 2mm !important;
     color: #172033;
+    font-size: 8pt !important;
+    box-shadow: none !important;
+  }
+
+  .fee-receipt-page > * + * {
+    margin-block-start: 2mm !important;
+  }
+
+  .fee-receipt-page:is(
+    [data-print-item-count="0"],
+    [data-print-item-count="1"],
+    [data-print-item-count="2"],
+    [data-print-item-count="3"],
+    [data-print-item-count="4"],
+    [data-print-item-count="5"],
+    [data-print-item-count="6"],
+    [data-print-item-count="7"],
+    [data-print-item-count="8"],
+    [data-print-item-count="9"]
+  ) {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .fee-receipt-page > header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2mm !important;
+    padding-bottom: 2mm !important;
+    break-inside: avoid;
+  }
+
+  .fee-receipt-page > header h1,
+  .fee-receipt-page > header h2 {
+    font-size: 12pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .fee-receipt-total {
+    border-radius: 1mm !important;
+    padding: 2.5mm !important;
+  }
+
+  .fee-receipt-total p:nth-child(2) {
+    font-size: 18pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .fee-receipt-page > .fee-receipt-total,
+  .fee-receipt-page > section.grid,
+  .fee-receipt-page > section.rounded-xl {
+    break-inside: avoid;
+  }
+
+  .fee-receipt-page > section.grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 2mm 4mm !important;
+  }
+
+  .fee-receipt-page > section.grid p {
+    margin-top: 0.5mm !important;
+    font-size: 7.5pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .fee-receipt-page > section.rounded-xl {
+    gap: 1.2mm !important;
+    border-radius: 1mm !important;
+    padding: 2.5mm !important;
+  }
+
+  .fee-receipt-page > div.rounded-xl {
+    gap: 2mm !important;
+    border-radius: 1mm !important;
+    padding: 2.5mm !important;
+    font-size: 7.5pt !important;
+  }
+
+  .fee-receipt-page > p.rounded-xl {
+    border-radius: 1mm !important;
+    padding: 2mm !important;
+    font-size: 7pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .fee-receipt-page > section.rounded-xl > div,
+  .fee-receipt-page > section.rounded-xl li {
+    font-size: 7.5pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .fee-receipt-page ul {
+    margin-top: 1mm !important;
+  }
+
+  .fee-receipt-page li {
+    break-inside: avoid;
+    padding: 0.6mm 0;
+  }
+
+  .fee-receipt-page p.border-t {
+    margin-top: 1.5mm !important;
+    padding-top: 1.5mm !important;
+    font-size: 7pt !important;
   }
 
   body.print-target-active [data-print-target].fee-invoice-page {
@@ -2490,10 +2638,11 @@ h6 {
   }
 
   .fee-invoice-card {
-    margin-bottom: 7mm;
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
     border: 1px solid #d8deea;
-    border-radius: 3mm;
-    padding: 5mm;
+    border-radius: 1mm;
+    padding: 3mm !important;
     box-shadow: none !important;
     break-inside: avoid;
   }
@@ -2503,41 +2652,80 @@ h6 {
   }
 
   .fee-invoice-title {
-    font-size: 30pt;
+    font-size: 17pt !important;
+    letter-spacing: -0.03em !important;
+    line-height: 1 !important;
+  }
+
+  .fee-invoice-card > * + * {
+    margin-block-start: 2mm !important;
+  }
+
+  .fee-invoice-title-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    align-items: center !important;
+    gap: 2.5mm !important;
+    break-inside: avoid;
+  }
+
+  .fee-invoice-title-row > div:first-child > p {
+    display: none !important;
   }
 
   .fee-invoice-number-block {
-    min-width: 42mm;
+    min-width: 31mm !important;
+    border-left-width: 0.6mm !important;
+    padding: 1mm 0 1mm 2mm !important;
+  }
+
+  .fee-invoice-number-block span {
+    font-size: 6.5pt !important;
+  }
+
+  .fee-invoice-number-block strong {
+    font-size: 8pt !important;
+    overflow-wrap: anywhere;
   }
 
   .fee-invoice-parties {
-    font-size: 8pt;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 3mm !important;
+    font-size: 7.5pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .fee-invoice-parties h3 {
+    margin-bottom: 1mm !important;
+    font-size: 6.5pt !important;
   }
 
   .fee-invoice-meta {
-    padding: 3mm 0;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 1mm 2mm !important;
+    padding: 1.5mm 0 !important;
   }
 
   .fee-invoice-meta dt {
-    font-size: 6.5pt;
+    font-size: 6pt !important;
   }
 
   .fee-invoice-meta dd {
-    font-size: 8pt;
+    font-size: 7pt !important;
   }
 
   .fee-invoice-divider {
-    font-size: 7pt;
+    display: none !important;
   }
 
   .fee-invoice-items {
-    font-size: 8.5pt;
+    font-size: 7.5pt !important;
   }
 
   .fee-invoice-items th,
   .fee-invoice-items td {
     border-bottom: 1px solid #e4e7ef;
-    padding: 2.5mm 2mm;
+    padding: 1.2mm 1.5mm !important;
   }
 
   .fee-invoice-items thead {
@@ -2545,18 +2733,32 @@ h6 {
   }
 
   .fee-invoice-totals {
-    max-width: 90mm;
+    max-width: 80mm !important;
     background: white !important;
-    font-size: 8pt;
+    gap: 1mm 3mm !important;
+    font-size: 7.5pt !important;
   }
 
   .fee-invoice-footer {
-    margin-top: 6mm;
+    margin-top: 2mm !important;
+    gap: 2mm !important;
+    border-top-color: #94a3b8 !important;
+    padding-top: 2mm !important;
     break-inside: avoid;
   }
 
+  .fee-invoice-footer h3 {
+    margin-bottom: 0.5mm !important;
+    font-size: 6.5pt !important;
+  }
+
+  .fee-invoice-footer p:not(.fee-invoice-thank-you) {
+    font-size: 7pt !important;
+    line-height: 1.2 !important;
+  }
+
   .fee-invoice-thank-you {
-    font-size: 20pt;
+    font-size: 11pt !important;
     -webkit-print-color-adjust: exact;
   }
 
@@ -3091,6 +3293,28 @@ h6 {
     object-fit: contain;
   }
 
+  body.print-target-active [data-print-qr-header] > .print-qr-stamp {
+    position: static !important;
+    width: fit-content;
+    max-width: 32mm;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    gap: 1mm;
+  }
+
+  body.print-target-active [data-print-qr-header] > .print-qr-stamp img {
+    width: 12mm;
+    height: 12mm;
+    flex-basis: 12mm;
+  }
+
+  body.print-target-active [data-print-qr-header] > .print-qr-stamp span {
+    max-width: 18mm;
+    font-size: 6pt;
+  }
+
   body.print-target-active[data-print-page-size="ID-1"] [data-print-qr-host] > .print-qr-stamp {
     position: absolute !important;
     z-index: 4;
@@ -3122,15 +3346,16 @@ h6 {
     right: 18mm !important;
   }
 
-  body.print-target-active [data-print-qr-document].fee-invoice-card {
-    position: relative;
-    padding-bottom: 24mm !important;
-  }
-
-  body.print-target-active [data-print-qr-document].fee-invoice-card > .print-qr-stamp {
-    position: absolute;
-    right: 4mm;
-    bottom: 4mm;
-    margin: 0;
+  .fee-invoice-card[data-print-item-count="1"],
+  .fee-invoice-card[data-print-item-count="2"],
+  .fee-invoice-card[data-print-item-count="3"],
+  .fee-invoice-card[data-print-item-count="4"],
+  .fee-invoice-card[data-print-item-count="5"],
+  .fee-invoice-card[data-print-item-count="6"],
+  .fee-invoice-card[data-print-item-count="7"],
+  .fee-invoice-card[data-print-item-count="8"],
+  .fee-invoice-card[data-print-item-count="9"] {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
   }
 }

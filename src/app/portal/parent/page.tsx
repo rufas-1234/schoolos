@@ -156,6 +156,9 @@ export default async function ParentPortalPage() {
     <FamilyPortalShell
       schoolName={context.schoolName}
       schoolLogoUrl={context.schoolLogoUrl}
+      schoolAddress={context.schoolAddress}
+      schoolPhone={context.schoolPhone}
+      schoolEmail={context.schoolEmail}
       userName={context.user.name}
       portalType="parent"
     >

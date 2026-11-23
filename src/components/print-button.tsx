@@ -63,7 +63,8 @@ export async function printCurrentPage({
       label.textContent = "Scan to open online";
       stamp.append(label);
     }
-    qrTarget.append(stamp);
+    const qrHost = qrTarget.querySelector<HTMLElement>("[data-print-qr-header]") ?? qrTarget;
+    qrHost.append(stamp);
     qrStamps.push(stamp);
     qrImages.push(image);
   }

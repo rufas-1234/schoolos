@@ -115,8 +115,12 @@ export default async function FeeReceiptPage({
   const netAmount = (originalAmount - reversedAmount) / 100;
 
   return (
-    <main className="fee-receipt-page mx-auto max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 print:border-0 print:p-0">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+    <main
+      className="fee-receipt-page mx-auto max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 print:border-0 print:p-0"
+      data-print-qr-document
+      data-print-item-count={reversals.length}
+    >
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5" data-print-qr-header>
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Official payment receipt</p>
           <h1 className="mt-1 text-2xl font-bold">{receipt.schoolName}</h1>

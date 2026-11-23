@@ -15,17 +15,26 @@ export function TeacherPortalShell({
   children,
   schoolName,
   schoolLogoUrl,
+  schoolAddress,
+  schoolPhone,
+  schoolEmail,
   teacherName,
 }: {
   children: React.ReactNode;
   schoolName: string;
   schoolLogoUrl: string | null;
+  schoolAddress: string | null;
+  schoolPhone: string | null;
+  schoolEmail: string | null;
   teacherName: string;
 }) {
   return (
     <PortalShell
       schoolName={schoolName}
       schoolLogoUrl={schoolLogoUrl}
+      schoolAddress={schoolAddress}
+      schoolPhone={schoolPhone}
+      schoolEmail={schoolEmail}
       userName={teacherName}
       portalLabel="Teacher Portal"
       navigation={teacherNavigation}
