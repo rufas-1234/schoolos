@@ -12,6 +12,7 @@ import {
   CalendarDays,
   CircleHelp,
   CircleDollarSign,
+  ChartNoAxesCombined,
   ChevronDown,
   GraduationCap,
   LayoutDashboard,
@@ -128,6 +129,13 @@ const navigation: NavigationItem[] = [
       { id: "reports", label: "Staff attendance reports", href: "/admin/hr/reports", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "settings", label: "HR settings", href: "/admin/hr/settings", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
     ],
+  },
+  {
+    href: "/portal/finance",
+    label: "Finance overview",
+    icon: ChartNoAxesCombined,
+    permission: "fees.manage",
+    permissionAlternatives: ["payments.record", "accounts.manage", "inventory.manage"],
   },
   {
     href: "/admin/fees/collection",
@@ -248,7 +256,7 @@ const navigationGroups = [
   { label: "Home", labels: ["Overview"] },
   { label: "Teaching & learning", labels: ["Academics", "Student Info", "Examinations"] },
   { label: "People", labels: ["Human resources", "Users"] },
-  { label: "School operations", labels: ["Fees", "Inventory", "Library", "Dormitories"] },
+  { label: "School operations", labels: ["Finance overview", "Fees", "Inventory", "Library", "Dormitories"] },
   { label: "Configuration", labels: ["System", "School profile"] },
 ];
 
@@ -372,7 +380,7 @@ export function AdminShell({
         ? "/admin/examinations"
       : permissions.includes("staff.manage")
         ? "/admin/hr"
-      : permissions.includes("accounts.manage") || permissions.includes("fees.manage") || permissions.includes("payments.record")
+      : permissions.includes("accounts.manage") || permissions.includes("fees.manage") || permissions.includes("payments.record") || permissions.includes("inventory.manage")
         ? "/portal/finance"
       : permissions.includes("dormitories.manage")
         ? "/portal/dormitories"
@@ -464,6 +472,8 @@ export function AdminShell({
           ? activeFeesSection?.label ?? "Fees"
         : pathname.startsWith("/admin/library")
           ? activeLibrarySection?.label ?? "Library"
+        : pathname === "/portal/finance"
+          ? "Finance overview"
         : pathname.startsWith("/admin/dormitories")
           ? activeDormitorySection?.label ?? "Dormitories"
         : pathname === "/admin/account-security"
