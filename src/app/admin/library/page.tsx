@@ -28,10 +28,11 @@ import {
   type LibraryStudentOption,
   type LibraryTermOption,
 } from "./library-forms";
+import { LibraryOverview } from "./library-overview";
 
 export const dynamic = "force-dynamic";
 
-const sections = ["add-book", "books", "categories", "members", "issue", "issued", "subjects"] as const;
+const sections = ["overview", "add-book", "books", "categories", "members", "issue", "issued", "subjects"] as const;
 type LibrarySection = (typeof sections)[number];
 const PAGE_SIZE = 25;
 
@@ -51,6 +52,7 @@ function validPage(value: string | undefined): number {
 
 function sectionTitle(section: LibrarySection): string {
   return {
+    overview: "Library overview",
     books: "Book list",
     "add-book": "Add book",
     categories: "Book categories",
@@ -93,7 +95,8 @@ export default async function LibraryPage({
   const queryParams = await searchParams;
   const section: LibrarySection = sections.includes(queryParams.section as LibrarySection)
     ? queryParams.section as LibrarySection
-    : "books";
+    : "overview";
+  if (section === "overview") return <LibraryOverview schoolId={context.schoolId} />;
   const query = (queryParams.q ?? "").trim().slice(0, 100);
   const selectedStatus = ["active", "returned", "all"].includes(queryParams.status ?? "")
     ? queryParams.status!

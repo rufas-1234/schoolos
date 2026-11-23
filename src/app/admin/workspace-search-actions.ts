@@ -226,7 +226,8 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (canManageLibrary) {
     addPage("library-portal", "Library portal", "Library overview, lending activity, and caretaker shortcuts", "/portal/library", ["librarian", "library workspace", "library caretaker"]);
-    addPage("library", "Library", "Book catalog, student loans, returns, and overdue books", "/admin/library", ["books", "book loans", "lending", "borrowed", "overdue"]);
+    addPage("library", "Library overview", "Catalog health, circulation activity, members, and returns", "/admin/library?section=overview", ["library dashboard", "library operations"]);
+    addPage("library-books", "Book catalog", "Search and manage library book titles", "/admin/library?section=books", ["books", "library books", "catalog"]);
     addPage("library-add-book", "Add book", "Add a new title to the library catalog", "/admin/library?section=add-book", ["new book", "catalog"]);
     addPage("library-members", "Library members", "Register student and staff borrowers", "/admin/library?section=members", ["student members", "staff members", "library card", "member register"]);
     addPage("library-circulation", "Issue and return books", "Check out, renew, and return library books", "/admin/library?section=issue", ["checkout", "check out", "book return", "circulation"]);
