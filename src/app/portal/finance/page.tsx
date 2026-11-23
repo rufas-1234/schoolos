@@ -11,8 +11,8 @@ import {
   PackageOpen,
   ReceiptText,
 } from "lucide-react";
+import { AdminShell } from "@/components/admin-shell";
 import { PrintButton } from "@/components/print-button";
-import { ManagementPortalShell } from "@/app/portal/management-portal-shell";
 import { db } from "@/db";
 import {
   accountTransactions,
@@ -29,6 +29,7 @@ import {
   studentFeeInvoices,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 import {
   buildFinanceTrend,
   getFinanceMonthKeys,
@@ -481,12 +482,19 @@ export default async function FinancePortalPage() {
   const assetValue = minorUnits(assetCounts[0]?.assetValue);
 
   return (
-    <ManagementPortalShell
+    <AdminShell
       schoolName={context.schoolName}
       schoolLogoUrl={context.schoolLogoUrl}
+      schoolEmail={context.schoolEmail}
+      schoolPhone={context.schoolPhone}
+      schoolAddress={context.schoolAddress}
       userName={context.user.name}
-      portalType="finance"
+      roleNames={context.roleNames}
       permissions={context.grantedPermissions}
+      activeSchoolPublicId={context.schoolPublicId}
+      schoolChoices={context.schoolChoices}
+      multiSchoolEnabled={context.multiSchoolEnabled}
+      isPlatformAdmin={isPlatformAdminEmail(context.user.email)}
     >
       <main className="print-report-page min-w-0 space-y-6 p-4 sm:p-6 lg:p-8">
         <header className="print:hidden flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -684,7 +692,7 @@ export default async function FinancePortalPage() {
           </ActivityCard>}
         </section>}
       </main>
-    </ManagementPortalShell>
+    </AdminShell>
   );
 }
 
