@@ -170,6 +170,15 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("student-admission-desk", "Admission Desk", "Review online registrations and manage pending student admissions", "/admin/admissions", ["admission applications", "online registration", "pending admissions"]);
   }
   if (canEnterResults) {
+    if (permissions.has("examinations.create") || permissions.has("results.publish")) {
+      addPage(
+        "examinations-overview",
+        "Exams Overview",
+        "Upcoming examinations, active sittings, published results, and exam workflows",
+        "/admin/examinations/overview",
+        ["exams overview", "examination dashboard"],
+      );
+    }
     addPage("exam-types", "Exam type", "Configure examination types", "/admin/examinations?section=types", ["examination type", "assessment type"]);
     addPage("examination-setup", "Examination setup", "Create, configure, and manage examinations", "/admin/examinations?section=setup", ["exams", "exam setup"]);
     addPage("exam-schedule", "Exam schedule", "Examination dates and subject schedules", "/admin/examinations?section=schedule", ["routine", "timetable"]);

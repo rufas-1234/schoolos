@@ -14,13 +14,14 @@ import {
   CircleDollarSign,
   ChartNoAxesCombined,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   GraduationCap,
   LayoutDashboard,
   KeyRound,
   LogOut,
   Menu,
   PackageOpen,
-  PanelRight,
   Search,
   School,
   Settings,
@@ -105,6 +106,14 @@ const navigation: NavigationItem[] = [
     permission: "examinations.create",
     permissionAlternatives: ["results.enter", "results.publish"],
     children: [
+      {
+        id: "overview",
+        label: "Exams Overview",
+        href: "/admin/examinations/overview",
+        matchPath: "/admin/examinations/overview",
+        permission: "examinations.create",
+        permissionAlternatives: ["results.publish"],
+      },
       { id: "types", label: "Exam Type", href: "/admin/examinations?section=types", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "types" } },
       { id: "setup", label: "Exam Setup", href: "/admin/examinations?section=setup", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "setup" } },
       { id: "schedule", label: "Exam Schedule", href: "/admin/examinations?section=schedule", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "schedule" } },
@@ -303,8 +312,6 @@ export function AdminShell({
   const [rightSidebarQuery, setRightSidebarQuery] = useState("");
   const [leftSidebarQuery, setLeftSidebarQuery] = useState("");
   const leftSidebarSearchRef = useRef<HTMLInputElement>(null);
-  const desktopSidebarRef = useRef<HTMLDivElement>(null);
-  const desktopRightSidebarRef = useRef<HTMLDivElement>(null);
   const mobileNavigationRef = useRef<HTMLDivElement>(null);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const closeNavigationRef = useRef<HTMLButtonElement>(null);
@@ -488,6 +495,8 @@ export function AdminShell({
           ? "Account security"
         : pathname === "/admin/exam-analytics"
           ? "Exam Analytics"
+        : pathname === "/admin/examinations/overview"
+          ? "Exams Overview"
       : visibleNavigation.find(
         (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
       )?.label ?? "Workspace";
@@ -552,7 +561,7 @@ export function AdminShell({
     }
   }
 
-  const sidebar = (compact = false) => (
+  const sidebar = (compact = false, desktop = false) => (
     <aside className={cn(
       "admin-shell-sidebar print:hidden flex h-full flex-col overflow-hidden border-r border-slate-200 bg-white py-5 transition-[padding] duration-200 motion-reduce:transition-none",
       compact ? "w-[68px] items-center px-2" : "w-[260px] px-4",
@@ -568,6 +577,28 @@ export function AdminShell({
           <span className="mt-0.5 block text-xs text-slate-500">School workspace</span>
         </span>
       </Link>
+
+      {desktop && (
+        <button
+          type="button"
+          title={desktopSidebarExpanded ? "Collapse left sidebar" : "Expand left sidebar"}
+          aria-label={desktopSidebarExpanded ? "Collapse left sidebar" : "Expand left sidebar"}
+          aria-controls="admin-left-sidebar"
+          aria-expanded={desktopSidebarExpanded}
+          onClick={() => setDesktopSidebarExpanded((expanded) => !expanded)}
+          className={cn(
+            "mb-3 flex h-9 items-center rounded-md text-slate-500 transition hover:bg-slate-100",
+            compact ? "w-9 justify-center" : "w-full justify-between px-3",
+          )}
+        >
+          {!compact && (
+            <span className="text-sm font-medium">
+              {desktopSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
+            </span>
+          )}
+          {desktopSidebarExpanded ? <ChevronLeft size={17} /> : <ChevronRight size={17} />}
+        </button>
+      )}
 
       {compact ? (
         <button
@@ -853,21 +884,13 @@ export function AdminShell({
         <div className="admin-print-seal" aria-hidden="true">SCHOOL</div>
       </header>
       <div
-        ref={desktopSidebarRef}
+        id="admin-left-sidebar"
         className={cn(
           "print:hidden fixed inset-y-0 left-0 z-30 hidden overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none lg:block",
           desktopSidebarExpanded ? "w-[260px]" : "w-[68px]",
         )}
-        onMouseEnter={() => setDesktopSidebarExpanded(true)}
-        onMouseLeave={() => {
-          if (!desktopSidebarRef.current?.contains(document.activeElement)) setDesktopSidebarExpanded(false);
-        }}
-        onFocusCapture={() => setDesktopSidebarExpanded(true)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDesktopSidebarExpanded(false);
-        }}
       >
-        {sidebar(!desktopSidebarExpanded)}
+        {sidebar(!desktopSidebarExpanded, true)}
       </div>
       {open && (
         <div
@@ -1008,24 +1031,29 @@ export function AdminShell({
         <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>
       <div
-        ref={desktopRightSidebarRef}
+        id="admin-workspace-sidebar"
         className={cn(
           "print:hidden fixed inset-y-0 right-0 z-10 hidden overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none 2xl:block",
           desktopRightSidebarExpanded ? "w-[260px]" : "w-[68px]",
         )}
-        onMouseEnter={() => setDesktopRightSidebarExpanded(true)}
-        onMouseLeave={() => {
-          if (!desktopRightSidebarRef.current?.contains(document.activeElement)) setDesktopRightSidebarExpanded(false);
-        }}
-        onFocusCapture={() => setDesktopRightSidebarExpanded(true)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDesktopRightSidebarExpanded(false);
-        }}
       >
       {desktopRightSidebarExpanded ? <aside className="admin-shell-right-sidebar print:hidden flex h-full w-[260px] flex-col border-l border-slate-200 bg-white px-4 pb-5 pt-[calc(76px+1.25rem)]">
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-slate-900">Workspace pages</h2>
-          <p className="mt-1 text-xs text-slate-500">Search all available sections</p>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Workspace pages</h2>
+            <p className="mt-1 text-xs text-slate-500">Search all available sections</p>
+          </div>
+          <button
+            type="button"
+            title="Collapse right sidebar"
+            aria-label="Collapse right sidebar"
+            aria-controls="admin-workspace-sidebar"
+            aria-expanded={desktopRightSidebarExpanded}
+            onClick={() => setDesktopRightSidebarExpanded(false)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+          >
+            <ChevronRight size={17} />
+          </button>
         </div>
         <label className="relative mb-4 block">
           <span className="sr-only">Search quick links</span>
@@ -1098,12 +1126,14 @@ export function AdminShell({
       </aside> : <aside className="admin-shell-right-sidebar print:hidden flex h-full w-[68px] flex-col items-center border-l border-slate-200 bg-white pt-[calc(76px+1.25rem)]">
         <button
           type="button"
-          title="Show workspace pages"
-          aria-label="Show workspace pages"
+          title="Expand right sidebar"
+          aria-label="Expand right sidebar"
+          aria-controls="admin-workspace-sidebar"
+          aria-expanded={desktopRightSidebarExpanded}
           onClick={() => setDesktopRightSidebarExpanded(true)}
           className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
         >
-          <PanelRight size={18} />
+          <ChevronLeft size={18} />
         </button>
       </aside>}
       </div>
