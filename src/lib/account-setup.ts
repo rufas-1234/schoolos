@@ -41,7 +41,7 @@ export async function issuePasswordSetupLink(
   const setupUrl = new URL("/account/setup", process.env.BETTER_AUTH_URL ?? "http://localhost:3000");
   setupUrl.hash = `${userId}.${challenge.secret}`;
 
-  await tx.update(user).set({ isActive: false }).where(eq(user.id, userId));
+  await tx.update(user).set({ isActive: false, mustChangePassword: false }).where(eq(user.id, userId));
   await tx.delete(session).where(eq(session.userId, userId));
   await tx.delete(verification).where(eq(verification.identifier, challenge.identifier));
   await tx.insert(verification).values({

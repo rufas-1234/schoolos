@@ -1,6 +1,7 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -9,6 +10,7 @@ import { db } from "@/db";
 import {
   academicYears,
   auditLogs,
+  account as authAccount,
   classLevels,
   classSections,
   schoolBranches,
@@ -142,6 +144,7 @@ export type StudentActionState = {
   error?: string;
   success?: boolean;
   setupUrls?: string[];
+  temporaryCredentials?: { admissionNumber: string; password: string }[];
   message?: string;
   completed?: number;
   failures?: string[];
@@ -910,7 +913,7 @@ export async function transitionStudentStatus(formData: FormData): Promise<Stude
   });
   if (!result.success) throw new Error("Invalid admission status request.");
 
-  let setupUrl: string | undefined;
+  let temporaryCredential: { admissionNumber: string; password: string } | undefined;
   const outcome = await db.transaction(async (tx) => {
     const [student] = await tx
       .select({
@@ -972,14 +975,27 @@ export async function transitionStudentStatus(formData: FormData): Promise<Stude
         if (existingEmail) return "account-conflict";
 
         const userId = randomUUID();
+        const temporaryPassword = randomBytes(12).toString("base64url");
+        const passwordHash = await hashPassword(temporaryPassword);
         await tx.insert(user).values({
           id: userId,
           name: `${student.firstName} ${student.lastName}`,
           email,
           emailVerified: false,
-          isActive: false,
+          isActive: true,
+          mustChangePassword: true,
         });
-        setupUrl = await issuePasswordSetupLink(tx, userId);
+        await tx.insert(authAccount).values({
+          id: randomUUID(),
+          accountId: userId,
+          providerId: "credential",
+          userId,
+          password: passwordHash,
+        });
+        temporaryCredential = {
+          admissionNumber: admissionIdentifier,
+          password: temporaryPassword,
+        };
         await tx.insert(schoolMemberships).values({
           schoolId: context.schoolId,
           userId,
@@ -1059,7 +1075,11 @@ export async function transitionStudentStatus(formData: FormData): Promise<Stude
       action: `student.status.${student.status}.to.${result.data.nextStatus}`,
       resourceType: "student",
       resourcePublicId: student.publicId,
-      changedFields: ["status", "enrollmentStatus"],
+      changedFields: [
+        "status",
+        "enrollmentStatus",
+        ...(temporaryCredential ? ["credential.password", "user.mustChangePassword"] : []),
+      ],
     });
     return "updated";
   });
@@ -1080,7 +1100,7 @@ export async function transitionStudentStatus(formData: FormData): Promise<Stude
   revalidatePath("/admin/dashboard");
   return {
     success: true,
-    ...(setupUrl ? { setupUrls: [setupUrl] } : {}),
+    ...(temporaryCredential ? { temporaryCredentials: [temporaryCredential] } : {}),
   };
 }
 
@@ -1117,7 +1137,7 @@ export async function approveAllPendingAdmissions(
 
   let completed = 0;
   const failures: string[] = [];
-  const setupUrls: string[] = [];
+  const temporaryCredentials: { admissionNumber: string; password: string }[] = [];
   for (const student of pendingStudents) {
     const formData = new FormData();
     formData.set("publicId", student.publicId);
@@ -1130,7 +1150,7 @@ export async function approveAllPendingAdmissions(
         continue;
       }
       completed += 1;
-      setupUrls.push(...(result.setupUrls ?? []));
+      temporaryCredentials.push(...(result.temporaryCredentials ?? []));
     } catch (error) {
       failures.push(`${name}: ${error instanceof Error ? error.message : "Could not approve this application."}`);
     }
@@ -1140,7 +1160,7 @@ export async function approveAllPendingAdmissions(
     success: completed > 0,
     completed,
     failures: failures.slice(0, 20),
-    setupUrls,
+    temporaryCredentials,
     message: `Approved ${completed} of ${pendingStudents.length} pending student applications.${failures.length > 20 ? ` ${failures.length - 20} more errors were not listed.` : ""}`,
   };
 }

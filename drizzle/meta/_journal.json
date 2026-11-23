@@ -372,6 +372,13 @@
       "when": 1795211324882,
       "tag": "0052_fuzzy_mach_iv",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "5",
+      "when": 1795391726587,
+      "tag": "0053_student_first_login_password",
+      "breakpoints": true
     }
   ]
 }

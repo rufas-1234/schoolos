@@ -22,12 +22,13 @@ export async function getCurrentUserSchoolMemberships() {
   if (!session) redirect("/login");
 
   const [account] = await db
-    .select({ isActive: user.isActive })
+    .select({ isActive: user.isActive, mustChangePassword: user.mustChangePassword })
     .from(user)
     .where(eq(user.id, session.user.id))
     .limit(1);
 
   if (!account?.isActive) redirect("/login?reason=account-disabled");
+  if (account.mustChangePassword) redirect("/account/first-login-password");
 
   const memberships = await db
     .select({

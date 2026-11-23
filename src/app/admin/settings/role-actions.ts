@@ -1,6 +1,6 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -30,7 +30,7 @@ import {
   shouldSkipConflictingLoginIdentifier,
 } from "@/lib/login-identifier-policy";
 
-export type RoleActionState = { error?: string; success?: boolean; message?: string; setupUrl?: string };
+export type RoleActionState = { error?: string; success?: boolean; message?: string; setupUrl?: string; temporaryPassword?: string; temporaryUsername?: string };
 
 function value(formData: FormData, key: string): string {
   const field = formData.get(key);
@@ -76,10 +76,16 @@ export async function createSchoolAccount(
     return { error: "One or more selected roles are unavailable for this school." };
   }
 
+  const temporaryPassword = parsed.data.personType === "student"
+    ? randomBytes(12).toString("base64url")
+    : undefined;
   const passwordHash = parsed.data.personType === "parent"
     ? await hashPassword(parsed.data.password!)
-    : null;
+    : temporaryPassword
+      ? await hashPassword(temporaryPassword)
+      : null;
   let setupUrl: string | undefined;
+  let temporaryUsername: string | undefined;
   let phoneIdentifierUnavailable = false;
   try {
     const outcome = await db.transaction(async (tx) => {
@@ -136,6 +142,7 @@ export async function createSchoolAccount(
         name = `${student.firstName} ${student.lastName}`;
         email = generatedAccountEmail("student", context.schoolId, student.id);
         identifier = student.admissionNumber.trim().toLocaleUpperCase();
+        temporaryUsername = identifier;
         identifierKind = "student_admission";
         linkedStudentIds = [student.id];
       } else {
@@ -227,6 +234,7 @@ export async function createSchoolAccount(
         email,
         emailVerified: false,
         isActive: parsed.data.personType === "parent",
+        mustChangePassword: Boolean(temporaryPassword),
       });
       if (passwordHash) {
         await tx.insert(authAccount).values({
@@ -288,6 +296,7 @@ export async function createSchoolAccount(
         changedFields: [
           "user",
           "credential.password",
+          ...(temporaryPassword ? ["user.mustChangePassword"] : []),
           "schoolMembership",
           "roles",
           ...(identifier ? ["loginIdentifier"] : []),
@@ -332,7 +341,14 @@ export async function createSchoolAccount(
   revalidatePath("/portal/parent");
   return {
     success: true,
+    ...(temporaryPassword
+      ? { message: "Student account created. Share this temporary password privately; the student must change it at first sign-in." }
+      : {}),
     ...(setupUrl ? { setupUrl } : {}),
+    ...(temporaryPassword ? { temporaryPassword } : {}),
+    ...(temporaryPassword && parsed.data.personType === "student"
+      ? { temporaryUsername }
+      : {}),
     ...(phoneIdentifierUnavailable
       ? {
         message: "Account created and linked. The phone number is already used by another login, so this staff account must sign in with its profile email.",

@@ -25,6 +25,7 @@ export const user = mysqlTable("user", {
   emailVerified: boolean("emailVerified").notNull().default(false),
   image: varchar("image", { length: 2048 }),
   isActive: boolean("isActive").notNull().default(true),
+  mustChangePassword: boolean("mustChangePassword").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

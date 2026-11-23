@@ -16,11 +16,12 @@ export async function requirePlatformAdmin() {
   if (!isPlatformAdminEmail(session.user.email)) redirect("/unauthorized");
 
   const [activeUser] = await db
-    .select({ isActive: user.isActive })
+    .select({ isActive: user.isActive, mustChangePassword: user.mustChangePassword })
     .from(user)
     .where(eq(user.id, session.user.id))
     .limit(1);
   if (!activeUser?.isActive) redirect("/login?reason=account-disabled");
+  if (activeUser.mustChangePassword) redirect("/account/first-login-password");
 
   return session.user;
 }

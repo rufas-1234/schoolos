@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, inArray, or } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db } from "@/db";
 import {
   permissions,
@@ -9,15 +9,25 @@ import {
   roles,
   students,
   staffMembers,
+  user,
   userRoles,
   userStudentLinks,
 } from "@/db/schema";
 import { getCurrentUserSchoolMemberships, requireSchoolMember } from "@/lib/access-control";
 import { getWorkspaceHomePath } from "@/lib/workspace-home-policy";
+import { auth } from "@/lib/auth";
 import { activeSchoolCookieName, isMultiSchoolEnabled, resolveSchoolChoice } from "@/lib/school-context-policy";
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 
 export async function getSignedInWorkspacePath(): Promise<string> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session) {
+    const [account] = await db.select({ mustChangePassword: user.mustChangePassword })
+      .from(user)
+      .where(eq(user.id, session.user.id))
+      .limit(1);
+    if (account?.mustChangePassword) return "/account/first-login-password";
+  }
   const { user: signedInUser, memberships } = await getCurrentUserSchoolMemberships();
   if (!memberships.length) {
     return isPlatformAdminEmail(signedInUser.email) && isMultiSchoolEnabled()

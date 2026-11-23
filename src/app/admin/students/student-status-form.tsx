@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { AdminConfirmSubmitButton } from "@/components/admin-data-table";
-import { AccountSetupLink } from "@/components/account-setup-link";
+import { AccountTemporaryPassword } from "@/components/account-temporary-password";
 import { transitionStudentStatusAction } from "./actions";
 
 export function StudentStatusForm({
@@ -53,7 +53,9 @@ export function StudentStatusForm({
         disabled={pending}
       />
       {state.error && <p role="alert" className="text-xs text-rose-700">{state.error}</p>}
-      {state.setupUrls?.map((url) => <AccountSetupLink key={url} url={url} />)}
+      {state.temporaryCredentials?.map((credential) => (
+        <AccountTemporaryPassword key={credential.admissionNumber} username={credential.admissionNumber} password={credential.password} />
+      ))}
     </form>
   );
 }

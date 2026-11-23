@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from "react";
 import { createSchoolAccount, type RoleActionState } from "../../settings/role-actions";
 import { getStudentRoleId } from "@/lib/account-provisioning-policy";
 import { AccountSetupLink } from "@/components/account-setup-link";
+import { AccountTemporaryPassword } from "@/components/account-temporary-password";
 
 type ProfileOption = {
   id: number;
@@ -52,7 +53,7 @@ export function AccountProvisionForm({
       <div>
         <h2 className="font-semibold text-slate-900">Create a login account</h2>
         <p className="mt-1 text-sm leading-5 text-slate-500">
-          Select an existing school profile and assign its school roles. Staff and student accounts receive a one-time password setup link.
+          Select an existing school profile and assign its school roles. Student accounts receive a temporary password; staff receive a one-time setup link.
         </p>
       </div>
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
@@ -207,6 +208,7 @@ export function AccountProvisionForm({
       )}
       {state.error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{state.error}</p>}
       {state.success && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{state.message ?? "Account created and linked successfully."}</p>}
+      {state.temporaryPassword && <AccountTemporaryPassword password={state.temporaryPassword} username={state.temporaryUsername} />}
       {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
       <button
         disabled={pending || roles.length === 0 || profiles.length === 0}
