@@ -317,7 +317,7 @@ export default async function FinancePortalPage() {
           db.select({
             itemCount: count(),
             lowStockCount: sql<number>`COALESCE(SUM(CASE WHEN ${inventoryItems.quantityOnHand} <= ${inventoryItems.reorderLevel} THEN 1 ELSE 0 END), 0)`,
-            stockValue: sql<string>`COALESCE(SUM(${inventoryItems.quantityOnHand} * ${inventoryItems.averageUnitCost}), 0)`,
+            stockValue: sql<string>`ROUND(COALESCE(SUM(${inventoryItems.quantityOnHand} * ${inventoryItems.averageUnitCost}), 0), 2)`,
           }).from(inventoryItems).where(and(
             eq(inventoryItems.schoolId, schoolId),
             eq(inventoryItems.status, "active"),
