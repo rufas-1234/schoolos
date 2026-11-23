@@ -860,6 +860,9 @@ export default async function StudentPortalPage({
                     {label} <span aria-hidden="true">→</span>
                   </Link>
                 ))}
+                <Link href="/portal/student/cards" className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-800 transition hover:border-violet-300 hover:bg-violet-100">
+                  Print student ID and exam cards <span aria-hidden="true">→</span>
+                </Link>
               </nav>
             </section>
 

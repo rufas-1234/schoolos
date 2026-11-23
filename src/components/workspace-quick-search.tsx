@@ -98,6 +98,14 @@ const studentSuggestions: WorkspaceSearchResult[] = [
     searchTerms: ["personal", "details", "student"],
   },
   {
+    id: "student-cards",
+    title: "My school cards",
+    description: "Print your student ID and eligible exam access cards.",
+    href: "/portal/student/cards",
+    category: "Examinations",
+    searchTerms: ["id", "identity", "exam card", "print"],
+  },
+  {
     id: "student-library",
     title: "Library",
     description: "Search the catalogue and check your loans.",

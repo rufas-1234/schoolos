@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CreditCard,
   GraduationCap,
+  IdCard,
   LayoutDashboard,
   ReceiptText,
   UsersRound,
@@ -19,6 +20,7 @@ const studentNavigation = [
   { href: "/portal/student?section=fees", label: "Invoices and fees", icon: CreditCard },
   { href: "/portal/student?section=receipts", label: "Payment receipts", icon: ReceiptText },
   { href: "/portal/student?section=profile", label: "My profile", icon: UsersRound },
+  { href: "/portal/student/cards", label: "My cards", icon: IdCard },
   { href: "/portal/student?section=library", label: "Library", icon: BookOpenCheck },
   { href: "/portal/student?section=attendance", label: "Attendance", icon: CalendarDays },
 ];
