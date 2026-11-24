@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, LockKeyhole } from "lucide-react";
@@ -11,21 +11,34 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [redirectTo, setRedirectTo] = useState("");
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!redirectTo) return;
+    const timer = window.setTimeout(() => router.replace(redirectTo), 650);
+    return () => window.clearTimeout(timer);
+  }, [redirectTo, router]);
 
   async function finishSignIn() {
     try {
       const destination = await getSignedInWorkspacePath();
-      router.replace(destination);
-      router.refresh();
+      setSuccess("Sign in successful. Opening your account…");
+      setRedirectTo(destination);
     } catch {
-      setError("You are signed in, but your school workspace could not be loaded. Refresh or contact your administrator.");
+      setSuccess("");
+      setError("Sign in succeeded, but your account could not be opened. Try signing in again or contact your school administrator.");
     }
   }
 
-  async function handlePasswordSubmit(formData: FormData) {
+  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
     setPending(true);
     setError("");
+    setSuccess("");
+    setRedirectTo("");
 
     try {
       const response = await fetch("/api/auth/identifier/sign-in", {
@@ -36,13 +49,26 @@ export function LoginForm() {
           password: String(formData.get("password") ?? ""),
         }),
       });
+      const payload: unknown = await response.json().catch(() => null);
+      const result = payload && typeof payload === "object" && !Array.isArray(payload)
+        ? payload as { success?: unknown; message?: unknown; error?: unknown }
+        : {};
       if (!response.ok) {
-        setError("Sign-in failed. Check your credentials or contact your administrator.");
+        const message = typeof result.message === "string"
+          ? result.message
+          : typeof result.error === "string"
+            ? result.error
+            : "Sign-in failed. Check your credentials and try again.";
+        setError(message);
+        return;
+      }
+      if (result.success !== true) {
+        setError("Sign-in could not be completed. Check your credentials and try again.");
         return;
       }
       await finishSignIn();
     } catch {
-      setError("Sign-in failed. Check your credentials or contact your administrator.");
+      setError("Sign-in failed. Check your connection and details, then try again.");
     } finally {
       setPending(false);
     }
@@ -62,13 +88,28 @@ export function LoginForm() {
           That password reset link is invalid or expired. Request a new one and try again.
         </p>
       )}
+      {reason === "workspace-unavailable" && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Your password was updated, but your workspace could not be opened automatically. Sign in with your new password to continue.
+        </p>
+      )}
+      {reason === "first-login-setup-incomplete" && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Your password was changed, but account setup did not finish. Sign in with your new password to continue setup.
+        </p>
+      )}
       {error && (
         <p id="login-error" role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
           {error}
         </p>
       )}
+      {success && (
+        <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {success}
+        </p>
+      )}
 
-      <form action={handlePasswordSubmit} className="space-y-5">
+      <form onSubmit={handlePasswordSubmit} className="space-y-5">
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-slate-700">Email, phone number, or admission number</span>
           <span className="relative block">
@@ -97,8 +138,8 @@ export function LoginForm() {
             />
           </span>
         </label>
-        <Button className="h-12 w-full rounded-xl" disabled={pending} type="submit">
-          {pending ? "Signing in..." : "Sign in with password"}
+        <Button className="h-12 w-full rounded-xl" disabled={pending || Boolean(redirectTo)} type="submit">
+          {pending ? "Signing in..." : redirectTo ? "Opening your account..." : "Sign in with password"}
         </Button>
       </form>
 

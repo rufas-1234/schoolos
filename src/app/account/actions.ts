@@ -47,41 +47,72 @@ export async function changeTemporaryPassword(
   _previousState: AccountPasswordState,
   formData: FormData,
 ): Promise<AccountPasswordState> {
-  const requestHeaders = await headers();
-  const session = await auth.api.getSession({ headers: requestHeaders });
-  if (!session) return { error: "Your session has expired. Sign in again to continue." };
+  let passwordUpdated = false;
+  try {
+    const requestHeaders = await headers();
+    const session = await auth.api.getSession({ headers: requestHeaders });
+    if (!session) return { error: "Your session has expired. Sign in again to continue." };
 
-  const [signedInUser] = await db.select({
-    isActive: user.isActive,
-    mustChangePassword: user.mustChangePassword,
-  }).from(user).where(eq(user.id, session.user.id)).limit(1);
-  if (!signedInUser?.isActive) return { error: "This account is inactive. Contact your school administrator." };
-  if (!signedInUser.mustChangePassword) {
-    return { error: "This account no longer needs a temporary password change. Sign in again." };
+    const [signedInUser] = await db.select({
+      isActive: user.isActive,
+      mustChangePassword: user.mustChangePassword,
+    }).from(user).where(eq(user.id, session.user.id)).limit(1);
+    if (!signedInUser?.isActive) return { error: "This account is inactive. Contact your school administrator." };
+    if (!signedInUser.mustChangePassword) {
+      return { error: "This account no longer needs a temporary password change. Sign in again." };
+    }
+
+    const currentPassword = readPassword(formData, "currentPassword");
+    const newPassword = readPassword(formData, "newPassword");
+    const passwordConfirmation = readPassword(formData, "passwordConfirmation");
+    if (!currentPassword || !newPassword) return { error: "Enter your temporary password and a new password." };
+    const passwordStrengthError = getPasswordStrengthError(newPassword);
+    if (passwordStrengthError) return { error: passwordStrengthError };
+    if (newPassword !== passwordConfirmation) return { error: "The new passwords do not match." };
+    if (newPassword === currentPassword) return { error: "Choose a password different from the temporary password." };
+
+    if (!(await changeSupabasePassword(currentPassword, newPassword))) {
+      return { error: "The temporary password is incorrect. Check it and try again." };
+    }
+    passwordUpdated = true;
+
+    await db.transaction(async (tx) => {
+      await tx.update(account).set({ password: null })
+        .where(and(eq(account.userId, session.user.id), eq(account.providerId, "credential")));
+      await tx.update(user)
+        .set({ mustChangePassword: false })
+        .where(eq(user.id, session.user.id));
+    });
+    revalidatePath("/");
+
+    let redirectTo: string;
+    try {
+      redirectTo = await getSignedInWorkspacePath();
+    } catch (error) {
+      console.error("Temporary password changed, but the workspace destination could not be resolved.", error);
+      return {
+        success: true,
+        message: "Your password is set, but the workspace could not be opened automatically. Sign in with your new password to continue.",
+        redirectTo: "/login?reason=workspace-unavailable",
+      };
+    }
+
+    return {
+      success: true,
+      message: "Your new password is set. Opening your school workspace…",
+      redirectTo,
+    };
+  } catch (error) {
+    console.error("First-login password update failed.", error);
+    if (passwordUpdated) {
+      return {
+        success: true,
+        message: "Your password was changed, but account setup could not finish. Sign in with your new password to continue.",
+        redirectTo: "/login?reason=first-login-setup-incomplete",
+      };
+    }
+    return {
+      error: "We could not update your password. Check the details and try again.",
+    };
   }
-
-  const currentPassword = readPassword(formData, "currentPassword");
-  const newPassword = readPassword(formData, "newPassword");
-  const passwordConfirmation = readPassword(formData, "passwordConfirmation");
-  if (!currentPassword || !newPassword) return { error: "Enter your temporary password and a new password." };
-  const passwordStrengthError = getPasswordStrengthError(newPassword);
-  if (passwordStrengthError) return { error: passwordStrengthError };
-  if (newPassword !== passwordConfirmation) return { error: "The new passwords do not match." };
-  if (newPassword === currentPassword) return { error: "Choose a password different from the temporary password." };
-
-  if (!(await changeSupabasePassword(currentPassword, newPassword))) {
-    return { error: "The temporary password is incorrect. Check it and try again." };
-  }
-
-  await db.update(account).set({ password: null })
-    .where(and(eq(account.userId, session.user.id), eq(account.providerId, "credential")));
-  await db.update(user)
-    .set({ mustChangePassword: false })
-    .where(eq(user.id, session.user.id));
-  revalidatePath("/");
-  return {
-    success: true,
-    message: "Your new password is set. Opening your school workspace…",
-    redirectTo: await getSignedInWorkspacePath(),
-  };
 }

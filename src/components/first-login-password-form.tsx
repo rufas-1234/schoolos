@@ -11,7 +11,10 @@ export function FirstLoginPasswordForm() {
   const [state, formAction, pending] = useActionState(changeTemporaryPassword, initialState);
 
   useEffect(() => {
-    if (state.redirectTo) router.replace(state.redirectTo);
+    const destination = state.redirectTo;
+    if (!destination) return;
+    const timer = window.setTimeout(() => router.replace(destination), 650);
+    return () => window.clearTimeout(timer);
   }, [router, state.redirectTo]);
 
   return (
@@ -63,7 +66,7 @@ export function FirstLoginPasswordForm() {
         disabled={pending || Boolean(state.redirectTo)}
         className="inline-flex w-full items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-400"
       >
-        {pending ? "Updating password…" : "Set password and continue"}
+        {pending ? "Updating password…" : state.redirectTo ? "Opening your account…" : "Set password and continue"}
       </button>
     </form>
   );
