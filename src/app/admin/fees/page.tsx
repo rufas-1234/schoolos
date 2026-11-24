@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { db } from "@/db";
 import { AdminRecordDialog } from "@/components/admin-data-table";
+import { SearchableSelect } from "@/components/searchable-select";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import { TablePagination } from "@/components/table-pagination";
 import { parsePageSize } from "@/components/pagination-utils";
 import {
@@ -21,6 +23,9 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { feeDisplayName } from "@/lib/fees-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
+import { filterAndSortFeeStructures, type FeeStructureSortBy } from "@/lib/fee-structures-policy";
 import {
   FeeDiscountForm,
   DeleteFeeRecordForm,
@@ -34,6 +39,16 @@ import {
 
 const feesSections = ["catalog", "discounts", "structure", "invoices"] as const;
 type FeesSection = (typeof feesSections)[number];
+const feeStructureSortFields = [
+  "branch",
+  "class",
+  "year",
+  "term",
+  "student",
+  "feeType",
+  "amount",
+  "dueDate",
+] as const satisfies readonly FeeStructureSortBy[];
 
 const feesSectionLabels: Record<FeesSection, string> = {
   catalog: "Fee setup",
@@ -41,6 +56,18 @@ const feesSectionLabels: Record<FeesSection, string> = {
   structure: "Set up fee structure",
   invoices: "Generate student invoices",
 };
+
+function parseOptionalFilterId(value: string | string[] | undefined): number | null {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseFeeStructureSortBy(value: string | string[] | undefined): FeeStructureSortBy {
+  return typeof value === "string"
+    ? feeStructureSortFields.find((field) => field === value) ?? "dueDate"
+    : "dueDate";
+}
 
 export default async function FeesSetupPage({
   searchParams,
@@ -53,6 +80,14 @@ export default async function FeesSetupPage({
     discountsPage?: string | string[];
     assignmentsPage?: string | string[];
     structuresPage?: string | string[];
+    structuresSearch?: string | string[];
+    structuresBranchId?: string | string[];
+    structuresYearId?: string | string[];
+    structuresTermId?: string | string[];
+    structuresClassId?: string | string[];
+    structuresFeeTypeId?: string | string[];
+    structuresSortBy?: string | string[];
+    structuresSortDirection?: string | string[];
   }>;
 }) {
   const [context, query] = await Promise.all([
@@ -79,17 +114,14 @@ export default async function FeesSetupPage({
     const parsed = Number(Array.isArray(value) ? value[0] : value);
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
   };
-  const [school, branches, years, terms, classes, groups, types, discounts, studentDiscountAssignments, eligibleStudents, structures] =
+  const [school, branches, academicYearSelection, terms, classes, groups, types, discounts, studentDiscountAssignments, eligibleStudents, structures] =
     await Promise.all([
       db.select({ currency: schools.currency }).from(schools).where(eq(schools.id, context.schoolId)).then((rows) => rows[0]),
       db.select({ id: schoolBranches.id, name: schoolBranches.name })
         .from(schoolBranches)
         .where(and(eq(schoolBranches.schoolId, context.schoolId), eq(schoolBranches.status, "active")))
         .orderBy(asc(schoolBranches.name)),
-      db.select({ id: academicYears.id, name: academicYears.name })
-        .from(academicYears)
-        .where(eq(academicYears.schoolId, context.schoolId))
-        .orderBy(asc(academicYears.startDate)),
+      getSchoolAcademicYearSelection(context.schoolId),
       db.select({
         id: academicTerms.id,
         name: academicTerms.name,
@@ -201,6 +233,7 @@ export default async function FeesSetupPage({
         termName: academicTerms.name,
         studentName: students.firstName,
         studentLastName: students.lastName,
+        studentAdmissionNumber: students.admissionNumber,
         branchName: schoolBranches.name,
       })
         .from(feeStructures)
@@ -217,6 +250,8 @@ export default async function FeesSetupPage({
         .where(eq(feeStructures.schoolId, context.schoolId))
         .orderBy(asc(academicYears.startDate), asc(classLevels.name)),
     ]);
+  const years = [...academicYearSelection.years]
+    .sort((first, second) => first.startDate.localeCompare(second.startDate));
 
   const paginateRows = <T,>(rows: T[], requested: number) => {
     const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -230,15 +265,6 @@ export default async function FeesSetupPage({
   const typePage = paginateRows(types, requestedPage(query.typesPage));
   const discountPage = paginateRows(discounts, requestedPage(query.discountsPage));
   const assignmentPage = paginateRows(studentDiscountAssignments, requestedPage(query.assignmentsPage));
-  const structurePage = paginateRows(structures, requestedPage(query.structuresPage));
-  const paginationHref = (parameter: string, page: number) => {
-    const params = new URLSearchParams({
-      section,
-      pageSize: String(pageSize),
-      [parameter]: String(page),
-    });
-    return `/admin/fees?${params.toString()}`;
-  };
 
   const studentsForDiscounts: FeeOption[] = eligibleStudents.map((student) => ({
     id: student.id,
@@ -275,6 +301,57 @@ export default async function FeesSetupPage({
     id: type.id,
     label: `${feeDisplayName(type.groupName)} · ${feeDisplayName(type.name)}`,
   }));
+  const structuresSearch = typeof query.structuresSearch === "string"
+    ? query.structuresSearch.trim().slice(0, 120)
+    : "";
+  const structuresBranchId = resolveBranchFilterId(
+    branches,
+    typeof query.structuresBranchId === "string" ? query.structuresBranchId : undefined,
+  );
+  const requestedStructuresYear = typeof query.structuresYearId === "string"
+    ? query.structuresYearId
+    : undefined;
+  const structuresYearId = query.structuresYearId === undefined
+    ? academicYearSelection.selectedYear?.id ?? null
+    : requestedStructuresYear === ""
+      ? null
+      : years.find((year) => year.id === parseOptionalFilterId(query.structuresYearId))?.id
+        ?? academicYearSelection.selectedYear?.id
+        ?? null;
+  const structuresTermId = parseOptionalFilterId(query.structuresTermId);
+  const structuresClassId = parseOptionalFilterId(query.structuresClassId);
+  const structuresFeeTypeId = parseOptionalFilterId(query.structuresFeeTypeId);
+  const structuresSortBy = parseFeeStructureSortBy(query.structuresSortBy);
+  const structuresSortDirection = query.structuresSortDirection === "desc" ? "desc" : "asc";
+  const filteredStructures = filterAndSortFeeStructures(structures, {
+    branchId: structuresBranchId,
+    academicYearId: structuresYearId,
+    academicTermId: structuresTermId,
+    classLevelId: structuresClassId,
+    feeTypeId: structuresFeeTypeId,
+    search: structuresSearch,
+    sortBy: structuresSortBy,
+    sortDirection: structuresSortDirection,
+  });
+  const structurePage = paginateRows(filteredStructures, requestedPage(query.structuresPage));
+  const paginationHref = (parameter: string, page: number) => {
+    const params = new URLSearchParams({
+      section,
+      pageSize: String(pageSize),
+      [parameter]: String(page),
+    });
+    if (parameter === "structuresPage") {
+      if (structuresSearch) params.set("structuresSearch", structuresSearch);
+      params.set("structuresBranchId", structuresBranchId?.toString() ?? "");
+      params.set("structuresYearId", structuresYearId?.toString() ?? "");
+      if (structuresTermId !== null) params.set("structuresTermId", String(structuresTermId));
+      if (structuresClassId !== null) params.set("structuresClassId", String(structuresClassId));
+      if (structuresFeeTypeId !== null) params.set("structuresFeeTypeId", String(structuresFeeTypeId));
+      params.set("structuresSortBy", structuresSortBy);
+      params.set("structuresSortDirection", structuresSortDirection);
+    }
+    return `/admin/fees?${params.toString()}`;
+  };
   const discountOptions: FeeOption[] = discounts.map((discount) => ({
     id: discount.id,
     label: feeDisplayName(discount.name),
@@ -457,7 +534,111 @@ export default async function FeesSetupPage({
               </Link>
             </div>
           </div>
-          {structures.length ? (
+          <div className="border-b border-slate-100 p-4">
+            <SmartFilterForm method="get" action="/admin/fees" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <input type="hidden" name="section" value="structure" />
+              <input type="hidden" name="pageSize" value={pageSize} />
+              <label className="text-sm font-medium text-slate-700">
+                Search fee structures
+                <input
+                  type="search"
+                  name="structuresSearch"
+                  maxLength={120}
+                  defaultValue={structuresSearch}
+                  placeholder="Branch, class, student, fee type..."
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                />
+              </label>
+              <SearchableSelect
+                label="Branch"
+                name="structuresBranchId"
+                options={[
+                  { value: "", label: "All branches" },
+                  ...branchOptions.map((branch) => ({ value: String(branch.id), label: branch.label })),
+                ]}
+                defaultValue={structuresBranchId?.toString() ?? ""}
+                placeholder="Search branches..."
+              />
+              <SearchableSelect
+                label="Academic year"
+                name="structuresYearId"
+                options={[
+                  { value: "", label: "All academic years" },
+                  ...yearOptions.map((year) => ({ value: String(year.id), label: year.label })),
+                ]}
+                defaultValue={structuresYearId?.toString() ?? ""}
+                placeholder="Search academic years..."
+              />
+              <SearchableSelect
+                label="Term"
+                name="structuresTermId"
+                options={[
+                  { value: "", label: "All terms" },
+                  ...termOptions.map((term) => ({ value: String(term.id), label: term.label })),
+                ]}
+                defaultValue={structuresTermId?.toString() ?? ""}
+                placeholder="Search terms..."
+              />
+              <SearchableSelect
+                label="Class"
+                name="structuresClassId"
+                options={[
+                  { value: "", label: "All classes" },
+                  ...classes.map((classLevel) => ({
+                    value: String(classLevel.id),
+                    label: `${classLevel.branchName} · ${classLevel.name}`,
+                  })),
+                ]}
+                defaultValue={structuresClassId?.toString() ?? ""}
+                placeholder="Search classes..."
+              />
+              <SearchableSelect
+                label="Fee type"
+                name="structuresFeeTypeId"
+                options={[
+                  { value: "", label: "All fee types" },
+                  ...structureTypeOptions.map((type) => ({ value: String(type.id), label: type.label })),
+                ]}
+                defaultValue={structuresFeeTypeId?.toString() ?? ""}
+                placeholder="Search fee types..."
+              />
+              <label className="text-sm font-medium text-slate-700">
+                Sort by
+                <select
+                  name="structuresSortBy"
+                  defaultValue={structuresSortBy}
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                >
+                  <option value="dueDate">Due date</option>
+                  <option value="branch">Branch</option>
+                  <option value="class">Class</option>
+                  <option value="year">Academic year</option>
+                  <option value="term">Term</option>
+                  <option value="student">Student</option>
+                  <option value="feeType">Fee type</option>
+                  <option value="amount">Amount</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Sort direction
+                <select
+                  name="structuresSortDirection"
+                  defaultValue={structuresSortDirection}
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                >
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                </select>
+              </label>
+              <button type="submit" className="self-end rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">
+                Search structures
+              </button>
+            </SmartFilterForm>
+            <p className="mt-3 text-xs text-slate-500">
+              Showing {filteredStructures.length} of {structures.length} created fee structures.
+            </p>
+          </div>
+          {filteredStructures.length ? (
             <div className="divide-y divide-slate-100">
               {structurePage.rows.map((structure) => (
                 <div key={structure.id} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
@@ -488,10 +669,14 @@ export default async function FeesSetupPage({
               ))}
             </div>
           ) : (
-            <p className="p-5 text-sm text-slate-500">No fee structures have been created yet.</p>
+            <p className="p-5 text-sm text-slate-500">
+              {structures.length
+                ? "No fee structures match these filters."
+                : "No fee structures have been created yet."}
+            </p>
           )}
-          {structures.length > 0 && (
-            <TablePagination ariaLabel="Created fee structures" currentPage={structurePage.page} pageSize={pageSize} totalRows={structures.length} hrefForPage={(page) => paginationHref("structuresPage", page)} />
+          {filteredStructures.length > 0 && (
+            <TablePagination ariaLabel="Created fee structures" currentPage={structurePage.page} pageSize={pageSize} totalRows={filteredStructures.length} hrefForPage={(page) => paginationHref("structuresPage", page)} />
           )}
           </section>
         </>
