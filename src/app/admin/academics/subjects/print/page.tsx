@@ -54,7 +54,9 @@ export default async function SubjectListPrintPage() {
               <td className="px-3 py-3 text-slate-500">{index + 1}</td>
               <td className="px-3 py-3 font-medium">{record.name}</td>
               <td className="px-3 py-3">{record.code}</td>
-              <td className="px-3 py-3 capitalize">{record.subjectType}</td>
+              <td className="px-3 py-3 capitalize">
+                {record.subjectType === "both" ? "Theory + practical" : record.subjectType}
+              </td>
               <td className="px-3 py-3">{record.branchName}</td>
             </tr>
           ))}

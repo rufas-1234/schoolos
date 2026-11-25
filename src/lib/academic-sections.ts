@@ -27,7 +27,7 @@ export const academicSections = [
   {
     id: "subjects",
     label: "Subjects",
-    description: "Create theory and practical subjects and assign them to classes and teachers.",
+    description: "Create theory-only, practical-only, or combined subjects and assign them to classes and teachers.",
   },
   {
     id: "optional-subjects",

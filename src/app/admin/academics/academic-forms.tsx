@@ -301,16 +301,20 @@ export function SubjectForm({
       <Field label="Subject name" name="name" placeholder="Mathematics" defaultValue={record?.name} />
       <Field label="Subject code" name="code" placeholder="MATH" defaultValue={record?.code} />
       <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Subject type <RequiredMark />
+        Assessment format <RequiredMark />
         <select
           name="subjectType"
           defaultValue={record?.subjectType ?? "theory"}
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
         >
-          <option value="theory">Theory</option>
-          <option value="practical">Practical</option>
+          <option value="theory">Theory only</option>
+          <option value="practical">Practical only</option>
+          <option value="both">Theory + practical</option>
         </select>
       </label>
+      <p className="text-xs leading-5 text-slate-500">
+        For combined subjects such as Biology, configure Theory and Practical marks separately in each exam.
+      </p>
     </ActionForm>
   );
 }

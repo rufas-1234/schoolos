@@ -94,7 +94,7 @@ const subjectSchema = z.object({
   branchId: idField,
   name: nameField,
   code: z.string().trim().min(2).max(20).refine(isValidSubjectCode).transform(normalizeSubjectCode),
-  subjectType: z.enum(["theory", "practical"]),
+  subjectType: z.enum(["theory", "practical", "both"]),
 });
 
 const classSubjectSchema = z.object({
@@ -940,7 +940,7 @@ export async function createSubject(
     subjectType: readFormValue(formData, "subjectType"),
   });
   if (!result.success) {
-    return { error: "Enter a subject name and a valid code (letters, numbers, hyphens, or underscores)." };
+    return { error: "Enter a subject name, a valid code, and an assessment format." };
   }
 
   const [branch] = await db

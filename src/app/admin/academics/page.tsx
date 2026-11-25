@@ -1061,7 +1061,9 @@ export default async function AcademicStructurePage({
                       branch: subject.branchName,
                       name: subject.name,
                       code: subject.code,
-                      type: subject.subjectType,
+                      type: subject.subjectType === "both"
+                        ? "Theory + practical"
+                        : subject.subjectType === "practical" ? "Practical" : "Theory",
                       branchId: String(subject.branchId),
                     },
                     editForm: <SubjectForm branches={allBranchOptions} record={subject} />,
