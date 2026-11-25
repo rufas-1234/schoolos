@@ -28,6 +28,13 @@ import {
 
 export type FeeOption = { id: number; label: string };
 type FeeTypeOption = FeeOption & { feeGroupId: number };
+type InvoiceStructureOption = FeeOption & {
+  branchName: string;
+  className: string;
+  academicYear: string;
+  feeTypeName: string;
+  dueDate: string;
+};
 type ValueOption = { value: string; label: string };
 export type CurrencyOption = ValueOption;
 type FeeDeleteAction = (
@@ -406,12 +413,58 @@ export function GenerateInvoicesForm({
   structures,
   students,
 }: {
-  structures: FeeOption[];
+  structures: InvoiceStructureOption[];
   students: FeeOption[];
 }) {
+  const [sortBy, setSortBy] = useState<"branchName" | "className" | "academicYear" | "feeTypeName" | "dueDate">("feeTypeName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const sortedStructures = [...structures].sort((first, second) => {
+    const comparison = first[sortBy].localeCompare(second[sortBy]);
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+
   return (
     <ActionForm action={generateStudentFeeInvoices} title="Generate student invoices" submitLabel="Generate invoices">
-      <SelectField label="Fee structure" name="feeStructureId" options={structures} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Sort fee structures by
+          <select
+            value={sortBy}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              if (
+                value === "branchName" ||
+                value === "className" ||
+                value === "academicYear" ||
+                value === "feeTypeName" ||
+                value === "dueDate"
+              ) setSortBy(value);
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
+          >
+            <option value="feeTypeName">Fee type</option>
+            <option value="branchName">Branch</option>
+            <option value="className">Class</option>
+            <option value="academicYear">Academic year</option>
+            <option value="dueDate">Due date</option>
+          </select>
+        </label>
+        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+          Sort direction
+          <select
+            value={sortDirection}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              if (value === "asc" || value === "desc") setSortDirection(value);
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </label>
+      </div>
+      <SelectField label="Fee structure" name="feeStructureId" options={sortedStructures} />
       <SearchableSelect
         label="Student (optional)"
         name="studentId"

@@ -357,9 +357,14 @@ export default async function FeesSetupPage({
     id: discount.id,
     label: feeDisplayName(discount.name),
   }));
-  const structureOptions: FeeOption[] = structures.map((structure) => ({
+  const structureOptions = structures.map((structure) => ({
     id: structure.id,
     label: `${structure.branchName} · ${structure.className} · ${structure.yearName} · ${feeDisplayName(structure.typeName)}`,
+    branchName: structure.branchName,
+    className: structure.className,
+    academicYear: structure.yearName,
+    feeTypeName: `${feeDisplayName(structure.groupName)} · ${feeDisplayName(structure.typeName)}`,
+    dueDate: structure.dueDate,
   }));
   const sectionDescriptions: Record<FeesSection, string> = {
     catalog: "Manage the fee groups and fee types used to organize your school’s charges.",
