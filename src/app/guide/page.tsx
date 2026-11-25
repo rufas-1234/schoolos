@@ -190,12 +190,12 @@ export default function GuidePage() {
                 <Step n={4}>Use the public staff registration link, when enabled, to collect applications. Review them under Staff Applications before creating or activating a staff record.</Step>
                 <Step n={5}>Record daily staff attendance and use reports to filter by period, branch, and staff member.</Step>
                 <Step n={6}>Configure leave types and entitlements, record requests, and approve or reject them in Leave Management.</Step>
-                <Step n={7}>Enter payroll records by pay period, track payment status, and print records or reports where available.</Step>
+                <Step n={7}>Prepare payroll records by pay period in Human resources. Finance then opens Accounts → Staff payroll, selects the bank/cash account and expense category, and records the payment after it has been sent outside SchoolOS.</Step>
               </ol>
               <p><strong>Staff directory and settings:</strong> use departments and designations to keep records consistent; staff settings control which profile fields are visible or required. Staff profiles can include employment, contact, emergency contact, qualification, and document details. Deactivate rather than delete a staff profile when preserving history is important.</p>
               <p><strong>Staff accounts and access:</strong> create or link a login only for staff who need system access, enable login where appropriate, and assign the least-privilege school role. Review the account status shown in the Staff Directory and disable access when someone leaves or changes duties.</p>
               <p><strong>Account email/password recovery:</strong> platform operators can open Platform → <strong>Account recovery</strong>, independently verify the requester, correct the login email, and either set a temporary password or issue a one-time setup link. Temporary passwords must be changed before workspace access; setup links expire after 24 hours and work once. Both methods clear active sessions and are audited. No recovery email is sent; share credentials or links only through a verified secure channel. Keep the staff/student profile email up to date separately.</p>
-              <p>Payroll stores pay-period records and payment status; it does not calculate tax, deductions, benefits, or take-home pay. Review the values entered before marking a payroll record paid. HR reports are for staff attendance; payroll and leave access depends on permissions.</p>
+              <p>Human resources prepares payroll; only Finance can record staff payments. Recording a payment creates an approved Accounts expense and marks payroll paid, but does not transfer funds. Payroll does not calculate tax, deductions, benefits, or take-home pay. HR reports are for staff attendance; payroll and leave access depends on permissions.</p>
             </GuideSection>
 
             <GuideSection id="fees" title="8. Fees and payments">
@@ -213,14 +213,15 @@ export default function GuidePage() {
             </GuideSection>
 
             <GuideSection id="accounts" title="9. Accounts and finance">
-              <p>The <strong>Accounts</strong> area provides the chart of accounts, bank/cash accounts, income, expenses, fund transfers, Profit &amp; Loss, and reports.</p>
+              <p>Expand <strong>Accounts</strong> in the main sidebar to open the chart of accounts, bank/cash accounts, income, expenses, fund transfers, staff payroll, Profit &amp; Loss, and reports. Each section can print its current report or register.</p>
               <ol className="space-y-3">
                 <Step n={1}>Review the default chart of accounts and add or update accounts to match the school’s bookkeeping categories.</Step>
                 <Step n={2}>Configure bank or cash accounts, currency, opening balance, and the linked chart account.</Step>
-                <Step n={3}>Record other income or an expense with the correct date, currency, chart category, amount, description, reference, and bank/cash account. Attach supporting details according to school policy.</Step>
-                <Step n={4}>Submit transactions for review where the approval workflow applies. Reviewers should check the evidence and status before approving or rejecting; approved transactions affect the relevant financial summaries.</Step>
-                <Step n={5}>Record fund transfers between configured accounts, verify the source and destination, and check that the amount and currency are correct.</Step>
-                <Step n={6}>Use <strong>Profit &amp; Loss</strong> and <strong>Accounts Reports</strong> to select a date range and status, review totals and transaction detail, and print or download available reports.</Step>
+                <Step n={3}>Prepare payroll records in Human resources. After sending a staff payment through the school’s bank/cash process, open <strong>Staff payroll</strong>, select the matching account and expense category, and confirm it. This creates an approved expense and marks the HR record paid.</Step>
+                <Step n={4}>Record other income or an expense with the correct date, currency, chart category, amount, description, reference, and bank/cash account. After income is approved, print its receipt from the Income register. Attach supporting details according to school policy.</Step>
+                <Step n={5}>Submit other transactions for review where the approval workflow applies. Reviewers should check the evidence and status before approving or rejecting; approved transactions affect the relevant financial summaries.</Step>
+                <Step n={6}>Record fund transfers between configured accounts, verify the source and destination, and check that the amount and currency are correct.</Step>
+                <Step n={7}>Use <strong>Profit &amp; Loss</strong> and <strong>Accounts Reports</strong> to select a date range and status, review totals and transaction detail, and print or download available reports.</Step>
               </ol>
               <p>Fee receipts contribute to school financial views. Keep bank-account identifiers and supporting references accurate and reconcile entries with external bank statements. SchoolOS does not connect directly to a bank; account categories and approval practices should follow the school’s accounting policy.</p>
             </GuideSection>
@@ -302,7 +303,7 @@ export default function GuidePage() {
                 <li>For results missing from family portals, confirm that the results have been published.</li>
                 <li>For school signup, remember that a platform operator must approve the application before the workspace opens.</li>
               </ul>
-              <p>Features that require external providers may be unavailable until configured. In particular, SMS delivery is disabled without a gateway, payment-provider integrations are not included, and payroll does not calculate tax or take-home pay.</p>
+              <p>Features that require external providers may be unavailable until configured. In particular, SMS delivery is disabled without a gateway, payment-provider integrations are not included, staff payments must be sent through the school&apos;s bank/cash process before being recorded, and payroll does not calculate tax or take-home pay.</p>
             </GuideSection>
 
             <footer className="mt-10 border-t border-slate-200 pt-6 text-sm text-slate-500">

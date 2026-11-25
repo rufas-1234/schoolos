@@ -8,6 +8,7 @@ type PrintOptions = {
   pageOrientation?: "portrait" | "landscape";
   pageSize?: "A4" | "ID-1";
   pageMargin?: string;
+  includeQrCode?: boolean;
 };
 
 const printHiddenAttribute = "data-print-hidden";
@@ -20,6 +21,7 @@ export async function printCurrentPage({
   pageOrientation = "portrait",
   pageSize = "A4",
   pageMargin,
+  includeQrCode = true,
 }: PrintOptions = {}) {
   const target = targetId
     ? document.getElementById(targetId)
@@ -36,45 +38,47 @@ export async function printCurrentPage({
     return;
   }
 
-  const qrValue = new URL(window.location.pathname, window.location.origin).toString();
-  let qrDataUrl: string;
-  try {
-    qrDataUrl = await QRCode.toDataURL(qrValue, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 256,
-    });
-  } catch (error) {
-    console.error("Could not generate the print QR code.", error);
-    window.alert("The QR code could not be generated, so this report was not printed. Please try again.");
-    return;
-  }
   const qrStamps: HTMLElement[] = [];
   const qrImages: HTMLImageElement[] = [];
-  for (const qrTarget of getQrTargets(target, pageSize)) {
-    const stamp = document.createElement("div");
-    stamp.className = "print-qr-stamp";
-    const image = document.createElement("img");
-    image.src = qrDataUrl;
-    image.alt = "QR code to open this school record online";
-    stamp.append(image);
-    if (pageSize !== "ID-1") {
-      const label = document.createElement("span");
-      label.textContent = "Scan to open online";
-      stamp.append(label);
+  if (includeQrCode) {
+    const qrValue = new URL(window.location.pathname, window.location.origin).toString();
+    let qrDataUrl: string;
+    try {
+      qrDataUrl = await QRCode.toDataURL(qrValue, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 256,
+      });
+    } catch (error) {
+      console.error("Could not generate the print QR code.", error);
+      window.alert("The QR code could not be generated, so this report was not printed. Please try again.");
+      return;
     }
-    const qrHost = qrTarget.querySelector<HTMLElement>("[data-print-qr-header]") ?? qrTarget;
-    qrHost.append(stamp);
-    qrStamps.push(stamp);
-    qrImages.push(image);
-  }
-  try {
-    await Promise.all(qrImages.map((image) => image.decode()));
-  } catch (error) {
-    for (const stamp of qrStamps) stamp.remove();
-    console.error("Could not load the generated print QR code.", error);
-    window.alert("The QR code could not be loaded, so this report was not printed. Please try again.");
-    return;
+    for (const qrTarget of getQrTargets(target, pageSize)) {
+      const stamp = document.createElement("div");
+      stamp.className = "print-qr-stamp";
+      const image = document.createElement("img");
+      image.src = qrDataUrl;
+      image.alt = "QR code to open this school record online";
+      stamp.append(image);
+      if (pageSize !== "ID-1") {
+        const label = document.createElement("span");
+        label.textContent = "Scan to open online";
+        stamp.append(label);
+      }
+      const qrHost = qrTarget.querySelector<HTMLElement>("[data-print-qr-header]") ?? qrTarget;
+      qrHost.append(stamp);
+      qrStamps.push(stamp);
+      qrImages.push(image);
+    }
+    try {
+      await Promise.all(qrImages.map((image) => image.decode()));
+    } catch (error) {
+      for (const stamp of qrStamps) stamp.remove();
+      console.error("Could not load the generated print QR code.", error);
+      window.alert("The QR code could not be loaded, so this report was not printed. Please try again.");
+      return;
+    }
   }
 
   const printHeader = document.querySelector<HTMLElement>(".admin-print-header");
@@ -207,6 +211,7 @@ export function PrintButton({
   pageOrientation,
   pageSize,
   pageMargin,
+  includeQrCode = true,
   disabled = false,
 }: {
   label?: string;
@@ -214,13 +219,14 @@ export function PrintButton({
   pageOrientation?: "portrait" | "landscape";
   pageSize?: "A4" | "ID-1";
   pageMargin?: string;
+  includeQrCode?: boolean;
   disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
-      onClick={() => printCurrentPage({ targetId, title: label, pageOrientation, pageSize, pageMargin })}
+      onClick={() => printCurrentPage({ targetId, title: label, pageOrientation, pageSize, pageMargin, includeQrCode })}
       className="print:hidden rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {label}

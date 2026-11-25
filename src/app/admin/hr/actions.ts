@@ -27,7 +27,6 @@ import {
   inclusiveCalendarDays,
   parsePayrollMoneyToMinorUnits,
   staffAttendanceStatuses,
-  staffPayrollStatuses,
 } from "@/lib/hr-policy";
 
 export type HrActionState = { error?: string; success?: boolean };
@@ -532,8 +531,6 @@ export async function recordStaffPayroll(
     baseSalary: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
     allowances: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
     deductions: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
-    status: z.enum(staffPayrollStatuses),
-    paidDate: z.union([z.literal(""), dateField]),
     notes: z.string().trim().max(1000),
   }).safeParse({
     staffId: value(formData, "staffId"),
@@ -543,13 +540,9 @@ export async function recordStaffPayroll(
     baseSalary: value(formData, "baseSalary"),
     allowances: value(formData, "allowances"),
     deductions: value(formData, "deductions"),
-    status: value(formData, "status"),
-    paidDate: value(formData, "paidDate"),
     notes: value(formData, "notes"),
   });
-  if (!result.success || (result.data.status === "paid" && !result.data.paidDate)) {
-    return { error: "Enter valid payroll amounts and a payment date for paid records." };
-  }
+  if (!result.success) return { error: "Enter valid payroll amounts and details." };
   const baseSalary = parsePayrollMoneyToMinorUnits(result.data.baseSalary);
   const allowances = parsePayrollMoneyToMinorUnits(result.data.allowances);
   const deductions = parsePayrollMoneyToMinorUnits(result.data.deductions);
@@ -585,14 +578,14 @@ export async function recordStaffPayroll(
         deductions: formatPayrollMinorUnits(deductions),
         amount: formatPayrollMinorUnits(payroll.net),
         currency: configuredCurrency.code,
-        paidDate: result.data.paidDate || null,
-        status: result.data.status,
+        paidDate: null,
+        status: "recorded",
         notes: result.data.notes || null,
         recordedBy: context.user.id,
       });
       await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.recorded",
         "staff_payroll_record", publicId,
-        ["staffId", "payPeriod", "baseSalary", "allowances", "deductions", "amount", "currency", "paidDate", "status", "notes"]);
+        ["staffId", "payPeriod", "baseSalary", "allowances", "deductions", "amount", "currency", "notes"]);
     });
   } catch (error) {
     if (isDuplicateError(error)) return { error: "A payroll record already exists for this staff member and period." };
@@ -616,8 +609,6 @@ export async function updateStaffPayroll(
     baseSalary: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
     allowances: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
     deductions: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
-    status: z.enum(staffPayrollStatuses),
-    paidDate: z.union([z.literal(""), dateField]),
     notes: z.string().trim().max(1000),
   }).safeParse({
     publicId: value(formData, "publicId"),
@@ -628,13 +619,9 @@ export async function updateStaffPayroll(
     baseSalary: value(formData, "baseSalary"),
     allowances: value(formData, "allowances"),
     deductions: value(formData, "deductions"),
-    status: value(formData, "status"),
-    paidDate: value(formData, "paidDate"),
     notes: value(formData, "notes"),
   });
-  if (!result.success || (result.data.status === "paid" && !result.data.paidDate)) {
-    return { error: "Enter valid payroll amounts and a payment date for paid records." };
-  }
+  if (!result.success) return { error: "Enter valid payroll amounts and details." };
   const baseSalary = parsePayrollMoneyToMinorUnits(result.data.baseSalary);
   const allowances = parsePayrollMoneyToMinorUnits(result.data.allowances);
   const deductions = parsePayrollMoneyToMinorUnits(result.data.deductions);
@@ -659,12 +646,16 @@ export async function updateStaffPayroll(
 
   try {
     const outcome = await db.transaction(async (tx) => {
-      const [existing] = await tx.select({ id: staffPayrollRecords.id })
+      const [existing] = await tx.select({
+        id: staffPayrollRecords.id,
+        status: staffPayrollRecords.status,
+      })
         .from(staffPayrollRecords).where(and(
           eq(staffPayrollRecords.publicId, result.data.publicId),
           eq(staffPayrollRecords.schoolId, context.schoolId),
         )).for("update").limit(1);
       if (!existing) return "not-found";
+      if (existing.status === "paid") return "already-paid";
       await tx.update(staffPayrollRecords).set({
         staffId: staff.id,
         payPeriod: result.data.payPeriod,
@@ -673,8 +664,6 @@ export async function updateStaffPayroll(
         deductions: formatPayrollMinorUnits(deductions),
         amount: formatPayrollMinorUnits(payroll.net),
         currency: configuredCurrency.code,
-        paidDate: result.data.status === "paid" ? result.data.paidDate : null,
-        status: result.data.status,
         notes: result.data.notes || null,
       }).where(and(
         eq(staffPayrollRecords.id, existing.id),
@@ -682,10 +671,11 @@ export async function updateStaffPayroll(
       ));
       await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.updated",
         "staff_payroll_record", result.data.publicId,
-        ["staffId", "payPeriod", "baseSalary", "allowances", "deductions", "amount", "currency", "paidDate", "status", "notes"]);
+        ["staffId", "payPeriod", "baseSalary", "allowances", "deductions", "amount", "currency", "notes"]);
       return "updated";
     });
     if (outcome === "not-found") return { error: "Payroll record was not found in this school." };
+    if (outcome === "already-paid") return { error: "Paid payroll records cannot be edited in Human resources." };
   } catch (error) {
     if (isDuplicateError(error)) return { error: "A payroll record already exists for this staff member and period." };
     throw error;
@@ -704,11 +694,13 @@ export async function deleteStaffPayrollRecord(
   const outcome = await db.transaction(async (tx) => {
     const [record] = await tx.select({
       id: staffPayrollRecords.id,
+      status: staffPayrollRecords.status,
     }).from(staffPayrollRecords).where(and(
       eq(staffPayrollRecords.publicId, publicId.data),
       eq(staffPayrollRecords.schoolId, context.schoolId),
     )).for("update").limit(1);
     if (!record) return "not-found";
+    if (record.status === "paid") return "already-paid";
     await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.deleted",
       "staff_payroll_record", publicId.data, ["staffId", "payPeriod", "amount", "status"]);
     await tx.delete(staffPayrollRecords).where(and(
@@ -718,43 +710,7 @@ export async function deleteStaffPayrollRecord(
     return "deleted";
   });
   if (outcome === "not-found") return { error: "Payroll record was not found in this school." };
-  revalidateHr();
-  return { success: true };
-}
-
-export async function markStaffPayrollPaid(
-  _previousState: HrActionState,
-  formData: FormData,
-): Promise<HrActionState> {
-  const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
-  const result = z.object({
-    publicId: z.string().uuid(),
-    paidDate: dateField,
-  }).safeParse({
-    publicId: value(formData, "publicId"),
-    paidDate: value(formData, "paidDate"),
-  });
-  if (!result.success) return { error: "Enter a valid payment date." };
-  const outcome = await db.transaction(async (tx) => {
-    const [record] = await tx.select({
-      id: staffPayrollRecords.id,
-      status: staffPayrollRecords.status,
-    }).from(staffPayrollRecords).where(and(
-      eq(staffPayrollRecords.publicId, result.data.publicId),
-      eq(staffPayrollRecords.schoolId, context.schoolId),
-    )).for("update").limit(1);
-    if (!record) return "not-found";
-    if (record.status === "paid") return "already-paid";
-    await tx.update(staffPayrollRecords).set({
-      status: "paid",
-      paidDate: result.data.paidDate,
-    }).where(eq(staffPayrollRecords.id, record.id));
-    await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.paid",
-      "staff_payroll_record", result.data.publicId, ["status", "paidDate"]);
-    return "updated";
-  });
-  if (outcome === "not-found") return { error: "Payroll record was not found in this school." };
-  if (outcome === "already-paid") return { error: "This payroll record is already marked paid." };
+  if (outcome === "already-paid") return { error: "Paid payroll records cannot be deleted." };
   revalidateHr();
   return { success: true };
 }

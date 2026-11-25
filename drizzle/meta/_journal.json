@@ -393,6 +393,13 @@
       "when": 1795473254542,
       "tag": "0055_lazy_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "5",
+      "when": 1795635128616,
+      "tag": "0056_mean_squadron_supreme",
+      "breakpoints": true
     }
   ]
 }

@@ -235,6 +235,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   }
   if (permissions.has("accounts.manage")) {
     addPage("accounts-profit", "Profit & Loss", "Income statement for an accounting period", "/admin/accounts?section=profit", ["profit", "loss", "income statement"]);
+    addPage("accounts-payroll", "Staff payroll payments", "Record staff salary payments in Accounts", "/admin/accounts?section=payroll", ["salary payments", "pay staff", "payroll payment", "staff salaries"]);
     addPage("accounts-income", "Income", "Record and review other school income", "/admin/accounts?section=income", ["donations", "grants"]);
     addPage("accounts-expenses", "Expenses", "Record and approve operational expenses", "/admin/accounts?section=expenses", ["staff expenses", "supplies", "utilities", "transport", "maintenance"]);
     addPage("accounts-chart", "Chart of accounts", "Manage accounting codes and reporting categories", "/admin/accounts?section=chart", ["account categories", "ledger"]);

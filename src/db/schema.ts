@@ -2383,6 +2383,8 @@ export const accountTransactions = mysqlTable(
     transactionType: varchar("transactionType", { length: 20 }).notNull(),
     categoryAccountId: bigint("categoryAccountId", { mode: "number", unsigned: true }).notNull().references(() => chartOfAccounts.id),
     bankAccountId: bigint("bankAccountId", { mode: "number", unsigned: true }).references(() => schoolBankAccounts.id),
+    payrollRecordId: bigint("payrollRecordId", { mode: "number", unsigned: true })
+      .references(() => staffPayrollRecords.id),
     currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     transactionDate: date("transactionDate", { mode: "string" }).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
@@ -2400,6 +2402,7 @@ export const accountTransactions = mysqlTable(
     index("account_transactions_school_type_date_idx").on(table.schoolId, table.transactionType, table.transactionDate),
     index("account_transactions_school_status_date_idx").on(table.schoolId, table.status, table.transactionDate),
     index("account_transactions_school_bank_idx").on(table.schoolId, table.bankAccountId),
+    uniqueIndex("account_transactions_school_payroll_uq").on(table.schoolId, table.payrollRecordId),
   ],
 );
 

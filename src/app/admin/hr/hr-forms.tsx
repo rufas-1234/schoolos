@@ -9,7 +9,6 @@ import {
   assignStaffLeaveBalance,
   createStaffLeaveRequest,
   createStaffLeaveType,
-  markStaffPayrollPaid,
   deleteStaffPayrollRecord,
   recordStaffAttendanceBulk,
   recordStaffAttendance,
@@ -261,8 +260,6 @@ export function PayrollForm({
     allowances: string;
     deductions: string;
     payPeriod: string;
-    paidDate: string | null;
-    status: string;
     notes: string | null;
   };
 }) {
@@ -270,7 +267,7 @@ export function PayrollForm({
   const [state, action, pending] = useActionState(actionToRun, {});
   return (
     <HrForm
-      title={record ? "Edit payroll record" : "Record payroll payment"}
+      title={record ? "Edit payroll record" : "Prepare payroll record"}
       action={action}
       pending={pending}
       submitLabel={record ? "Save payroll changes" : "Save payroll record"}
@@ -301,17 +298,9 @@ export function PayrollForm({
       <Field label="Base salary (selected currency)" name="baseSalary" type="number" min="0.01" step="0.01" defaultValue={record?.baseSalary} />
       <Field label="Allowances (selected currency)" name="allowances" type="number" min="0" step="0.01" defaultValue={record?.allowances ?? "0"} />
       <Field label="Deductions (selected currency)" name="deductions" type="number" min="0" step="0.01" defaultValue={record?.deductions ?? "0"} />
-      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-        Payment status <RequiredMark />
-        <select name="status" required defaultValue={record?.status ?? "recorded"} className={inputClass}>
-          <option value="recorded">Recorded, not paid</option>
-          <option value="paid">Paid</option>
-        </select>
-      </label>
-      <Field label="Paid date (required if marked paid)" name="paidDate" type="date" defaultValue={record?.paidDate ?? ""} required={false} />
       <Field label="Notes (optional)" name="notes" maxLength={1000} defaultValue={record?.notes ?? ""} required={false} />
       <p className="text-xs leading-5 text-slate-500">
-        Gross pay = salary + allowances. Net pay = gross minus deductions; enter statutory deductions.
+        Gross pay = salary + allowances. Net pay = gross minus deductions; Finance records staff payments in Accounts.
       </p>
     </HrForm>
   );
@@ -396,20 +385,6 @@ export function PayrollRecordPrintButton({
         <footer><span>Prepared by: ____________________</span><span>Received by: ____________________</span></footer>
       </article>
     </>
-  );
-}
-
-export function MarkPayrollPaidForm({ publicId }: { publicId: string }) {
-  const [state, action, pending] = useActionState(markStaffPayrollPaid, {});
-  return (
-    <form action={action} className="flex items-center gap-2">
-      <input type="hidden" name="publicId" value={publicId} />
-      <input type="date" name="paidDate" required aria-label="Payment date" className="w-36 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-      <button type="submit" disabled={pending} className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
-        {pending ? "Saving…" : "Mark paid"}
-      </button>
-      {state.error && <span role="alert" className="text-xs text-rose-600">{state.error}</span>}
-    </form>
   );
 }
 

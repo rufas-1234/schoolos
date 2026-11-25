@@ -8,6 +8,7 @@ import {
   createChartAccount,
   createFundTransfer,
   createSchoolBankAccount,
+  payStaffPayrollRecord,
   reviewAccountTransaction,
   type AccountActionState,
 } from "./actions";
@@ -185,6 +186,60 @@ export function AccountForms({
         </div>
       </ActionForm>}
     </div>
+  );
+}
+
+export function PayrollPaymentForm({
+  payrollPublicId,
+  banks,
+  expenseAccounts,
+  defaultExpenseAccountId,
+  currentDate,
+}: {
+  payrollPublicId: string;
+  banks: AccountOption[];
+  expenseAccounts: AccountOption[];
+  defaultExpenseAccountId: string;
+  currentDate: string;
+}) {
+  const [state, formAction, pending] = useActionState(payStaffPayrollRecord, {});
+  return (
+    <form action={formAction} className="min-w-[34rem] space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <input type="hidden" name="payrollPublicId" value={payrollPublicId} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <SearchableSelect
+          label="Pay from"
+          name="bankAccountId"
+          options={banks.map((bank) => ({ value: String(bank.id), label: bank.label }))}
+          placeholder="Search bank or cash account..."
+          required
+        />
+        <SearchableSelect
+          label="Expense category"
+          name="categoryAccountId"
+          options={expenseAccounts.map((account) => ({ value: String(account.id), label: account.label }))}
+          defaultValue={defaultExpenseAccountId}
+          placeholder="Search expense categories..."
+          required
+        />
+        <label className="block text-xs font-medium text-slate-700">
+          Payment date
+          <input type="date" name="paidDate" required defaultValue={currentDate}
+            className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm" />
+        </label>
+        <label className="block text-xs font-medium text-slate-700">
+          Reference (optional)
+          <input name="reference" maxLength={120} placeholder="Transfer or cheque reference"
+            className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm" />
+        </label>
+      </div>
+      {state.error && <p role="alert" className="text-xs text-rose-700">{state.error}</p>}
+      {state.success && <p role="status" className="text-xs text-emerald-700">{state.message}</p>}
+      <button type="submit" disabled={pending}
+        className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">
+        {pending ? "Recording payment..." : "Confirm payment"}
+      </button>
+    </form>
   );
 }
 

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { db } from "@/db";
 import {
@@ -11,13 +11,21 @@ import {
   schools,
   schoolBankAccounts,
   studentFeeInvoices,
+  staffMembers,
+  staffPayrollRecords,
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { parseCostMinorUnits } from "@/lib/inventory-policy";
 import { DownloadCsv } from "@/components/download-csv";
-import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
-import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOption } from "./account-forms";
+import { PrintButton } from "@/components/print-button";
+import {
+  AccountForms,
+  PayrollPaymentForm,
+  ProfitLossFilters,
+  ReviewTransactionForm,
+  type AccountOption,
+} from "./account-forms";
 import { TablePagination } from "@/components/table-pagination";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { parsePageSize } from "@/components/pagination-utils";
@@ -29,6 +37,8 @@ type SearchParams = {
   to?: string | string[];
   status?: string | string[];
   search?: string | string[];
+  period?: string | string[];
+  payrollPage?: string | string[];
   incomePage?: string | string[];
   expensePage?: string | string[];
   chartPage?: string | string[];
@@ -38,7 +48,7 @@ type SearchParams = {
   reportTransfersPage?: string | string[];
   pageSize?: string | string[];
 };
-type Section = "profit" | "income" | "expenses" | "chart" | "bank" | "transfers" | "reports";
+type Section = "profit" | "income" | "expenses" | "chart" | "bank" | "transfers" | "payroll" | "reports";
 const approverUser = alias(user, "approver_user");
 const sourceBankAccount = alias(schoolBankAccounts, "source_account");
 const destinationBankAccount = alias(schoolBankAccounts, "destination_account");
@@ -50,6 +60,7 @@ const sections: Array<{ id: Section; label: string }> = [
   { id: "transfers", label: "Fund transfers" },
   { id: "income", label: "Income" },
   { id: "expenses", label: "Expenses" },
+  { id: "payroll", label: "Staff payroll" },
   { id: "reports", label: "Reports" },
 ];
 
@@ -116,6 +127,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const requestedStatus = first(query.status);
   const search = first(query.search)?.trim().slice(0, 120) ?? "";
   const searchTerm = search.toLocaleLowerCase();
+  const requestedPayrollPeriod = first(query.period);
+  const payrollPeriod = requestedPayrollPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedPayrollPeriod)
+    ? requestedPayrollPeriod
+    : today.slice(0, 7);
   const reportStatus = requestedStatus === "pending" || requestedStatus === "approved" || requestedStatus === "rejected"
     ? requestedStatus
     : "all";
@@ -158,6 +173,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         .orderBy(asc(schoolBankAccounts.accountName)),
       db.select({
         id: accountTransactions.id,
+        publicId: accountTransactions.publicId,
         transactionType: accountTransactions.transactionType,
         transactionDate: accountTransactions.transactionDate,
         amount: accountTransactions.amount,
@@ -169,6 +185,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         accountName: chartOfAccounts.name,
         accountCode: chartOfAccounts.code,
         bankAccountId: accountTransactions.bankAccountId,
+        bankAccountName: schoolBankAccounts.accountName,
         submitterName: user.name,
         approvedAt: accountTransactions.approvedAt,
         approverName: approverUser.name,
@@ -178,6 +195,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           eq(chartOfAccounts.schoolId, context.schoolId),
         ))
         .innerJoin(user, eq(user.id, accountTransactions.submittedBy))
+        .leftJoin(schoolBankAccounts, and(
+          eq(schoolBankAccounts.id, accountTransactions.bankAccountId),
+          eq(schoolBankAccounts.schoolId, context.schoolId),
+        ))
         .leftJoin(approverUser, eq(approverUser.id, accountTransactions.approvedBy))
         .where(eq(accountTransactions.schoolId, context.schoolId))
         .orderBy(desc(accountTransactions.createdAt), desc(accountTransactions.id)),
@@ -225,6 +246,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         .orderBy(asc(accountTransactions.transactionDate)),
       db.select({
         id: accountTransactions.id,
+        publicId: accountTransactions.publicId,
         transactionType: accountTransactions.transactionType,
         transactionDate: accountTransactions.transactionDate,
         amount: accountTransactions.amount,
@@ -236,6 +258,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         accountName: chartOfAccounts.name,
         accountCode: chartOfAccounts.code,
         bankAccountId: accountTransactions.bankAccountId,
+        bankAccountName: schoolBankAccounts.accountName,
         submitterName: user.name,
         approvedAt: accountTransactions.approvedAt,
         approverName: approverUser.name,
@@ -245,6 +268,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           eq(chartOfAccounts.schoolId, context.schoolId),
         ))
         .innerJoin(user, eq(user.id, accountTransactions.submittedBy))
+        .leftJoin(schoolBankAccounts, and(
+          eq(schoolBankAccounts.id, accountTransactions.bankAccountId),
+          eq(schoolBankAccounts.schoolId, context.schoolId),
+        ))
         .leftJoin(approverUser, eq(approverUser.id, accountTransactions.approvedBy))
         .where(and(
           eq(accountTransactions.schoolId, context.schoolId),
@@ -336,6 +363,38 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         .where(eq(fundTransfers.schoolId, context.schoolId))
         .groupBy(fundTransfers.destinationBankAccountId),
     ]);
+  const payrollRecords = section === "payroll"
+    ? await db.select({
+      publicId: staffPayrollRecords.publicId,
+      payPeriod: staffPayrollRecords.payPeriod,
+      amount: staffPayrollRecords.amount,
+      currency: staffPayrollRecords.currency,
+      status: staffPayrollRecords.status,
+      paidDate: staffPayrollRecords.paidDate,
+      paymentTransactionId: accountTransactions.id,
+      staffName: staffMembers.firstName,
+      staffLastName: staffMembers.lastName,
+      employeeCode: staffMembers.employeeCode,
+    }).from(staffPayrollRecords)
+      .innerJoin(staffMembers, and(
+        eq(staffMembers.id, staffPayrollRecords.staffId),
+        eq(staffMembers.schoolId, context.schoolId),
+      ))
+      .leftJoin(accountTransactions, and(
+        eq(accountTransactions.payrollRecordId, staffPayrollRecords.id),
+        eq(accountTransactions.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(staffPayrollRecords.schoolId, context.schoolId),
+        eq(staffPayrollRecords.payPeriod, payrollPeriod),
+        ...(searchTerm ? [or(
+          like(staffMembers.firstName, `%${searchTerm}%`),
+          like(staffMembers.lastName, `%${searchTerm}%`),
+          like(staffMembers.employeeCode, `%${searchTerm}%`),
+        )!] : []),
+      ))
+      .orderBy(asc(staffMembers.lastName), asc(staffMembers.firstName))
+    : [];
   const currencyRows = await db.select({
     code: schoolCurrencies.code,
     name: schoolCurrencies.name,
@@ -359,11 +418,13 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const chartPage = paginateRows(accounts, requestedPage(first(query.chartPage)), pageSize);
   const bankPage = paginateRows(bankAccounts, requestedPage(first(query.bankPage)), pageSize);
   const transferPage = paginateRows(transfers, requestedPage(first(query.transfersPage)), pageSize);
+  const payrollPage = paginateRows(payrollRecords, requestedPage(first(query.payrollPage)), pageSize);
   const reportTransactionPage = paginateRows(reportTransactions, requestedPage(first(query.reportTransactionsPage)), pageSize);
   const reportTransferPage = paginateRows(reportTransfers, requestedPage(first(query.reportTransfersPage)), pageSize);
   const pageHref = (parameter: string, page: number) => {
     const params = new URLSearchParams({ section, from, to });
     if (search) params.set("search", search);
+    if (section === "payroll") params.set("period", payrollPeriod);
     if (reportStatus !== "all") params.set("status", reportStatus);
     params.set("pageSize", String(pageSize));
     params.set(parameter, String(page));
@@ -389,6 +450,9 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     defaultCurrency: currency,
     currentDate: today,
   };
+  const defaultPayrollExpense = expenseAccounts.find((account) =>
+    /salary|staff|payroll/i.test(account.label)
+  ) ?? expenseAccounts[0];
   const pnlCurrencyCodes = new Set([
     currency,
     ...currencyRows.map((row) => row.code),
@@ -441,10 +505,20 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     <main className="space-y-6">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <p className="text-sm font-semibold text-violet-700">Finance · Accounts</p>
-        <h1 className="mt-1 text-3xl font-bold text-slate-950">{section === "expenses" ? "Expenses" : section === "reports" ? "Accounts reports" : "Accounts"}</h1>
+        <h1 className="mt-1 text-3xl font-bold text-slate-950">
+          {section === "expenses"
+            ? "Expenses"
+            : section === "payroll"
+              ? "Staff payroll payments"
+              : section === "reports"
+                ? "Accounts reports"
+                : "Accounts"}
+        </h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-600">
           {section === "expenses"
             ? "Record and review operating expenses with approval status, categories, payees, and references."
+            : section === "payroll"
+              ? "Finance records staff payments against a bank or cash account and posts each payment to expenses."
             : section === "reports"
               ? "Review date-filtered income and expense activity, approval status, cash balances, and transfers."
               : "Monitor school income, balances, transfers, and period-based profit and loss."}
@@ -466,11 +540,29 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         </a>
       )}
 
-      <section>
-        <h2 className="mb-3 text-xl font-bold text-slate-900">{activeSection.label}</h2>
+      <div className="flex justify-end print:hidden">
+        <PrintButton
+          label={`Print ${section === "reports" ? "Accounts activity report" : activeSection.label}`}
+          targetId="accounts-section-print"
+        />
+      </div>
+      <section id="accounts-section-print" className="print-report-content space-y-5">
+        <header className="print-report-heading">
+          <p className="print-report-kicker">Finance · Accounts</p>
+          <h2>{section === "reports" ? "Accounts activity report" : activeSection.label}</h2>
+          <p>
+            {section === "reports"
+              ? `${from} through ${to} · ${reportStatus === "all" ? "All statuses" : `${reportStatus} transactions`} · ${reportTransactions.length} transactions${search ? ` · Search: ${search}` : ""}`
+              : section === "profit"
+                ? `${from} through ${to} · Approved activity`
+                : section === "payroll"
+                  ? `Pay period ${payrollPeriod}`
+                  : `Generated ${today}`}
+          </p>
+        </header>
         {section === "profit" && (
           <div className="space-y-4">
-            <ProfitLossFilters from={from} to={to} />
+            <div className="print:hidden"><ProfitLossFilters from={from} to={to} /></div>
             <p className="text-xs text-slate-500">P&amp;L uses approved activity and fee receipts net of refunds; pending and test items are excluded.</p>
             {hasDemoProfitTransactions && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Demo test records appear in totals but are not real income or expenses.</p>}
             {pnlSummaries.map((summary) => (
@@ -502,8 +594,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         {section === "income" && (
           <div className="space-y-4">
             <p className="text-sm text-slate-500">Fee receipts are added automatically. Record other income here to avoid double counting.</p>
-            <AccountForms section={section} {...accountFormProps} />
-            <TransactionTable transactions={incomeTransactionPage.rows} reviewNeeded={reviewNeeded} />
+            <div className="print:hidden"><AccountForms section={section} {...accountFormProps} /></div>
+            <TransactionTable transactions={incomeTransactionPage.rows} reviewNeeded={reviewNeeded} schoolName={context.schoolName} />
             <TablePagination ariaLabel="Income transactions" currentPage={incomeTransactionPage.page} pageSize={incomeTransactionPage.pageSize} totalRows={incomeTransactions.length}
               hrefForPage={(page) => pageHref("incomePage", page)} />
           </div>
@@ -513,15 +605,118 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             <p className="text-sm text-slate-600">
               Select an existing expense category or create one in the form below. New categories are added to the chart automatically.
             </p>
-            <AccountForms section={section} {...accountFormProps} />
-            <TransactionTable transactions={expenseTransactionPage.rows} reviewNeeded={reviewNeeded} />
+            <div className="print:hidden"><AccountForms section={section} {...accountFormProps} /></div>
+            <TransactionTable transactions={expenseTransactionPage.rows} reviewNeeded={reviewNeeded} schoolName={context.schoolName} />
             <TablePagination ariaLabel="Expense transactions" currentPage={expenseTransactionPage.page} pageSize={expenseTransactionPage.pageSize} totalRows={expenseTransactions.length}
               hrefForPage={(page) => pageHref("expensePage", page)} />
           </div>
         )}
+        {section === "payroll" && (
+          <div className="space-y-4">
+            <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+              <input type="hidden" name="section" value="payroll" />
+              <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+                Pay period
+                <input type="month" name="period" defaultValue={payrollPeriod}
+                  className="block rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
+              </label>
+              <label className="min-w-52 flex-1 text-sm font-medium text-slate-700">
+                Search staff
+                <input type="search" name="search" maxLength={120} defaultValue={search}
+                  placeholder="Name or staff number"
+                  className="mt-1 block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3" />
+              </label>
+              <button className="h-10 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">View payroll</button>
+            </SmartFilterForm>
+            <p className="print:hidden rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              After paying staff through your bank or cash process, confirm it here. SchoolOS records the approved expense and marks payroll paid; it does not transfer funds automatically.
+            </p>
+            <section className="grid gap-3 sm:grid-cols-3">
+              <SummaryCard label={`Payroll records · ${payrollPeriod}`} value={String(payrollRecords.length)} />
+              <SummaryCard label="Awaiting payment" value={String(payrollRecords.filter((record) => record.status === "recorded").length)} />
+              <SummaryCard label="Paid" value={String(payrollRecords.filter((record) => record.status === "paid").length)} />
+            </section>
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-100 p-5">
+                <h3 className="font-semibold text-slate-900">Staff payroll · {payrollPeriod}</h3>
+                <p className="mt-1 text-sm text-slate-500">Prepared by Human resources; paid and posted to Accounts by Finance.</p>
+              </div>
+              {payrollRecords.length === 0 ? (
+                <p className="p-7 text-center text-sm text-slate-500">No payroll records match this period and search.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1050px] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">Staff member</th>
+                        <th className="px-4 py-3">Pay period</th>
+                        <th className="px-4 py-3">Net pay</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="print:hidden px-4 py-3">Payment details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payrollPage.rows.map((record) => {
+                        const matchingBanks = bankAccounts
+                          .filter((bank) => bank.status === "active" && bank.currency === record.currency)
+                          .map((bank) => ({
+                            id: bank.id,
+                            label: `${bank.accountName} · ${bank.bankName}`,
+                          }));
+                        return (
+                          <tr key={record.publicId}>
+                            <td className="px-4 py-3">
+                              <p className="font-medium text-slate-900">{record.staffName} {record.staffLastName}</p>
+                              {record.employeeCode && <p className="text-xs text-slate-500">{record.employeeCode}</p>}
+                            </td>
+                            <td className="px-4 py-3">{record.payPeriod}</td>
+                            <td className="px-4 py-3 font-semibold">{displayAmount(record.amount, record.currency)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                record.status === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                              }`}>
+                                {record.status === "paid" ? `Paid · ${record.paidDate ?? "date not recorded"}` : "Awaiting payment"}
+                              </span>
+                            </td>
+                            <td className="print:hidden px-4 py-3">
+                              {record.status === "paid" ? (
+                                <span className="text-sm text-slate-500">
+                                  {record.paymentTransactionId
+                                    ? "Payment recorded in Accounts."
+                                    : "Previously marked paid; no linked Finance transaction."}
+                                </span>
+                              ) : !matchingBanks.length || !expenseAccounts.length ? (
+                                <p className="max-w-sm text-sm text-amber-800">
+                                  Set up a matching bank/cash account and expense category before paying this record.{" "}
+                                  {!matchingBanks.length && <a className="font-semibold underline" href="/admin/accounts?section=bank">Bank accounts</a>}
+                                  {!matchingBanks.length && !expenseAccounts.length && " · "}
+                                  {!expenseAccounts.length && <a className="font-semibold underline" href="/admin/accounts?section=chart">Chart of accounts</a>}
+                                </p>
+                              ) : (
+                                <PayrollPaymentForm
+                                  payrollPublicId={record.publicId}
+                                  banks={matchingBanks}
+                                  expenseAccounts={expenseAccounts}
+                                  defaultExpenseAccountId={String(defaultPayrollExpense?.id ?? "")}
+                                  currentDate={today}
+                                />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <TablePagination ariaLabel="Staff payroll payments" currentPage={payrollPage.page} pageSize={payrollPage.pageSize} totalRows={payrollRecords.length}
+                hrefForPage={(page) => pageHref("payrollPage", page)} />
+            </section>
+          </div>
+        )}
         {section === "chart" && (
           <div className="space-y-4">
-            <AccountForms section={section} {...accountFormProps} />
+            <div className="print:hidden"><AccountForms section={section} {...accountFormProps} /></div>
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[600px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Account name</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Description</th><th className="px-4 py-3">Status</th></tr></thead>
@@ -536,7 +731,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         )}
         {section === "bank" && (
           <div className="space-y-4">
-            <AccountForms section={section} {...accountFormProps} />
+            <div className="print:hidden"><AccountForms section={section} {...accountFormProps} /></div>
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Linked chart account</th><th className="px-4 py-3">Opening balance</th><th className="px-4 py-3">Current balance</th><th className="px-4 py-3">Status</th></tr></thead>
@@ -551,7 +746,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         )}
         {section === "transfers" && (
           <div className="space-y-4">
-            <AccountForms section={section} {...accountFormProps} />
+            <div className="print:hidden"><AccountForms section={section} {...accountFormProps} /></div>
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[650px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">From</th><th className="px-4 py-3">To</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Reference / note</th></tr></thead>
@@ -599,15 +794,9 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 ])}
                 fileName={`fund-transfers-${from}-to-${to}.csv`}
               />
-              <PrintReportButton />
             </SmartFilterForm>
 
-            <section className="print-report-content space-y-5">
-              <header className="print-report-heading">
-                <p className="print-report-kicker">Finance · Accounts</p>
-                <h2>Accounts activity report</h2>
-                <p>{from} through {to} · {reportStatus === "all" ? "All statuses" : `${reportStatus} transactions`} · {reportTransactions.length} transactions{search ? ` · Search: ${search}` : ""}</p>
-              </header>
+            <section className="space-y-5">
               {pnlSummaries.map((summary) => (
                 <section key={summary.code} className="space-y-3">
                   <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
@@ -626,6 +815,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <TransactionTable
                 transactions={reportTransactionPage.rows}
                 reviewNeeded={reportTransactions.filter((row) => row.status === "pending")}
+                schoolName={context.schoolName}
               />
               <TablePagination ariaLabel="Accounts report transactions" currentPage={reportTransactionPage.page} pageSize={reportTransactionPage.pageSize} totalRows={reportTransactions.length}
                 hrefForPage={(page) => pageHref("reportTransactionsPage", page)} />
@@ -714,6 +904,7 @@ function SummaryTable({ title, rows }: { title: string; rows: Array<{ label: str
 
 type TransactionRow = {
   id: number;
+  publicId: string;
   transactionType: string;
   transactionDate: string;
   amount: string;
@@ -725,6 +916,7 @@ type TransactionRow = {
   accountName: string;
   accountCode: string;
   bankAccountId: number | null;
+  bankAccountName: string | null;
   submitterName: string;
   approvedAt: Date | null;
   approverName: string | null;
@@ -733,15 +925,17 @@ type TransactionRow = {
 function TransactionTable({
   transactions,
   reviewNeeded,
+  schoolName,
 }: {
   transactions: TransactionRow[];
   reviewNeeded: TransactionRow[];
+  schoolName: string;
 }) {
   const reviewIds = new Set(reviewNeeded.map((row) => row.id));
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full min-w-[1000px] text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / description</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Payee</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Status / approval</th><th className="px-4 py-3">Review</th></tr></thead>
+      <table className="w-full min-w-[1120px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Date / description</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Payee</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Status / approval</th><th className="print:hidden px-4 py-3">Receipt</th><th className="print:hidden px-4 py-3">Review</th></tr></thead>
         <tbody className="divide-y divide-slate-100">{transactions.map((transaction) => (
           <tr key={transaction.id}>
             <td className="px-4 py-3"><strong>{transaction.transactionDate}</strong><span className="block text-xs text-slate-500">{transaction.description}{transaction.reference ? ` · Ref: ${transaction.reference}` : ""}</span></td>
@@ -749,10 +943,50 @@ function TransactionTable({
             <td className="px-4 py-3">{transaction.payee ?? "—"}</td>
             <td className="px-4 py-3 font-semibold">{displayAmount(transaction.amount, transaction.currency)}</td>
             <td className="px-4 py-3 capitalize">{transaction.status}<span className="block text-xs text-slate-500">{transaction.approverName ? `By ${transaction.approverName} · ${displayTimestamp(transaction.approvedAt)}` : `Submitted by ${transaction.submitterName}`}</span></td>
-            <td className="px-4 py-3">{reviewIds.has(transaction.id) ? <ReviewTransactionForm transactionId={transaction.id} /> : "—"}</td>
+            <td className="print:hidden px-4 py-3">{transaction.transactionType === "income" && transaction.status === "approved"
+              ? <PrintButton label="Print receipt" targetId={`income-receipt-${transaction.publicId}`} includeQrCode={false} />
+              : "—"}</td>
+            <td className="print:hidden px-4 py-3">{reviewIds.has(transaction.id) ? <ReviewTransactionForm transactionId={transaction.id} /> : "—"}</td>
           </tr>
-        ))}{!transactions.length && <EmptyRow columns={6} text="No income or expense records yet." />}</tbody>
+        ))}{!transactions.length && <EmptyRow columns={7} text="No income or expense records yet." />}</tbody>
       </table>
+      {transactions.filter((transaction) => transaction.transactionType === "income" && transaction.status === "approved").map((transaction) => (
+        <article
+          key={transaction.publicId}
+          id={`income-receipt-${transaction.publicId}`}
+          data-print-qr-document=""
+          className="hidden space-y-7 bg-white p-8 text-slate-900"
+        >
+          <header data-print-qr-header="" className="border-b-2 border-violet-700 pb-5">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-700">Official income receipt</p>
+            <h1 className="mt-2 text-3xl font-bold">{schoolName}</h1>
+            <p className="mt-2 text-sm text-slate-600">Receipt no. RCPT-{transaction.publicId.toUpperCase()}</p>
+          </header>
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <ReceiptField label="Received from" value={transaction.payee ?? "Not specified"} />
+            <ReceiptField label="Date received" value={transaction.transactionDate} />
+            <ReceiptField label="Income category" value={`${transaction.accountCode} · ${transaction.accountName}`} />
+            <ReceiptField label="Deposited into" value={transaction.bankAccountName ?? "Not specified"} />
+            <ReceiptField label="Payment reference" value={transaction.reference ?? "Not provided"} />
+            <ReceiptField label="Description" value={transaction.description} />
+          </dl>
+          <p className="border-y border-slate-200 py-5 text-lg font-bold">
+            Amount received: {displayAmount(transaction.amount, transaction.currency)}
+          </p>
+          <footer className="text-sm text-slate-600">
+            Approved by {transaction.approverName ?? "Finance"} on {displayTimestamp(transaction.approvedAt)}.
+          </footer>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ReceiptField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words font-medium text-slate-900">{value}</dd>
     </div>
   );
 }

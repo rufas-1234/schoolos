@@ -12,7 +12,6 @@ import {
 import { PrintButton } from "@/components/print-button";
 import {
   DeletePayrollForm,
-  MarkPayrollPaidForm,
   PayrollForm,
   PayrollRecordPrintButton,
 } from "../hr-forms";
@@ -156,7 +155,7 @@ export default async function StaffPayrollPage({
         <p className="text-sm font-medium text-violet-700">Human resources</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Payroll records</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
-          Prepare monthly payroll, calculate gross and net pay, track payments, and print reports.
+          Prepare monthly gross and net pay, monitor payment status, and print reports. Finance records payments in Accounts.
         </p>
       </header>
 
@@ -288,7 +287,7 @@ export default async function StaffPayrollPage({
                               <PayrollDetail label="Notes">{record.notes ?? "—"}</PayrollDetail>
                             </dl>
                           </AdminRecordDialog>
-                          {record.staffBranchId !== null && (
+                          {record.status === "recorded" && record.staffBranchId !== null && (
                             <AdminRecordDialog title={`Edit payroll for ${record.staffName} ${record.staffLastName}`} wide>
                               <PayrollForm
                                 branchId={record.staffBranchId}
@@ -315,8 +314,7 @@ export default async function StaffPayrollPage({
                             status={record.status}
                             notes={record.notes}
                           />
-                          <DeletePayrollForm publicId={record.publicId} />
-                          {record.status === "recorded" && <MarkPayrollPaidForm publicId={record.publicId} />}
+                          {record.status === "recorded" && <DeletePayrollForm publicId={record.publicId} />}
                         </div>
                       </td>
                     </tr>

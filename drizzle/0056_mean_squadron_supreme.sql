@@ -1,0 +1,3 @@
+ALTER TABLE `account_transactions` ADD `payrollRecordId` bigint unsigned;--> statement-breakpoint
+ALTER TABLE `account_transactions` ADD CONSTRAINT `account_transactions_school_payroll_uq` UNIQUE(`schoolId`,`payrollRecordId`);--> statement-breakpoint
+ALTER TABLE `account_transactions` ADD CONSTRAINT `account_transactions_payrollRecordId_staff_payroll_records_id_fk` FOREIGN KEY (`payrollRecordId`) REFERENCES `staff_payroll_records`(`id`) ON DELETE no action ON UPDATE no action;

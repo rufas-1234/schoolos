@@ -164,6 +164,16 @@ const navigation: NavigationItem[] = [
     label: "Accounts",
     icon: ChartNoAxesCombined,
     permission: "accounts.manage",
+    children: [
+      { id: "accounts-profit", label: "Profit & Loss", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" } },
+      { id: "accounts-income", label: "Income", href: "/admin/accounts?section=income", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "income" } },
+      { id: "accounts-expenses", label: "Expenses", href: "/admin/accounts?section=expenses", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "expenses" } },
+      { id: "accounts-chart", label: "Chart of accounts", href: "/admin/accounts?section=chart", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "chart" } },
+      { id: "accounts-bank", label: "Bank accounts", href: "/admin/accounts?section=bank", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "bank" } },
+      { id: "accounts-transfers", label: "Fund transfers", href: "/admin/accounts?section=transfers", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "transfers" } },
+      { id: "accounts-payroll", label: "Staff payroll", href: "/admin/accounts?section=payroll", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "payroll" } },
+      { id: "accounts-reports", label: "Reports", href: "/admin/accounts?section=reports", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "reports" } },
+    ],
   },
   {
     href: "/admin/fees/collection",
@@ -340,6 +350,9 @@ export function AdminShell({
   );
   const [inventoryOpen, setInventoryOpen] = useState(() =>
     pathname.startsWith("/admin/inventory") || permissions.includes("inventory.manage"),
+  );
+  const [accountsOpen, setAccountsOpen] = useState(() =>
+    pathname.startsWith("/admin/accounts") || permissions.includes("accounts.manage"),
   );
   const [feesOpen, setFeesOpen] = useState(() =>
     pathname.startsWith("/admin/fees") ||
@@ -669,6 +682,7 @@ export function AdminShell({
             const isUsers = href === "/admin/users";
             const isHumanResources = href === "/admin/hr";
             const isInventory = label === "Inventory";
+            const isAccounts = label === "Accounts";
             const isLibrary = label === "Library";
             const isDormitories = label === "Dormitories";
             const isFees = href === "/admin/fees/collection";
@@ -680,6 +694,8 @@ export function AdminShell({
                 ? usersOpen
               : isHumanResources
                 ? humanResourcesOpen
+                : isAccounts
+                  ? accountsOpen
                 : isInventory
                   ? inventoryOpen
                 : isLibrary
@@ -699,6 +715,8 @@ export function AdminShell({
                 ? setUsersOpen
               : isHumanResources
                 ? setHumanResourcesOpen
+                : isAccounts
+                  ? setAccountsOpen
                 : isInventory
                   ? setInventoryOpen
                 : isLibrary
@@ -719,6 +737,8 @@ export function AdminShell({
                 (sectionPath === pathname &&
                   (!section.matchQuery ||
                     searchParams.get(section.matchQuery.key) === section.matchQuery.value)) ||
+                (section.id === "accounts-profit" && pathname === "/admin/accounts" &&
+                  searchParams.get("section") === null) ||
                 (section.id === "stock-register" && pathname === "/admin/inventory" &&
                   searchParams.get("view") === null)
               );
