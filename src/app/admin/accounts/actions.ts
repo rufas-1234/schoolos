@@ -13,8 +13,6 @@ import {
   schoolCurrencies,
   schoolBankAccounts,
   schools,
-  staffMembers,
-  staffPayrollRecords,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
@@ -24,6 +22,10 @@ import {
 } from "@/lib/account-code-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { formatCostMinorUnits, parseCostMinorUnits } from "@/lib/inventory-policy";
+import {
+  getStaffPayrollPaymentError,
+  recordStaffPayrollPayment,
+} from "@/lib/staff-payroll-payment";
 
 export type AccountActionState = { error?: string; success?: boolean; message?: string };
 
@@ -452,94 +454,17 @@ export async function payStaffPayrollRecord(
   });
   if (!parsed.success) return { error: "Choose an expense category, matching bank or cash account, and valid payment date." };
 
-  const transactionPublicId = randomUUID();
   try {
-    const outcome = await db.transaction(async (tx) => {
-      const [record] = await tx.select({
-        id: staffPayrollRecords.id,
-        staffId: staffPayrollRecords.staffId,
-        publicId: staffPayrollRecords.publicId,
-        payPeriod: staffPayrollRecords.payPeriod,
-        amount: staffPayrollRecords.amount,
-        currency: staffPayrollRecords.currency,
-        status: staffPayrollRecords.status,
-      }).from(staffPayrollRecords).where(and(
-        eq(staffPayrollRecords.publicId, parsed.data.payrollPublicId),
-        eq(staffPayrollRecords.schoolId, context.schoolId),
-      )).for("update").limit(1);
-      if (!record) return "not-found";
-      if (record.status !== "recorded") return "already-paid";
-
-      const amount = parseCostMinorUnits(record.amount);
-      if (amount === null || amount === BigInt(0)) return "invalid-amount";
-
-      const [staff] = await tx.select({
-        firstName: staffMembers.firstName,
-        lastName: staffMembers.lastName,
-      }).from(staffMembers).where(and(
-        eq(staffMembers.id, record.staffId),
-        eq(staffMembers.schoolId, context.schoolId),
-      )).limit(1);
-      if (!staff) return "staff-not-found";
-
-      const [category] = await tx.select({ id: chartOfAccounts.id }).from(chartOfAccounts)
-        .where(and(
-          eq(chartOfAccounts.id, parsed.data.categoryAccountId),
-          eq(chartOfAccounts.schoolId, context.schoolId),
-          eq(chartOfAccounts.accountType, "expense"),
-          eq(chartOfAccounts.status, "active"),
-        )).limit(1);
-      const [bankAccount] = await tx.select({
-        id: schoolBankAccounts.id,
-        currency: schoolBankAccounts.currency,
-      }).from(schoolBankAccounts).where(and(
-        eq(schoolBankAccounts.id, parsed.data.bankAccountId),
-        eq(schoolBankAccounts.schoolId, context.schoolId),
-        eq(schoolBankAccounts.status, "active"),
-      )).limit(1);
-      if (!category || !bankAccount) return "invalid-account";
-      if (bankAccount.currency !== record.currency) return "currency-mismatch";
-
-      const staffName = `${staff.firstName} ${staff.lastName}`;
-      await tx.insert(accountTransactions).values({
-        publicId: transactionPublicId,
-        schoolId: context.schoolId,
-        transactionType: "expense",
-        categoryAccountId: category.id,
-        bankAccountId: bankAccount.id,
-        payrollRecordId: record.id,
-        currency: record.currency,
-        transactionDate: parsed.data.paidDate,
-        amount: formatCostMinorUnits(amount),
-        description: `Staff payroll · ${record.payPeriod}`,
-        payee: staffName,
-        reference: parsed.data.reference || null,
-        status: "approved",
-        submittedBy: context.user.id,
-        approvedBy: context.user.id,
-        approvedAt: new Date(),
-      });
-      await tx.update(staffPayrollRecords).set({
-        status: "paid",
-        paidDate: parsed.data.paidDate,
-      }).where(and(
-        eq(staffPayrollRecords.id, record.id),
-        eq(staffPayrollRecords.schoolId, context.schoolId),
-      ));
-      await writeAudit(tx, context.schoolId, context.user.id, "account_transaction.payroll_paid",
-        "account_transaction", transactionPublicId,
-        ["transactionType", "categoryAccountId", "bankAccountId", "payrollRecordId", "currency", "transactionDate", "amount", "payee", "reference", "status"]);
-      await writeAudit(tx, context.schoolId, context.user.id, "staff.payroll.paid",
-        "staff_payroll_record", record.publicId, ["status", "paidDate", "accountTransaction"]);
-      return "paid";
+    const outcome = await recordStaffPayrollPayment({
+      schoolPublicId: context.schoolPublicId,
+      actorUserId: context.user.id,
+      payrollPublicId: parsed.data.payrollPublicId,
+      categoryAccountId: parsed.data.categoryAccountId,
+      bankAccountId: parsed.data.bankAccountId,
+      paidDate: parsed.data.paidDate,
+      reference: parsed.data.reference,
     });
-
-    if (outcome === "not-found") return { error: "The payroll record was not found for this school." };
-    if (outcome === "already-paid") return { error: "This payroll record has already been paid." };
-    if (outcome === "invalid-amount") return { error: "The payroll amount is invalid and cannot be paid." };
-    if (outcome === "staff-not-found") return { error: "The payroll staff member could not be found in this school." };
-    if (outcome === "invalid-account") return { error: "Choose an active expense category and bank or cash account belonging to this school." };
-    if (outcome === "currency-mismatch") return { error: "The bank or cash account currency must match the payroll currency." };
+    if (outcome !== "paid") return { error: getStaffPayrollPaymentError(outcome) };
   } catch (error) {
     if (isDuplicateEntryError(error)) return { error: "A payment has already been recorded for this payroll record." };
     throw error;

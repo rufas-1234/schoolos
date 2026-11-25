@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { KeyRound, Menu, School, X } from "lucide-react";
+import { KeyRound, Menu, School, Wallet, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 import { PlatformSignOutButton } from "./schools/sign-out-button";
 
 const links = [
   { href: "/platform/schools", label: "School workspaces", icon: School },
+  { href: "/platform/payroll", label: "Staff payroll", icon: Wallet },
   { href: "/platform/accounts", label: "Account recovery", icon: KeyRound },
 ];
 
