@@ -303,18 +303,15 @@ export default async function InventoryReportsPage({ searchParams }: { searchPar
         <div>
           <p className="text-sm font-semibold text-violet-700">Operations · Inventory module</p>
           <h1 className="mt-1 text-3xl font-bold text-slate-950">Reports</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">Review stock value, movements, low stock, assets, maintenance, and account activity.</p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">Review current stock, stock movements, low stock, assets, and maintenance.</p>
         </div>
       </header>
 
       <InventoryModuleNav active="reports" permissions={context.grantedPermissions} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900">Inventory reports</h2>
-          <p className="text-sm text-slate-500">Choose a report or review accounts activity.</p>
-        </div>
-        <Link href="/admin/accounts?section=reports" className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-100 print:hidden">Open accounts reports</Link>
+      <div>
+        <h2 className="text-lg font-bold text-slate-900">Inventory reports</h2>
+        <p className="text-sm text-slate-500">Choose a stock or asset report.</p>
       </div>
       <nav aria-label="Inventory reports" className="flex flex-wrap gap-2 print:hidden">
         {reports.map((item) => (

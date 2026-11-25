@@ -1,4 +1,5 @@
 import { and, asc, desc, eq } from "drizzle-orm";
+import Link from "next/link";
 import { db } from "@/db";
 import {
   assetMaintenance,
@@ -46,7 +47,7 @@ type SearchParams = {
   status?: string | string[];
   movementType?: string | string[];
   itemPage?: string | string[];
-  lowStockPage?: string | string[];
+  lowStock?: string | string[];
   assetPage?: string | string[];
   movementPage?: string | string[];
   maintenancePage?: string | string[];
@@ -76,7 +77,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const movementType = requestedMovementType === "received" || requestedMovementType === "issued" ||
     requestedMovementType === "adjustment" ? requestedMovementType : "all";
   const requestedItemPage = requestedPage(first(query.itemPage));
-  const requestedLowStockPage = requestedPage(first(query.lowStockPage));
+  const lowStockOnly = first(query.lowStock) === "true";
   const requestedAssetPage = requestedPage(first(query.assetPage));
   const requestedMovementPage = requestedPage(first(query.movementPage));
   const requestedMaintenancePage = requestedPage(first(query.maintenancePage));
@@ -207,12 +208,18 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     total + Number(item.quantityOnHand) * Number(item.averageUnitCost), 0);
   const assetValue = assets.reduce((total, asset) => total + Number(asset.acquisitionCost), 0);
   const normalizedSearch = search.toLocaleLowerCase();
-  const filteredItems = items.filter((item) =>
+  const matchingItems = items.filter((item) =>
     (!normalizedSearch || `${item.name} ${item.sku} ${item.categoryName} ${item.supplierName ?? ""} ${item.locationName ?? ""}`
       .toLocaleLowerCase().includes(normalizedSearch)) &&
     (!selectedCategory || String(categories.find((category) => category.name === item.categoryName)?.id) === selectedCategory) &&
     (!selectedSupplier || String(suppliers.find((supplier) => supplier.name === item.supplierName)?.id) === selectedSupplier) &&
     (!selectedLocation || String(locations.find((location) => location.name === item.locationName)?.id) === selectedLocation)
+  );
+  const lowStock = items.filter((item) =>
+    item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
+  );
+  const filteredItems = matchingItems.filter((item) =>
+    !lowStockOnly || item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
   );
   const filteredAssets = assets.filter((asset) =>
     (!normalizedSearch || `${asset.name} ${asset.assetTag} ${asset.description ?? ""} ${asset.locationName ?? ""}`
@@ -247,18 +254,13 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     if (selectedCategory) params.set("categoryId", selectedCategory);
     if (selectedSupplier) params.set("supplierId", selectedSupplier);
     if (selectedLocation) params.set("locationId", selectedLocation);
+    if (lowStockOnly) params.set("lowStock", "true");
     if (assetStatus !== "all") params.set("status", assetStatus);
     if (movementType !== "all") params.set("movementType", movementType);
     params.set("pageSize", String(pageSize));
     params.set(parameter, String(page));
     return `/admin/inventory?${params.toString()}`;
   };
-  const lowStock = filteredItems.filter((item) =>
-    item.status === "active" && Number(item.quantityOnHand) <= Number(item.reorderLevel)
-  );
-  const lowStockPageCount = Math.max(1, Math.ceil(lowStock.length / pageSize));
-  const lowStockPage = Math.min(requestedLowStockPage, lowStockPageCount);
-  const visibleLowStock = lowStock.slice((lowStockPage - 1) * pageSize, lowStockPage * pageSize);
   const hasDemoRows = items.some((item) => item.name.startsWith("DEMO TEST ONLY - "))
     || assets.some((asset) => asset.name.startsWith("DEMO TEST ONLY - "));
   const currency = school?.currency ?? "USD";
@@ -266,19 +268,19 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   return (
     <main className="space-y-6">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <p className="text-sm font-semibold text-violet-700">Operations · Inventory module</p>
+        <p className="text-sm font-semibold text-violet-700">School operations · Inventory</p>
         <h1 className="mt-1 text-3xl font-bold text-slate-950">{{
           setup: "Inventory setup",
-          register: "Stock register",
-          movements: "Stock movement",
+          register: "Items",
+          movements: "Stock movements",
           assets: "School assets",
           maintenance: "Asset maintenance",
         }[section]}</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-600">
           {{
-            setup: "Create and maintain categories, suppliers, locations, and stock items.",
-            register: "Review current quantities, costs, and reorder levels for each stock item.",
-            movements: "Record stock receipts, issues, or adjustments and review movement history.",
+            setup: "Manage categories, suppliers, and storage locations used by your items.",
+            register: "View quantities, costs, and low-stock items. Receive or issue items from Stock movements.",
+            movements: "Record received stock, stock issued, or a correction. The movement history keeps quantities auditable.",
             assets: "Register school property, track locations and lifecycle status, and keep maintenance records together.",
             maintenance: "Record and search maintenance performed on registered school assets.",
           }[section]}
@@ -289,10 +291,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
 
       {section !== "assets" && section !== "maintenance" ? (
         <section aria-label="Inventory overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Active items" value={String(items.filter((item) => item.status === "active").length)} />
-          <Metric label="Low stock" value={String(lowStock.length)} tone={lowStock.length ? "amber" : "normal"} />
+          <Metric href="/admin/inventory?view=register" label="Active items" value={String(items.filter((item) => item.status === "active").length)} />
+          <Metric href="/admin/inventory?view=register&lowStock=true" label="Low stock" value={String(lowStock.length)} tone={lowStock.length ? "amber" : "normal"} />
           <Metric label="Stock on hand value" value={formatCurrency(stockValue, currency)} />
-          <Metric label="Categories" value={String(categories.length)} />
+          <Metric href="/admin/inventory?view=setup" label="Categories" value={String(categories.length)} />
         </section>
       ) : (
         <section aria-label="Asset overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -300,22 +302,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           <Metric label="Active assets" value={String(assets.filter((asset) => asset.status === "active").length)} />
           <Metric label="Acquisition value" value={formatCurrency(assetValue, currency)} />
           <Metric label="Maintenance records" value={String(maintenance.length)} />
-        </section>
-      )}
-
-      {section === "register" && lowStock.length > 0 && (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-          <h2 className="font-bold text-amber-950">Low-stock notification</h2>
-          <p className="mt-1 text-sm text-amber-900">Items at or below their configured reorder level need attention.</p>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {visibleLowStock.map((item) => (
-              <li key={item.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-amber-950">
-                <strong>{item.name}</strong> · {item.quantityOnHand} {item.unit} remaining (reorder at {item.reorderLevel})
-              </li>
-            ))}
-          </ul>
-          <TablePagination ariaLabel="Low-stock notifications" currentPage={lowStockPage} pageSize={pageSize} totalRows={lowStock.length}
-            hrefForPage={(page) => pageHref("lowStockPage", page)} />
         </section>
       )}
 
@@ -341,6 +327,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </label>
         {section === "register" ? (
           <>
+            <label className="text-sm font-medium text-slate-700">Stock level
+              <select name="lowStock" defaultValue={lowStockOnly ? "true" : ""} className="mt-1.5 block h-10 rounded-xl border border-slate-200 bg-slate-50 px-3">
+                <option value="">All stock items</option>
+                <option value="true">Low stock only</option>
+              </select>
+            </label>
             <SearchableSelect label="Category" name="categoryId" defaultValue={selectedCategory}
               options={[{ value: "", label: "All categories" }, ...categories.map((category) => ({ value: String(category.id), label: category.name }))]}
               placeholder="Search categories..." />
@@ -368,7 +360,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           placeholder="Search locations..." />}
         <div className="flex items-center gap-2">
           <button className="h-10 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800">Apply filters</button>
-          <a href={`/admin/inventory?view=${section}`} className="h-10 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</a>
+          <Link href={`/admin/inventory?view=${section}`} className="h-10 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Reset</Link>
         </div>
       </SmartFilterForm>
 
@@ -382,7 +374,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       {section === "register" && <>
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 p-5">
-          <h2 className="text-lg font-bold text-slate-900">Stock register</h2>
+          <h2 className="text-lg font-bold text-slate-900">Items</h2>
           <p className="mt-1 text-sm text-slate-500">Current quantities and average acquisition cost by item.</p>
         </div>
         <div className="overflow-x-auto">
@@ -402,18 +394,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3">{item.supplierName ?? "—"}<span className="block text-xs text-slate-500">{item.locationName ?? "No location"}</span></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      <InventoryRecordView title={`Inventory item: ${item.name}`} fields={[
-                        { label: "Item", value: item.name },
-                        { label: "SKU", value: item.sku },
-                        { label: "Description", value: item.description },
-                        { label: "Category", value: item.categoryName },
-                        { label: "Quantity on hand", value: `${item.quantityOnHand} ${item.unit}` },
-                        { label: "Reorder level", value: `${item.reorderLevel} ${item.unit}` },
-                        { label: "Average unit cost", value: formatCurrency(item.averageUnitCost, currency) },
-                        { label: "Supplier", value: item.supplierName },
-                        { label: "Location", value: item.locationName },
-                        { label: "Status", value: item.status },
-                      ]} />
                       <InventoryItemEditor item={item} categories={categoryOptions} suppliers={supplierOptions} locations={locationOptions} />
                       <InventoryDeleteForm recordId={item.id} recordType="item" label={`Delete ${item.name}`} />
                     </div>
@@ -527,13 +507,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <td className="px-4 py-3">{record.performedBy ?? "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      <InventoryRecordView title={`Maintenance: ${record.assetTag} · ${record.assetName}`} fields={[
-                        { label: "Date", value: record.maintenanceDate },
-                        { label: "Asset", value: `${record.assetTag} · ${record.assetName}` },
-                        { label: "Work performed", value: record.description },
-                        { label: "Cost", value: formatCurrency(record.cost, currency) },
-                        { label: "Provider", value: record.performedBy },
-                      ]} />
                       <AssetMaintenanceEditor record={{ ...record, assetLabel: `${record.assetTag} · ${record.assetName}` }} assets={allAssetOptions} />
                       <InventoryDeleteForm recordId={record.id} recordType="maintenance" label={`Delete maintenance record for ${record.assetTag}`} />
                     </div>
@@ -553,12 +526,28 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   );
 }
 
-function Metric({ label, value, tone = "normal" }: { label: string; value: string; tone?: "normal" | "amber" }) {
-  return (
-    <div className={`rounded-2xl border p-4 ${tone === "amber" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}>
+function Metric({
+  label,
+  value,
+  tone = "normal",
+  href,
+}: {
+  label: string;
+  value: string;
+  tone?: "normal" | "amber";
+  href?: string;
+}) {
+  const content = (
+    <>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-bold tabular-nums text-slate-950">{value}</p>
-    </div>
+    </>
+  );
+  const className = `block rounded-2xl border p-4 ${tone === "amber" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"} ${href ? "transition hover:border-violet-300 hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500" : ""}`;
+  return href ? (
+    <Link href={href} className={className}>{content}</Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 

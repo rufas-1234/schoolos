@@ -157,7 +157,13 @@ const navigation: NavigationItem[] = [
     label: "Finance overview",
     icon: ChartNoAxesCombined,
     permission: "fees.manage",
-    permissionAlternatives: ["payments.record", "accounts.manage", "inventory.manage"],
+    permissionAlternatives: ["payments.record", "accounts.manage"],
+  },
+  {
+    href: "/admin/accounts?section=profit",
+    label: "Accounts",
+    icon: ChartNoAxesCombined,
+    permission: "accounts.manage",
   },
   {
     href: "/admin/fees/collection",
@@ -226,20 +232,11 @@ const navigation: NavigationItem[] = [
     label: "Inventory",
     icon: PackageOpen,
     permission: "inventory.manage",
-    permissionAlternatives: ["accounts.manage"],
     children: [
-      { id: "inventory-setup", label: "Inventory setup", href: "/admin/inventory?view=setup", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "setup" }, permission: "inventory.manage" },
-      { id: "stock-register", label: "Stock register", href: "/admin/inventory?view=register", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "register" }, permission: "inventory.manage" },
-      { id: "stock-movements", label: "Stock movement & history", href: "/admin/inventory?view=movements", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "movements" }, permission: "inventory.manage" },
-      { id: "accounts-chart", label: "Chart of accounts", href: "/admin/accounts?section=chart", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "chart" }, permission: "accounts.manage" },
-      { id: "accounts-profit", label: "Profit & loss", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" }, permission: "accounts.manage" },
-      { id: "accounts-bank", label: "Bank accounts", href: "/admin/accounts?section=bank", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "bank" }, permission: "accounts.manage" },
-      { id: "accounts-transfers", label: "Fund transfers", href: "/admin/accounts?section=transfers", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "transfers" }, permission: "accounts.manage" },
-      { id: "assets", label: "Assets", href: "/admin/inventory?view=assets", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "assets" }, permission: "inventory.manage" },
-      { id: "asset-maintenance", label: "Asset maintenance", href: "/admin/inventory?view=maintenance", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "maintenance" }, permission: "inventory.manage" },
-      { id: "accounts-income", label: "Income", href: "/admin/accounts?section=income", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "income" }, permission: "accounts.manage" },
-      { id: "expenses", label: "Expenses", href: "/admin/accounts?section=expenses", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "expenses" }, permission: "accounts.manage" },
-      { id: "inventory-reports", label: "Reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports", permission: "inventory.manage", permissionAlternatives: ["accounts.manage"] },
+      { id: "stock-register", label: "Items", href: "/admin/inventory?view=register", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "register" } },
+      { id: "stock-movements", label: "Stock movements", href: "/admin/inventory?view=movements", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "movements" } },
+      { id: "inventory-setup", label: "Setup", href: "/admin/inventory?view=setup", matchPath: "/admin/inventory", matchQuery: { key: "view", value: "setup" } },
+      { id: "inventory-reports", label: "Reports", href: "/admin/inventory/reports", matchPath: "/admin/inventory/reports" },
     ],
   },
   {
@@ -278,7 +275,7 @@ const navigationGroups = [
   { label: "Home", labels: ["Overview"] },
   { label: "Teaching & learning", labels: ["Academics", "Student Info", "Examinations"] },
   { label: "People", labels: ["Human resources", "Users"] },
-  { label: "School operations", labels: ["Finance overview", "Fees", "Inventory", "Library", "Dormitories"] },
+  { label: "School operations", labels: ["Finance overview", "Accounts", "Fees", "Inventory", "Library", "Dormitories"] },
   { label: "Configuration", labels: ["System", "School profile"] },
 ];
 
@@ -342,8 +339,7 @@ export function AdminShell({
     pathname.startsWith("/admin/hr") || pathname === "/admin/settings/roles",
   );
   const [inventoryOpen, setInventoryOpen] = useState(() =>
-    pathname.startsWith("/admin/inventory") || pathname.startsWith("/admin/accounts") ||
-    permissions.some((permission) => ["inventory.manage", "accounts.manage"].includes(permission)),
+    pathname.startsWith("/admin/inventory") || permissions.includes("inventory.manage"),
   );
   const [feesOpen, setFeesOpen] = useState(() =>
     pathname.startsWith("/admin/fees") ||
@@ -378,18 +374,13 @@ export function AdminShell({
     .filter((item) =>
       permissions.includes(item.permission) ||
       (item.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false)
-    )
-    .map((item) => item.label === "Inventory" && !permissions.includes("inventory.manage")
-      ? { ...item, href: "/admin/accounts?section=profit" }
-      : item);
+    );
   const rightSidebarItems = visibleNavigation.map((item) => ({
       ...item,
       children: item.children?.filter((child) =>
         (!child.permission || permissions.includes(child.permission)) ||
         (child.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false),
-      ).map((child) => child.id === "inventory-reports" && !permissions.includes("inventory.manage")
-        ? { ...child, href: "/admin/accounts?section=reports" }
-        : child),
+      ),
     }));
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
   const homeHref = permissions.includes("dashboard.view")
@@ -404,14 +395,14 @@ export function AdminShell({
         ? "/admin/examinations"
       : permissions.includes("staff.manage")
         ? "/admin/hr"
-      : permissions.includes("accounts.manage") || permissions.includes("fees.manage") || permissions.includes("payments.record") || permissions.includes("inventory.manage")
+      : permissions.includes("inventory.manage")
+        ? "/admin/inventory"
+      : permissions.includes("accounts.manage") || permissions.includes("fees.manage") || permissions.includes("payments.record")
         ? "/portal/finance"
       : permissions.includes("dormitories.manage")
         ? "/portal/dormitories"
       : permissions.includes("library.manage")
         ? "/portal/library"
-      : permissions.includes("inventory.manage")
-        ? "/admin/inventory"
       : permissions.includes("students.view")
         ? "/admin/students"
         : "/unauthorized";
@@ -454,8 +445,6 @@ export function AdminShell({
       const sectionPath = section.matchPath ?? section.href?.split("?")[0];
       const queryMatches = !section.matchQuery ||
         searchParams.get(section.matchQuery.key) === section.matchQuery.value ||
-        (section.id === "accounts-profit" && searchParams.get("section") === null) ||
-        (section.id === "assets" && searchParams.get("section") === "assets") ||
         (section.id === "stock-register" && searchParams.get("view") === null);
       return sectionPath === pathname && queryMatches;
     });
@@ -492,10 +481,10 @@ export function AdminShell({
         ? activeHrSection?.label ?? "Human resources"
         : pathname.startsWith("/admin/users") || pathname === "/admin/settings/roles"
           ? activeUserSection?.label ?? "Users"
-        : pathname.startsWith("/admin/accounts") || pathname.startsWith("/admin/inventory")
-          ? pathname.startsWith("/admin/accounts") && searchParams.get("section") === "reports"
-            ? "Reports"
-            : activeInventorySection?.label ?? "Inventory"
+        : pathname.startsWith("/admin/accounts")
+          ? "Accounts"
+        : pathname.startsWith("/admin/inventory")
+          ? activeInventorySection?.label ?? "Inventory"
         : pathname.startsWith("/admin/fees")
           ? activeFeesSection?.label ?? "Fees"
         : pathname.startsWith("/admin/library")
@@ -664,10 +653,8 @@ export function AdminShell({
             (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
             (href === "/admin/users" && pathname.startsWith("/admin/users")) ||
             (href === "/admin/examinations" && pathname === "/admin/exam-analytics") ||
-            (label === "Inventory" && (
-              pathname.startsWith("/admin/inventory") ||
-              pathname.startsWith("/admin/accounts")
-            )) ||
+            (label === "Inventory" && pathname.startsWith("/admin/inventory")) ||
+            (label === "Accounts" && pathname.startsWith("/admin/accounts")) ||
             (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees")) ||
             (href === "/admin/hr" && pathname === "/admin/settings/roles") ||
             (label === "System" && pathname.startsWith("/admin/system"));
@@ -677,16 +664,7 @@ export function AdminShell({
                 (!section.permission || permissions.includes(section.permission)) ||
                 (section.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false),
             );
-            const resolvedSections = visibleSections.map((section) =>
-              section.id === "inventory-reports" && !permissions.includes("inventory.manage")
-                ? {
-                    ...section,
-                    href: "/admin/accounts?section=reports",
-                    matchPath: "/admin/accounts",
-                    matchQuery: { key: "section", value: "reports" },
-                  }
-                : section,
-            );
+            const resolvedSections = visibleSections;
             const isStudentInfo = href === "/admin/students";
             const isUsers = href === "/admin/users";
             const isHumanResources = href === "/admin/hr";
@@ -741,14 +719,8 @@ export function AdminShell({
                 (sectionPath === pathname &&
                   (!section.matchQuery ||
                     searchParams.get(section.matchQuery.key) === section.matchQuery.value)) ||
-                (section.id === "inventory-reports" && pathname === "/admin/accounts" &&
-                  searchParams.get("section") === "reports") ||
-                (section.id === "assets" && pathname === "/admin/inventory" &&
-                  searchParams.get("section") === "assets") ||
                 (section.id === "stock-register" && pathname === "/admin/inventory" &&
-                  searchParams.get("view") === null) ||
-                (section.id === "accounts-profit" && pathname === "/admin/accounts" &&
-                  (searchParams.get("section") === null || searchParams.get("section") === "profit"))
+                  searchParams.get("view") === null)
               );
             });
             return (

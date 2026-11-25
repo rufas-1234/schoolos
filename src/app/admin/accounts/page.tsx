@@ -17,7 +17,6 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { parseCostMinorUnits } from "@/lib/inventory-policy";
 import { DownloadCsv } from "@/components/download-csv";
 import { PrintReportButton } from "@/app/admin/hr/reports/print-report-button";
-import { InventoryModuleNav } from "@/app/admin/inventory/module-nav";
 import { AccountForms, ProfitLossFilters, ReviewTransactionForm, type AccountOption } from "./account-forms";
 import { TablePagination } from "@/components/table-pagination";
 import { SmartFilterForm } from "@/components/smart-filter-form";
@@ -441,7 +440,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   return (
     <main className="space-y-6">
       <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <p className="text-sm font-semibold text-violet-700">Operations · Inventory module</p>
+        <p className="text-sm font-semibold text-violet-700">Finance · Accounts</p>
         <h1 className="mt-1 text-3xl font-bold text-slate-950">{section === "expenses" ? "Expenses" : section === "reports" ? "Accounts reports" : "Accounts"}</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-600">
           {section === "expenses"
@@ -452,12 +451,6 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         </p>
       </header>
 
-      <InventoryModuleNav
-        active={section}
-        permissions={context.grantedPermissions}
-        reportsHref="/admin/accounts?section=reports"
-      />
-
       {section !== "reports" && <nav aria-label="Accounts sections" className="flex flex-wrap gap-2">
         {sections.filter((item) => item.id !== "reports").map((item) => (
           <a key={item.id} href={`/admin/accounts?section=${item.id}${item.id === "profit" ? `&from=${from}&to=${to}` : ""}`}
@@ -467,6 +460,11 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           </a>
         ))}
       </nav>}
+      {section === "reports" && (
+        <a href="/admin/accounts?section=profit" className="inline-flex rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50">
+          ← Accounts
+        </a>
+      )}
 
       <section>
         <h2 className="mb-3 text-xl font-bold text-slate-900">{activeSection.label}</h2>
