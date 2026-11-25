@@ -215,7 +215,7 @@ export default function GuidePage() {
             <GuideSection id="accounts" title="9. Accounts and finance">
               <p>Expand <strong>Accounts</strong> in the main sidebar to open the chart of accounts, bank/cash accounts, income, expenses, fund transfers, staff payroll, Profit &amp; Loss, and reports. Each section can print its current report or register.</p>
               <ol className="space-y-3">
-                <Step n={1}>Review the default chart of accounts and add or update accounts to match the school’s bookkeeping categories.</Step>
+                <Step n={1}>Review the default chart of accounts and add or update accounts to match the school’s bookkeeping categories. Categories created while recording transactions and linked bank/cash asset accounts receive short numeric codes automatically.</Step>
                 <Step n={2}>Configure bank or cash accounts, currency, opening balance, and the linked chart account.</Step>
                 <Step n={3}>Prepare payroll records in Human resources. After sending a staff payment through the school’s bank/cash process, a user with the required accounts and payroll permissions can open <strong>Staff payroll</strong>, select the matching account and expense category, and confirm it. This creates an approved expense and marks the HR record paid; use <strong>Print receipt</strong> on the paid row to print its receipt.</Step>
                 <Step n={4}>Record other income or an expense with the correct date, currency, chart category, amount, description, reference, and bank/cash account. After income is approved, print its receipt from the Income register. Attach supporting details according to school policy.</Step>

@@ -12,11 +12,16 @@ import {
   fundTransfers,
   schoolCurrencies,
   schoolBankAccounts,
+  schools,
   staffMembers,
   staffPayrollRecords,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
+import {
+  nextGeneratedChartAccountCode,
+  type GeneratedChartAccountType,
+} from "@/lib/account-code-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { formatCostMinorUnits, parseCostMinorUnits } from "@/lib/inventory-policy";
 
@@ -49,6 +54,35 @@ function revalidateAccounts() {
   revalidatePath("/admin/hr/payroll");
 }
 
+class GeneratedChartAccountCodeExhaustedError extends Error {
+  constructor(accountType: GeneratedChartAccountType) {
+    super(`No short numeric account codes remain for ${accountType} accounts.`);
+    this.name = "GeneratedChartAccountCodeExhaustedError";
+  }
+}
+
+async function lockSchoolChartAccountCodes(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  schoolId: number,
+) {
+  const [school] = await tx.select({ id: schools.id }).from(schools)
+    .where(eq(schools.id, schoolId)).for("update").limit(1);
+  if (!school) throw new Error("The school account code sequence could not be locked.");
+}
+
+async function createGeneratedChartAccountCode(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  schoolId: number,
+  accountType: GeneratedChartAccountType,
+): Promise<string> {
+  await lockSchoolChartAccountCodes(tx, schoolId);
+  const accounts = await tx.select({ code: chartOfAccounts.code }).from(chartOfAccounts)
+    .where(eq(chartOfAccounts.schoolId, schoolId));
+  const code = nextGeneratedChartAccountCode(accountType, accounts.map((account) => account.code));
+  if (!code) throw new GeneratedChartAccountCodeExhaustedError(accountType);
+  return code;
+}
+
 export async function createChartAccount(_state: AccountActionState, formData: FormData): Promise<AccountActionState> {
   const context = await requireSchoolPermission("accounts.manage");
   const parsed = z.object({
@@ -66,6 +100,7 @@ export async function createChartAccount(_state: AccountActionState, formData: F
   const publicId = randomUUID();
   try {
     await db.transaction(async (tx) => {
+      await lockSchoolChartAccountCodes(tx, context.schoolId);
       await tx.insert(chartOfAccounts).values({ publicId, schoolId: context.schoolId, ...parsed.data });
       await tx.insert(auditLogs).values({
         schoolId: context.schoolId,
@@ -158,7 +193,6 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
     }
   const publicId = randomUUID();
     const createdAssetAccountPublicId = parsed.data.newAssetAccountName && !matchingNewAssetAccount ? randomUUID() : null;
-    const generatedAssetAccountCode = `AUTO-ASSET-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
   try {
     await db.transaction(async (tx) => {
         let chartAccountId = chartAccount?.id ?? matchingNewAssetAccount?.id;
@@ -166,6 +200,7 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
           if (!parsed.data.newAssetAccountName || !createdAssetAccountPublicId) {
             throw new Error("A linked asset account was not selected or created.");
           }
+          const generatedAssetAccountCode = await createGeneratedChartAccountCode(tx, context.schoolId, "asset");
           await tx.insert(chartOfAccounts).values({
             publicId: createdAssetAccountPublicId,
             schoolId: context.schoolId,
@@ -211,6 +246,9 @@ export async function createSchoolBankAccount(_state: AccountActionState, formDa
       });
     });
   } catch (error) {
+    if (error instanceof GeneratedChartAccountCodeExhaustedError) {
+      return { error: "No short numeric codes remain for new asset accounts. Add an asset account manually and try again." };
+    }
     if (isDuplicateEntryError(error)) return { error: "A bank or cash account with that display name already exists." };
     throw error;
   }
@@ -321,62 +359,69 @@ export async function createAccountTransaction(
   }
   const publicId = randomUUID();
   const createdCategoryPublicId = parsed.data.newCategoryName && !matchingNewCategory ? randomUUID() : null;
-  const createdCategoryCode = `AUTO-${expectedType === "income" ? "INCOME" : "EXPENSE"}-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
-  await db.transaction(async (tx) => {
-    let categoryAccountId = category?.id ?? matchingNewCategory?.id;
-    if (categoryAccountId === undefined) {
-      if (!parsed.data.newCategoryName || !createdCategoryPublicId) {
-        throw new Error("A transaction category was not selected or created.");
+  try {
+    await db.transaction(async (tx) => {
+      let categoryAccountId = category?.id ?? matchingNewCategory?.id;
+      if (categoryAccountId === undefined) {
+        if (!parsed.data.newCategoryName || !createdCategoryPublicId) {
+          throw new Error("A transaction category was not selected or created.");
+        }
+        const createdCategoryCode = await createGeneratedChartAccountCode(tx, context.schoolId, expectedType);
+        await tx.insert(chartOfAccounts).values({
+          publicId: createdCategoryPublicId,
+          schoolId: context.schoolId,
+          code: createdCategoryCode,
+          name: parsed.data.newCategoryName,
+          accountType: expectedType,
+          description: `Created while recording ${expectedType}.`,
+        });
+        const [createdCategory] = await tx.select({ id: chartOfAccounts.id }).from(chartOfAccounts)
+          .where(and(
+            eq(chartOfAccounts.publicId, createdCategoryPublicId),
+            eq(chartOfAccounts.schoolId, context.schoolId),
+          )).limit(1);
+        if (!createdCategory) throw new Error("The new transaction category could not be loaded.");
+        categoryAccountId = createdCategory.id;
+        await writeAudit(
+          tx,
+          context.schoolId,
+          context.user.id,
+          "chart_account.created",
+          "chart_of_account",
+          createdCategoryPublicId,
+          ["code", "name", "accountType", "description"],
+        );
       }
-      await tx.insert(chartOfAccounts).values({
-        publicId: createdCategoryPublicId,
+      await tx.insert(accountTransactions).values({
+        publicId,
         schoolId: context.schoolId,
-        code: createdCategoryCode,
-        name: parsed.data.newCategoryName,
-        accountType: expectedType,
-        description: `Created while recording ${expectedType}.`,
+        transactionType: expectedType,
+        categoryAccountId,
+        bankAccountId: bankAccount?.id ?? null,
+        currency: parsed.data.currency,
+        transactionDate: parsed.data.transactionDate,
+        amount: formatCostMinorUnits(amount),
+        description: parsed.data.description,
+        payee: parsed.data.payee || null,
+        reference: parsed.data.reference || null,
+        status: "pending",
+        submittedBy: context.user.id,
       });
-      const [createdCategory] = await tx.select({ id: chartOfAccounts.id }).from(chartOfAccounts)
-        .where(and(
-          eq(chartOfAccounts.publicId, createdCategoryPublicId),
-          eq(chartOfAccounts.schoolId, context.schoolId),
-        )).limit(1);
-      if (!createdCategory) throw new Error("The new transaction category could not be loaded.");
-      categoryAccountId = createdCategory.id;
-      await writeAudit(
-        tx,
-        context.schoolId,
-        context.user.id,
-        "chart_account.created",
-        "chart_of_account",
-        createdCategoryPublicId,
-        ["code", "name", "accountType", "description"],
-      );
+      await tx.insert(auditLogs).values({
+        schoolId: context.schoolId,
+        actorUserId: context.user.id,
+        action: `account_transaction.${expectedType}_submitted`,
+        resourceType: "account_transaction",
+        resourcePublicId: publicId,
+        changedFields: ["transactionType", "categoryAccountId", "bankAccountId", "currency", "transactionDate", "amount", "description", "payee", "reference", "status"],
+      });
+    });
+  } catch (error) {
+    if (error instanceof GeneratedChartAccountCodeExhaustedError) {
+      return { error: `No short numeric codes remain for new ${expectedType} categories. Add a category manually and try again.` };
     }
-    await tx.insert(accountTransactions).values({
-      publicId,
-      schoolId: context.schoolId,
-      transactionType: expectedType,
-      categoryAccountId,
-      bankAccountId: bankAccount?.id ?? null,
-      currency: parsed.data.currency,
-      transactionDate: parsed.data.transactionDate,
-      amount: formatCostMinorUnits(amount),
-      description: parsed.data.description,
-      payee: parsed.data.payee || null,
-      reference: parsed.data.reference || null,
-      status: "pending",
-      submittedBy: context.user.id,
-    });
-    await tx.insert(auditLogs).values({
-      schoolId: context.schoolId,
-      actorUserId: context.user.id,
-      action: `account_transaction.${expectedType}_submitted`,
-      resourceType: "account_transaction",
-      resourcePublicId: publicId,
-      changedFields: ["transactionType", "categoryAccountId", "bankAccountId", "currency", "transactionDate", "amount", "description", "payee", "reference", "status"],
-    });
-  });
+    throw error;
+  }
   revalidateAccounts();
   return {
     success: true,
