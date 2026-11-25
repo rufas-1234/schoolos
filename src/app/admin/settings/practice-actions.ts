@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -11,11 +11,14 @@ import {
   schoolCurrencies,
   schoolMemberships,
   schools,
+  uploadedFiles,
   userRoles,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isMultiSchoolEnabled, activeSchoolCookieName } from "@/lib/school-context-policy";
 import { isSchoolAvailable, schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
+import { deletePracticeWorkspaceRows } from "@/lib/practice-workspace-deletion";
+import { getObjectStorage, isObjectStorageConfigured } from "@/lib/storage";
 import {
   provisionSchoolWorkspace,
   SchoolNameConflictError,
@@ -178,21 +181,110 @@ async function createPracticeWorkspace(
   });
 }
 
-async function writePracticeAudit(
+type PracticeWorkspaceRecord = {
+  id: number;
+  publicId: string;
+  archivedAt: Date | null;
+};
+
+async function getPracticeWorkspaces(tx: PracticeTransaction, parentSchoolId: number) {
+  return tx.select({
+    id: schools.id,
+    publicId: schools.publicId,
+    archivedAt: schools.archivedAt,
+  }).from(schools).where(and(
+    eq(schools.practiceParentSchoolId, parentSchoolId),
+    eq(schools.isPracticeWorkspace, true),
+  )).for("update");
+}
+
+async function archivePracticeWorkspaces(
   tx: PracticeTransaction,
-  schoolId: number,
-  schoolPublicId: string,
+  workspaces: PracticeWorkspaceRecord[],
   actorUserId: string,
-  action: string,
-  changedFields: string[],
 ) {
-  await tx.insert(auditLogs).values({
-    schoolId,
-    actorUserId,
-    action,
-    resourceType: "school",
-    resourcePublicId: schoolPublicId,
-    changedFields,
+  const activeIds = workspaces.filter((workspace) => workspace.archivedAt === null)
+    .map((workspace) => workspace.id);
+  if (activeIds.length) {
+    await tx.update(schools).set({
+      archivedAt: new Date(),
+      archivedBy: actorUserId,
+    }).where(inArray(schools.id, activeIds));
+  }
+}
+
+async function deletePracticeWorkspaceFiles(workspaces: PracticeWorkspaceRecord[]) {
+  for (const workspace of workspaces) {
+    const [storedFile] = await db.select({ id: uploadedFiles.id }).from(uploadedFiles)
+      .where(eq(uploadedFiles.schoolId, workspace.id)).limit(1);
+    let storageConfigured: boolean;
+    try {
+      storageConfigured = isObjectStorageConfigured();
+    } catch (error) {
+      console.error("Practice workspace storage configuration could not be read.", error);
+      throw new PracticeWorkspaceError(
+        "Practice records were not deleted because object storage is misconfigured. Correct the storage settings and retry.",
+      );
+    }
+    if (!storageConfigured) {
+      if (storedFile) {
+        throw new PracticeWorkspaceError(
+          "Practice records were not deleted because object storage is not configured. Configure storage and retry.",
+        );
+      }
+      continue;
+    }
+
+    try {
+      await getObjectStorage().deleteObjectsByPrefix(`${workspace.publicId}/`);
+    } catch (error) {
+      console.error("Practice workspace file cleanup failed.", error);
+      throw new PracticeWorkspaceError(
+        "Practice records were not deleted because some stored files could not be removed. Retry the action.",
+      );
+    }
+  }
+}
+
+async function permanentlyDeletePracticeWorkspaces(
+  parentSchoolId: number,
+  actorUserId: string,
+  workspaces: PracticeWorkspaceRecord[],
+  action: string,
+  allowOtherActiveWorkspaces = false,
+) {
+  if (!workspaces.length) return;
+  await deletePracticeWorkspaceFiles(workspaces);
+
+  await db.transaction(async (tx) => {
+    const parent = await lockParentSchool(tx, parentSchoolId);
+    const remaining = await getPracticeWorkspaces(tx, parent.id);
+    const requestedIds = new Set(workspaces.map((workspace) => workspace.id));
+    const unexpected = remaining.filter((workspace) => !requestedIds.has(workspace.id));
+    if (unexpected.some((workspace) => !allowOtherActiveWorkspaces || workspace.archivedAt !== null)) {
+      throw new PracticeWorkspaceError(
+        "Practice workspaces changed while deletion was in progress. No remaining workspace was deleted; retry the action.",
+      );
+    }
+
+    const deletedIds = await deletePracticeWorkspaceRows(
+      tx,
+      parent.id,
+      workspaces.map((workspace) => workspace.id),
+    );
+    const deletedPublicIds = workspaces
+      .filter((workspace) => deletedIds.includes(workspace.id))
+      .map((workspace) => workspace.publicId);
+    if (deletedPublicIds.length) {
+      await tx.insert(auditLogs).values(deletedPublicIds.map((publicId) => ({
+        schoolId: parent.id,
+        actorUserId,
+        action,
+        resourceType: "school",
+        resourcePublicId: publicId,
+        changedFields: ["permanentlyDeleted"],
+      })));
+    }
   });
 }
 
@@ -228,6 +320,21 @@ export async function startPracticeWorkspace(
     if (context.schoolIsPractice) {
       throw new PracticeWorkspaceError("Start practice mode from your live school workspace.");
     }
+
+    const staleWorkspaces = await db.transaction(async (tx) => {
+      const parent = await lockParentSchool(tx, context.schoolId);
+      const workspaces = await getPracticeWorkspaces(tx, parent.id);
+      const stale = workspaces.filter((workspace) => workspace.archivedAt !== null);
+      await archivePracticeWorkspaces(tx, stale, context.user.id);
+      return stale;
+    });
+    await permanentlyDeletePracticeWorkspaces(
+      context.schoolId,
+      context.user.id,
+      staleWorkspaces,
+      "practice_workspace.stale_data_deleted",
+      true,
+    );
 
     const practicePublicId = await db.transaction(async (tx) => {
       const parent = await lockParentSchool(tx, context.schoolId);
@@ -270,7 +377,7 @@ export async function resetPracticeWorkspace(
       throw new PracticeWorkspaceError("This practice workspace is not linked to a live school.");
     }
 
-    const practicePublicId = await db.transaction(async (tx) => {
+    const practiceWorkspaces = await db.transaction(async (tx) => {
       const parent = await lockParentSchool(tx, parentSchoolId);
       const currentPractice = await findActivePracticeWorkspace(tx, parent.id);
       if (!currentPractice) throw new PracticeWorkspaceError("There is no active practice workspace to reset.");
@@ -278,12 +385,24 @@ export async function resetPracticeWorkspace(
         throw new PracticeWorkspaceError("This practice workspace is no longer active. Switch to the current practice workspace.");
       }
 
-      await tx.update(schools).set({
-        archivedAt: new Date(),
-        archivedBy: context.user.id,
-      }).where(eq(schools.id, currentPractice.id));
-      await writePracticeAudit(tx, currentPractice.id, currentPractice.publicId, context.user.id,
-        "practice_workspace.reset", ["archivedAt", "archivedBy"]);
+      const workspaces = await getPracticeWorkspaces(tx, parent.id);
+      await archivePracticeWorkspaces(tx, workspaces, context.user.id);
+      return workspaces;
+    });
+    await permanentlyDeletePracticeWorkspaces(
+      parentSchoolId,
+      context.user.id,
+      practiceWorkspaces,
+      "practice_workspace.reset",
+    );
+
+    const practicePublicId = await db.transaction(async (tx) => {
+      const parent = await lockParentSchool(tx, parentSchoolId);
+      const currentPractice = await findActivePracticeWorkspace(tx, parent.id);
+      if (currentPractice) {
+        await ensurePracticeAdministrator(tx, currentPractice.id, context.user.id);
+        return currentPractice.publicId;
+      }
 
       const created = await createPracticeWorkspace(tx, parent, context.user.id);
       const [newPractice] = await tx.select({
@@ -318,7 +437,7 @@ export async function finishPracticeWorkspace(
       throw new PracticeWorkspaceError("This practice workspace is not linked to a live school.");
     }
 
-    const parentPublicId = await db.transaction(async (tx) => {
+    const practiceWorkspaces = await db.transaction(async (tx) => {
       const parent = await lockParentSchool(tx, parentSchoolId);
       const practice = await findActivePracticeWorkspace(tx, parent.id);
       if (!practice) throw new PracticeWorkspaceError("There is no active practice workspace to finish.");
@@ -326,12 +445,19 @@ export async function finishPracticeWorkspace(
         throw new PracticeWorkspaceError("This practice workspace is no longer active.");
       }
 
-      await tx.update(schools).set({
-        archivedAt: new Date(),
-        archivedBy: context.user.id,
-      }).where(eq(schools.id, practice.id));
-      await writePracticeAudit(tx, practice.id, practice.publicId, context.user.id,
-        "practice_workspace.finished", ["archivedAt", "archivedBy"]);
+      const workspaces = await getPracticeWorkspaces(tx, parent.id);
+      await archivePracticeWorkspaces(tx, workspaces, context.user.id);
+      return workspaces;
+    });
+    await permanentlyDeletePracticeWorkspaces(
+      parentSchoolId,
+      context.user.id,
+      practiceWorkspaces,
+      "practice_workspace.finished",
+    );
+
+    const parentPublicId = await db.transaction(async (tx) => {
+      const parent = await lockParentSchool(tx, parentSchoolId);
       return parent.publicId;
     });
 

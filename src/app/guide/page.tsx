@@ -102,7 +102,7 @@ export default function GuidePage() {
               </ol>
               <h3 className="font-semibold text-slate-900">Practice in an isolated workspace</h3>
               <p>School administrators can open <strong>School profile → Practice mode → Start practice mode</strong> to create a separate workspace for training. It has its own records and basic setup, carries over the school’s currency settings, and does not copy student, staff, or finance records. The account menu identifies it as a practice workspace, and a banner remains visible while you are using it.</p>
-              <p>Use <strong>Reset practice</strong> to archive the current sandbox and create a clean one, or <strong>Finish practice</strong> to archive it and return to the live school. Archived practice records are retained; they are not permanently deleted. Always confirm the workspace name before entering or using records.</p>
+              <p>Use <strong>Reset practice</strong> to permanently delete the current sandbox and its stored files, then create a clean one, or <strong>Finish practice</strong> to permanently delete it and return to the live school. Deletion cannot be undone. Your live school records are not affected. Always confirm the workspace name before entering or using records.</p>
             </GuideSection>
 
             <GuideSection id="roles" title="3. Users, roles, and access">

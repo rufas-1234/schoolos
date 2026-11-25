@@ -42,14 +42,14 @@ export function PracticeWorkspacePanel({
         <>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">You are in an isolated practice workspace</h2>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            Records created here are separate from your live school. Reset archives this workspace and creates a fresh one.
-            Finishing practice archives it and returns you to the live school; archived practice records are retained.
+            Records created here are separate from your live school. Reset permanently deletes this workspace and creates a fresh one.
+            Finishing permanently deletes it and returns you to the live school. These deletions cannot be undone.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <form
               action={resetAction}
               onSubmit={(event) => {
-                if (!window.confirm("Reset this practice workspace? Its current records will be archived and a clean practice workspace will be created. Your live school will not be changed.")) {
+                if (!window.confirm("Permanently delete this practice workspace and all its records and files, then create a clean one? This cannot be undone. Your live school will not be changed.")) {
                   event.preventDefault();
                 }
               }}
@@ -61,7 +61,7 @@ export function PracticeWorkspacePanel({
             <form
               action={finishAction}
               onSubmit={(event) => {
-                if (!window.confirm("Finish practice mode? The practice workspace will be archived and you will return to your live school. Its records will be retained.")) {
+                if (!window.confirm("Permanently delete this practice workspace and all its records and files, then return to your live school? This cannot be undone.")) {
                   event.preventDefault();
                 }
               }}
@@ -88,7 +88,7 @@ export function PracticeWorkspacePanel({
             <form
               action={resetAction}
               onSubmit={(event) => {
-                if (!window.confirm("Reset the practice workspace? Its current records will be archived and replaced with a clean practice workspace. Your live school will not be changed.")) {
+                if (!window.confirm("Permanently delete the practice workspace and all its records and files, then create a clean one? This cannot be undone. Your live school will not be changed.")) {
                   event.preventDefault();
                 }
               }}
@@ -100,7 +100,7 @@ export function PracticeWorkspacePanel({
             <form
               action={finishAction}
               onSubmit={(event) => {
-                if (!window.confirm("Finish practice mode? The practice workspace will be archived. Its records will be retained and your live school will remain unchanged.")) {
+                if (!window.confirm("Permanently delete the practice workspace and all its records and files, then return to your live school? This cannot be undone.")) {
                   event.preventDefault();
                 }
               }}

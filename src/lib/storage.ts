@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { get, put } from "@vercel/blob";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { del, get, list, put } from "@vercel/blob";
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export interface ObjectStorage {
@@ -15,6 +21,7 @@ export interface ObjectStorage {
     fileName: string;
     disposition?: "attachment" | "inline";
   }): Promise<Response | null>;
+  deleteObjectsByPrefix(prefix: string): Promise<void>;
 }
 
 function safeFileName(fileName: string) {
@@ -80,6 +87,32 @@ export class S3CompatibleStorage implements ObjectStorage {
     });
     return Response.redirect(await getSignedUrl(this.client, command, { expiresIn: 300 }), 302);
   }
+
+  async deleteObjectsByPrefix(prefix: string) {
+    let continuationToken: string | undefined;
+    do {
+      const page = await this.client.send(new ListObjectsV2Command({
+        Bucket: this.bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }));
+      const objects = (page.Contents ?? [])
+        .flatMap((object) => object.Key ? [{ Key: object.Key }] : []);
+      if (objects.length) {
+        const result = await this.client.send(new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: { Objects: objects, Quiet: false },
+        }));
+        if (result.Errors?.length) {
+          throw new Error(`Failed to delete ${result.Errors.length} stored practice file(s).`);
+        }
+      }
+      continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+      if (page.IsTruncated && !continuationToken) {
+        throw new Error("Object storage did not provide a continuation token.");
+      }
+    } while (continuationToken);
+  }
 }
 
 export class VercelBlobStorage implements ObjectStorage {
@@ -117,6 +150,26 @@ export class VercelBlobStorage implements ObjectStorage {
         "X-Content-Type-Options": "nosniff",
       },
     });
+  }
+
+  async deleteObjectsByPrefix(prefix: string) {
+    const credentials = getVercelBlobCredentials();
+    let cursor: string | undefined;
+    do {
+      const page = await list({
+        prefix,
+        limit: 1000,
+        ...(cursor ? { cursor } : {}),
+        ...credentials,
+      });
+      if (page.blobs.length) {
+        await del(page.blobs.map((blob) => blob.pathname), credentials);
+      }
+      cursor = page.hasMore ? page.cursor : undefined;
+      if (page.hasMore && !cursor) {
+        throw new Error("Object storage did not provide a continuation cursor.");
+      }
+    } while (cursor);
   }
 }
 

@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { del, list } from "@vercel/blob";
+import { describe, expect, it, vi } from "vitest";
 import { getObjectStorage, S3CompatibleStorage, VercelBlobStorage } from "./storage";
+
+vi.mock("@vercel/blob", () => ({
+  del: vi.fn(),
+  get: vi.fn(),
+  list: vi.fn(),
+  put: vi.fn(),
+}));
 
 const storageEnvironmentVariables = [
   "BLOB_READ_WRITE_TOKEN",
@@ -40,6 +48,58 @@ describe("object storage selection", () => {
       OBJECT_STORAGE_SECRET_ACCESS_KEY: "test-secret-key",
     }, () => {
       expect(getObjectStorage()).toBeInstanceOf(S3CompatibleStorage);
+    });
+  });
+
+  describe("practice workspace object cleanup", () => {
+    it("deletes every page of objects under the workspace prefix", async () => {
+      const previousToken = process.env.BLOB_READ_WRITE_TOKEN;
+      process.env.BLOB_READ_WRITE_TOKEN = "test-blob-token";
+      vi.mocked(list).mockResolvedValueOnce({
+        blobs: [{
+          url: "https://blob.test/practice/one",
+          downloadUrl: "https://blob.test/practice/one",
+          pathname: "practice/one",
+          size: 10,
+          uploadedAt: new Date(),
+          etag: "first",
+        }],
+        cursor: "next-page",
+        hasMore: true,
+      }).mockResolvedValueOnce({
+        blobs: [{
+          url: "https://blob.test/practice/two",
+          downloadUrl: "https://blob.test/practice/two",
+          pathname: "practice/two",
+          size: 10,
+          uploadedAt: new Date(),
+          etag: "second",
+        }],
+        hasMore: false,
+      });
+      vi.mocked(del).mockResolvedValue(undefined);
+
+      try {
+        await new VercelBlobStorage().deleteObjectsByPrefix("practice/");
+
+        expect(list).toHaveBeenNthCalledWith(1, {
+          prefix: "practice/",
+          limit: 1000,
+          token: "test-blob-token",
+        });
+        expect(list).toHaveBeenNthCalledWith(2, {
+          prefix: "practice/",
+          limit: 1000,
+          cursor: "next-page",
+          token: "test-blob-token",
+        });
+        expect(del).toHaveBeenNthCalledWith(1, ["practice/one"], { token: "test-blob-token" });
+        expect(del).toHaveBeenNthCalledWith(2, ["practice/two"], { token: "test-blob-token" });
+      } finally {
+        if (previousToken === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
+        else process.env.BLOB_READ_WRITE_TOKEN = previousToken;
+        vi.clearAllMocks();
+      }
     });
   });
 
