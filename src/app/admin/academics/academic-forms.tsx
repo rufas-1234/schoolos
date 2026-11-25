@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { RequiredMark } from "@/components/required-mark";
 import { AdminConfirmSubmitButton, AdminDeleteButton } from "@/components/admin-data-table";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -416,6 +416,13 @@ export function ActionForm({
   confirmation?: { title: string; message: string };
 }) {
   const [state, formAction, pending] = useActionState<AcademicActionState, FormData>(action, {});
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (!pending && state.error) {
+      errorRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [pending, state.error]);
 
   return (
     <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -424,8 +431,12 @@ export function ActionForm({
         <RequiredMark /> Required fields
       </p>
       {recordId !== undefined && <input type="hidden" name="recordId" value={recordId} />}
+      {state.error && (
+        <p ref={errorRef} role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-800">
+          {state.error}
+        </p>
+      )}
       {children}
-      {state.error && <p role="alert" className="text-sm text-rose-600">{state.error}</p>}
       {state.success && <p role="status" className="text-sm text-emerald-700">Saved successfully.</p>}
       <div className="admin-dialog-form-actions flex justify-end">
         {confirmation
