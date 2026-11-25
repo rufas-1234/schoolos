@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { SearchableSelect } from "@/components/searchable-select";
 import { RequiredMark } from "@/components/required-mark";
@@ -27,6 +27,7 @@ import {
 } from "./actions";
 
 export type FeeOption = { id: number; label: string };
+type FeeTypeOption = FeeOption & { feeGroupId: number };
 type ValueOption = { value: string; label: string };
 export type CurrencyOption = ValueOption;
 type FeeDeleteAction = (
@@ -297,7 +298,7 @@ export function FeeStructureForm({
   students: FeeOption[];
   classes: FeeOption[];
   groups: FeeOption[];
-  types: FeeOption[];
+  types: FeeTypeOption[];
   currencies: CurrencyOption[];
   defaultCurrency: string;
   record?: {
@@ -316,6 +317,11 @@ export function FeeStructureForm({
     fineValue: string;
   };
 }) {
+  const [selectedGroupId, setSelectedGroupId] = useState(
+    record ? String(record.feeGroupId) : "",
+  );
+  const typesForSelectedGroup = types.filter((type) => String(type.feeGroupId) === selectedGroupId);
+
   return (
     <ActionForm
       action={createFeeStructure}
@@ -348,8 +354,36 @@ export function FeeStructureForm({
         required={false}
       />
       <SelectField label="Class" name="classLevelId" options={classes} defaultValue={record?.classLevelId} />
-      <SelectField label="Fee group" name="feeGroupId" options={groups} defaultValue={record?.feeGroupId} />
-      <SelectField label="Fee type" name="feeTypeId" options={types} defaultValue={record?.feeTypeId} />
+      <SearchableSelect
+        label="Fee group"
+        name="feeGroupId"
+        options={groups.map((group) => ({ value: String(group.id), label: group.label }))}
+        defaultValue={record ? String(record.feeGroupId) : ""}
+        placeholder="Search or choose a fee group..."
+        required
+        onValueChange={setSelectedGroupId}
+      />
+      <SearchableSelect
+        key={selectedGroupId}
+        label="Fee type"
+        name="feeTypeId"
+        options={typesForSelectedGroup.map((type) => ({ value: String(type.id), label: type.label }))}
+        defaultValue={
+          record && String(record.feeGroupId) === selectedGroupId
+            ? String(record.feeTypeId)
+            : ""
+        }
+        placeholder={
+          !selectedGroupId
+            ? "Select a fee group first"
+            : typesForSelectedGroup.length
+              ? "Search fee types in this group..."
+              : "No fee types assigned to this group"
+        }
+        emptyLabel="No fee types are assigned to this group."
+        required
+        disabled={!selectedGroupId || !typesForSelectedGroup.length}
+      />
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <ValueSelectField label="Currency" name="currency" options={currencies}

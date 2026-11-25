@@ -297,8 +297,9 @@ export default async function FeesSetupPage({
     id: type.id,
     label: feeDisplayName(type.name),
   }));
-  const structureTypeOptions: FeeOption[] = types.map((type) => ({
+  const structureTypeOptions = types.map((type) => ({
     id: type.id,
+    feeGroupId: type.feeGroupId,
     label: `${feeDisplayName(type.groupName)} · ${feeDisplayName(type.name)}`,
   }));
   const structuresSearch = typeof query.structuresSearch === "string"

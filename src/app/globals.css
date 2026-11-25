@@ -1182,7 +1182,7 @@ h6 {
 }
 
 .annual-progress-card .academic-progress-subject-score {
-  grid-template-columns: minmax(0, 1fr) minmax(2.5rem, 0.8fr) 2.2rem;
+  grid-template-columns: minmax(0, 1fr) minmax(2.5rem, 0.8fr) 2.2rem 1.4rem;
 }
 
 .annual-progress-summaries {
@@ -2940,7 +2940,7 @@ h6 {
     }
 
     .exam-report-document .annual-progress-card .academic-progress-subject-score {
-      grid-template-columns: minmax(0, 1fr) auto !important;
+      grid-template-columns: minmax(0, 1fr) auto auto auto !important;
     }
 
     .exam-report-document .annual-progress-summaries {

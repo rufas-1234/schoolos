@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, eq, inArray, like, lt, or, sql, sum } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, lt, or, sql, sum } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/print-button";
 import { db } from "@/db";
@@ -33,6 +33,7 @@ type SearchParams = {
   classLevelId?: string | string[];
   sectionId?: string | string[];
   currency?: string | string[];
+  sort?: string | string[];
 };
 
 function parseId(value: string | string[] | undefined): number | null {
@@ -75,6 +76,10 @@ export default async function FeeInvoicePrintPage({
   const classLevelId = parseId(params.classLevelId);
   const sectionId = parseId(params.sectionId);
   const requestedCurrency = typeof params.currency === "string" ? params.currency : "";
+  const sort = typeof params.sort === "string" &&
+    ["fee-type-asc", "fee-type-desc"].includes(params.sort)
+    ? params.sort
+    : "recent";
   const invalidDirectSelector =
     (params.invoiceId !== undefined && (!invoiceId || params.studentId !== undefined ||
       params.search !== undefined || params.status !== undefined || params.overdue !== undefined || params.branchId !== undefined ||
@@ -235,7 +240,16 @@ export default async function FeeInvoicePrintPage({
           ? [eq(filterStatus, status)]
           : []),
     ))
-    .orderBy(asc(students.lastName), asc(students.firstName), asc(studentFeeInvoices.dueDate))
+    .orderBy(
+      ...(sort === "fee-type-asc"
+        ? [asc(feeTypes.name), asc(feeGroups.name)]
+        : sort === "fee-type-desc"
+          ? [desc(feeTypes.name), desc(feeGroups.name)]
+          : []),
+      asc(students.lastName),
+      asc(students.firstName),
+      asc(studentFeeInvoices.dueDate),
+    )
     .limit(501);
   const tooManyInvoices = invoices.length > 500;
   const printableInvoices = tooManyInvoices ? [] : invoices;

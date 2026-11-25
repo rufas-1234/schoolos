@@ -15,6 +15,7 @@ export function FeeInvoiceFilters({
   selectedStatus,
   overdueOnly,
   selectedCurrency,
+  selectedSort,
 }: {
   search: string;
   branches: SearchableSelectOption[];
@@ -27,6 +28,7 @@ export function FeeInvoiceFilters({
   selectedStatus: string;
   overdueOnly: boolean;
   selectedCurrency: string;
+  selectedSort: string;
 }) {
   return (
     <SmartFilterForm method="get" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-8">
@@ -100,6 +102,18 @@ export function FeeInvoiceFilters({
         options={currencies}
         defaultValue={selectedCurrency}
         placeholder="Search currencies..."
+        autoSubmit
+      />
+      <SearchableSelect
+        label="Sort invoices"
+        name="sort"
+        options={[
+          { value: "recent", label: "Most recent" },
+          { value: "fee-type-asc", label: "Fee type A–Z" },
+          { value: "fee-type-desc", label: "Fee type Z–A" },
+        ]}
+        defaultValue={selectedSort}
+        placeholder="Choose sorting..."
         autoSubmit
       />
       <div className="sm:col-span-2 xl:col-span-8">

@@ -41,6 +41,7 @@ type SearchParams = {
   classLevelId?: string | string[];
   sectionId?: string | string[];
   currency?: string | string[];
+  sort?: string | string[];
   page?: string | string[];
   pageSize?: string | string[];
 };
@@ -95,6 +96,10 @@ export default async function FeeCollectionPage({
   const selectedCurrency = currencyRows.some((item) => item.code === requestedCurrency)
     ? requestedCurrency
     : currency;
+  const sort = typeof params.sort === "string" &&
+    ["fee-type-asc", "fee-type-desc"].includes(params.sort)
+    ? params.sort
+    : "recent";
   const currencyOptions: SearchableSelectOption[] = currencyRows.map((item) => ({
     value: item.code,
     label: `${item.code} · ${item.name} (${item.symbol})`,
@@ -265,7 +270,15 @@ export default async function FeeCollectionPage({
   const page = Math.min(requestedPage, pageCount);
   const invoices = await db.select().from(matchingInvoices)
     .where(statusFilterCondition)
-    .orderBy(desc(matchingInvoices.createdAt), desc(matchingInvoices.id))
+    .orderBy(
+      ...(sort === "fee-type-asc"
+        ? [asc(matchingInvoices.typeName), asc(matchingInvoices.groupName)]
+        : sort === "fee-type-desc"
+          ? [desc(matchingInvoices.typeName), desc(matchingInvoices.groupName)]
+          : []),
+      desc(matchingInvoices.createdAt),
+      desc(matchingInvoices.id),
+    )
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   const invoiceRows = invoices.map((invoice) => {
@@ -333,6 +346,7 @@ export default async function FeeCollectionPage({
     if (search) query.set("search", search);
     if (statusFilter) query.set("status", statusFilter);
     if (overdueOnly) query.set("overdue", "true");
+    if (sort !== "recent") query.set("sort", sort);
     if (requestedBranch !== null) query.set("branchId", String(requestedBranch));
     else if (params.branchId === "") query.set("branchId", "");
     if (requestedClass !== null) query.set("classLevelId", String(requestedClass));
@@ -372,6 +386,7 @@ export default async function FeeCollectionPage({
           selectedStatus={statusFilter}
           overdueOnly={overdueOnly}
           selectedCurrency={selectedCurrency}
+          selectedSort={sort}
         />
         <AdminActionDialog label="Quick add payment" title="Quick add payment">
           <RecordFeePaymentForm
@@ -402,6 +417,7 @@ export default async function FeeCollectionPage({
           ...(requestedClass !== null ? { classLevelId: String(requestedClass) } : {}),
           ...(requestedSection !== null ? { sectionId: String(requestedSection) } : {}),
           currency: selectedCurrency,
+          ...(sort !== "recent" ? { sort } : {}),
         }).toString()}`}
         className="inline-flex rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
       >

@@ -13,6 +13,7 @@ import {
   classSubjects,
   examClasses,
   examAttendance,
+  examGradeBands,
   examMarks,
   examReportSignatures,
   examSubjects,
@@ -29,7 +30,9 @@ import {
   calculateAnnualProgress,
   calculateWeightedAverage,
   examAssessmentResultState,
+  gradeForPercentage,
   hasCompleteExamResult,
+  type GradeBand,
 } from "@/lib/examination-policy";
 import { getDeputyHeadteacherSignatures, getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
@@ -49,6 +52,7 @@ type ProgressExam = {
   key: string;
   label: string;
   order: string;
+  gradingBands: GradeBand[];
 };
 
 type SubjectProgress = {
@@ -70,6 +74,7 @@ type StudentProgress = {
   subjects: SubjectProgress[];
   examAverages: Map<string, number | null>;
   annualAverage: number | null;
+  annualGrade: GradeBand | null;
   change: number | null;
 };
 
@@ -236,6 +241,9 @@ function buildProgressRows(input: {
       subjects: subjectRows,
       examAverages,
       annualAverage: annualProgress.average,
+      annualGrade: annualProgress.average === null
+        ? null
+        : gradeForPercentage(annualProgress.average, input.exams.at(-1)?.gradingBands ?? []),
       change: annualProgress.change,
     };
   });
@@ -274,6 +282,7 @@ function StudentProgressCard({
     .sort((a, b) => b.annualPercentage - a.annualPercentage || a.subjectName.localeCompare(b.subjectName))
     .slice(0, 4);
   const examsWithResults = exams.filter((exam) => typeof student.examAverages.get(exam.key) === "number").length;
+  const annualBands = exams.at(-1)?.gradingBands ?? [];
   const reportDate = new Date().toISOString().slice(0, 10);
   return (
     <article className={`academic-progress-card annual-progress-card a4-report-card${last ? " a4-report-card-last" : ""}`}>
@@ -305,6 +314,11 @@ function StudentProgressCard({
           <AnnualReportField label="Report date" value={reportDate} />
           <AnnualReportField label="Exams with results" value={`${examsWithResults} of ${exams.length}`} />
           <AnnualReportField label="Annual average" value={percentageLabel(student.annualAverage)} />
+          <AnnualReportField
+            label="Annual grade"
+            value={student.annualGrade ? `${student.annualGrade.grade} · ${student.annualGrade.description}` : "—"}
+          />
+          <AnnualReportField label="Performance remark" value={student.annualGrade?.performanceRemark ?? "—"} />
           <AnnualReportField label="Progress change" value={changeLabel(student.change)} />
         </div>
         <div className="academic-progress-performance">
@@ -321,12 +335,30 @@ function StudentProgressCard({
                   <span style={{ width: `${Math.max(0, Math.min(100, subject.annualPercentage))}%` }} />
                 </span>
                 <strong>{subject.annualPercentage.toFixed(0)}%</strong>
+                <span className="academic-progress-subject-grade">
+                  {gradeForPercentage(subject.annualPercentage, annualBands)?.grade ?? "—"}
+                </span>
               </div>
             ))}
             {!strongestSubjects.length && <p className="academic-progress-empty">No subject averages are available.</p>}
           </div>
         </div>
       </section>
+      {annualBands.length > 0 && (
+        <section className="academic-progress-grade-guide">
+          <h3>Annual grade guide · {exams.at(-1)?.label}</h3>
+          <div>
+            {annualBands.map((band) => (
+              <article key={`${band.grade}-${band.minPercent}`}>
+                <strong>{band.grade}</strong>
+                <span>{band.minPercent}–{band.maxPercent}%</span>
+                <small>{band.description}</small>
+                <small>{band.performanceRemark}</small>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="academic-progress-assessment">
         <h3>Detailed annual assessment</h3>
         <div className="academic-progress-table-wrap">
@@ -348,7 +380,12 @@ function StudentProgressCard({
                     return (
                       <td key={exam.key}>
                         {score
-                          ? `${score.totalMarks.toFixed(1)} / ${score.maxMarks.toFixed(1)} · ${percentageLabel(score.percentage)}`
+                          ? <>
+                            {`${score.totalMarks.toFixed(1)} / ${score.maxMarks.toFixed(1)} · ${percentageLabel(score.percentage)}`}
+                            <span className="block text-xs">
+                              Grade {gradeForPercentage(score.percentage, exam.gradingBands)?.grade ?? "—"}
+                            </span>
+                          </>
                           : status === "not_applicable" ? "Not taking"
                           : status === "x" ? "X · Absent"
                           : status === "y" ? "Y · Nullified (malpractice)"
@@ -359,15 +396,32 @@ function StudentProgressCard({
                       </td>
                     );
                   })}
-                  <td>{percentageLabel(subject.annualPercentage)}</td>
+                  <td>
+                    {percentageLabel(subject.annualPercentage)}
+                    <span className="block text-xs">
+                      Grade {subject.annualPercentage === null
+                        ? "—"
+                        : gradeForPercentage(subject.annualPercentage, annualBands)?.grade ?? "—"}
+                    </span>
+                  </td>
                 </tr>
               ))}
               <tr className="font-bold">
                 <td>Overall average</td>
                 {exams.map((exam) => (
-                  <td key={exam.key}>{percentageLabel(student.examAverages.get(exam.key) ?? null)}</td>
+                  <td key={exam.key}>
+                    {percentageLabel(student.examAverages.get(exam.key) ?? null)}
+                    <span className="block text-xs">
+                      Grade {typeof student.examAverages.get(exam.key) === "number"
+                        ? gradeForPercentage(student.examAverages.get(exam.key)!, exam.gradingBands)?.grade ?? "—"
+                        : "—"}
+                    </span>
+                  </td>
                 ))}
-                <td>{percentageLabel(student.annualAverage)}</td>
+                <td>
+                  {percentageLabel(student.annualAverage)}
+                  <span className="block text-xs">Grade {student.annualGrade?.grade ?? "—"}</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -377,7 +431,11 @@ function StudentProgressCard({
         {exams.map((exam) => (
           <article key={exam.key}>
             <h3>{exam.label}</h3>
-            <p>{percentageLabel(student.examAverages.get(exam.key) ?? null)} average</p>
+            <p>{percentageLabel(student.examAverages.get(exam.key) ?? null)} average · Grade {
+              typeof student.examAverages.get(exam.key) === "number"
+                ? gradeForPercentage(student.examAverages.get(exam.key)!, exam.gradingBands)?.grade ?? "—"
+                : "—"
+            }</p>
           </article>
         ))}
         <article>
@@ -389,7 +447,10 @@ function StudentProgressCard({
         <article className="exam-report-summary-card rounded-lg border border-slate-200 bg-white p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Annual average</p>
           <strong className="mt-1 block text-xl text-slate-950">{percentageLabel(student.annualAverage)}</strong>
-          <p className="mt-1 text-xs text-slate-600">Across examinations with published results</p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">
+            Grade {student.annualGrade?.grade ?? "—"} · {student.annualGrade?.description ?? "No grade"}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">{student.annualGrade?.performanceRemark ?? "Across examinations with published results"}</p>
         </article>
         <article className="exam-report-summary-card rounded-lg border border-slate-200 bg-white p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress change</p>
@@ -468,6 +529,7 @@ export default async function AnnualProgressCardPage({
       branchName: schoolBranches.name,
       principalRemark: examClasses.principalRemark,
       classTeacherId: examClasses.classTeacherId,
+      gradingScaleId: examinations.gradingScaleId,
     }).from(examClasses)
       .innerJoin(examinations, and(
         eq(examinations.id, examClasses.examinationId),
@@ -499,6 +561,34 @@ export default async function AnnualProgressCardPage({
   const selectedClassRows = classRows.filter((row) => row.classLevelId === selectedClass?.id);
   const examClassIds = [...new Set(selectedClassRows.map((row) => row.examClassId))];
   const examClassById = new Map(selectedClassRows.map((row) => [row.examClassId, row]));
+  const gradingScaleIds = [...new Set(selectedClassRows.map((row) => row.gradingScaleId))];
+  const gradeBandRows = gradingScaleIds.length
+    ? await db.select({
+      gradingScaleId: examGradeBands.gradingScaleId,
+      minPercent: examGradeBands.minPercent,
+      maxPercent: examGradeBands.maxPercent,
+      grade: examGradeBands.grade,
+      description: examGradeBands.description,
+      performanceRemark: examGradeBands.performanceRemark,
+    }).from(examGradeBands)
+      .where(inArray(examGradeBands.gradingScaleId, gradingScaleIds))
+      .orderBy(asc(examGradeBands.sortOrder))
+    : [];
+  const bandsByScaleId = new Map<number, GradeBand[]>();
+  for (const band of gradeBandRows) {
+    const bands = bandsByScaleId.get(band.gradingScaleId) ?? [];
+    bands.push({
+      minPercent: Number(band.minPercent),
+      maxPercent: Number(band.maxPercent),
+      grade: band.grade,
+      description: band.description,
+      performanceRemark: band.performanceRemark,
+    });
+    bandsByScaleId.set(band.gradingScaleId, bands);
+  }
+  const gradingScaleIdByExamKey = new Map(
+    selectedClassRows.map((row) => [`exam:${row.examId}`, row.gradingScaleId]),
+  );
   const subjectAssessments = examClassIds.length
     ? await db.select({
       id: examSubjects.id,
@@ -535,6 +625,9 @@ export default async function AnnualProgressCardPage({
         startDate: examClass.examStartDate,
       }]
       : [];
+  })).map((period) => ({
+    ...period,
+    gradingBands: bandsByScaleId.get(gradingScaleIdByExamKey.get(period.key) ?? -1) ?? [],
   }));
   const examPeriodById = new Map(
     selectedClassRows.map((row) => [row.examId, `exam:${row.examId}`]),
