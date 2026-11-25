@@ -114,6 +114,7 @@ function accountOptions(rows: Array<{ id: number; code: string; name: string }>)
 
 export default async function AccountsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const context = await requireSchoolPermission("accounts.manage");
+  const canPayStaffPayroll = context.grantedPermissions.includes("staff.payroll.pay");
   const query = await searchParams;
   const pageSize = parsePageSize(query.pageSize);
   const requestedSection = first(query.section);
@@ -685,6 +686,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                                     ? "Payment recorded in Accounts."
                                     : "Previously marked paid; no linked Finance transaction."}
                                 </span>
+                              ) : !canPayStaffPayroll ? (
+                                <p className="max-w-sm text-sm text-amber-800">
+                                  Your role cannot pay staff payroll. Ask a school administrator to grant the Pay staff payroll permission.
+                                </p>
                               ) : !matchingBanks.length || !expenseAccounts.length ? (
                                 <p className="max-w-sm text-sm text-amber-800">
                                   Set up a matching bank/cash account and expense category before paying this record.{" "}

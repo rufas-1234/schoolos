@@ -389,6 +389,9 @@ export async function payStaffPayrollRecord(
   formData: FormData,
 ): Promise<AccountActionState> {
   const context = await requireSchoolPermission("accounts.manage");
+  if (!context.grantedPermissions.includes("staff.payroll.pay")) {
+    return { error: "Your role is not permitted to pay staff payroll. Ask a school administrator to grant this permission." };
+  }
   const parsed = z.object({
     payrollPublicId: z.string().uuid(),
     categoryAccountId: idField,

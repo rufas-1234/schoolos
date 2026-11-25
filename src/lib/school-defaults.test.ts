@@ -10,3 +10,11 @@ describe("default school examination permissions", () => {
     expect(defaultRolePermissionKeys["Deputy principal"]).toEqual(expect.arrayContaining(examinationPermissions));
   });
 });
+
+describe("default staff payroll permissions", () => {
+  it("allows Accountants and school administrators to pay staff payroll", () => {
+    expect(defaultRolePermissionKeys.Accountant).toContain("staff.payroll.pay");
+    expect(schoolAdminPermissionKeys).toContain("staff.payroll.pay");
+    expect(defaultRolePermissionKeys["Human resources officer"]).not.toContain("staff.payroll.pay");
+  });
+});

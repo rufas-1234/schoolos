@@ -9,6 +9,7 @@ import {
   BookMarked,
   BedDouble,
   BriefcaseBusiness,
+  Calculator,
   CalendarDays,
   CircleHelp,
   CircleDollarSign,
@@ -162,7 +163,7 @@ const navigation: NavigationItem[] = [
   {
     href: "/admin/accounts?section=profit",
     label: "Accounts",
-    icon: ChartNoAxesCombined,
+    icon: Calculator,
     permission: "accounts.manage",
     children: [
       { id: "accounts-profit", label: "Profit & Loss", href: "/admin/accounts?section=profit", matchPath: "/admin/accounts", matchQuery: { key: "section", value: "profit" } },
