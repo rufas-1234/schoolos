@@ -589,6 +589,18 @@ h6 {
   max-height: 94dvh;
 }
 
+@media (min-width: 640px) {
+  .admin-resizable-dialog.academic-year-dialog {
+    width: min(94vw, 42rem);
+    max-width: min(94vw, 42rem);
+    resize: none;
+  }
+
+  .admin-resizable-dialog.academic-year-dialog .admin-dialog-content form > .admin-dialog-form-actions {
+    position: static;
+  }
+}
+
 .admin-dialog-form-actions,
 .admin-dialog-content form > div:last-child:has(> button[type="submit"]),
 .admin-dialog-content form > div:last-child:has(> button[type="button"]) {

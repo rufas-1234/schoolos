@@ -432,7 +432,7 @@ export function ActionForm({
       </p>
       {recordId !== undefined && <input type="hidden" name="recordId" value={recordId} />}
       {state.error && (
-        <p ref={errorRef} role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-800">
+        <p ref={errorRef} role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-800 sm:sticky sm:top-0 sm:z-20">
           {state.error}
         </p>
       )}

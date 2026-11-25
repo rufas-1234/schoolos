@@ -822,7 +822,7 @@ export default async function AcademicStructurePage({
                 filters={yearStatusFilters}
                 toolbarActions={
                   <>
-                    <AdminActionDialog label="Add year" title="Add academic year">
+                    <AdminActionDialog label="Add year" title="Add academic year" className="academic-year-dialog">
                       <AcademicYearForm />
                     </AdminActionDialog>
                     <AdminActionDialog label="Change year status" title="Activate or archive an academic year">
