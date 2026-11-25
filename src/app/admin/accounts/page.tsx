@@ -373,6 +373,18 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       status: staffPayrollRecords.status,
       paidDate: staffPayrollRecords.paidDate,
       paymentTransactionId: accountTransactions.id,
+      paymentPublicId: accountTransactions.publicId,
+      paymentStatus: accountTransactions.status,
+      paymentDate: accountTransactions.transactionDate,
+      paymentAmount: accountTransactions.amount,
+      paymentCurrency: accountTransactions.currency,
+      paymentReference: accountTransactions.reference,
+      paymentAccountName: schoolBankAccounts.accountName,
+      paymentBankName: schoolBankAccounts.bankName,
+      paymentCategoryName: chartOfAccounts.name,
+      paymentCategoryCode: chartOfAccounts.code,
+      paymentApprovedAt: accountTransactions.approvedAt,
+      paymentApproverName: approverUser.name,
       staffName: staffMembers.firstName,
       staffLastName: staffMembers.lastName,
       employeeCode: staffMembers.employeeCode,
@@ -385,6 +397,15 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         eq(accountTransactions.payrollRecordId, staffPayrollRecords.id),
         eq(accountTransactions.schoolId, context.schoolId),
       ))
+      .leftJoin(schoolBankAccounts, and(
+        eq(schoolBankAccounts.id, accountTransactions.bankAccountId),
+        eq(schoolBankAccounts.schoolId, context.schoolId),
+      ))
+      .leftJoin(chartOfAccounts, and(
+        eq(chartOfAccounts.id, accountTransactions.categoryAccountId),
+        eq(chartOfAccounts.schoolId, context.schoolId),
+      ))
+      .leftJoin(approverUser, eq(approverUser.id, accountTransactions.approvedBy))
       .where(and(
         eq(staffPayrollRecords.schoolId, context.schoolId),
         eq(staffPayrollRecords.payPeriod, payrollPeriod),
@@ -543,7 +564,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
 
       <div className="flex justify-end print:hidden">
         <PrintButton
-          label={`Print ${section === "reports" ? "Accounts activity report" : activeSection.label}`}
+          label={`Print ${section === "reports" ? "Accounts activity report" : section === "payroll" ? "Staff payroll report" : activeSection.label}`}
           targetId="accounts-section-print"
         />
       </div>
@@ -681,11 +702,16 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                             </td>
                             <td className="print:hidden px-4 py-3">
                               {record.status === "paid" ? (
-                                <span className="text-sm text-slate-500">
-                                  {record.paymentTransactionId
-                                    ? "Payment recorded in Accounts."
-                                    : "Previously marked paid; no linked Finance transaction."}
-                                </span>
+                                record.paymentTransactionId && record.paymentPublicId && record.paymentStatus === "approved" ? (
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm text-slate-500">Payment recorded in Accounts.</span>
+                                    <PrintButton
+                                      label="Print receipt"
+                                      targetId={`payroll-payment-receipt-${record.paymentPublicId}`}
+                                      includeQrCode={false}
+                                    />
+                                  </div>
+                                ) : <span className="text-sm text-slate-500">Previously marked paid; no linked Finance receipt.</span>
                               ) : !canPayStaffPayroll ? (
                                 <p className="max-w-sm text-sm text-amber-800">
                                   Your role cannot pay staff payroll. Ask a school administrator to grant the Pay staff payroll permission.
@@ -714,6 +740,44 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                   </table>
                 </div>
               )}
+              {payrollPage.rows.map((record) => {
+                if (record.status !== "paid" || !record.paymentPublicId || record.paymentStatus !== "approved") return null;
+                return (
+                  <article
+                    key={record.paymentPublicId}
+                    id={`payroll-payment-receipt-${record.paymentPublicId}`}
+                    className="hidden space-y-7 bg-white p-8 text-slate-900"
+                  >
+                    <header className="border-b-2 border-violet-700 pb-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-700">Staff payment receipt</p>
+                      <h1 className="mt-2 text-3xl font-bold">{context.schoolName}</h1>
+                      <p className="mt-2 text-sm text-slate-600">Receipt no. PAY-{record.paymentPublicId.toUpperCase()}</p>
+                    </header>
+                    <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                      <ReceiptField label="Staff member" value={`${record.staffName} ${record.staffLastName}`} />
+                      <ReceiptField label="Staff number" value={record.employeeCode ?? "Not provided"} />
+                      <ReceiptField label="Pay period" value={record.payPeriod} />
+                      <ReceiptField label="Payment date" value={record.paymentDate ?? record.paidDate ?? "—"} />
+                      <ReceiptField
+                        label="Paid from"
+                        value={[record.paymentAccountName, record.paymentBankName].filter(Boolean).join(" · ") || "Not recorded"}
+                      />
+                      <ReceiptField
+                        label="Expense category"
+                        value={[record.paymentCategoryCode, record.paymentCategoryName].filter(Boolean).join(" · ") || "Not recorded"}
+                      />
+                      <ReceiptField label="Payment reference" value={record.paymentReference ?? "Not provided"} />
+                      <ReceiptField label="Recorded by" value={record.paymentApproverName ?? "Finance"} />
+                    </dl>
+                    <p className="border-y border-slate-200 py-5 text-lg font-bold">
+                      Amount paid: {displayAmount(record.paymentAmount ?? record.amount, record.paymentCurrency ?? record.currency)}
+                    </p>
+                    <footer className="text-sm text-slate-600">
+                      Recorded and approved in Accounts on {displayTimestamp(record.paymentApprovedAt)}. This receipt records a payment made through the school’s bank/cash process; SchoolOS does not transfer funds.
+                    </footer>
+                  </article>
+                );
+              })}
               <TablePagination ariaLabel="Staff payroll payments" currentPage={payrollPage.page} pageSize={payrollPage.pageSize} totalRows={payrollRecords.length}
                 hrefForPage={(page) => pageHref("payrollPage", page)} />
             </section>
