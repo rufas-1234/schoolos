@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { selectSchool } from "@/app/select-school/actions";
+import { AdminConfirmSubmitButton } from "@/components/admin-data-table";
 import {
   finishPracticeWorkspace,
   resetPracticeWorkspace,
@@ -46,29 +47,25 @@ export function PracticeWorkspacePanel({
             Finishing permanently deletes it and returns you to the live school. These deletions cannot be undone.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <form
-              action={resetAction}
-              onSubmit={(event) => {
-                if (!window.confirm("Permanently delete this practice workspace and all its records and files, then create a clean one? This cannot be undone. Your live school will not be changed.")) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              <button type="submit" disabled={resetPending} className={buttonClass}>
-                {resetPending ? "Resetting…" : "Reset practice"}
-              </button>
+            <form action={resetAction}>
+              <AdminConfirmSubmitButton
+                label="Reset practice"
+                buttonText={resetPending ? "Resetting…" : "Reset practice"}
+                confirmationTitle="Permanently delete practice data?"
+                confirmationMessage="This will permanently delete this practice workspace and all its records and files, then create a clean one. This cannot be undone. Your live school will not be changed."
+                disabled={resetPending}
+                variant="danger"
+              />
             </form>
-            <form
-              action={finishAction}
-              onSubmit={(event) => {
-                if (!window.confirm("Permanently delete this practice workspace and all its records and files, then return to your live school? This cannot be undone.")) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              <button type="submit" disabled={finishPending} className="rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60">
-                {finishPending ? "Finishing…" : "Finish practice"}
-              </button>
+            <form action={finishAction}>
+              <AdminConfirmSubmitButton
+                label="Finish practice"
+                buttonText={finishPending ? "Finishing…" : "Finish practice"}
+                confirmationTitle="Permanently delete practice data?"
+                confirmationMessage="This will permanently delete this practice workspace and all its records and files, then return you to the live school. This cannot be undone."
+                disabled={finishPending}
+                variant="danger"
+              />
             </form>
           </div>
           <ActionError state={resetState} />
@@ -85,29 +82,25 @@ export function PracticeWorkspacePanel({
               <input type="hidden" name="schoolPublicId" value={activePracticeWorkspacePublicId} />
               <button type="submit" className={buttonClass}>Open practice workspace</button>
             </form>
-            <form
-              action={resetAction}
-              onSubmit={(event) => {
-                if (!window.confirm("Permanently delete the practice workspace and all its records and files, then create a clean one? This cannot be undone. Your live school will not be changed.")) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              <button type="submit" disabled={resetPending} className="rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60">
-                {resetPending ? "Resetting…" : "Reset practice"}
-              </button>
+            <form action={resetAction}>
+              <AdminConfirmSubmitButton
+                label="Reset practice"
+                buttonText={resetPending ? "Resetting…" : "Reset practice"}
+                confirmationTitle="Permanently delete practice data?"
+                confirmationMessage="This will permanently delete the practice workspace and all its records and files, then create a clean one. This cannot be undone. Your live school will not be changed."
+                disabled={resetPending}
+                variant="danger"
+              />
             </form>
-            <form
-              action={finishAction}
-              onSubmit={(event) => {
-                if (!window.confirm("Permanently delete the practice workspace and all its records and files, then return to your live school? This cannot be undone.")) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              <button type="submit" disabled={finishPending} className="rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60">
-                {finishPending ? "Finishing…" : "Finish practice"}
-              </button>
+            <form action={finishAction}>
+              <AdminConfirmSubmitButton
+                label="Finish practice"
+                buttonText={finishPending ? "Finishing…" : "Finish practice"}
+                confirmationTitle="Permanently delete practice data?"
+                confirmationMessage="This will permanently delete the practice workspace and all its records and files, then return you to the live school. This cannot be undone."
+                disabled={finishPending}
+                variant="danger"
+              />
             </form>
           </div>
           <ActionError state={resetState} />
