@@ -21,6 +21,7 @@ export default async function PlatformSchoolsPage() {
     createdAt: schools.createdAt,
     status: schools.status,
     archivedAt: schools.archivedAt,
+    isPracticeWorkspace: schools.isPracticeWorkspace,
   }).from(schools).orderBy(asc(schools.name), asc(schools.id));
 
   return (
@@ -51,6 +52,7 @@ export default async function PlatformSchoolsPage() {
               { key: "name", label: "School" },
               { key: "contact", label: "Contact" },
               { key: "status", label: "Status" },
+              { key: "type", label: "Workspace type" },
               { key: "publicId", label: "Workspace ID" },
               { key: "createdAt", label: "Created" },
             ]}
@@ -63,14 +65,23 @@ export default async function PlatformSchoolsPage() {
                 { value: "rejected", label: "Rejected" },
                 { value: "archived", label: "Archived" },
               ],
+            }, {
+              key: "workspaceType",
+              label: "Workspace type",
+              options: [
+                { value: "school", label: "Live school" },
+                { value: "practice", label: "Practice" },
+              ],
             }]}
             rows={schoolList.map((school) => ({
               id: school.publicId,
-              searchableText: `${school.name} ${school.email ?? ""} ${school.phone ?? ""} ${school.publicId} ${getSchoolDisplayStatus(school.status, school.archivedAt)}`,
+              searchableText: `${school.name} ${school.email ?? ""} ${school.phone ?? ""} ${school.publicId} ${getSchoolDisplayStatus(school.status, school.archivedAt)} ${school.isPracticeWorkspace ? "practice" : "live school"}`,
               values: {
                 name: school.name,
                 contact: school.email || school.phone || "No contact details",
                 status: getSchoolDisplayStatus(school.status, school.archivedAt),
+                type: school.isPracticeWorkspace ? "Practice" : "Live school",
+                workspaceType: school.isPracticeWorkspace ? "practice" : "school",
                 publicId: school.publicId,
                 createdAt: new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(school.createdAt),
               },

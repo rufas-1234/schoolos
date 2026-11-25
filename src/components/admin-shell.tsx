@@ -303,6 +303,7 @@ export function AdminShell({
   activeSchoolPublicId,
   schoolChoices,
   multiSchoolEnabled,
+  workspaceIsPractice,
   isPlatformAdmin,
   academicYears,
   selectedAcademicYearId,
@@ -319,6 +320,7 @@ export function AdminShell({
   activeSchoolPublicId: string;
   schoolChoices: { schoolPublicId: string; schoolName: string }[];
   multiSchoolEnabled: boolean;
+  workspaceIsPractice: boolean;
   isPlatformAdmin: boolean;
   academicYears: { id: number; name: string }[];
   selectedAcademicYearId: number | null;
@@ -590,7 +592,9 @@ export function AdminShell({
         </span>
         <span className={cn("min-w-0", compact && "hidden")}>
           <span className="block truncate text-sm font-semibold text-slate-900">{schoolName}</span>
-          <span className="mt-0.5 block text-xs text-slate-500">School workspace</span>
+          <span className="mt-0.5 block text-xs text-slate-500">
+            {workspaceIsPractice ? "Practice workspace" : "School workspace"}
+          </span>
         </span>
       </Link>
 
@@ -1074,6 +1078,16 @@ export function AdminShell({
           <p role="alert" className="print:hidden border-b border-rose-100 bg-rose-50 px-5 py-2 text-sm text-rose-700 md:px-8">
             {signOutError}
           </p>
+        )}
+        {workspaceIsPractice && (
+          <div className="print:hidden flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950 sm:px-6 md:px-8">
+            <p><strong>Practice workspace:</strong> changes here are isolated from your live school.</p>
+            {permissions.includes("school.settings.manage") && (
+              <Link href="/admin/settings" className="font-semibold underline underline-offset-2">
+                Reset or finish practice
+              </Link>
+            )}
+          </div>
         )}
         <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>

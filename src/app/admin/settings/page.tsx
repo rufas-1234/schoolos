@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { schoolCurrencies, schools } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { SchoolCurrencySettings, SchoolSettingsForm } from "./school-settings-form";
 import { SchoolLogoUpload } from "./school-logo-upload";
+import { PracticeWorkspacePanel } from "./practice-workspace-panel";
 
 export default async function SchoolSettingsPage() {
   const context = await requireSchoolPermission("school.settings.manage");
@@ -16,6 +17,14 @@ export default async function SchoolSettingsPage() {
     symbol: schoolCurrencies.symbol,
     isDefault: schoolCurrencies.isDefault,
   }).from(schoolCurrencies).where(eq(schoolCurrencies.schoolId, context.schoolId));
+  const [activePracticeWorkspace] = context.schoolIsPractice
+    ? [{ publicId: school.publicId }]
+    : await db.select({ publicId: schools.publicId }).from(schools).where(and(
+        eq(schools.practiceParentSchoolId, context.schoolId),
+        eq(schools.isPracticeWorkspace, true),
+        eq(schools.status, "active"),
+        isNull(schools.archivedAt),
+      )).limit(1);
 
   return (
     <div className="mx-auto max-w-4xl space-y-7">
@@ -35,6 +44,10 @@ export default async function SchoolSettingsPage() {
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-7">
         <SchoolCurrencySettings currencies={currencies} />
       </section>
+      <PracticeWorkspacePanel
+        isPracticeWorkspace={school.isPracticeWorkspace}
+        activePracticeWorkspacePublicId={activePracticeWorkspace?.publicId ?? null}
+      />
     </div>
   );
 }

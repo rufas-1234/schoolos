@@ -104,9 +104,18 @@ export const schools = mysqlTable("schools", {
   approvedBy: varchar("approvedBy", { length: 36 }).references(() => user.id),
   archivedAt: timestamp("archivedAt"),
   archivedBy: varchar("archivedBy", { length: 36 }).references(() => user.id),
+  isPracticeWorkspace: boolean("isPracticeWorkspace").notNull().default(false),
+  practiceParentSchoolId: bigint("practiceParentSchoolId", { mode: "number", unsigned: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (table) => [
+  foreignKey({
+    columns: [table.practiceParentSchoolId],
+    foreignColumns: [table.id],
+    name: "schools_practice_parent_fk",
+  }),
+  index("schools_practice_parent_idx").on(table.practiceParentSchoolId),
+]);
 
 export const schoolCurrencies = mysqlTable(
   "school_currencies",

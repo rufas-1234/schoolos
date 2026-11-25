@@ -30,6 +30,11 @@ export async function provisionSchoolWorkspace(
     administratorUserId,
     actorUserId,
     status = schoolWorkspaceStatuses.active,
+    currency = "USD",
+    timezone = "UTC",
+    currencies,
+    isPracticeWorkspace = false,
+    practiceParentSchoolId = null,
   }: {
     name: string;
     email: string | null;
@@ -38,6 +43,11 @@ export async function provisionSchoolWorkspace(
     administratorUserId: string;
     actorUserId: string;
     status?: SchoolWorkspaceStatus;
+    currency?: string;
+    timezone?: string;
+    currencies?: { code: string; name: string; symbol: string; isDefault: boolean }[];
+    isPracticeWorkspace?: boolean;
+    practiceParentSchoolId?: number | null;
   },
 ) {
   const [existingSchool] = await tx.select({ id: schools.id })
@@ -52,21 +62,30 @@ export async function provisionSchoolWorkspace(
     email,
     phone,
     address,
+    currency,
+    timezone,
     status,
     approvedAt: isApproved ? new Date() : null,
     approvedBy: isApproved ? actorUserId : null,
+    isPracticeWorkspace,
+    practiceParentSchoolId,
   });
   const [school] = await tx.select({ id: schools.id }).from(schools)
     .where(eq(schools.publicId, schoolPublicId)).limit(1);
   if (!school) throw new Error("The new school record could not be loaded.");
-  await tx.insert(schoolCurrencies).values({
+  const currencyRows = currencies?.length
+    ? currencies
+    : [{
+        code: currency,
+        name: currency === "USD" ? "US Dollar" : currency,
+        symbol: currency === "USD" ? "$" : currency,
+        isDefault: true,
+      }];
+  await tx.insert(schoolCurrencies).values(currencyRows.map((currencyRow) => ({
     publicId: randomUUID(),
     schoolId: school.id,
-    code: "USD",
-    name: "US Dollar",
-    symbol: "$",
-    isDefault: true,
-  });
+    ...currencyRow,
+  })));
 
   await tx.insert(schoolBranches).values({
     publicId: randomUUID(),

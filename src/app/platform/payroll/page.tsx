@@ -22,6 +22,7 @@ export default async function PlatformPayrollPage() {
     name: schools.name,
   }).from(schools).where(and(
     eq(schools.status, "active"),
+    eq(schools.isPracticeWorkspace, false),
     isNull(schools.archivedAt),
   )).orderBy(asc(schools.name));
   const schoolIds = activeSchools.map((school) => school.id);
@@ -49,6 +50,7 @@ export default async function PlatformPayrollPage() {
             inArray(staffPayrollRecords.schoolId, schoolIds),
             eq(staffPayrollRecords.status, "recorded"),
             eq(schools.status, "active"),
+            eq(schools.isPracticeWorkspace, false),
             isNull(schools.archivedAt),
           ))
           .orderBy(desc(staffPayrollRecords.payPeriod), asc(schools.name), asc(staffMembers.lastName), asc(staffMembers.firstName)),

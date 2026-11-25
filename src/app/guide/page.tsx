@@ -100,6 +100,9 @@ export default function GuidePage() {
                 <Step n={5}>Set up fees, grading scales, examinations, library, dormitories, and finance records as needed.</Step>
                 <Step n={6}>Create named user accounts and assign only the roles needed for each person.</Step>
               </ol>
+              <h3 className="font-semibold text-slate-900">Practice in an isolated workspace</h3>
+              <p>School administrators can open <strong>School profile → Practice mode → Start practice mode</strong> to create a separate workspace for training. It has its own records and basic setup, carries over the school’s currency settings, and does not copy student, staff, or finance records. The account menu identifies it as a practice workspace, and a banner remains visible while you are using it.</p>
+              <p>Use <strong>Reset practice</strong> to archive the current sandbox and create a clean one, or <strong>Finish practice</strong> to archive it and return to the live school. Archived practice records are retained; they are not permanently deleted. Always confirm the workspace name before entering or using records.</p>
             </GuideSection>
 
             <GuideSection id="roles" title="3. Users, roles, and access">

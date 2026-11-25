@@ -45,6 +45,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       activeSchoolPublicId={context.schoolPublicId}
       schoolChoices={context.schoolChoices}
       multiSchoolEnabled={context.multiSchoolEnabled}
+      workspaceIsPractice={context.schoolIsPractice}
       isPlatformAdmin={isPlatformAdminEmail(context.user.email)}
       academicYears={academicYearSelection.years.map(({ id, name }) => ({ id, name }))}
       selectedAcademicYearId={academicYearSelection.selectedYear?.id ?? null}

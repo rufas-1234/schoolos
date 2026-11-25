@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -36,6 +36,8 @@ export async function getCurrentUserSchoolMemberships() {
       schoolId: schools.id,
       schoolPublicId: schools.publicId,
       schoolName: schools.name,
+      isPracticeWorkspace: schools.isPracticeWorkspace,
+      practiceParentSchoolId: schools.practiceParentSchoolId,
       schoolLogoUrl: schools.logoUrl,
       schoolEmail: schools.email,
       schoolPhone: schools.phone,
@@ -55,7 +57,29 @@ export async function getCurrentUserSchoolMemberships() {
     )
     .orderBy(asc(schools.name), asc(schools.id));
 
-  return { user: session.user, memberships };
+  const practiceParentIds = [...new Set(memberships
+    .map((membership) => membership.practiceParentSchoolId)
+    .filter((schoolId): schoolId is number => schoolId !== null))];
+  const availablePracticeParents = practiceParentIds.length
+    ? await db.select({ id: schools.id }).from(schools)
+        .innerJoin(schoolMemberships, and(
+          eq(schoolMemberships.schoolId, schools.id),
+          eq(schoolMemberships.userId, session.user.id),
+          eq(schoolMemberships.status, "active"),
+        ))
+        .where(and(
+          inArray(schools.id, practiceParentIds),
+          eq(schools.status, schoolWorkspaceStatuses.active),
+          isNull(schools.archivedAt),
+        ))
+    : [];
+  const availablePracticeParentIds = new Set(availablePracticeParents.map((school) => school.id));
+  const availableMemberships = memberships.filter((membership) =>
+    !membership.isPracticeWorkspace ||
+    (membership.practiceParentSchoolId !== null && availablePracticeParentIds.has(membership.practiceParentSchoolId))
+  );
+
+  return { user: session.user, memberships: availableMemberships };
 }
 
 export async function requireSchoolMember() {
@@ -86,6 +110,8 @@ export async function requireSchoolMember() {
     schoolAddress: membership.schoolAddress,
     schoolCurrency: membership.schoolCurrency,
     schoolTimezone: membership.schoolTimezone,
+    schoolIsPractice: membership.isPracticeWorkspace,
+    practiceParentSchoolId: membership.practiceParentSchoolId,
     membershipId: membership.membershipId,
     schoolChoices: memberships.map(({ schoolPublicId, schoolName }) => ({ schoolPublicId, schoolName })),
     multiSchoolEnabled: isMultiSchoolEnabled(),
