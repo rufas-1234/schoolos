@@ -651,7 +651,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <button className="h-10 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white">View payroll</button>
             </SmartFilterForm>
             <p className="print:hidden rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-              After paying staff through your bank or cash process, confirm it here. SchoolOS records the approved expense and marks payroll paid; it does not transfer funds automatically.
+              After paying staff externally, confirm the payment here.
             </p>
             <section className="grid gap-3 sm:grid-cols-3">
               <SummaryCard label={`Payroll records · ${payrollPeriod}`} value={String(payrollRecords.length)} />
