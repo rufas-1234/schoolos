@@ -34,6 +34,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { getStudentStatusTransitions } from "@/lib/student-policy";
 import { normalizeStudentFieldSettings } from "@/lib/student-settings";
 import { StudentForm } from "./student-form";
+import { StudentImportForm } from "./student-import-form";
 import { StudentProfileDetails } from "./student-profile-details";
 import { StudentStatusForm } from "./student-status-form";
 import { StudentPlacementForm } from "../academics/management-forms";
@@ -539,21 +540,33 @@ export default async function StudentsPage({
           showRowNumber={false}
           mobileCardView
           toolbarActions={canCreate ? (
-            <AdminActionDialog
-              label="Add student"
-              title="Add student record"
-              initialOpen={openAddStudent}
-              openWhenSearchParam={{ name: "action", value: "add" }}
-            >
-              <StudentForm
-                branches={branchOptions}
-                years={yearOptions}
-                classes={classOptions}
-                sections={sectionOptions}
-                categories={categorySelectOptions}
-                settings={studentFieldSettings}
-              />
-            </AdminActionDialog>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href="/templates/student-import-template.csv"
+                download
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Student CSV template
+              </a>
+              <AdminActionDialog label="Import students" title="Import students" className="w-[min(94vw,42rem)]">
+                <StudentImportForm />
+              </AdminActionDialog>
+              <AdminActionDialog
+                label="Add student"
+                title="Add student record"
+                initialOpen={openAddStudent}
+                openWhenSearchParam={{ name: "action", value: "add" }}
+              >
+                <StudentForm
+                  branches={branchOptions}
+                  years={yearOptions}
+                  classes={classOptions}
+                  sections={sectionOptions}
+                  categories={categorySelectOptions}
+                  settings={studentFieldSettings}
+                />
+              </AdminActionDialog>
+            </div>
           ) : null}
           rows={records.map((record) => ({
             id: record.id,

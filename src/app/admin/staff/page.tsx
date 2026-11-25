@@ -289,20 +289,29 @@ export default async function StaffDirectoryPage({
           initialFilters={initialFilters}
           showActionLabels
           toolbarActions={
-            <AdminActionDialog
-              label="Add staff member"
-              title="Add staff member"
-              openWhenSearchParam={{ name: "action", value: "add" }}
-            >
-              <StaffForm
-                accounts={accounts}
-                branches={branches}
-                departments={departments}
-                designations={designations}
-                requiredFields={requiredFields}
-                visibleFields={visibleFields}
-              />
-            </AdminActionDialog>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href="/templates/staff-import-template.csv"
+                download
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Staff CSV template
+              </a>
+              <AdminActionDialog
+                label="Add staff member"
+                title="Add staff member"
+                openWhenSearchParam={{ name: "action", value: "add" }}
+              >
+                <StaffForm
+                  accounts={accounts}
+                  branches={branches}
+                  departments={departments}
+                  designations={designations}
+                  requiredFields={requiredFields}
+                  visibleFields={visibleFields}
+                />
+              </AdminActionDialog>
+            </div>
           }
           rows={records.map((record) => ({
             id: record.id,
