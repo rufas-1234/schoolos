@@ -22,6 +22,7 @@ import {
   KeyRound,
   LogOut,
   Menu,
+  MoreHorizontal,
   PackageOpen,
   Search,
   School,
@@ -326,9 +327,10 @@ export function AdminShell({
   selectedAcademicYearId: number | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(false);
+  const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(true);
   const [desktopRightSidebarExpanded, setDesktopRightSidebarExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const [rightSidebarQuery, setRightSidebarQuery] = useState("");
   const [leftSidebarQuery, setLeftSidebarQuery] = useState("");
@@ -368,6 +370,10 @@ export function AdminShell({
   const [dormitoriesOpen, setDormitoriesOpen] = useState(() => pathname.startsWith("/admin/dormitories"));
   const [systemOpen, setSystemOpen] = useState(() => pathname.startsWith("/admin/system"));
   const router = useRouter();
+  const expandDesktopSidebar = () => {
+    window.localStorage.setItem("schoolos-admin-sidebar", "expanded");
+    setDesktopSidebarExpanded(true);
+  };
   useEffect(() => {
     function focusSidebarSearch(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -376,7 +382,7 @@ export function AdminShell({
           setOpen(true);
           window.setTimeout(() => leftSidebarSearchRef.current?.focus(), 50);
         } else if (!desktopSidebarExpanded) {
-          setDesktopSidebarExpanded(true);
+          expandDesktopSidebar();
           window.setTimeout(() => leftSidebarSearchRef.current?.focus(), 50);
         } else {
           leftSidebarSearchRef.current?.focus();
@@ -398,6 +404,12 @@ export function AdminShell({
         (child.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false),
       ),
     }));
+  const mobilePrimaryNavigation = visibleNavigation.slice(0, 4);
+  const mobileMoreNavigation = rightSidebarItems.slice(4);
+  const mobileMoreActive = mobileMoreNavigation.some((item) => {
+    const itemPath = item.href.split("?")[0];
+    return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+  });
   const roleLabel = roleNames.length === 1 ? roleNames[0] : "Multiple roles";
   const homeHref = permissions.includes("dashboard.view")
     ? "/admin/dashboard"
@@ -520,6 +532,12 @@ export function AdminShell({
       )?.label ?? "Workspace";
 
   useEffect(() => {
+    const savedPreference = window.localStorage.getItem("schoolos-admin-sidebar");
+    if (savedPreference === "collapsed") setDesktopSidebarExpanded(false);
+    else if (savedPreference === "expanded") setDesktopSidebarExpanded(true);
+  }, []);
+
+  useEffect(() => {
     document
       .querySelectorAll<HTMLAnchorElement>(".admin-sidebar-nav a[aria-current='page']")
       .forEach((link) => link.scrollIntoView({ block: "nearest" }));
@@ -605,7 +623,11 @@ export function AdminShell({
           aria-label={desktopSidebarExpanded ? "Collapse left sidebar" : "Expand left sidebar"}
           aria-controls="admin-left-sidebar"
           aria-expanded={desktopSidebarExpanded}
-          onClick={() => setDesktopSidebarExpanded((expanded) => !expanded)}
+          onClick={() => setDesktopSidebarExpanded((expanded) => {
+            const nextExpanded = !expanded;
+            window.localStorage.setItem("schoolos-admin-sidebar", nextExpanded ? "expanded" : "collapsed");
+            return nextExpanded;
+          })}
           className={cn(
             "mb-3 flex h-9 items-center rounded-md text-slate-500 transition hover:bg-slate-100",
             compact ? "w-9 justify-center" : "w-full justify-between px-3",
@@ -626,7 +648,7 @@ export function AdminShell({
           title="Search navigation"
           aria-label="Expand navigation and search"
           onClick={() => {
-            setDesktopSidebarExpanded(true);
+            expandDesktopSidebar();
             window.setTimeout(() => leftSidebarSearchRef.current?.focus(), 40);
           }}
           className="mb-3 flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
@@ -756,7 +778,7 @@ export function AdminShell({
                   title={compact ? label : undefined}
                   onClick={() => {
                     if (compact) {
-                      setDesktopSidebarExpanded(true);
+                      expandDesktopSidebar();
                     } else if (active) {
                       setSectionOpen((value) => !value);
                     } else {
@@ -806,7 +828,6 @@ export function AdminShell({
                           key={section.id}
                           href={section.href}
                           onClick={() => {
-                            setOpen(false);
                             document.querySelectorAll<HTMLDialogElement>("dialog[open]")
                               .forEach((dialog) => dialog.close());
                           }}
@@ -831,7 +852,6 @@ export function AdminShell({
             <Link
               key={href}
               href={href}
-              onClick={() => setOpen(false)}
               title={compact ? label : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition",
@@ -855,7 +875,6 @@ export function AdminShell({
 
       <Link
         href="/guide"
-        onClick={() => setOpen(false)}
         title={compact ? "User guide" : undefined}
         className={cn("mt-3 flex items-center gap-3 rounded-lg py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950", compact ? "justify-center px-0" : "px-3")}
       >
@@ -1091,6 +1110,71 @@ export function AdminShell({
         )}
         <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>
+      <nav aria-label="Mobile primary navigation" className="admin-mobile-bottom-navigation print:hidden fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[35] flex items-stretch justify-around rounded-2xl border border-slate-200 bg-white/95 px-2 py-1.5 shadow-[0_10px_35px_-15px_rgba(15,23,42,0.55)] backdrop-blur lg:hidden">
+        {mobilePrimaryNavigation.map((item) => {
+          const itemPath = item.href.split("?")[0];
+          const active = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold leading-tight",
+                active ? "text-violet-800" : "text-slate-500 hover:text-slate-900",
+              )}
+            >
+              <Icon size={21} strokeWidth={active ? 2.4 : 1.9} aria-hidden="true" />
+              <span className="max-w-full truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+        <div className="relative flex min-w-0 flex-1">
+          {mobileMoreOpen && (
+            <div className="admin-mobile-more-panel absolute bottom-[calc(100%+0.65rem)] right-1 max-h-[min(70dvh,34rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
+              <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white pb-2">
+                <p className="text-sm font-semibold text-slate-900">More pages</p>
+                <button type="button" onClick={() => setMobileMoreOpen(false)} aria-label="Close more pages" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={17} /></button>
+              </div>
+              <div className="space-y-3 pt-2">
+                {mobileMoreNavigation.map((item) => {
+                  const itemPath = item.href.split("?")[0];
+                  const active = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+                  const Icon = item.icon;
+                  return (
+                    <section key={item.label}>
+                      <Link href={item.href} onClick={() => setMobileMoreOpen(false)} className={cn("flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold", active ? "bg-violet-50 text-violet-800" : "text-slate-800 hover:bg-slate-50")}>
+                        <Icon size={17} aria-hidden="true" />{item.label}
+                      </Link>
+                      {item.children?.length ? (
+                        <div className="ml-7 mt-1 grid gap-0.5 border-l border-slate-200 pl-2">
+                          {item.children.filter((child) => child.href).map((child) => {
+                            const childPath = child.matchPath ?? child.href!.split("?")[0];
+                            const childActive = pathname === childPath && (!child.matchQuery || searchParams.get(child.matchQuery.key) === child.matchQuery.value);
+                            return <Link key={child.id} href={child.href!} onClick={() => setMobileMoreOpen(false)} aria-current={childActive ? "page" : undefined} className={cn("rounded-md px-2 py-1.5 text-xs", childActive ? "bg-violet-50 font-semibold text-violet-800" : "text-slate-600 hover:bg-slate-50")}>{child.label}</Link>;
+                          })}
+                        </div>
+                      ) : null}
+                    </section>
+                  );
+                })}
+                <Link href="/guide" onClick={() => setMobileMoreOpen(false)} className="block rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">User guide</Link>
+              </div>
+            </div>
+          )}
+          <button
+            type="button"
+            aria-label="More navigation options"
+            aria-expanded={mobileMoreOpen}
+            onClick={() => setMobileMoreOpen((value) => !value)}
+            className={cn("flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold leading-tight", mobileMoreOpen || mobileMoreActive ? "text-violet-800" : "text-slate-500 hover:text-slate-900")}
+          >
+            <MoreHorizontal size={21} aria-hidden="true" />
+            <span>More</span>
+          </button>
+        </div>
+      </nav>
       <div
         id="admin-workspace-sidebar"
         className={cn(

@@ -510,6 +510,17 @@ html {
   top: max(1rem, env(safe-area-inset-top));
 }
 
+.dark .admin-mobile-bottom-navigation {
+  border-color: #334155;
+  background-color: rgb(15 23 42 / 96%);
+}
+
+.dark .admin-mobile-more-panel,
+.dark .admin-mobile-more-panel .sticky {
+  border-color: #334155;
+  background-color: #0f172a;
+}
+
 @media (min-width: 768px) {
   .admin-shell-topbar {
     min-height: calc(4.75rem + env(safe-area-inset-top));
@@ -537,6 +548,12 @@ html {
   .admin-shell-main input[type="radio"] {
     height: 1.125rem;
     width: 1.125rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .admin-shell-main {
+    padding-bottom: calc(7.5rem + env(safe-area-inset-bottom)) !important;
   }
 }
 
