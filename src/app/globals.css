@@ -611,10 +611,8 @@ h6 {
 .admin-dialog-form-actions,
 .admin-dialog-content form > div:last-child:has(> button[type="submit"]),
 .admin-dialog-content form > div:last-child:has(> button[type="button"]) {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  margin: 0 -1.75rem -1.75rem;
+  position: static;
+  margin: 0 -1.75rem;
   border-top: 1px solid #e2e8f0;
   background: rgb(255 255 255 / 96%);
   padding: 1rem 1.75rem;
@@ -655,8 +653,7 @@ h6 {
   .admin-dialog-form-actions,
   .admin-dialog-content form > div:last-child:has(> button[type="submit"]),
   .admin-dialog-content form > div:last-child:has(> button[type="button"]) {
-    bottom: 0;
-    margin: 0 -1.25rem -1.25rem;
+    margin: 0 -1.25rem;
     padding: 0.75rem 1.25rem max(0.75rem, env(safe-area-inset-bottom));
   }
 
@@ -707,9 +704,7 @@ h6 {
 
   .admin-library-dialog .admin-dialog-form-actions,
   .admin-library-dialog .library-dialog-actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
+    position: static;
     margin: 0 -1rem;
     border-top: 1px solid #e2e8f0;
     background: rgb(255 255 255 / 96%);
