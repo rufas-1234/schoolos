@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { RequiredMark } from "@/components/required-mark";
 
@@ -48,17 +49,21 @@ export function SearchableSelect({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [menuPlacement, setMenuPlacement] = useState<"above" | "below">("below");
   const [menuMaxHeight, setMenuMaxHeight] = useState(240);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [dialogPortal, setDialogPortal] = useState<HTMLDialogElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const filterQuery = showAllOptions || (open && selectedValue && query === selectedOption?.label) ? "" : query;
   const filteredOptions = options
     .filter((option) => option.label.toLocaleLowerCase().includes(filterQuery.trim().toLocaleLowerCase()))
     .slice(0, 40);
 
-  function updateMenuPlacement() {
+  const updateMenuPlacement = useCallback(() => {
     const input = inputRef.current;
     if (!input) return;
 
     const inputBounds = input.getBoundingClientRect();
+    const dialog = input.closest<HTMLDialogElement>("dialog[open]");
+    const dialogBounds = dialog?.getBoundingClientRect();
     const dialogContent = input.closest<HTMLElement>(".admin-dialog-content");
     const contentBounds = dialogContent?.getBoundingClientRect();
     const topBoundary = Math.max(contentBounds?.top ?? 0, 8);
@@ -77,9 +82,19 @@ export function SearchableSelect({
     const spaceAbove = Math.max(0, inputBounds.top - topBoundary - 8);
     const spaceBelow = Math.max(0, bottomBoundary - inputBounds.bottom - 8);
     const placement = spaceBelow < 180 && spaceAbove > spaceBelow ? "above" : "below";
+    const maxHeight = Math.min(240, placement === "above" ? spaceAbove : spaceBelow);
+    const top = placement === "above"
+      ? inputBounds.top - maxHeight - 4
+      : inputBounds.bottom + 4;
     setMenuPlacement(placement);
-    setMenuMaxHeight(Math.min(240, placement === "above" ? spaceAbove : spaceBelow));
-  }
+    setMenuMaxHeight(maxHeight);
+    setDialogPortal(dialog);
+    setMenuPosition({
+      top: dialogBounds ? top - dialogBounds.top : top,
+      left: dialogBounds ? inputBounds.left - dialogBounds.left : inputBounds.left,
+      width: inputBounds.width,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +105,17 @@ export function SearchableSelect({
       window.removeEventListener("resize", updateMenuPlacement);
       window.removeEventListener("scroll", updateMenuPlacement, true);
     };
-  }, [open]);
+  }, [open, updateMenuPlacement]);
+
+  useEffect(() => {
+    if (!dialogPortal) return;
+    const closeMenu = () => {
+      setOpen(false);
+      setDialogPortal(null);
+    };
+    dialogPortal.addEventListener("close", closeMenu);
+    return () => dialogPortal.removeEventListener("close", closeMenu);
+  }, [dialogPortal]);
 
   function choose(option: SearchableSelectOption) {
     setSelectedValue(option.value);
@@ -127,6 +152,49 @@ export function SearchableSelect({
       choose(filteredOptions[activeIndex]);
     }
   }
+
+  const optionList = open ? (
+    <div
+      id={listId}
+      role="listbox"
+      aria-label={`${label} options`}
+      className={`absolute z-[60] overflow-y-auto rounded-md border border-[#dedede] bg-white p-1 shadow-lg ${
+        dialogPortal
+          ? ""
+          : `left-0 right-0 ${menuPlacement === "above" ? "bottom-full mb-1" : "top-full mt-1"}`
+      }`}
+      style={dialogPortal
+        ? {
+            top: menuPosition.top,
+            left: menuPosition.left,
+            width: menuPosition.width,
+            maxHeight: menuMaxHeight,
+            right: "auto",
+            bottom: "auto",
+          }
+        : { maxHeight: menuMaxHeight }}
+    >
+      {filteredOptions.length ? filteredOptions.map((option, index) => (
+        <button
+          key={option.value}
+          id={`${listId}-option-${index}`}
+          type="button"
+          role="option"
+          aria-selected={selectedValue === option.value}
+          onPointerDown={(event) => event.preventDefault()}
+          onMouseEnter={() => setActiveIndex(index)}
+          onClick={() => choose(option)}
+          className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+            activeIndex === index || selectedValue === option.value ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          {option.label}
+        </button>
+      )) : (
+        <p className="px-3 py-2 text-sm text-slate-500">{emptyLabel}</p>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div hidden={hidden} className="relative block space-y-1.5 text-sm font-medium text-slate-700">
@@ -187,37 +255,7 @@ export function SearchableSelect({
       >
         <ChevronDown size={16} aria-hidden="true" />
       </button>
-      {open && (
-        <div
-          id={listId}
-          role="listbox"
-          aria-label={`${label} options`}
-          className={`absolute left-0 right-0 z-[60] overflow-y-auto rounded-md border border-[#dedede] bg-white p-1 shadow-lg ${
-            menuPlacement === "above" ? "bottom-full mb-1" : "top-full mt-1"
-          }`}
-          style={{ maxHeight: menuMaxHeight }}
-        >
-          {filteredOptions.length ? filteredOptions.map((option, index) => (
-            <button
-              key={option.value}
-              id={`${listId}-option-${index}`}
-              type="button"
-              role="option"
-              aria-selected={selectedValue === option.value}
-              onPointerDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setActiveIndex(index)}
-              onClick={() => choose(option)}
-              className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                activeIndex === index || selectedValue === option.value ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              {option.label}
-            </button>
-          )) : (
-            <p className="px-3 py-2 text-sm text-slate-500">{emptyLabel}</p>
-          )}
-        </div>
-      )}
+      {optionList && (dialogPortal ? createPortal(optionList, dialogPortal) : optionList)}
     </div>
   );
 }

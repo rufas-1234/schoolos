@@ -40,8 +40,9 @@ export type AdminTableRow = {
 
 function observeDialogFeedback(dialog: HTMLDialogElement) {
   let animationFrame = 0;
+  const feedbackSelector = '[role="alert"], [role="status"]';
   const scrollToFeedback = () => {
-    const messages = dialog.querySelectorAll<HTMLElement>('[role="alert"], [role="status"]');
+    const messages = dialog.querySelectorAll<HTMLElement>(feedbackSelector);
     const feedback = messages.item(messages.length - 1);
     if (!feedback) return;
 
@@ -56,12 +57,18 @@ function observeDialogFeedback(dialog: HTMLDialogElement) {
     const containerBounds = scrollContainer.getBoundingClientRect();
     const feedbackBounds = feedback.getBoundingClientRect();
     const visibleTop = containerBounds.top + 12;
-    const visibleBottom = containerBounds.bottom - 12;
+    let visibleBottom = containerBounds.bottom - 12;
+    const stickyActions = dialog.querySelector<HTMLElement>(".admin-dialog-form-actions");
+    const actionsBounds = stickyActions?.getBoundingClientRect();
+    if (actionsBounds && actionsBounds.top > visibleTop && actionsBounds.top < visibleBottom) {
+      visibleBottom = actionsBounds.top - 12;
+    }
     if (feedbackBounds.top >= visibleTop && feedbackBounds.bottom <= visibleBottom) return;
 
+    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
     const targetTop = scrollContainer.scrollTop +
-      feedbackBounds.top - containerBounds.top -
-      (scrollContainer.clientHeight - feedbackBounds.height) / 2;
+      feedbackBounds.top - visibleTop -
+      Math.max(0, (visibleHeight - feedbackBounds.height) / 2);
     scrollContainer.scrollTo({
       top: Math.max(0, targetTop),
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
@@ -71,12 +78,27 @@ function observeDialogFeedback(dialog: HTMLDialogElement) {
     window.cancelAnimationFrame(animationFrame);
     animationFrame = window.requestAnimationFrame(scrollToFeedback);
   };
-  const observer = new MutationObserver(scheduleScroll);
-  observer.observe(dialog, { subtree: true, childList: true, characterData: true });
+  const isFeedbackElement = (element: Element) =>
+    element.matches(feedbackSelector) || element.querySelector(feedbackSelector) !== null;
+  const feedbackObserver = new MutationObserver((records) => {
+    const feedbackChanged = records.some((record) => {
+      const target = record.target instanceof Element
+        ? record.target
+        : record.target.parentElement;
+      return Boolean(
+        target?.closest(feedbackSelector) ||
+        Array.from(record.addedNodes).some(
+          (node) => node instanceof Element && isFeedbackElement(node),
+        ),
+      );
+    });
+    if (feedbackChanged) scheduleScroll();
+  });
+  feedbackObserver.observe(dialog, { subtree: true, childList: true, characterData: true });
   scheduleScroll();
 
   return () => {
-    observer.disconnect();
+    feedbackObserver.disconnect();
     window.cancelAnimationFrame(animationFrame);
   };
 }

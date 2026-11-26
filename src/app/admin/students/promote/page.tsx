@@ -22,7 +22,7 @@ export default async function StudentPromotionPage() {
   const canUpdate = context.grantedPermissions.includes("students.update");
   const [years, branches, sections, enrollments, events] = await Promise.all([
     db
-      .select({ id: academicYears.id, name: academicYears.name, status: academicYears.status })
+      .select({ id: academicYears.id, name: academicYears.name, startDate: academicYears.startDate, status: academicYears.status })
       .from(academicYears)
       .where(and(eq(academicYears.schoolId, context.schoolId), ne(academicYears.status, "archived")))
       .orderBy(asc(academicYears.startDate)),
@@ -57,6 +57,11 @@ export default async function StudentPromotionPage() {
       ? db
           .select({
             id: studentEnrollments.id,
+            sourceClassLevelId: classLevels.id,
+            sourceBranchId: classLevels.branchId,
+            sourceYearId: academicYears.id,
+            sourceYearStartDate: academicYears.startDate,
+            sourceYearName: academicYears.name,
             studentFirstName: students.firstName,
             studentLastName: students.lastName,
             admissionNumber: students.admissionNumber,
@@ -104,12 +109,25 @@ export default async function StudentPromotionPage() {
   ]);
   const enrollmentOptions = enrollments.map((enrollment) => ({
     id: enrollment.id,
+    classLevelId: enrollment.sourceClassLevelId,
     label: `${enrollment.studentFirstName} ${enrollment.studentLastName}${enrollment.admissionNumber ? ` · ${enrollment.admissionNumber}` : ""} — ${enrollment.className} ${enrollment.sectionName} · ${enrollment.yearName}`,
   }));
   const yearOptions = years.map((year) => ({
     id: year.id,
+    startDate: year.startDate,
     label: `${year.name} · ${year.status}`,
   }));
+  const promotionClasses = [...new Map(enrollments.map((enrollment) => [
+    enrollment.sourceClassLevelId,
+    {
+      id: enrollment.sourceClassLevelId,
+      branchId: enrollment.sourceBranchId,
+      yearId: enrollment.sourceYearId,
+      yearStartDate: enrollment.sourceYearStartDate,
+      yearName: enrollment.sourceYearName,
+      label: `${enrollment.className} · ${branches.find((branch) => branch.id === enrollment.sourceBranchId)?.name ?? "Branch"} · ${enrollment.yearName}`,
+    },
+  ])).values()];
   const sectionOptions = sections.map((section) => ({
     id: section.id,
     branchId: section.branchId,
@@ -152,6 +170,7 @@ export default async function StudentPromotionPage() {
             <EnrollmentOperationForm
               branches={branchOptions}
               enrollments={enrollmentOptions}
+              promotionClasses={promotionClasses}
               years={yearOptions}
               sections={sectionOptions}
               allowBulkSelection

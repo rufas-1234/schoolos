@@ -1078,13 +1078,20 @@ export function StudentPlacementForm({
 export function EnrollmentOperationForm({
   branches,
   enrollments,
+  promotionClasses,
   years,
   sections,
   allowBulkSelection = false,
 }: {
   branches: Option[];
-  enrollments: Option[];
-  years: Option[];
+  enrollments: (Option & { classLevelId?: number })[];
+  promotionClasses?: (Option & {
+    branchId: number;
+    yearId: number;
+    yearStartDate: string;
+    yearName: string;
+  })[];
+  years: (Option & { startDate?: string })[];
   sections: (Option & { branchId: number; academicYearId: number })[];
   allowBulkSelection?: boolean;
 }) {
@@ -1093,27 +1100,44 @@ export function EnrollmentOperationForm({
   const [yearId, setYearId] = useState("");
   const [branchId, setBranchId] = useState("");
   const [sectionId, setSectionId] = useState("");
+  const [sourceClassLevelId, setSourceClassLevelId] = useState("");
   const [rosterSearch, setRosterSearch] = useState("");
   const [showStudentList, setShowStudentList] = useState(false);
-  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState(
-    () => new Set(enrollments.map((enrollment) => String(enrollment.id))),
-  );
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState(() => new Set<string>());
   const [state, formAction, pending] = useActionState<AcademicActionState, FormData>(
     allowBulkSelection ? recordEnrollmentOperationsBulk : recordEnrollmentOperation,
     {},
   );
+  const selectedClass = promotionClasses?.find((item) => String(item.id) === sourceClassLevelId);
+  const classEnrollments = useMemo(() => allowBulkSelection
+    ? enrollments.filter((enrollment) => String(enrollment.classLevelId) === sourceClassLevelId)
+    : enrollments,
+  [allowBulkSelection, enrollments, sourceClassLevelId]);
   const filteredEnrollments = useMemo(() => {
     const query = rosterSearch.trim().toLocaleLowerCase();
     return query
-      ? enrollments.filter((enrollment) => enrollment.label.toLocaleLowerCase().includes(query))
-      : enrollments;
-  }, [enrollments, rosterSearch]);
-  const allStudentsSelected = enrollments.length > 0 &&
-    enrollments.every((enrollment) => selectedEnrollmentIds.has(String(enrollment.id)));
+      ? classEnrollments.filter((enrollment) => enrollment.label.toLocaleLowerCase().includes(query))
+      : classEnrollments;
+  }, [classEnrollments, rosterSearch]);
+  const allStudentsSelected = classEnrollments.length > 0 &&
+    classEnrollments.every((enrollment) => selectedEnrollmentIds.has(String(enrollment.id)));
+  const targetYearOptions = !allowBulkSelection
+    ? years
+    : operation === "transfer_in_school"
+    ? years.filter((year) => String(year.id) === String(selectedClass?.yearId))
+    : operation === "promote" || operation === "repeat"
+      ? years.filter((year) => (year.startDate ?? "") > (selectedClass?.yearStartDate ?? ""))
+        .sort((first, second) => (first.startDate ?? "").localeCompare(second.startDate ?? ""))
+        .slice(0, 1)
+      : years;
+  const targetBranchOptions = (operation === "promote" || operation === "repeat") && selectedClass
+    ? branches.filter((branch) => String(branch.id) === String(selectedClass.branchId))
+    : branches;
   const availableSections = sections.filter(
     (section) =>
       String(section.academicYearId) === yearId &&
-      String(section.branchId) === branchId,
+      String(section.branchId) === branchId &&
+      (operation !== "promote" && operation !== "repeat" || String(section.branchId) === String(selectedClass?.branchId)),
   );
 
   return (
@@ -1122,33 +1146,65 @@ export function EnrollmentOperationForm({
       <p className="text-xs text-slate-500"><RequiredMark /> Required fields</p>
       {allowBulkSelection ? (
         <fieldset className="min-w-0 space-y-3 rounded-xl border border-slate-200 p-3 sm:p-4">
-          <legend className="px-1 text-sm font-medium text-slate-700">Select students to process <RequiredMark /></legend>
+          <legend className="px-1 text-sm font-medium text-slate-700">Choose a class to process <RequiredMark /></legend>
+          <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+            Current class <RequiredMark />
+            <select
+              value={sourceClassLevelId}
+              required
+              onChange={(event) => {
+                const nextClassId = event.target.value;
+                const nextClass = promotionClasses?.find((item) => String(item.id) === nextClassId);
+                const nextPromotionYear = years
+                  .filter((year) => (year.startDate ?? "") > (nextClass?.yearStartDate ?? ""))
+                  .sort((first, second) => (first.startDate ?? "").localeCompare(second.startDate ?? ""))[0];
+                setSourceClassLevelId(nextClassId);
+                const classEnrollmentIds = enrollments
+                  .filter((enrollment) => String(enrollment.classLevelId) === nextClassId)
+                  .map((enrollment) => String(enrollment.id));
+                setSelectedEnrollmentIds(new Set(classEnrollmentIds));
+                setYearId(nextPromotionYear ? String(nextPromotionYear.id) : "");
+                setBranchId(nextClass ? String(nextClass.branchId) : "");
+                setSectionId("");
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none focus:border-violet-400 focus:bg-white"
+            >
+              <option value="">Choose a current class</option>
+              {(promotionClasses ?? []).map((item) => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+          </label>
           {Array.from(selectedEnrollmentIds, (enrollmentId) => (
             <input key={enrollmentId} type="hidden" name="enrollmentIds" value={enrollmentId} />
           ))}
           <p className="text-xs text-slate-500">
-            Everyone starts selected. Uncheck students who need to repeat.
+            {selectedClass
+              ? `All active students in ${selectedClass.label} start selected. Exclude students who are repeating, transferring, graduating, or otherwise not eligible; record those outcomes separately.`
+              : "Choose a current class to load its active students."}
           </p>
           <label className="flex min-w-0 items-start gap-2 text-sm font-semibold leading-5 text-slate-700">
             <input
               type="checkbox"
               checked={allStudentsSelected}
+              disabled={!selectedClass}
               onChange={(event) => setSelectedEnrollmentIds(() => {
                 return event.target.checked
-                  ? new Set(enrollments.map((enrollment) => String(enrollment.id)))
+                  ? new Set(classEnrollments.map((enrollment) => String(enrollment.id)))
                   : new Set<string>();
               })}
               className="size-4 rounded border-slate-300 text-violet-700 focus:ring-violet-500"
             />
-            <span>Select all {enrollments.length} students</span>
+            <span>Select all {classEnrollments.length} students in this class</span>
           </label>
           <p aria-live="polite" className="text-xs font-medium text-slate-600">
-            {selectedEnrollmentIds.size} of {enrollments.length} students selected
+            {selectedEnrollmentIds.size} of {classEnrollments.length} students selected
           </p>
           <button
             type="button"
             aria-expanded={showStudentList}
             aria-controls="enrollment-student-list"
+            disabled={!selectedClass}
             onClick={() => setShowStudentList((shown) => !shown)}
             className="text-sm font-medium text-violet-700 underline decoration-violet-300 underline-offset-4 hover:text-violet-900"
           >
@@ -1161,7 +1217,7 @@ export function EnrollmentOperationForm({
                 value={rosterSearch}
                 onChange={(event) => setRosterSearch(event.target.value)}
                 placeholder="Search students..."
-                aria-label="Search current student enrollments"
+                aria-label="Search students in the selected class"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
               />
               <div className="max-h-64 min-w-0 space-y-1 overflow-x-hidden overflow-y-auto border-y border-slate-100 py-2">
@@ -1198,10 +1254,24 @@ export function EnrollmentOperationForm({
           name="operation"
           required
           defaultValue="promote"
-          onChange={(event) => setOperation(event.target.value)}
+          onChange={(event) => {
+            const nextOperation = event.target.value;
+            setOperation(nextOperation);
+            const nextYear = !allowBulkSelection
+              ? undefined
+              : nextOperation === "transfer_in_school"
+              ? selectedClass?.yearId
+              : nextOperation === "promote" || nextOperation === "repeat"
+                ? years
+                  .filter((year) => (year.startDate ?? "") > (selectedClass?.yearStartDate ?? ""))
+                  .sort((first, second) => (first.startDate ?? "").localeCompare(second.startDate ?? ""))[0]?.id
+                : undefined;
+            setYearId(nextYear ? String(nextYear) : "");
+            setSectionId("");
+          }}
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
         >
-          <option value="promote">Promote or place in a different class in a later year</option>
+          <option value="promote">Promote this class to the next class in the next academic year</option>
           <option value="repeat">Repeat the same class in a later year</option>
           <option value="transfer_in_school">Transfer to another class or section this year</option>
           <option value="transfer_out">Transfer out to another school</option>
@@ -1209,15 +1279,16 @@ export function EnrollmentOperationForm({
         </select>
       </label>
       <SearchableSelect
+        key={`destination-year-${selectedClass?.id ?? "single"}-${operation}`}
         label="Destination academic year (not needed for transfer-out / graduation)"
         name="targetYearId"
         options={[
           { value: "", label: needsDestination ? "Choose a destination year" : "No destination year" },
-          ...years.map((year) => ({ value: String(year.id), label: year.label })),
+          ...targetYearOptions.map((year) => ({ value: String(year.id), label: year.label })),
         ]}
         required={needsDestination}
         defaultValue={yearId}
-        disabled={!needsDestination || !years.length}
+        disabled={!needsDestination || !targetYearOptions.length}
         placeholder="Search academic years..."
         onValueChange={(value) => {
           setYearId(value);
@@ -1225,12 +1296,12 @@ export function EnrollmentOperationForm({
         }}
       />
       <SearchableSelect
-        key={`destination-branch-${needsDestination}`}
+        key={`destination-branch-${selectedClass?.id ?? "single"}-${operation}`}
         label="Destination branch"
         name="branchId"
         options={[
           { value: "", label: needsDestination ? "Choose a branch" : "No destination branch" },
-          ...branches.map((branch) => ({ value: String(branch.id), label: branch.label })),
+          ...targetBranchOptions.map((branch) => ({ value: String(branch.id), label: branch.label })),
         ]}
         required={needsDestination}
         defaultValue={branchId}
@@ -1243,7 +1314,7 @@ export function EnrollmentOperationForm({
       />
       <SearchableSelect
         key={`destination-section-${yearId}-${branchId}-${needsDestination}`}
-        label="Destination class section (not needed for transfer-out / graduation)"
+        label="Destination class section (choose the next class for promotion)"
         name="targetSectionId"
         options={[
           {
