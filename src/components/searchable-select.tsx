@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown } from "lucide-react";
 import { RequiredMark } from "@/components/required-mark";
 
@@ -46,11 +46,51 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [showAllOptions, setShowAllOptions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [menuPlacement, setMenuPlacement] = useState<"above" | "below">("below");
+  const [menuMaxHeight, setMenuMaxHeight] = useState(240);
   const inputRef = useRef<HTMLInputElement>(null);
   const filterQuery = showAllOptions || (open && selectedValue && query === selectedOption?.label) ? "" : query;
   const filteredOptions = options
     .filter((option) => option.label.toLocaleLowerCase().includes(filterQuery.trim().toLocaleLowerCase()))
     .slice(0, 40);
+
+  function updateMenuPlacement() {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const inputBounds = input.getBoundingClientRect();
+    const dialogContent = input.closest<HTMLElement>(".admin-dialog-content");
+    const contentBounds = dialogContent?.getBoundingClientRect();
+    const topBoundary = Math.max(contentBounds?.top ?? 0, 8);
+    let bottomBoundary = Math.min(contentBounds?.bottom ?? window.innerHeight, window.innerHeight) - 8;
+
+    const stickyActions = dialogContent?.querySelector<HTMLElement>(".admin-dialog-form-actions");
+    const actionsBounds = stickyActions?.getBoundingClientRect();
+    if (
+      actionsBounds &&
+      actionsBounds.top > inputBounds.bottom &&
+      actionsBounds.top < (contentBounds?.bottom ?? window.innerHeight)
+    ) {
+      bottomBoundary = Math.min(bottomBoundary, actionsBounds.top - 8);
+    }
+
+    const spaceAbove = Math.max(0, inputBounds.top - topBoundary - 8);
+    const spaceBelow = Math.max(0, bottomBoundary - inputBounds.bottom - 8);
+    const placement = spaceBelow < 180 && spaceAbove > spaceBelow ? "above" : "below";
+    setMenuPlacement(placement);
+    setMenuMaxHeight(Math.min(240, placement === "above" ? spaceAbove : spaceBelow));
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPlacement();
+    window.addEventListener("resize", updateMenuPlacement);
+    window.addEventListener("scroll", updateMenuPlacement, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPlacement);
+      window.removeEventListener("scroll", updateMenuPlacement, true);
+    };
+  }, [open]);
 
   function choose(option: SearchableSelectOption) {
     setSelectedValue(option.value);
@@ -75,10 +115,12 @@ export function SearchableSelect({
     } else if (event.key === "ArrowDown" && filteredOptions.length > 0) {
       event.preventDefault();
       setOpen(true);
+      updateMenuPlacement();
       setActiveIndex((index) => (index + 1) % filteredOptions.length);
     } else if (event.key === "ArrowUp" && filteredOptions.length > 0) {
       event.preventDefault();
       setOpen(true);
+      updateMenuPlacement();
       setActiveIndex((index) => index <= 0 ? filteredOptions.length - 1 : index - 1);
     } else if (event.key === "Enter" && open && activeIndex >= 0 && filteredOptions[activeIndex]) {
       event.preventDefault();
@@ -111,6 +153,7 @@ export function SearchableSelect({
         onFocus={() => {
           if (disabled) return;
           setOpen(true);
+          updateMenuPlacement();
           setShowAllOptions(!query);
           if (selectedValue) setQuery("");
         }}
@@ -133,7 +176,9 @@ export function SearchableSelect({
         aria-expanded={open}
         onPointerDown={(event) => event.preventDefault()}
         onClick={() => {
-          setOpen((value) => !value);
+          const nextOpen = !open;
+          setOpen(nextOpen);
+          if (nextOpen) updateMenuPlacement();
           setShowAllOptions(true);
           setActiveIndex(-1);
           inputRef.current?.focus();
@@ -147,7 +192,10 @@ export function SearchableSelect({
           id={listId}
           role="listbox"
           aria-label={`${label} options`}
-          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-md border border-[#dedede] bg-white p-1 shadow-lg"
+          className={`absolute left-0 right-0 z-[60] overflow-y-auto rounded-md border border-[#dedede] bg-white p-1 shadow-lg ${
+            menuPlacement === "above" ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
+          style={{ maxHeight: menuMaxHeight }}
         >
           {filteredOptions.length ? filteredOptions.map((option, index) => (
             <button

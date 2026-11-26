@@ -440,8 +440,12 @@ export function ActionForm({
           {state.error}
         </p>
       )}
+      {state.success && (
+        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+          Saved successfully.
+        </p>
+      )}
       {children}
-      {state.success && <p role="status" className="text-sm text-emerald-700">Saved successfully.</p>}
       <div className="admin-dialog-form-actions flex justify-end">
         {confirmation
           ? <AdminConfirmSubmitButton
