@@ -2301,53 +2301,6 @@ export async function reopenApprovedExamSubject(
   return { success: true };
 }
 
-export async function assignExamClassTeacher(
-  _previousState: ExaminationActionState,
-  formData: FormData,
-): Promise<ExaminationActionState> {
-  const context = await requireSchoolPermission("examinations.create");
-  const parsed = z.object({
-    examClassId: idField,
-    teacherId: idField,
-  }).safeParse({
-    examClassId: value(formData, "examClassId"),
-    teacherId: value(formData, "teacherId"),
-  });
-  if (!parsed.success) return { error: "Choose an examination class and an active class teacher." };
-  const [teacher] = await db.select({ id: teachers.id }).from(teachers).where(and(
-    eq(teachers.id, parsed.data.teacherId),
-    eq(teachers.schoolId, context.schoolId),
-    eq(teachers.status, "active"),
-  )).limit(1);
-  if (!teacher) return { error: "Choose an active teacher belonging to this school." };
-  const [examClass] = await db.select({
-    id: examClasses.id,
-    examId: examinations.id,
-    examStatus: examinations.status,
-    classLevelId: examClasses.classLevelId,
-    academicYearId: examinations.academicYearId,
-  }).from(examClasses).innerJoin(examinations, and(
-    eq(examinations.id, examClasses.examinationId),
-    eq(examinations.schoolId, context.schoolId),
-  )).where(and(
-    eq(examClasses.id, parsed.data.examClassId),
-    eq(examClasses.schoolId, context.schoolId),
-  )).limit(1);
-  if (!examClass || examClass.examStatus !== "open") return { error: "Class teacher assignments can only be changed while the examination is open." };
-  const [appointedTeacher] = await db.select({ id: classSections.id }).from(classSections).where(and(
-    eq(classSections.schoolId, context.schoolId),
-    eq(classSections.academicYearId, examClass.academicYearId),
-    eq(classSections.classLevelId, examClass.classLevelId),
-    eq(classSections.classTeacherId, parsed.data.teacherId),
-  )).limit(1);
-  if (!appointedTeacher) return { error: "The review teacher must already be appointed to this class for the selected academic year." };
-  await db.update(examClasses).set({ classTeacherId: parsed.data.teacherId })
-    .where(and(eq(examClasses.id, examClass.id), eq(examClasses.schoolId, context.schoolId)));
-  revalidatePath(`/admin/examinations/${examClass.examId}`);
-  revalidatePath("/portal/teacher");
-  return { success: true };
-}
-
 export async function publishExamination(
   _previousState: ExaminationActionState,
   formData: FormData,

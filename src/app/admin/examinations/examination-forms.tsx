@@ -9,7 +9,6 @@ import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
 import {
   createExamType,
   createExamination,
-  assignExamClassTeacher,
   createGradingScale,
   deleteExamination,
   publishExamination,
@@ -822,32 +821,6 @@ export function ReopenApprovedSubjectForm({ examSubjectId }: { examSubjectId: nu
         <textarea required name="reason" maxLength={1000} rows={2} className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-2" />
       </label>
       <SubmitButton pending={pending}>Reopen for correction</SubmitButton>
-      <Feedback state={state} />
-    </form>
-  );
-}
-
-export function AssignExamClassTeacherForm({
-  examClassId,
-  classTeacherId,
-  teachers,
-}: {
-  examClassId: number;
-  classTeacherId: number | null;
-  teachers: Array<{ id: number; name: string }>;
-}) {
-  const [state, action, pending] = useActionState<ExaminationActionState, FormData>(assignExamClassTeacher, {});
-  return (
-    <form action={action} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-3">
-      <input type="hidden" name="examClassId" value={examClassId} />
-      <label className="min-w-60 flex-1 text-xs font-medium text-slate-600">
-        Class teacher responsible for reviewing results
-        <select name="teacherId" defaultValue={classTeacherId ? String(classTeacherId) : ""} required className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900">
-          <option value="">Select class teacher</option>
-          {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
-        </select>
-      </label>
-      <SubmitButton pending={pending}>Assign</SubmitButton>
       <Feedback state={state} />
     </form>
   );
