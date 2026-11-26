@@ -1758,8 +1758,8 @@
         }
       },
       "foreignKeys": {
-        "class_section_subject_teachers_schoolId_schools_id_fk": {
-          "name": "class_section_subject_teachers_schoolId_schools_id_fk",
+        "csst_school_fk": {
+          "name": "csst_school_fk",
           "tableFrom": "class_section_subject_teachers",
           "tableTo": "schools",
           "columnsFrom": [
@@ -1771,8 +1771,8 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "class_section_subject_teachers_classSubjectId_class_subjects_id_fk": {
-          "name": "class_section_subject_teachers_classSubjectId_class_subjects_id_fk",
+        "csst_class_subject_fk": {
+          "name": "csst_class_subject_fk",
           "tableFrom": "class_section_subject_teachers",
           "tableTo": "class_subjects",
           "columnsFrom": [
@@ -1784,8 +1784,8 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "class_section_subject_teachers_classSectionId_class_sections_id_fk": {
-          "name": "class_section_subject_teachers_classSectionId_class_sections_id_fk",
+        "csst_class_section_fk": {
+          "name": "csst_class_section_fk",
           "tableFrom": "class_section_subject_teachers",
           "tableTo": "class_sections",
           "columnsFrom": [
@@ -1797,8 +1797,8 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "class_section_subject_teachers_teacherId_teachers_id_fk": {
-          "name": "class_section_subject_teachers_teacherId_teachers_id_fk",
+        "csst_teacher_fk": {
+          "name": "csst_teacher_fk",
           "tableFrom": "class_section_subject_teachers",
           "tableTo": "teachers",
           "columnsFrom": [
@@ -12545,8 +12545,8 @@
         }
       },
       "foreignKeys": {
-        "student_elective_selections_schoolId_schools_id_fk": {
-          "name": "student_elective_selections_schoolId_schools_id_fk",
+        "ses_school_fk": {
+          "name": "ses_school_fk",
           "tableFrom": "student_elective_selections",
           "tableTo": "schools",
           "columnsFrom": [
@@ -12558,8 +12558,8 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "student_elective_selections_studentEnrollmentId_student_enrollments_id_fk": {
-          "name": "student_elective_selections_studentEnrollmentId_student_enrollments_id_fk",
+        "ses_student_enrollment_fk": {
+          "name": "ses_student_enrollment_fk",
           "tableFrom": "student_elective_selections",
           "tableTo": "student_enrollments",
           "columnsFrom": [
@@ -12571,8 +12571,8 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "student_elective_selections_classSubjectId_class_subjects_id_fk": {
-          "name": "student_elective_selections_classSubjectId_class_subjects_id_fk",
+        "ses_class_subject_fk": {
+          "name": "ses_class_subject_fk",
           "tableFrom": "student_elective_selections",
           "tableTo": "class_subjects",
           "columnsFrom": [

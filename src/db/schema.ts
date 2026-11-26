@@ -1121,20 +1121,36 @@ export const classSectionSubjectTeachers = mysqlTable(
     id: id(),
     publicId: varchar("publicId", { length: 36 }).notNull().unique(),
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
-      .notNull()
-      .references(() => schools.id),
+      .notNull(),
     classSubjectId: bigint("classSubjectId", { mode: "number", unsigned: true })
-      .notNull()
-      .references(() => classSubjects.id, { onDelete: "cascade" }),
+      .notNull(),
     classSectionId: bigint("classSectionId", { mode: "number", unsigned: true })
-      .notNull()
-      .references(() => classSections.id, { onDelete: "cascade" }),
+      .notNull(),
     teacherId: bigint("teacherId", { mode: "number", unsigned: true })
-      .notNull()
-      .references(() => teachers.id),
+      .notNull(),
     createdAt: createdAt(),
   },
   (table) => [
+    foreignKey({
+      name: "csst_school_fk",
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+    }),
+    foreignKey({
+      name: "csst_class_subject_fk",
+      columns: [table.classSubjectId],
+      foreignColumns: [classSubjects.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "csst_class_section_fk",
+      columns: [table.classSectionId],
+      foreignColumns: [classSections.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "csst_teacher_fk",
+      columns: [table.teacherId],
+      foreignColumns: [teachers.id],
+    }),
     uniqueIndex("csst_scope_teacher_uq").on(
       table.schoolId,
       table.classSubjectId,
@@ -1230,19 +1246,31 @@ export const studentElectiveSelections = mysqlTable(
   {
     id: id(),
     schoolId: bigint("schoolId", { mode: "number", unsigned: true })
-      .notNull()
-      .references(() => schools.id),
+      .notNull(),
     studentEnrollmentId: bigint("studentEnrollmentId", { mode: "number", unsigned: true })
-      .notNull()
-      .references(() => studentEnrollments.id, { onDelete: "cascade" }),
+      .notNull(),
     classSubjectId: bigint("classSubjectId", { mode: "number", unsigned: true })
-      .notNull()
-      .references(() => classSubjects.id, { onDelete: "cascade" }),
+      .notNull(),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
+    foreignKey({
+      name: "ses_school_fk",
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+    }),
+    foreignKey({
+      name: "ses_student_enrollment_fk",
+      columns: [table.studentEnrollmentId],
+      foreignColumns: [studentEnrollments.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "ses_class_subject_fk",
+      columns: [table.classSubjectId],
+      foreignColumns: [classSubjects.id],
+    }).onDelete("cascade"),
     uniqueIndex("ses_school_enrollment_subject_uq").on(
       table.schoolId,
       table.studentEnrollmentId,

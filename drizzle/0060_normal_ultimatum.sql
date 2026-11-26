@@ -10,7 +10,7 @@ CREATE TABLE `student_elective_selections` (
 	CONSTRAINT `ses_school_enrollment_subject_uq` UNIQUE(`schoolId`,`studentEnrollmentId`,`classSubjectId`)
 );
 --> statement-breakpoint
-ALTER TABLE `student_elective_selections` ADD CONSTRAINT `student_elective_selections_schoolId_schools_id_fk` FOREIGN KEY (`schoolId`) REFERENCES `schools`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `student_elective_selections` ADD CONSTRAINT `student_elective_selections_studentEnrollmentId_student_enrollments_id_fk` FOREIGN KEY (`studentEnrollmentId`) REFERENCES `student_enrollments`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `student_elective_selections` ADD CONSTRAINT `student_elective_selections_classSubjectId_class_subjects_id_fk` FOREIGN KEY (`classSubjectId`) REFERENCES `class_subjects`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `student_elective_selections` ADD CONSTRAINT `ses_school_fk` FOREIGN KEY (`schoolId`) REFERENCES `schools`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `student_elective_selections` ADD CONSTRAINT `ses_student_enrollment_fk` FOREIGN KEY (`studentEnrollmentId`) REFERENCES `student_enrollments`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `student_elective_selections` ADD CONSTRAINT `ses_class_subject_fk` FOREIGN KEY (`classSubjectId`) REFERENCES `class_subjects`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX `ses_school_subject_status_idx` ON `student_elective_selections` (`schoolId`,`classSubjectId`,`status`);
