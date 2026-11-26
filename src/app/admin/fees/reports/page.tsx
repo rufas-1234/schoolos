@@ -579,6 +579,22 @@ export default async function FeeReportsPage({
     (parseMoneyToMinorUnits(paymentTotals?.fineAmount ?? "0") ?? 0) -
     (parseMoneyToMinorUnits(reversalTotals?.fineAmount ?? "0") ?? 0);
   const totalOutstanding = outstandingInvoices.reduce((total, item) => total + item.balance, 0);
+  const selectedStatusLabel = requestedStatus === "paid"
+    ? "Fully paid"
+    : requestedStatus === "partial"
+      ? "Partially paid"
+      : requestedStatus === "unpaid"
+        ? "Unpaid"
+        : "All statuses";
+  const selectedInvoiceFilters = [
+    `${from} through ${to}`,
+    requestedBranch ? `Branch: ${branches.find((branch) => branch.id === requestedBranch)?.name ?? "Selected branch"}` : "All branches",
+    requestedClass ? `Class: ${classes.find((item) => item.id === requestedClass)?.name ?? "Selected class"}` : "All classes",
+    requestedSection ? `Section: ${sections.find((section) => section.id === requestedSection)?.name ?? "Selected section"}` : "All sections",
+    requestedFeeTypeId ? `Fee type: ${feeTypesList.find((feeType) => feeType.id === requestedFeeTypeId)?.name ?? "Selected fee type"}` : "All fee types",
+    `Status: ${selectedStatusLabel}`,
+    `Currency: ${currency}`,
+  ].join(" · ");
 
   return (
     <div className="space-y-6 print-report-page">
@@ -588,7 +604,7 @@ export default async function FeeReportsPage({
           <h1 className="mt-1 text-2xl font-bold text-slate-900">Fee reports</h1>
           <p className="mt-2 text-sm text-slate-600">Review payments, reversals, refunds, fines and outstanding balances by date, branch and class.</p>
         </div>
-        <PrintButton label="Print report" targetId="fee-report-content" />
+        <PrintButton label="Print filtered invoice report" targetId="fee-invoice-status-print-report" pageOrientation="landscape" />
       </header>
 
       <FeeReportFilters
@@ -720,6 +736,36 @@ export default async function FeeReportsPage({
               <td className="px-4 py-3">{invoice.dueDate}</td>
               <td className="px-4 py-3">{invoice.currency} {money(invoice.paid)}</td>
               <td className="px-4 py-3 font-semibold">{invoice.currency} {money(invoice.balance)}</td>
+              <td className="px-4 py-3 capitalize">{invoice.status}</td>
+            </tr>
+          ))}
+        </ReportTable>
+      </section>
+
+      <section id="fee-invoice-status-print-report" className="print-report-content hidden print:block space-y-4">
+        <header className="print-report-heading">
+          <p className="print-report-kicker">Finances · Invoice report</p>
+          <h2>Invoice payment status report</h2>
+          <p>{selectedInvoiceFilters}</p>
+          <p className="text-xs">Invoices are included when their issue date or due date falls within this period.</p>
+          <p className="text-xs">{filteredInvoices.length} matching invoice{filteredInvoices.length === 1 ? "" : "s"}</p>
+        </header>
+        <ReportTable
+          title="Filtered invoices"
+          description={`${selectedStatusLabel} invoices matching the selected report filters.`}
+          empty="No invoices match the selected filters."
+          headings={["Student", "Class / section", "Fee type", "Due date", "Amount due", "Paid", "Balance", "Status"]}
+          hasRows={filteredInvoices.length > 0}
+        >
+          {filteredInvoices.map((invoice) => (
+            <tr key={invoice.id} className="border-t border-slate-100">
+              <td className="px-4 py-3">{invoice.studentName} {invoice.studentLastName}<span className="block text-xs text-slate-500">{invoice.admissionNumber || "—"} · {invoice.rollNumber || "—"}</span></td>
+              <td className="px-4 py-3">{invoice.branchName} / {invoice.className} / {invoice.sectionName}</td>
+              <td className="px-4 py-3">{invoice.feeTypeName}</td>
+              <td className="px-4 py-3">{invoice.dueDate}</td>
+              <td className="px-4 py-3">{currency} {money(invoice.amountDue)}</td>
+              <td className="px-4 py-3">{currency} {money(invoice.paid)}</td>
+              <td className="px-4 py-3 font-semibold">{currency} {money(invoice.balance)}</td>
               <td className="px-4 py-3 capitalize">{invoice.status}</td>
             </tr>
           ))}
