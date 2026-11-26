@@ -523,11 +523,16 @@ html {
 }
 
 .admin-mobile-more-panel {
-  background: linear-gradient(145deg, rgb(255 255 255 / 84%), rgb(248 250 252 / 68%));
+  border-color: rgb(255 255 255 / 84%);
+  background: linear-gradient(145deg, rgb(255 255 255 / 97%), rgb(248 250 252 / 93%));
+  box-shadow:
+    0 18px 48px rgb(15 23 42 / 30%),
+    inset 0 1px 0 rgb(255 255 255 / 98%),
+    inset 0 -1px 0 rgb(255 255 255 / 56%);
 }
 
 .admin-mobile-more-panel .sticky {
-  background: linear-gradient(145deg, rgb(255 255 255 / 88%), rgb(248 250 252 / 72%));
+  background: linear-gradient(145deg, rgb(255 255 255 / 99%), rgb(248 250 252 / 96%));
 }
 
 .dark .admin-mobile-bottom-navigation,
@@ -540,9 +545,27 @@ html {
     inset 0 -1px 0 rgb(255 255 255 / 8%);
 }
 
+.dark .admin-mobile-more-panel {
+  background: linear-gradient(145deg, rgb(15 23 42 / 98%), rgb(15 23 42 / 96%));
+}
+
 .dark .admin-mobile-more-panel .sticky {
   border-color: rgb(255 255 255 / 12%);
-  background: linear-gradient(145deg, rgb(30 41 59 / 90%), rgb(15 23 42 / 82%));
+  background: linear-gradient(145deg, rgb(30 41 59 / 99%), rgb(15 23 42 / 97%));
+}
+
+.dark .admin-mobile-more-panel :is(p, a, button) {
+  color: #e2e8f0;
+}
+
+.dark .admin-mobile-more-panel a:hover,
+.dark .admin-mobile-more-panel button:hover {
+  background-color: rgb(255 255 255 / 10%);
+}
+
+.dark .admin-mobile-more-panel a.bg-violet-50 {
+  background-color: rgb(109 40 217 / 34%);
+  color: #fff;
 }
 
 @media (min-width: 768px) {
