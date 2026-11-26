@@ -683,161 +683,215 @@ export async function generateStudentFeeInvoices(
   formData: FormData,
 ): Promise<FeeActionState> {
   const context = await requireSchoolPermission("fees.manage");
-  const structureId = idField.safeParse(value(formData, "feeStructureId"));
-  if (!structureId.success) return { error: "Select a valid fee structure." };
+  const academicYearId = idField.safeParse(value(formData, "academicYearId"));
+  if (!academicYearId.success) return { error: "Select a valid academic year." };
+  const rawClassIds = formData.getAll("classLevelIds");
+  if (!rawClassIds.length || rawClassIds.some((id) => typeof id !== "string")) {
+    return { error: "Select at least one class." };
+  }
+  const classIds: number[] = [];
+  for (const rawId of rawClassIds) {
+    if (typeof rawId !== "string") return { error: "One or more selected classes are invalid." };
+    const parsedId = idField.safeParse(rawId);
+    if (!parsedId.success) return { error: "One or more selected classes are invalid." };
+    classIds.push(parsedId.data);
+  }
+  if (new Set(classIds).size !== classIds.length) return { error: "A class can only be selected once." };
   const requestedStudent = value(formData, "studentId");
   const studentId = requestedStudent ? idField.safeParse(requestedStudent) : null;
   if (studentId && !studentId.success) return { error: "Select a valid student." };
   const result = await db.transaction(async (tx) => {
-    const [structure] = await tx.select().from(feeStructures)
-      .where(and(eq(feeStructures.id, structureId.data), eq(feeStructures.schoolId, context.schoolId)))
-      .for("update").limit(1);
-    if (!structure) return { error: "Fee structure not found." };
-    const eligible = await tx.select({
-      enrollmentId: studentEnrollments.id,
-      studentId: students.id,
-      discountId: studentFeeDiscounts.discountId,
-      discountType: feeDiscounts.discountType,
-      discountValue: feeDiscounts.value,
-      discountCurrency: feeDiscounts.currency,
-      discountFrequency: feeDiscounts.frequency,
-    })
-      .from(studentEnrollments)
-      .innerJoin(classSections, and(
-        eq(classSections.id, studentEnrollments.classSectionId),
-        eq(classSections.schoolId, context.schoolId),
+    const activeClasses = await tx.select({ id: classLevels.id }).from(classLevels)
+      .innerJoin(schoolBranches, and(
+        eq(schoolBranches.id, classLevels.branchId),
+        eq(schoolBranches.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
       ))
-      .innerJoin(classLevels, and(
-        eq(classLevels.id, classSections.classLevelId),
+      .where(and(
         eq(classLevels.schoolId, context.schoolId),
+        eq(classLevels.status, "active"),
+        inArray(classLevels.id, classIds),
       ))
-      .innerJoin(students, and(eq(students.id, studentEnrollments.studentId), eq(students.schoolId, context.schoolId)))
-      .leftJoin(studentFeeDiscounts, and(
-        eq(studentFeeDiscounts.studentId, students.id),
-        eq(studentFeeDiscounts.schoolId, context.schoolId),
-        eq(studentFeeDiscounts.feeTypeId, structure.feeTypeId),
-      ))
-      .leftJoin(feeDiscounts, and(
-        eq(feeDiscounts.id, studentFeeDiscounts.discountId),
-        eq(feeDiscounts.schoolId, context.schoolId),
-      ))
-      .where(and(
-        eq(studentEnrollments.schoolId, context.schoolId),
-        eq(studentEnrollments.academicYearId, structure.academicYearId),
-        eq(studentEnrollments.status, "enrolled"),
-        eq(classSections.academicYearId, structure.academicYearId),
-        eq(classSections.classLevelId, structure.classLevelId),
-        eq(classLevels.branchId, structure.branchId),
-        inArray(students.status, ["admitted", "active"]),
-        ...(structure.studentId !== null ? [eq(students.id, structure.studentId)] : []),
-        ...(studentId?.success ? [eq(students.id, studentId.data)] : []),
-      ));
-    if (!eligible.length) {
-      return studentId?.success
-        ? { error: "The selected student is not eligible for this fee structure; they must be admitted or active and enrolled in the matching class and year." }
-        : { created: 0 };
+      .for("update");
+    if (activeClasses.length !== classIds.length) {
+      return { error: "One or more selected classes are no longer active or do not belong to this school." };
     }
-    if (eligible.some((row) =>
-      row.discountType === "fixed" &&
-      row.discountId !== null &&
-      row.discountCurrency !== structure.currency
-    )) {
-      return { error: "A fixed discount uses a different currency from this fee structure. Update the discount before generating invoices." };
-    }
-    const alreadyInvoiced = await tx.select({ enrollmentId: studentFeeInvoices.enrollmentId })
-      .from(studentFeeInvoices)
+    const [academicYear] = await tx.select({ id: academicYears.id }).from(academicYears)
       .where(and(
-        eq(studentFeeInvoices.schoolId, context.schoolId),
-        eq(studentFeeInvoices.feeStructureId, structure.id),
-        inArray(studentFeeInvoices.enrollmentId, eligible.map((row) => row.enrollmentId)),
-      ));
-    const existing = new Set(alreadyInvoiced.map((row) => row.enrollmentId));
-    const limitedFrequencyDiscountIds = [...new Set(eligible
-      .filter((row) => (row.discountFrequency === "one_time" || row.discountFrequency === "yearly") && row.discountId !== null)
-      .map((row) => row.discountId)
-      .filter((id): id is number => id !== null))];
-    const appliedDiscountKeys = new Set<string>();
-    if (limitedFrequencyDiscountIds.length) {
-      const usedDiscounts = await tx.select({
-        studentId: studentFeeInvoices.studentId,
-        discountId: studentFeeInvoices.discountId,
-        academicYearId: feeStructures.academicYearId,
-        frequency: feeDiscounts.frequency,
+        eq(academicYears.id, academicYearId.data),
+        eq(academicYears.schoolId, context.schoolId),
+      ))
+      .for("update")
+      .limit(1);
+    if (!academicYear) return { error: "The selected academic year does not belong to this school." };
+    const structures = await tx.select().from(feeStructures)
+      .where(and(
+        eq(feeStructures.schoolId, context.schoolId),
+        eq(feeStructures.academicYearId, academicYear.id),
+        inArray(feeStructures.classLevelId, classIds),
+      ))
+      .orderBy(asc(feeStructures.classLevelId), asc(feeStructures.academicYearId), asc(feeStructures.id))
+      .for("update");
+    if (!structures.length) return { error: "The selected classes do not have any fee structures." };
+    const classesWithStructures = new Set(structures.map((structure) => structure.classLevelId));
+    if (classIds.some((classId) => !classesWithStructures.has(classId))) {
+      return { error: "Each selected class needs at least one fee structure in the selected academic year." };
+    }
+    let createdCount = 0;
+    let eligibleStudentCount = 0;
+    for (const structure of structures) {
+      const eligible = await tx.select({
+        enrollmentId: studentEnrollments.id,
+        studentId: students.id,
+        discountId: studentFeeDiscounts.discountId,
+        discountType: feeDiscounts.discountType,
+        discountValue: feeDiscounts.value,
+        discountCurrency: feeDiscounts.currency,
+        discountFrequency: feeDiscounts.frequency,
       })
-        .from(studentFeeInvoices)
-        .innerJoin(feeStructures, and(
-          eq(feeStructures.id, studentFeeInvoices.feeStructureId),
-          eq(feeStructures.schoolId, context.schoolId),
+        .from(studentEnrollments)
+        .innerJoin(classSections, and(
+          eq(classSections.id, studentEnrollments.classSectionId),
+          eq(classSections.schoolId, context.schoolId),
         ))
-        .innerJoin(feeDiscounts, and(
-          eq(feeDiscounts.id, studentFeeInvoices.discountId),
+        .innerJoin(classLevels, and(
+          eq(classLevels.id, classSections.classLevelId),
+          eq(classLevels.schoolId, context.schoolId),
+        ))
+        .innerJoin(students, and(eq(students.id, studentEnrollments.studentId), eq(students.schoolId, context.schoolId)))
+        .leftJoin(studentFeeDiscounts, and(
+          eq(studentFeeDiscounts.studentId, students.id),
+          eq(studentFeeDiscounts.schoolId, context.schoolId),
+          eq(studentFeeDiscounts.feeTypeId, structure.feeTypeId),
+        ))
+        .leftJoin(feeDiscounts, and(
+          eq(feeDiscounts.id, studentFeeDiscounts.discountId),
           eq(feeDiscounts.schoolId, context.schoolId),
         ))
         .where(and(
-          eq(studentFeeInvoices.schoolId, context.schoolId),
-          eq(feeStructures.feeTypeId, structure.feeTypeId),
-          inArray(studentFeeInvoices.discountId, limitedFrequencyDiscountIds),
-          inArray(studentFeeInvoices.studentId, eligible.map((row) => row.studentId)),
+          eq(studentEnrollments.schoolId, context.schoolId),
+          eq(studentEnrollments.academicYearId, structure.academicYearId),
+          eq(studentEnrollments.status, "enrolled"),
+          eq(classSections.academicYearId, structure.academicYearId),
+          eq(classSections.classLevelId, structure.classLevelId),
+          eq(classLevels.branchId, structure.branchId),
+          inArray(students.status, ["admitted", "active"]),
+          ...(structure.studentId !== null ? [eq(students.id, structure.studentId)] : []),
+          ...(studentId?.success ? [eq(students.id, studentId.data)] : []),
         ));
-      for (const row of usedDiscounts) {
-        if (row.discountId === null || (row.frequency !== "one_time" && row.frequency !== "yearly")) continue;
-        const key = row.frequency === "one_time"
-          ? `once:${row.studentId}:${row.discountId}`
-          : `year:${row.academicYearId}:${row.studentId}:${row.discountId}`;
-        appliedDiscountKeys.add(key);
+      if (!eligible.length) continue;
+      eligibleStudentCount += eligible.length;
+      if (eligible.some((row) =>
+        row.discountType === "fixed" &&
+        row.discountId !== null &&
+        row.discountCurrency !== structure.currency
+      )) {
+        return { error: "A fixed discount uses a different currency from this fee structure. Update the discount before generating invoices." };
       }
+      const alreadyInvoiced = await tx.select({ enrollmentId: studentFeeInvoices.enrollmentId })
+        .from(studentFeeInvoices)
+        .where(and(
+          eq(studentFeeInvoices.schoolId, context.schoolId),
+          eq(studentFeeInvoices.feeStructureId, structure.id),
+          inArray(studentFeeInvoices.enrollmentId, eligible.map((row) => row.enrollmentId)),
+        ));
+      const existing = new Set(alreadyInvoiced.map((row) => row.enrollmentId));
+      const limitedFrequencyDiscountIds = [...new Set(eligible
+        .filter((row) => (row.discountFrequency === "one_time" || row.discountFrequency === "yearly") && row.discountId !== null)
+        .map((row) => row.discountId)
+        .filter((id): id is number => id !== null))];
+      const appliedDiscountKeys = new Set<string>();
+      if (limitedFrequencyDiscountIds.length) {
+        const usedDiscounts = await tx.select({
+          studentId: studentFeeInvoices.studentId,
+          discountId: studentFeeInvoices.discountId,
+          academicYearId: feeStructures.academicYearId,
+          frequency: feeDiscounts.frequency,
+        })
+          .from(studentFeeInvoices)
+          .innerJoin(feeStructures, and(
+            eq(feeStructures.id, studentFeeInvoices.feeStructureId),
+            eq(feeStructures.schoolId, context.schoolId),
+          ))
+          .innerJoin(feeDiscounts, and(
+            eq(feeDiscounts.id, studentFeeInvoices.discountId),
+            eq(feeDiscounts.schoolId, context.schoolId),
+          ))
+          .where(and(
+            eq(studentFeeInvoices.schoolId, context.schoolId),
+            eq(feeStructures.feeTypeId, structure.feeTypeId),
+            inArray(studentFeeInvoices.discountId, limitedFrequencyDiscountIds),
+            inArray(studentFeeInvoices.studentId, eligible.map((row) => row.studentId)),
+          ));
+        for (const row of usedDiscounts) {
+          if (row.discountId === null || (row.frequency !== "one_time" && row.frequency !== "yearly")) continue;
+          const key = row.frequency === "one_time"
+            ? `once:${row.studentId}:${row.discountId}`
+            : `year:${row.academicYearId}:${row.studentId}:${row.discountId}`;
+          appliedDiscountKeys.add(key);
+        }
+      }
+      const amountMinor = parseMoneyToMinorUnits(structure.amount);
+      if (amountMinor === null || amountMinor <= 0) throw new Error("Stored fee structure amount is invalid.");
+      const newInvoices = eligible.filter((row) => !existing.has(row.enrollmentId)).map((row) => {
+        const discountValue = row.discountValue;
+        const discountKey = row.discountId === null || row.discountFrequency === null
+          ? null
+          : row.discountFrequency === "one_time"
+            ? `once:${row.studentId}:${row.discountId}`
+            : `year:${structure.academicYearId}:${row.studentId}:${row.discountId}`;
+        const appliesDiscount = row.discountId !== null &&
+          !(discountKey !== null && appliedDiscountKeys.has(discountKey));
+        if (appliesDiscount && discountKey) {
+          appliedDiscountKeys.add(discountKey);
+        }
+        const discountAmount = !appliesDiscount ? 0 : calculateDiscountMinorUnits(
+          amountMinor,
+          row.discountType ?? "",
+          discountValue ?? "",
+        );
+        if (discountAmount === null) throw new Error("Stored student discount is invalid.");
+        return {
+          publicId: randomUUID(),
+          schoolId: context.schoolId,
+          invoiceNumber: `INV-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`,
+          studentId: row.studentId,
+          enrollmentId: row.enrollmentId,
+          feeStructureId: structure.id,
+          currency: structure.currency,
+          discountId: appliesDiscount ? row.discountId : null,
+          amount: (amountMinor / 100).toFixed(2),
+          discountAmount: (discountAmount / 100).toFixed(2),
+          fineType: structure.fineType,
+          fineValue: structure.fineValue,
+          dueDate: structure.dueDate,
+          status: discountAmount === amountMinor && structure.fineType === "none" ? "paid" : "unpaid",
+          generatedBy: context.user.id,
+        };
+      });
+      for (let offset = 0; offset < newInvoices.length; offset += 250) {
+        const batch = newInvoices.slice(offset, offset + 250);
+        await tx.insert(studentFeeInvoices).values(batch);
+        for (const invoice of batch) {
+          await writeAudit(tx, context.schoolId, context.user.id, "fee_invoice.generated", "student_fee_invoice", invoice.publicId,
+            ["studentId", "feeStructureId", "amount", "discountAmount", "dueDate"]);
+        }
+      }
+      createdCount += newInvoices.length;
     }
-    const amountMinor = parseMoneyToMinorUnits(structure.amount);
-    if (amountMinor === null || amountMinor <= 0) throw new Error("Stored fee structure amount is invalid.");
-    const newInvoices = eligible.filter((row) => !existing.has(row.enrollmentId)).map((row) => {
-      const discountValue = row.discountValue;
-      const discountKey = row.discountId === null || row.discountFrequency === null
-        ? null
-        : row.discountFrequency === "one_time"
-          ? `once:${row.studentId}:${row.discountId}`
-          : `year:${structure.academicYearId}:${row.studentId}:${row.discountId}`;
-      const appliesDiscount = row.discountId !== null &&
-        !(discountKey !== null && appliedDiscountKeys.has(discountKey));
-      if (appliesDiscount && discountKey) {
-        appliedDiscountKeys.add(discountKey);
-      }
-      const discountAmount = !appliesDiscount ? 0 : calculateDiscountMinorUnits(
-        amountMinor,
-        row.discountType ?? "",
-        discountValue ?? "",
-      );
-      if (discountAmount === null) throw new Error("Stored student discount is invalid.");
-      return {
-        publicId: randomUUID(),
-        schoolId: context.schoolId,
-        invoiceNumber: `INV-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`,
-        studentId: row.studentId,
-        enrollmentId: row.enrollmentId,
-        feeStructureId: structure.id,
-        currency: structure.currency,
-        discountId: appliesDiscount ? row.discountId : null,
-        amount: (amountMinor / 100).toFixed(2),
-        discountAmount: (discountAmount / 100).toFixed(2),
-        fineType: structure.fineType,
-        fineValue: structure.fineValue,
-        dueDate: structure.dueDate,
-        status: discountAmount === amountMinor && structure.fineType === "none" ? "paid" : "unpaid",
-        generatedBy: context.user.id,
-      };
-    });
-    for (let offset = 0; offset < newInvoices.length; offset += 250) {
-      const batch = newInvoices.slice(offset, offset + 250);
-      await tx.insert(studentFeeInvoices).values(batch);
-      for (const invoice of batch) {
-        await writeAudit(tx, context.schoolId, context.user.id, "fee_invoice.generated", "student_fee_invoice", invoice.publicId,
-          ["studentId", "feeStructureId", "amount", "discountAmount", "dueDate"]);
-      }
+    if (studentId?.success && !eligibleStudentCount) {
+      return { error: "The selected student is not eligible for any fee structure in the selected classes and academic years." };
     }
-    return { created: newInvoices.length };
+    return { created: createdCount };
   });
   if ("error" in result) return { error: result.error };
   revalidateFees();
-  return { success: true, message: `Generated ${result.created} invoice${result.created === 1 ? "" : "s"}.` };
+  return {
+    success: true,
+    message: result.created
+      ? `Generated ${result.created} invoice${result.created === 1 ? "" : "s"} for ${classIds.length} class${classIds.length === 1 ? "" : "es"}.`
+      : "No new invoices were created; existing invoices were left unchanged.",
+  };
 }
 
 export async function updateFeeInvoice(

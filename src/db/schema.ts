@@ -1115,6 +1115,37 @@ export const classSections = mysqlTable(
   ],
 );
 
+export const classSectionSubjectTeachers = mysqlTable(
+  "class_section_subject_teachers",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    classSubjectId: bigint("classSubjectId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => classSubjects.id, { onDelete: "cascade" }),
+    classSectionId: bigint("classSectionId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => classSections.id, { onDelete: "cascade" }),
+    teacherId: bigint("teacherId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => teachers.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("csst_scope_teacher_uq").on(
+      table.schoolId,
+      table.classSubjectId,
+      table.classSectionId,
+      table.teacherId,
+    ),
+    index("csst_school_section_idx").on(table.schoolId, table.classSectionId),
+    index("csst_school_teacher_idx").on(table.schoolId, table.teacherId),
+  ],
+);
+
 export const classRoutines = mysqlTable(
   "class_routines",
   {
@@ -1191,6 +1222,33 @@ export const studentEnrollments = mysqlTable(
       table.academicYearId,
       table.status,
     ),
+  ],
+);
+
+export const studentElectiveSelections = mysqlTable(
+  "student_elective_selections",
+  {
+    id: id(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => schools.id),
+    studentEnrollmentId: bigint("studentEnrollmentId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => studentEnrollments.id, { onDelete: "cascade" }),
+    classSubjectId: bigint("classSubjectId", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => classSubjects.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("ses_school_enrollment_subject_uq").on(
+      table.schoolId,
+      table.studentEnrollmentId,
+      table.classSubjectId,
+    ),
+    index("ses_school_subject_status_idx").on(table.schoolId, table.classSubjectId, table.status),
   ],
 );
 

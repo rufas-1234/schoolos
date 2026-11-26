@@ -207,7 +207,7 @@ export default function GuidePage() {
                 <Step n={1}>Confirm branches, classes, academic years, terms, and currencies.</Step>
                 <Step n={2}>Create fee groups and fee types. Add discounts or scholarships and assign them to eligible students.</Step>
                 <Step n={3}>Create fee structures for the relevant branch/class/year/term and set amounts and due dates.</Step>
-                <Step n={4}>Generate invoices for the intended students. Check the fee structure, selected year/term, due date, and student group before generating for a whole class or school.</Step>
+                <Step n={4}>Choose an academic year and one or more active classes to generate invoices. The system uses every fee structure for that year assigned to those classes; optionally choose one student, or leave the student field blank to invoice all eligible enrolled students. Existing invoices are not duplicated.</Step>
                 <Step n={5}>Open <strong>Fee Collection</strong>, search for the student or invoice, verify the outstanding balance, record the amount, date, method, and reference, then save and issue the receipt.</Step>
                 <Step n={6}>Open the receipt to print it or use the receipt link to verify the payment. If a payment was entered incorrectly, use the authorized reversal workflow and record the reason; do not enter a second payment as a workaround.</Step>
                 <Step n={7}>Use fee reports to review collections, balances, discounts, reversals, or overdue amounts. Use <strong>Carry-forward fees</strong> only after checking the source balance and destination period/student.</Step>

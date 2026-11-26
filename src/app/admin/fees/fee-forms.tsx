@@ -27,14 +27,8 @@ import {
 } from "./actions";
 
 export type FeeOption = { id: number; label: string };
+type InvoiceClassOption = FeeOption & { academicYearIds: number[] };
 type FeeTypeOption = FeeOption & { feeGroupId: number };
-type InvoiceStructureOption = FeeOption & {
-  branchName: string;
-  className: string;
-  academicYear: string;
-  feeTypeName: string;
-  dueDate: string;
-};
 type ValueOption = { value: string; label: string };
 export type CurrencyOption = ValueOption;
 type FeeDeleteAction = (
@@ -410,70 +404,79 @@ export function FeeStructureForm({
 }
 
 export function GenerateInvoicesForm({
-  structures,
+  classes,
+  academicYears,
+  defaultAcademicYearId,
   students,
 }: {
-  structures: InvoiceStructureOption[];
+  classes: InvoiceClassOption[];
+  academicYears: FeeOption[];
+  defaultAcademicYearId: number;
   students: FeeOption[];
 }) {
-  const [sortBy, setSortBy] = useState<"branchName" | "className" | "academicYear" | "feeTypeName" | "dueDate">("feeTypeName");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const sortedStructures = [...structures].sort((first, second) => {
-    const comparison = first[sortBy].localeCompare(second[sortBy]);
-    return sortDirection === "asc" ? comparison : -comparison;
-  });
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState(defaultAcademicYearId);
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const availableClasses = classes.filter((classOption) =>
+    classOption.academicYearIds.includes(selectedAcademicYearId),
+  );
 
   return (
     <ActionForm action={generateStudentFeeInvoices} title="Generate student invoices" submitLabel="Generate invoices">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Sort fee structures by
-          <select
-            value={sortBy}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (
-                value === "branchName" ||
-                value === "className" ||
-                value === "academicYear" ||
-                value === "feeTypeName" ||
-                value === "dueDate"
-              ) setSortBy(value);
-            }}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
-          >
-            <option value="feeTypeName">Fee type</option>
-            <option value="branchName">Branch</option>
-            <option value="className">Class</option>
-            <option value="academicYear">Academic year</option>
-            <option value="dueDate">Due date</option>
-          </select>
-        </label>
-        <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-          Sort direction
-          <select
-            value={sortDirection}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (value === "asc" || value === "desc") setSortDirection(value);
-            }}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-        </label>
+      <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+        Academic year
+        <select
+          name="academicYearId"
+          value={selectedAcademicYearId}
+          onChange={(event) => {
+            const academicYearId = Number(event.currentTarget.value);
+            setSelectedAcademicYearId(academicYearId);
+            setSelectedClassIds((current) => current.filter((id) =>
+              classes.some((classOption) =>
+                classOption.id === id && classOption.academicYearIds.includes(academicYearId),
+              ),
+            ));
+          }}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900"
+          required
+        >
+          {academicYears.map((year) => <option key={year.id} value={year.id}>{year.label}</option>)}
+        </select>
+      </label>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-slate-700">Select classes (listed by class)</legend>
+        <div className="grid max-h-64 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
+          {availableClasses.map((classOption) => (
+            <label key={classOption.id} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                name="classLevelIds"
+                value={classOption.id}
+                checked={selectedClassIds.includes(classOption.id)}
+                onChange={(event) => setSelectedClassIds((current) => event.target.checked
+                  ? [...current, classOption.id]
+                  : current.filter((id) => id !== classOption.id))}
+                className="size-4 rounded border-slate-300 text-violet-700"
+              />
+              {classOption.label}
+            </label>
+          ))}
+          {!availableClasses.length && <p className="text-sm text-slate-500">No active classes have fee structures for this academic year.</p>}
+        </div>
+        <p className="text-xs leading-5 text-slate-500">
+          Every fee structure in this academic year assigned to the selected classes will be invoiced for eligible enrolled students. Existing invoices stay unchanged.
+        </p>
+      </fieldset>
+      <div>
+        <SearchableSelect
+          label="Student (optional)"
+          name="studentId"
+          options={students.map((student) => ({ value: String(student.id), label: student.label }))}
+          placeholder="Search a student or leave blank for all eligible students..."
+        />
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          Leave blank to generate invoices for all eligible students in the selected classes.
+        </p>
       </div>
-      <SelectField label="Fee structure" name="feeStructureId" options={sortedStructures} />
-      <SearchableSelect
-        label="Student (optional)"
-        name="studentId"
-        options={students.map((student) => ({ value: String(student.id), label: student.label }))}
-        placeholder="Search a student or leave blank for the whole class..."
-      />
-      <p className="text-xs leading-5 text-slate-500">
-        Select one student or leave blank for all eligible students in this class and year. Existing invoices stay unchanged.
-      </p>
     </ActionForm>
   );
 }

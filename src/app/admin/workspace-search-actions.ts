@@ -44,6 +44,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { academicSections } from "@/lib/academic-sections";
 import { studentSections } from "@/lib/student-sections";
 import {
+  feePaymentWorkspaceResult,
   getFuzzySearchNgrams,
   rankWorkspaceSearchResults,
   studentCertificateWorkspaceResult,
@@ -489,7 +490,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
       : Promise.resolve([]),
     canManageFees
       ? db.select({
-        id: feePayments.id,
+        publicId: feePayments.publicId,
         receiptNumber: feePayments.receiptNumber,
         reference: feePayments.reference,
         invoiceNumber: studentFeeInvoices.invoiceNumber,
@@ -1144,13 +1145,12 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     });
   }
   for (const payment of paymentRows) {
-    results.push({
-      id: `fee-payment-${payment.id}`,
-      title: payment.receiptNumber,
-      description: `Fee payment · ${payment.studentName} ${payment.studentLastName} · ${payment.invoiceNumber}`,
-      href: `/admin/fees/receipt/${payment.id}`,
-      category: "Fees",
-    });
+    results.push(feePaymentWorkspaceResult({
+      publicId: payment.publicId,
+      receiptNumber: payment.receiptNumber,
+      studentName: `${payment.studentName} ${payment.studentLastName}`,
+      invoiceNumber: payment.invoiceNumber,
+    }));
   }
   for (const advance of advanceRows) {
     results.push({

@@ -20,6 +20,7 @@ import {
   classRoutines,
   classLevels,
   classSections,
+  classSectionSubjectTeachers,
   classSubjects,
   studentAcademicEvents,
   studentAttendance,
@@ -62,6 +63,8 @@ import {
   SchoolBranchList,
   SectionAssignmentForm,
   StudentPlacementForm,
+  SectionSubjectTeacherForm,
+  RemoveSectionSubjectTeacherForm,
   SubjectTeacherForm,
   ClassLevelDeleteForm,
 } from "./management-forms";
@@ -552,8 +555,41 @@ export default async function AcademicStructurePage({
   const assignmentOptions = subjectAssignments.map((assignment) => ({
     id: assignment.id,
     branchId: assignment.branchId,
+    classLevelId: assignment.classLevelId,
     label: `${assignment.className} · ${assignment.subjectName}`,
   }));
+  const sectionTeacherAssignments = await db.select({
+    id: classSectionSubjectTeachers.id,
+    classSubjectId: classSectionSubjectTeachers.classSubjectId,
+    classSectionId: classSectionSubjectTeachers.classSectionId,
+    teacherId: classSectionSubjectTeachers.teacherId,
+    sectionName: classSections.name,
+    teacherFirstName: teachers.firstName,
+    teacherLastName: teachers.lastName,
+  }).from(classSectionSubjectTeachers)
+    .innerJoin(classSubjects, and(
+      eq(classSubjects.id, classSectionSubjectTeachers.classSubjectId),
+      eq(classSubjects.schoolId, context.schoolId),
+    ))
+    .innerJoin(classSections, and(
+      eq(classSections.id, classSectionSubjectTeachers.classSectionId),
+      eq(classSections.schoolId, context.schoolId),
+    ))
+    .innerJoin(teachers, and(
+      eq(teachers.id, classSectionSubjectTeachers.teacherId),
+      eq(teachers.schoolId, context.schoolId),
+    ))
+    .where(and(
+      eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+      eq(classSections.academicYearId, selectedAcademicYear?.id ?? 0),
+    ))
+    .orderBy(asc(classSections.name), asc(teachers.firstName), asc(teachers.lastName));
+  const sectionTeachersByClassSubject = new Map<number, typeof sectionTeacherAssignments>();
+  for (const assignment of sectionTeacherAssignments) {
+    const records = sectionTeachersByClassSubject.get(assignment.classSubjectId) ?? [];
+    records.push(assignment);
+    sectionTeachersByClassSubject.set(assignment.classSubjectId, records);
+  }
   const routineAssignmentOptions = subjectAssignments.map((assignment) => ({
     id: assignment.id,
     classLevelId: assignment.classLevelId,
@@ -1098,6 +1134,14 @@ export default async function AcademicStructurePage({
                           teachers={teacherOptions}
                         />
                       </AdminActionDialog>
+                      <AdminActionDialog label="Assign teacher to stream" title="Assign subject teacher to stream">
+                        <SectionSubjectTeacherForm
+                          branches={branchOptions}
+                          assignments={assignmentOptions}
+                          sections={sectionOptions}
+                          teachers={teacherOptions}
+                        />
+                      </AdminActionDialog>
                     </>
                   }
                   records={subjectAssignments.map((assignment) => ({
@@ -1107,9 +1151,13 @@ export default async function AcademicStructurePage({
                       class: assignment.className,
                       subject: `${assignment.subjectName} (${assignment.subjectCode})`,
                       requirement: assignment.isCompulsory ? "Compulsory" : "Optional",
-                      teacher: assignment.teacherFirstName
-                        ? `${assignment.teacherFirstName} ${assignment.teacherLastName}`
-                        : "Not assigned",
+                      teacher: [
+                        assignment.teacherFirstName
+                          ? `All streams: ${assignment.teacherFirstName} ${assignment.teacherLastName}`
+                          : "",
+                        ...(sectionTeachersByClassSubject.get(assignment.id) ?? []).map((teacher) =>
+                          `${teacher.sectionName}: ${teacher.teacherFirstName} ${teacher.teacherLastName}`),
+                      ].filter(Boolean).join(" · ") || "Not assigned",
                       branchId: String(assignment.branchId),
                       classLevelId: String(assignment.classLevelId),
                     },
@@ -1126,6 +1174,33 @@ export default async function AcademicStructurePage({
                           assignments={assignmentOptions}
                           teachers={teacherOptions}
                           record={{ assignmentId: assignment.id, teacherId: assignment.teacherId }}
+                        />
+                        {(sectionTeachersByClassSubject.get(assignment.id) ?? []).map((teacher) => (
+                          <div key={teacher.id} className="space-y-3 rounded-xl border border-slate-200 p-3">
+                            <SectionSubjectTeacherForm
+                              branches={allBranchOptions}
+                              assignments={assignmentOptions}
+                              sections={sectionOptions}
+                              teachers={teacherOptions}
+                              record={{
+                                id: teacher.id,
+                                assignmentId: teacher.classSubjectId,
+                                sectionId: teacher.classSectionId,
+                                teacherId: teacher.teacherId,
+                              }}
+                            />
+                            <RemoveSectionSubjectTeacherForm
+                              id={teacher.id}
+                              label={`${teacher.sectionName} subject teacher assignment`}
+                            />
+                          </div>
+                        ))}
+                        <SectionSubjectTeacherForm
+                          branches={allBranchOptions}
+                          assignments={assignmentOptions}
+                          sections={sectionOptions}
+                          teachers={teacherOptions}
+                          defaultAssignmentId={assignment.id}
                         />
                       </div>
                     ),
@@ -1188,6 +1263,18 @@ export default async function AcademicStructurePage({
                           teachers={teacherOptions}
                           record={{ assignmentId: assignment.id, teacherId: assignment.teacherId }}
                         />
+                        <div className="rounded-xl border border-violet-100 bg-violet-50 p-4">
+                          <h3 className="font-semibold text-slate-900">Student elective choices</h3>
+                          <p className="mt-1 text-sm text-slate-600">
+                            Confirm which enrolled students take this optional subject for the active academic year.
+                          </p>
+                          <Link
+                            href={`/admin/academics/electives/${assignment.id}`}
+                            className="mt-3 inline-flex rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-800"
+                          >
+                            Manage student choices
+                          </Link>
+                        </div>
                       </div>
                     ),
                     deleteForm: canDeleteAcademic ? (

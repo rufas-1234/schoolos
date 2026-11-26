@@ -414,6 +414,20 @@
       "when": 1795644211827,
       "tag": "0058_practice_workspaces",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "5",
+      "when": 1795653618047,
+      "tag": "0059_heavy_eternity",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1795655680029,
+      "tag": "0060_normal_ultimatum",
+      "breakpoints": true
     }
   ]
 }

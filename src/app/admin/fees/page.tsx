@@ -357,20 +357,34 @@ export default async function FeesSetupPage({
     id: discount.id,
     label: feeDisplayName(discount.name),
   }));
-  const structureOptions = structures.map((structure) => ({
-    id: structure.id,
-    label: `${structure.branchName} · ${structure.className} · ${structure.yearName} · ${feeDisplayName(structure.typeName)}`,
-    branchName: structure.branchName,
-    className: structure.className,
-    academicYear: structure.yearName,
-    feeTypeName: `${feeDisplayName(structure.groupName)} · ${feeDisplayName(structure.typeName)}`,
-    dueDate: structure.dueDate,
-  }));
+  const invoiceYearIds = new Set(structures.map((structure) => structure.academicYearId));
+  const invoiceAcademicYearOptions: FeeOption[] = years
+    .filter((year) => invoiceYearIds.has(year.id))
+    .map((year) => ({ id: year.id, label: year.name }));
+  const defaultInvoiceAcademicYearId = invoiceAcademicYearOptions.find((year) =>
+    year.id === academicYearSelection.selectedYear?.id,
+  )?.id ?? invoiceAcademicYearOptions[0]?.id ?? 0;
+  const invoiceClassOptions = classes
+    .filter((classLevel) =>
+      classLevel.status === "active" &&
+      classLevel.branchStatus === "active" &&
+      structures.some((structure) => structure.classLevelId === classLevel.id),
+    )
+    .sort((first, second) =>
+      first.name.localeCompare(second.name) || first.branchName.localeCompare(second.branchName),
+    )
+    .map((classLevel) => ({
+      id: classLevel.id,
+      label: `${classLevel.branchName} · ${classLevel.name}`,
+      academicYearIds: [...new Set(structures
+        .filter((structure) => structure.classLevelId === classLevel.id)
+        .map((structure) => structure.academicYearId))],
+    }));
   const sectionDescriptions: Record<FeesSection, string> = {
     catalog: "Manage the fee groups and fee types used to organize your school’s charges.",
     discounts: "Create scholarships and discounts, then assign them to individual students and fee types.",
     structure: "Set up fee structures for a class or an individual student, then review and manage them here.",
-    invoices: "Generate student invoices from an existing fee structure.",
+    invoices: "Select one or more classes to generate invoices from their fee structures.",
   };
   return (
     <div className="space-y-8">
@@ -689,7 +703,12 @@ export default async function FeesSetupPage({
       )}
 
       {section === "invoices" && (
-        <GenerateInvoicesForm structures={structureOptions} students={studentsForDiscounts} />
+        <GenerateInvoicesForm
+          classes={invoiceClassOptions}
+          academicYears={invoiceAcademicYearOptions}
+          defaultAcademicYearId={defaultInvoiceAcademicYearId}
+          students={studentsForDiscounts}
+        />
       )}
     </div>
   );

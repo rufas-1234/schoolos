@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  feePaymentWorkspaceResult,
   getFuzzySearchNgrams,
   rankWorkspaceSearchResults,
   studentCertificateWorkspaceResult,
@@ -66,6 +67,19 @@ describe("workspace search policy", () => {
         category: "Students",
         searchTerms: expect.arrayContaining(["Radhika Shriwastav", "S-104", "ID card"]),
       });
+  });
+
+  it("links a fee receipt search result with the public ID expected by its receipt page", () => {
+    expect(feePaymentWorkspaceResult({
+      publicId: "payment-public-id",
+      receiptNumber: "R-104",
+      studentName: "Radhika Shriwastav",
+      invoiceNumber: "INV-104",
+    })).toMatchObject({
+      id: "fee-payment-payment-public-id",
+      href: "/admin/fees/receipt/payment-public-id",
+      category: "Fees",
+    });
   });
 
   it("links a certificate search result to its print view with its academic year preserved", () => {

@@ -8,6 +8,7 @@ import {
   classRooms,
   classRoutines,
   classSections,
+  classSectionSubjectTeachers,
   classSubjects,
   examClasses,
   examMarks,
@@ -110,6 +111,10 @@ export default async function TeacherPortalPage({
   const teacherName = teacherRecords.length
     ? [...new Set(teacherRecords.map((teacher) => `${teacher.firstName} ${teacher.lastName}`))].join(" · ")
     : context.user.name;
+  const teacherNamesById = new Map(teacherRecords.map((teacher) => [
+    teacher.id,
+    `${teacher.firstName} ${teacher.lastName}`,
+  ]));
 
   const [assignments, routines, assessmentRows, classTeacherSections] = teacherIds.length
     ? await Promise.all([
@@ -169,12 +174,19 @@ export default async function TeacherPortalPage({
         roomNumber: classRooms.roomNumber,
         classTeacherId: classSections.classTeacherId,
         subjectTeacherId: classSubjects.teacherId,
+        sectionSubjectTeacherId: classSectionSubjectTeachers.teacherId,
         assignedTeacherFirstName: teachers.firstName,
         assignedTeacherLastName: teachers.lastName,
       }).from(classRoutines)
         .innerJoin(classSubjects, and(
           eq(classSubjects.id, classRoutines.classSubjectId),
           eq(classSubjects.schoolId, context.schoolId),
+        ))
+        .leftJoin(classSectionSubjectTeachers, and(
+          eq(classSectionSubjectTeachers.classSubjectId, classSubjects.id),
+          eq(classSectionSubjectTeachers.classSectionId, classRoutines.classSectionId),
+          eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+          inArray(classSectionSubjectTeachers.teacherId, teacherIds),
         ))
         .leftJoin(teachers, and(
           eq(teachers.id, classSubjects.teacherId!),
@@ -207,11 +219,12 @@ export default async function TeacherPortalPage({
           eq(classRoutines.schoolId, context.schoolId),
           or(
             inArray(classSubjects.teacherId, teacherIds),
+            inArray(classSectionSubjectTeachers.teacherId, teacherIds),
             inArray(classSections.classTeacherId, teacherIds),
           ),
         ))
         .orderBy(asc(classRoutines.dayOfWeek), asc(classRoutines.startsAt)) : Promise.resolve([]),
-      showOverview || activeSection === "assessments" ? db.select({
+      showOverview || activeSection === "assessments" ? db.selectDistinct({
         examId: examinations.id,
         examClassId: examClasses.id,
         assessmentId: examSubjects.id,
@@ -230,17 +243,6 @@ export default async function TeacherPortalPage({
           eq(classSubjects.id, examSubjects.classSubjectId),
           eq(classSubjects.schoolId, context.schoolId),
         ))
-        .innerJoin(teachers, and(
-          eq(teachers.id, classSubjects.teacherId!),
-          eq(teachers.schoolId, context.schoolId),
-          eq(teachers.status, "active"),
-        ))
-        .innerJoin(staffMembers, and(
-          eq(staffMembers.id, teachers.staffMemberId!),
-          eq(staffMembers.schoolId, context.schoolId),
-          eq(staffMembers.linkedUserId, context.user.id),
-          eq(staffMembers.status, "active"),
-        ))
         .innerJoin(examClasses, and(
           eq(examClasses.id, examSubjects.examClassId),
           eq(examClasses.schoolId, context.schoolId),
@@ -249,6 +251,17 @@ export default async function TeacherPortalPage({
           eq(examinations.id, examClasses.examinationId),
           eq(examinations.schoolId, context.schoolId),
           inArray(examinations.status, ["open", "published"]),
+        ))
+        .leftJoin(classSections, and(
+          eq(classSections.classLevelId, examClasses.classLevelId),
+          eq(classSections.academicYearId, examinations.academicYearId),
+          eq(classSections.schoolId, context.schoolId),
+        ))
+        .leftJoin(classSectionSubjectTeachers, and(
+          eq(classSectionSubjectTeachers.classSubjectId, classSubjects.id),
+          eq(classSectionSubjectTeachers.classSectionId, classSections.id),
+          eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+          inArray(classSectionSubjectTeachers.teacherId, teacherIds),
         ))
         .leftJoin(examTypes, and(
           eq(examTypes.id, examinations.examTypeId!),
@@ -270,7 +283,10 @@ export default async function TeacherPortalPage({
         ))
         .where(and(
           eq(examSubjects.schoolId, context.schoolId),
-          inArray(classSubjects.teacherId, teacherIds),
+          or(
+            inArray(classSubjects.teacherId, teacherIds),
+            inArray(classSectionSubjectTeachers.teacherId, teacherIds),
+          ),
         ))
         .orderBy(asc(examSubjects.examDate), asc(classLevels.name), asc(subjects.name)) : Promise.resolve([]),
       showOverview || ["classes", "register", "timetable"].includes(activeSection) ? db.select({
@@ -304,6 +320,60 @@ export default async function TeacherPortalPage({
         .orderBy(asc(academicYears.startDate), asc(classLevels.name), asc(classSections.name)) : Promise.resolve([]),
     ])
     : [[], [], [], []];
+
+  const sectionAssignments = teacherIds.length && (showOverview || activeSection === "classes")
+    ? await db.select({
+      yearName: academicYears.name,
+      className: classLevels.name,
+      sectionName: classSections.name,
+      branchName: schoolBranches.name,
+      subjectName: subjects.name,
+      subjectCode: subjects.code,
+    }).from(classSectionSubjectTeachers)
+      .innerJoin(classSubjects, and(
+        eq(classSubjects.id, classSectionSubjectTeachers.classSubjectId),
+        eq(classSubjects.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSections, and(
+        eq(classSections.id, classSectionSubjectTeachers.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+      ))
+      .innerJoin(academicYears, and(
+        eq(academicYears.id, classSections.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+        eq(academicYears.status, "active"),
+      ))
+      .innerJoin(classLevels, and(
+        eq(classLevels.id, classSubjects.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+        eq(classLevels.status, "active"),
+      ))
+      .innerJoin(schoolBranches, and(
+        eq(schoolBranches.id, classLevels.branchId),
+        eq(schoolBranches.schoolId, context.schoolId),
+      ))
+      .innerJoin(subjects, and(
+        eq(subjects.id, classSubjects.subjectId),
+        eq(subjects.schoolId, context.schoolId),
+      ))
+      .innerJoin(teachers, and(
+        eq(teachers.id, classSectionSubjectTeachers.teacherId),
+        eq(teachers.schoolId, context.schoolId),
+        eq(teachers.status, "active"),
+      ))
+      .innerJoin(staffMembers, and(
+        eq(staffMembers.id, teachers.staffMemberId!),
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.linkedUserId, context.user.id),
+        eq(staffMembers.status, "active"),
+      ))
+      .where(and(
+        eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+        inArray(classSectionSubjectTeachers.teacherId, teacherIds),
+      ))
+      .orderBy(asc(classLevels.name), asc(classSections.name), asc(subjects.name))
+    : [];
+  const allSubjectAssignments = [...assignments, ...sectionAssignments];
 
   const classTeacherSubjects = classTeacherSections.length && (showOverview || activeSection === "classes")
     ? await db.select({
@@ -475,7 +545,7 @@ export default async function TeacherPortalPage({
     classTeacherProgress.set(subject.examClassId, progress);
   }
 
-  const uniqueAssignments = [...new Map(assignments.map((assignment) => [
+  const uniqueAssignments = [...new Map(allSubjectAssignments.map((assignment) => [
     `${assignment.yearName}:${assignment.className}:${assignment.sectionName}:${assignment.subjectName}`,
     assignment,
   ])).values()];
@@ -642,13 +712,17 @@ export default async function TeacherPortalPage({
       .map((assessment) => [assessment.examId, assessment.examName]),
   )].sort((a, b) => a[1].localeCompare(b[1]));
   const routinesWithRoles = routines.map((routine) => {
-    const isSubjectTeacher = routine.subjectTeacherId !== null && teacherIds.includes(routine.subjectTeacherId);
+    const isSubjectTeacher =
+      (routine.subjectTeacherId !== null && teacherIds.includes(routine.subjectTeacherId)) ||
+      (routine.sectionSubjectTeacherId !== null && teacherIds.includes(routine.sectionSubjectTeacherId));
     const isClassTeacher = routine.classTeacherId !== null && teacherIds.includes(routine.classTeacherId);
     return {
       ...routine,
-      assignedTeacherName: routine.assignedTeacherFirstName
-        ? `${routine.assignedTeacherFirstName} ${routine.assignedTeacherLastName}`
-        : "Not assigned",
+      assignedTeacherName: routine.sectionSubjectTeacherId !== null
+        ? teacherNamesById.get(routine.sectionSubjectTeacherId) ?? "Not assigned"
+        : routine.assignedTeacherFirstName
+          ? `${routine.assignedTeacherFirstName} ${routine.assignedTeacherLastName}`
+          : "Not assigned",
       teacherRole: isSubjectTeacher && isClassTeacher
         ? "Subject and class teacher"
         : isSubjectTeacher ? "Subject teacher" : "Class teacher",

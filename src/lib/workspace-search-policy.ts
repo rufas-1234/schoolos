@@ -7,6 +7,21 @@ export type RankedWorkspaceSearchResult = {
   searchTerms?: string[];
 };
 
+export function feePaymentWorkspaceResult(payment: {
+  publicId: string;
+  receiptNumber: string;
+  studentName: string;
+  invoiceNumber: string;
+}): Omit<RankedWorkspaceSearchResult, "category"> & { category: "Fees" } {
+  return {
+    id: `fee-payment-${payment.publicId}`,
+    title: payment.receiptNumber,
+    description: `Fee payment · ${payment.studentName} · ${payment.invoiceNumber}`,
+    href: `/admin/fees/receipt/${encodeURIComponent(payment.publicId)}`,
+    category: "Fees",
+  };
+}
+
 export function studentIdWorkspaceResult(student: {
   publicId: string;
   firstName: string;

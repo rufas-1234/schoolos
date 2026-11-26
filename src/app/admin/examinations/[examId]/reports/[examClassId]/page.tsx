@@ -222,6 +222,7 @@ export default async function ClassMarksheetReportPage({
   const attendanceByStudent = new Map<number, { present: number; total: number }>();
   const attendanceStatusByStudent = new Map<number, Map<number, string>>();
   for (const entry of attendance) {
+    if (entry.status === "not_applicable") continue;
     const current = attendanceByStudent.get(entry.enrollmentId) ?? { present: 0, total: 0 };
     current.total += 1;
     if (entry.status === "present" || entry.status === "late") current.present += 1;

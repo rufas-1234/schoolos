@@ -21,6 +21,7 @@ import {
   examinations,
   schools,
   studentEnrollments,
+  studentElectiveSelections,
   students,
   subjects,
   staffMembers,
@@ -28,6 +29,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { canEnterExamMarks, canViewExamSubject } from "@/lib/examination-policy";
+import { getExamSubjectTeacherSectionScope } from "@/lib/exam-subject-teacher-scope";
 import { isSystemSuperAdmin } from "@/lib/platform-admin-policy";
 import { getExamTeacherSignatures } from "@/lib/exam-report-signatures";
 import { schoolLogoSource } from "@/lib/school-logo";
@@ -71,6 +73,7 @@ export default async function SubjectMarksPage({
     maxMarks: examSubjects.maxMarks,
     weight: examSubjects.weight,
     isCompulsory: classSubjects.isCompulsory,
+    classSubjectId: classSubjects.id,
     teacherId: classSubjects.teacherId,
     status: examSubjects.status,
     examStatus: examinations.status,
@@ -107,26 +110,15 @@ export default async function SubjectMarksPage({
   const isSuperAdmin = isSystemSuperAdmin(context.user.email, context.roleNames);
   let assignedTeacher = false;
   let assignedClassTeacher = false;
+  let assignedTeacherSectionIds: number[] | null = null;
   if (context.grantedPermissions.includes("results.enter")) {
-    const assignment = await db.select({ id: examSubjects.id }).from(examSubjects)
-      .innerJoin(classSubjects, and(
-        eq(classSubjects.id, examSubjects.classSubjectId),
-        eq(classSubjects.schoolId, context.schoolId),
-      ))
-      .innerJoin(teachers, and(
-        eq(teachers.id, classSubjects.teacherId!),
-        eq(teachers.schoolId, context.schoolId),
-        eq(teachers.status, "active"),
-      ))
-      .innerJoin(staffMembers, and(
-        eq(staffMembers.id, teachers.staffMemberId!),
-        eq(staffMembers.schoolId, context.schoolId),
-        eq(staffMembers.linkedUserId, context.user.id),
-        eq(staffMembers.status, "active"),
-      ))
-      .where(and(eq(examSubjects.id, subject.id), eq(examSubjects.schoolId, context.schoolId)))
-      .limit(1);
-    assignedTeacher = assignment.length > 0;
+    const assignment = await getExamSubjectTeacherSectionScope(
+      subject.id,
+      context.schoolId,
+      context.user.id,
+    );
+    assignedTeacher = Boolean(assignment);
+    assignedTeacherSectionIds = assignment?.sectionIds ?? null;
     let manuallyAssignedClassTeacher = false;
     if (subject.classTeacherId !== null) {
       const [classTeacher] = await db.select({ id: teachers.id }).from(teachers)
@@ -165,6 +157,9 @@ export default async function SubjectMarksPage({
     assignedClassTeacher = manuallyAssignedClassTeacher || Boolean(sectionClassTeacher);
   }
   if (!canViewExamSubject(context.grantedPermissions, assignedTeacher || assignedClassTeacher)) notFound();
+  const rosterSectionIds = !canConfigure && !canReview && !assignedClassTeacher && assignedTeacher
+    ? assignedTeacherSectionIds
+    : null;
   const roster = await db.select({
     markId: examMarks.id,
     enrollmentId: studentEnrollments.id,
@@ -196,6 +191,11 @@ export default async function SubjectMarksPage({
       eq(classSections.classLevelId, subject.classLevelId),
       eq(classSections.academicYearId, subject.yearId),
     ))
+    .leftJoin(studentElectiveSelections, and(
+      eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+      eq(studentElectiveSelections.classSubjectId, subject.classSubjectId),
+      eq(studentElectiveSelections.schoolId, context.schoolId),
+    ))
     .leftJoin(examStudentRemarks, and(
       eq(examStudentRemarks.examClassId, subject.examClassId),
       eq(examStudentRemarks.enrollmentId, studentEnrollments.id),
@@ -204,6 +204,8 @@ export default async function SubjectMarksPage({
     .where(and(
       eq(examMarks.examSubjectId, subject.id),
       eq(examMarks.schoolId, context.schoolId),
+      ...(!subject.isCompulsory ? [eq(studentElectiveSelections.status, "selected")] : []),
+      ...(rosterSectionIds ? [inArray(classSections.id, rosterSectionIds)] : []),
     ))
     .orderBy(asc(students.lastName), asc(students.firstName));
   const specialStatusRows = await db.select({

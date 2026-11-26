@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   classLevels,
@@ -10,14 +10,15 @@ import {
   examClasses,
   examSubjects,
   examinations,
-  staffMembers,
+  studentElectiveSelections,
   studentEnrollments,
   students,
   subjects,
-  teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { canEditExamAttendance, canViewExamSubject } from "@/lib/examination-policy";
+import { getExamSubjectTeacherSectionScope } from "@/lib/exam-subject-teacher-scope";
+import { getElectiveAttendanceDefault, isElectiveSelectionStatus } from "@/lib/elective-selection-policy";
 import { isSystemSuperAdmin } from "@/lib/platform-admin-policy";
 import { SaveExamAttendanceForm } from "../../../examination-forms";
 
@@ -40,6 +41,7 @@ export default async function ExamAttendancePage({
     examStatus: examinations.status,
     subjectStatus: examSubjects.status,
     isCompulsory: classSubjects.isCompulsory,
+    classSubjectId: classSubjects.id,
     subjectName: subjects.name,
     className: classLevels.name,
     classLevelId: classLevels.id,
@@ -75,29 +77,19 @@ export default async function ExamAttendancePage({
   if (!record) notFound();
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");
+  let assignedTeacherSectionIds: number[] | null = null;
   let assignedTeacher = false;
   if (context.grantedPermissions.includes("results.enter")) {
-    const [assignment] = await db.select({ id: examSubjects.id }).from(examSubjects)
-      .innerJoin(classSubjects, and(
-        eq(classSubjects.id, examSubjects.classSubjectId),
-        eq(classSubjects.schoolId, context.schoolId),
-      ))
-      .innerJoin(teachers, and(
-        eq(teachers.id, classSubjects.teacherId!),
-        eq(teachers.schoolId, context.schoolId),
-        eq(teachers.status, "active"),
-      ))
-      .innerJoin(staffMembers, and(
-        eq(staffMembers.id, teachers.staffMemberId!),
-        eq(staffMembers.schoolId, context.schoolId),
-        eq(staffMembers.linkedUserId, context.user.id),
-        eq(staffMembers.status, "active"),
-      ))
-      .where(and(eq(examSubjects.id, record.id), eq(examSubjects.schoolId, context.schoolId)))
-      .limit(1);
+    const assignment = await getExamSubjectTeacherSectionScope(
+      record.id,
+      context.schoolId,
+      context.user.id,
+    );
     assignedTeacher = Boolean(assignment);
+    assignedTeacherSectionIds = assignment?.sectionIds ?? null;
   }
   if (!canViewExamSubject(context.grantedPermissions, assignedTeacher)) notFound();
+  const rosterSectionIds = canManage ? null : assignedTeacherSectionIds;
   const isSuperAdmin = isSystemSuperAdmin(context.user.email, context.roleNames);
   const roster = await db.select({
     enrollmentId: studentEnrollments.id,
@@ -106,6 +98,7 @@ export default async function ExamAttendancePage({
     admissionNumber: students.admissionNumber,
     status: examAttendance.status,
     note: examAttendance.note,
+    electiveSelectionStatus: studentElectiveSelections.status,
   }).from(studentEnrollments)
     .innerJoin(classSections, and(
       eq(classSections.id, studentEnrollments.classSectionId),
@@ -122,20 +115,43 @@ export default async function ExamAttendancePage({
       eq(examAttendance.enrollmentId, studentEnrollments.id),
       eq(examAttendance.schoolId, context.schoolId),
     ))
+    .leftJoin(studentElectiveSelections, and(
+      eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+      eq(studentElectiveSelections.classSubjectId, record.classSubjectId),
+      eq(studentElectiveSelections.schoolId, context.schoolId),
+    ))
     .where(and(
       eq(studentEnrollments.schoolId, context.schoolId),
       eq(studentEnrollments.academicYearId, record.academicYearId),
       eq(studentEnrollments.status, "enrolled"),
       ne(students.status, "disabled"),
+      ...(rosterSectionIds ? [inArray(classSections.id, rosterSectionIds)] : []),
     ))
     .orderBy(asc(students.lastName), asc(students.firstName));
-  const rosterStudents = roster.map((student) => ({
-    enrollmentId: student.enrollmentId,
-    name: `${student.name} ${student.lastName}`,
-    admissionNumber: student.admissionNumber,
-    status: student.status,
-    note: student.note,
-  }));
+  const rosterStudents = roster.map((student) => {
+    if (
+      student.electiveSelectionStatus !== null &&
+      !isElectiveSelectionStatus(student.electiveSelectionStatus)
+    ) {
+      throw new Error(`Unknown elective selection status: ${student.electiveSelectionStatus}`);
+    }
+    const selectionStatus = record.isCompulsory
+      ? "not_required" as const
+      : student.electiveSelectionStatus ?? "not_selected";
+    return {
+      enrollmentId: student.enrollmentId,
+      name: `${student.name} ${student.lastName}`,
+      admissionNumber: student.admissionNumber,
+      selectionStatus,
+      status: selectionStatus === "not_required"
+        ? student.status
+        : getElectiveAttendanceDefault(selectionStatus, student.status),
+      note: student.note,
+    };
+  });
+  const pendingSelections = rosterStudents.filter((student) =>
+    student.selectionStatus === "pending",
+  ).length;
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6">
       <header>
@@ -143,11 +159,15 @@ export default async function ExamAttendancePage({
         <p className="mt-4 text-sm font-semibold text-violet-700">{context.schoolName} · {record.examDate}</p>
         <h1 className="mt-1 text-3xl font-bold text-slate-950">{record.examName}</h1>
         <p className="mt-2 text-sm text-slate-600">{record.className} · {record.subjectName} · {rosterStudents.length} enrolled students</p>
+        {pendingSelections > 0 && (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            {pendingSelections} student elective {pendingSelections === 1 ? "choice is" : "choices are"} pending. Confirm them under Academics → Optional subjects before saving attendance.
+          </p>
+        )}
       </header>
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <SaveExamAttendanceForm
           examSubjectId={record.id}
-          isCompulsory={record.isCompulsory}
           students={rosterStudents}
           editable={canEditExamAttendance({
             examStatus: record.examStatus,

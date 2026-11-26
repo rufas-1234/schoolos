@@ -14,6 +14,7 @@ import {
   classRoutines,
   classLevels,
   classSections,
+  classSectionSubjectTeachers,
   classSubjects,
   feeStructures,
   studentAcademicEvents,
@@ -1079,6 +1080,14 @@ export async function assignSubjectToClass(
             .from(classRoutines)
             .where(and(eq(classRoutines.schoolId, context.schoolId), eq(classRoutines.classSubjectId, recordId)));
           if (Number(routineCount.total) > 0) return "assignment-has-routines";
+          const [sectionTeacherCount] = await tx
+            .select({ total: count() })
+            .from(classSectionSubjectTeachers)
+            .where(and(
+              eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+              eq(classSectionSubjectTeachers.classSubjectId, recordId),
+            ));
+          if (Number(sectionTeacherCount.total) > 0) return "assignment-has-section-teachers";
           if (assignment.teacherId !== null) {
             const [teacher] = await tx
               .select({ branchId: teachers.branchId })
@@ -1116,6 +1125,9 @@ export async function assignSubjectToClass(
     if (outcome === "assignment-not-found") return { error: "Subject assignment was not found in this school." };
     if (outcome === "assignment-has-routines") {
       return { error: "A class-subject assignment with scheduled periods cannot be moved to another class or subject." };
+    }
+    if (outcome === "assignment-has-section-teachers") {
+      return { error: "Remove this subject's stream teacher assignments before moving it to another class or subject." };
     }
     if (outcome === "teacher-branch-mismatch") {
       return { error: "Clear or reassign this subject teacher before changing the assignment's branch." };

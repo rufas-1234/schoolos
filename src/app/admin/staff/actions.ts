@@ -11,6 +11,7 @@ import {
   account as authAccount,
   auditLogs,
   classSections,
+  classSectionSubjectTeachers,
   classSubjects,
   schoolBranches,
   schoolMemberships,
@@ -145,7 +146,7 @@ async function syncAcademicTeacher(
   }
 
   if (teacher && teacher.branchId !== staff.branchId) {
-    const [[sectionCount], [subjectCount]] = await Promise.all([
+    const [[sectionCount], [subjectCount], [sectionSubjectTeacherCount]] = await Promise.all([
       tx.select({ total: count() }).from(classSections).where(and(
         eq(classSections.schoolId, schoolId),
         eq(classSections.classTeacherId, teacher.id),
@@ -154,8 +155,16 @@ async function syncAcademicTeacher(
         eq(classSubjects.schoolId, schoolId),
         eq(classSubjects.teacherId, teacher.id),
       )),
+      tx.select({ total: count() }).from(classSectionSubjectTeachers).where(and(
+        eq(classSectionSubjectTeachers.schoolId, schoolId),
+        eq(classSectionSubjectTeachers.teacherId, teacher.id),
+      )),
     ]);
-    if (Number(sectionCount.total) + Number(subjectCount.total) > 0) {
+    if (
+      Number(sectionCount.total) +
+      Number(subjectCount.total) +
+      Number(sectionSubjectTeacherCount.total) > 0
+    ) {
       throw new TeacherSyncError("A teacher's branch cannot be changed while they are assigned to a class or subject.");
     }
   }

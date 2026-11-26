@@ -5,6 +5,7 @@ import {
   academicTerms,
   academicYears,
   classSections,
+  classSectionSubjectTeachers,
   classLevels,
   classSubjects,
   examClasses,
@@ -207,7 +208,7 @@ export default async function ExaminationsPage({
       ))
       .orderBy(asc(academicYears.startDate), asc(examinations.startDate));
   } else {
-    const assignments = await db.select({ examId: examinations.id }).from(examSubjects)
+    const assignments = await db.selectDistinct({ examId: examinations.id }).from(examSubjects)
       .innerJoin(examClasses, eq(examClasses.id, examSubjects.examClassId))
       .innerJoin(examinations, and(
         eq(examinations.id, examClasses.examinationId),
@@ -233,6 +234,34 @@ export default async function ExaminationsPage({
           ? eq(examinations.academicYearId, academicYearSelection.selectedYear.id)
           : undefined,
       ));
+    const sectionAssignments = userTeacherIds.length
+      ? await db.selectDistinct({ examId: examinations.id }).from(classSectionSubjectTeachers)
+        .innerJoin(examSubjects, and(
+          eq(examSubjects.classSubjectId, classSectionSubjectTeachers.classSubjectId),
+          eq(examSubjects.schoolId, context.schoolId),
+        ))
+        .innerJoin(examClasses, and(
+          eq(examClasses.id, examSubjects.examClassId),
+          eq(examClasses.schoolId, context.schoolId),
+        ))
+        .innerJoin(examinations, and(
+          eq(examinations.id, examClasses.examinationId),
+          eq(examinations.schoolId, context.schoolId),
+        ))
+        .innerJoin(classSections, and(
+          eq(classSections.id, classSectionSubjectTeachers.classSectionId),
+          eq(classSections.schoolId, context.schoolId),
+          eq(classSections.classLevelId, examClasses.classLevelId),
+          eq(classSections.academicYearId, examinations.academicYearId),
+        ))
+        .where(and(
+          eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+          inArray(classSectionSubjectTeachers.teacherId, userTeacherIds),
+          academicYearSelection.selectedYear
+            ? eq(examinations.academicYearId, academicYearSelection.selectedYear.id)
+            : undefined,
+        ))
+      : [];
     const classTeacherAssignments = userTeacherIds.length
       ? await db.selectDistinct({ examId: examinations.id }).from(classSections)
         .innerJoin(examClasses, and(
@@ -254,6 +283,7 @@ export default async function ExaminationsPage({
       : [];
     const ids = [...new Set([
       ...assignments.map((entry) => entry.examId),
+      ...sectionAssignments.map((entry) => entry.examId),
       ...classTeacherAssignments.map((entry) => entry.examId),
     ])];
     exams = ids.length
@@ -381,6 +411,32 @@ export default async function ExaminationsPage({
           inArray(examClasses.examinationId, examIds),
         ))
       : [];
+    const sectionAssignedSubjects = examIds.length && userTeacherIds.length
+      ? await db.selectDistinct({ id: examSubjects.id }).from(classSectionSubjectTeachers)
+        .innerJoin(examSubjects, and(
+          eq(examSubjects.classSubjectId, classSectionSubjectTeachers.classSubjectId),
+          eq(examSubjects.schoolId, context.schoolId),
+        ))
+        .innerJoin(examClasses, and(
+          eq(examClasses.id, examSubjects.examClassId),
+          eq(examClasses.schoolId, context.schoolId),
+        ))
+        .innerJoin(examinations, and(
+          eq(examinations.id, examClasses.examinationId),
+          eq(examinations.schoolId, context.schoolId),
+        ))
+        .innerJoin(classSections, and(
+          eq(classSections.id, classSectionSubjectTeachers.classSectionId),
+          eq(classSections.schoolId, context.schoolId),
+          eq(classSections.classLevelId, examClasses.classLevelId),
+          eq(classSections.academicYearId, examinations.academicYearId),
+        ))
+        .where(and(
+          eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+          inArray(classSectionSubjectTeachers.teacherId, userTeacherIds),
+          inArray(examClasses.examinationId, examIds),
+        ))
+      : [];
     const classTeacherSubjects = examIds.length && userTeacherIds.length
       ? await db.selectDistinct({ id: examSubjects.id }).from(examSubjects)
         .innerJoin(examClasses, and(
@@ -404,6 +460,7 @@ export default async function ExaminationsPage({
       : [];
     assignedSubjectIds = [...new Set([
       ...assignedSubjects.map((subject) => subject.id),
+      ...sectionAssignedSubjects.map((subject) => subject.id),
       ...classTeacherSubjects.map((subject) => subject.id),
     ])];
   }

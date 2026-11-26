@@ -409,12 +409,10 @@ export function EditGradingScaleForm({ scale }: { scale: GradingScaleEditorData 
 export function SaveExamAttendanceForm({
   examSubjectId,
   students,
-  isCompulsory,
   editable,
   approvedAssessment = false,
 }: {
   examSubjectId: number;
-  isCompulsory: boolean;
   editable: boolean;
   approvedAssessment?: boolean;
   students: Array<{
@@ -423,6 +421,7 @@ export function SaveExamAttendanceForm({
     admissionNumber: string | null;
     status: string | null;
     note: string | null;
+    selectionStatus: "pending" | "selected" | "not_selected" | "not_required";
   }>;
 }) {
   const [state, action, pending] = useActionState<ExaminationActionState, FormData>(saveExamAttendance, {});
@@ -453,7 +452,12 @@ export function SaveExamAttendanceForm({
         <button
           type="button"
           onClick={() => setStatuses(Object.fromEntries(
-            students.map((student) => [student.enrollmentId, "present"]),
+            students.map((student) => [
+              student.enrollmentId,
+              student.selectionStatus === "not_selected"
+                ? "not_applicable"
+                : student.selectionStatus === "pending" ? "" : "present",
+            ]),
           ))}
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
         >
@@ -466,7 +470,7 @@ export function SaveExamAttendanceForm({
       </p>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Attendance</th><th className="p-3">Note</th></tr></thead>
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Elective choice</th><th className="p-3">Attendance</th><th className="p-3">Note</th></tr></thead>
           <tbody>{students.map((student) => (
             <tr
               key={student.enrollmentId}
@@ -475,8 +479,52 @@ export function SaveExamAttendanceForm({
             >
               <td className="p-3 font-medium">{student.name}</td>
               <td className="p-3">{student.admissionNumber ?? "—"}</td>
-              <td className="p-3"><select required name={`attendance_${student.enrollmentId}`} value={statuses[student.enrollmentId] ?? ""} onChange={(event) => setStatuses((current) => ({ ...current, [student.enrollmentId]: event.target.value }))} className="rounded-lg border p-2"><option value="" disabled>Select status</option><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option>{!isCompulsory && <option value="not_applicable">Not taking optional subject</option>}<option value="x">X — Absent</option><option value="y">Y — Nullified (malpractice)</option></select></td>
-              <td className="p-3"><input name={`note_${student.enrollmentId}`} maxLength={500} required={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y"} placeholder={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y" ? "Required: record the reason" : ""} defaultValue={student.note ?? ""} className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100" /></td>
+              <td className="p-3">
+                {student.selectionStatus === "pending" ? "Pending confirmation"
+                  : student.selectionStatus === "selected" ? "Taking subject"
+                    : student.selectionStatus === "not_selected" ? "Not taking subject"
+                      : "—"}
+              </td>
+              <td className="p-3">
+                {student.selectionStatus === "pending"
+                  ? <span className="text-amber-800">Confirm choice first</span>
+                  : student.selectionStatus === "not_selected"
+                    ? <span className="font-medium text-slate-600">Not taking optional subject</span>
+                    : (
+                      <select
+                        required
+                        name={`attendance_${student.enrollmentId}`}
+                        value={statuses[student.enrollmentId] ?? ""}
+                        onChange={(event) => setStatuses((current) => ({
+                          ...current,
+                          [student.enrollmentId]: event.target.value,
+                        }))}
+                        className="rounded-lg border p-2"
+                      >
+                        <option value="" disabled>Select status</option>
+                        <option value="present">Present</option>
+                        <option value="absent">Absent</option>
+                        <option value="late">Late</option>
+                        <option value="excused">Excused</option>
+                        <option value="x">X — Absent</option>
+                        <option value="y">Y — Nullified (malpractice)</option>
+                      </select>
+                    )}
+              </td>
+              <td className="p-3">
+                {student.selectionStatus === "selected" || student.selectionStatus === "not_required"
+                  ? (
+                    <input
+                      name={`note_${student.enrollmentId}`}
+                      maxLength={500}
+                      required={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y"}
+                      placeholder={statuses[student.enrollmentId] === "x" || statuses[student.enrollmentId] === "y" ? "Required: record the reason" : ""}
+                      defaultValue={student.note ?? ""}
+                      className="w-56 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                    />
+                  )
+                  : "—"}
+              </td>
             </tr>
           ))}</tbody>
         </table>
@@ -608,6 +656,11 @@ export function SaveMarksForm({
     <form action={action} className="space-y-4">
       <input type="hidden" name="examSubjectId" value={examSubjectId} />
       <p className="text-sm text-slate-600">Attendance is required before marks can be saved. Enter marks or X (absent) / Y (malpractice); codes clear scores. Use one code across components (max {maxMarks}).</p>
+      {students.length === 0 && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          No students are currently eligible for marks. For an optional subject, confirm at least one student as taking the subject; compulsory-subject rosters follow current enrollment.
+        </p>
+      )}
       <label className="block max-w-lg text-sm font-medium text-slate-700">
         Search students
         <input

@@ -6,6 +6,7 @@ import {
   academicYears,
   classLevels,
   classSections,
+  classSectionSubjectTeachers,
   classSubjects,
   examClasses,
   examAttendance,
@@ -87,6 +88,30 @@ export default async function ExaminationDetailPage({
       .where(and(eq(teachers.schoolId, context.schoolId), eq(teachers.status, "active")))
     : [];
   const myTeacherIds = myTeacherRows.map((teacher) => teacher.id);
+  const sectionAssignedSubjects = myTeacherIds.length
+    ? await db.selectDistinct({
+      id: examSubjects.id,
+    }).from(classSectionSubjectTeachers)
+      .innerJoin(examSubjects, and(
+        eq(examSubjects.classSubjectId, classSectionSubjectTeachers.classSubjectId),
+        eq(examSubjects.schoolId, context.schoolId),
+      ))
+      .innerJoin(examClasses, and(
+        eq(examClasses.id, examSubjects.examClassId),
+        eq(examClasses.schoolId, context.schoolId),
+        eq(examClasses.examinationId, exam.id),
+      ))
+      .innerJoin(classSections, and(
+        eq(classSections.id, classSectionSubjectTeachers.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.classLevelId, examClasses.classLevelId),
+        eq(classSections.academicYearId, exam.academicYearId),
+      ))
+      .where(and(
+        eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+        inArray(classSectionSubjectTeachers.teacherId, myTeacherIds),
+      ))
+    : [];
   const classTeacherSubjects = myTeacherIds.length
     ? await db.selectDistinct({
       id: examSubjects.id,
@@ -132,7 +157,11 @@ export default async function ExaminationDetailPage({
         eq(staffMembers.status, "active"),
       ))
       .where(and(eq(examClasses.examinationId, exam.id), eq(examClasses.schoolId, context.schoolId)));
-    assignedIds = [...new Set([...assigned.map((row) => row.id), ...classTeacherSubjects.map((row) => row.id)])];
+    assignedIds = [...new Set([
+      ...assigned.map((row) => row.id),
+      ...sectionAssignedSubjects.map((row) => row.id),
+      ...classTeacherSubjects.map((row) => row.id),
+    ])];
     if (!assignedIds.length) notFound();
   }
   const allSubjects = await db.select({

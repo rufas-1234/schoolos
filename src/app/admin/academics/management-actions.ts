@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, inArray, ne } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -14,6 +14,7 @@ import {
   classRoutines,
   classLevels,
   classSections,
+  classSectionSubjectTeachers,
   classSubjects,
   schools,
   schoolBranches,
@@ -25,6 +26,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { getSectionSubjectTeacherScopeError } from "@/lib/subject-teacher-policy";
 import {
   canReceiveEnrollmentOperation,
   canTransitionAcademicYear,
@@ -1099,10 +1101,19 @@ export async function updateSubjectTeacher(
         })
         .from(classRoutines)
         .innerJoin(classSubjects, eq(classRoutines.classSubjectId, classSubjects.id))
+        .leftJoin(classSectionSubjectTeachers, and(
+          eq(classSectionSubjectTeachers.classSubjectId, classSubjects.id),
+          eq(classSectionSubjectTeachers.classSectionId, classRoutines.classSectionId),
+          eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+          eq(classSectionSubjectTeachers.teacherId, teacher.id),
+        ))
         .where(
           and(
             eq(classRoutines.schoolId, context.schoolId),
-            eq(classSubjects.teacherId, teacher.id),
+            or(
+              eq(classSubjects.teacherId, teacher.id),
+              isNotNull(classSectionSubjectTeachers.id),
+            ),
             ne(classSubjects.id, assignment.id),
           ),
         );
@@ -1148,6 +1159,253 @@ export async function updateSubjectTeacher(
   }
   revalidatePath("/admin/academics");
   return { success: true };
+}
+
+const sectionSubjectTeacherSchema = z.object({
+  classSubjectId: idField,
+  sectionId: idField,
+  teacherId: idField,
+});
+
+export async function assignSubjectTeacherToSection(
+  _previousState: AcademicActionState,
+  formData: FormData,
+): Promise<AcademicActionState> {
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
+  const recordId = readRecordId(formData);
+  if (recordId === undefined) return { error: "Invalid section subject-teacher assignment." };
+  const result = sectionSubjectTeacherSchema.safeParse({
+    classSubjectId: readFormValue(formData, "classSubjectId"),
+    sectionId: readFormValue(formData, "sectionId"),
+    teacherId: readFormValue(formData, "teacherId"),
+  });
+  if (!result.success) return { error: "Choose a class subject, stream, and teacher." };
+
+  const publicId = randomUUID();
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const [school] = await tx.select({ id: schools.id }).from(schools)
+        .where(eq(schools.id, context.schoolId)).for("update").limit(1);
+      if (!school) return "school-not-found";
+
+      const [classSubject] = await tx.select({
+        id: classSubjects.id,
+        publicId: classSubjects.publicId,
+        classLevelId: classSubjects.classLevelId,
+        branchId: classLevels.branchId,
+      }).from(classSubjects)
+        .innerJoin(classLevels, eq(classLevels.id, classSubjects.classLevelId))
+        .where(and(
+          eq(classSubjects.id, result.data.classSubjectId),
+          eq(classSubjects.schoolId, context.schoolId),
+          eq(classLevels.schoolId, context.schoolId),
+          eq(classLevels.status, "active"),
+        ))
+        .for("update").limit(1);
+      if (!classSubject) return "class-subject-not-found";
+
+      const [section] = await tx.select({
+        id: classSections.id,
+        classLevelId: classSections.classLevelId,
+        yearStatus: academicYears.status,
+      }).from(classSections)
+        .innerJoin(academicYears, eq(academicYears.id, classSections.academicYearId))
+        .where(and(
+          eq(classSections.id, result.data.sectionId),
+          eq(classSections.schoolId, context.schoolId),
+          eq(academicYears.schoolId, context.schoolId),
+        ))
+        .for("update").limit(1);
+      if (!section) return "section-not-found";
+      if (section.yearStatus !== "active") return "year-not-active";
+
+      const [teacher] = await tx.select({
+        id: teachers.id,
+        branchId: teachers.branchId,
+      }).from(teachers)
+        .where(and(
+          eq(teachers.id, result.data.teacherId),
+          eq(teachers.schoolId, context.schoolId),
+          eq(teachers.status, "active"),
+        ))
+        .for("update").limit(1);
+      if (!teacher) return "teacher-not-found";
+
+      const scopeError = getSectionSubjectTeacherScopeError({
+        classLevelId: classSubject.classLevelId,
+        sectionClassLevelId: section.classLevelId,
+        classBranchId: classSubject.branchId,
+        teacherBranchId: teacher.branchId,
+      });
+      if (scopeError) return scopeError;
+
+      const targetRoutines = await tx.select({
+        id: classRoutines.id,
+        dayOfWeek: classRoutines.dayOfWeek,
+        startsAt: classRoutines.startsAt,
+        endsAt: classRoutines.endsAt,
+      }).from(classRoutines)
+        .where(and(
+          eq(classRoutines.schoolId, context.schoolId),
+          eq(classRoutines.classSubjectId, classSubject.id),
+          eq(classRoutines.classSectionId, section.id),
+        ));
+      if (targetRoutines.length) {
+        const teacherRoutines = await tx.select({
+          id: classRoutines.id,
+          dayOfWeek: classRoutines.dayOfWeek,
+          startsAt: classRoutines.startsAt,
+          endsAt: classRoutines.endsAt,
+        }).from(classRoutines)
+          .innerJoin(classSubjects, eq(classSubjects.id, classRoutines.classSubjectId))
+          .leftJoin(classSectionSubjectTeachers, and(
+            eq(classSectionSubjectTeachers.classSubjectId, classSubjects.id),
+            eq(classSectionSubjectTeachers.classSectionId, classRoutines.classSectionId),
+            eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+            eq(classSectionSubjectTeachers.teacherId, teacher.id),
+          ))
+          .where(and(
+            eq(classRoutines.schoolId, context.schoolId),
+            or(
+              eq(classSubjects.teacherId, teacher.id),
+              isNotNull(classSectionSubjectTeachers.id),
+            ),
+          ));
+        if (targetRoutines.some((routine) => teacherRoutines.some((other) =>
+          other.id !== routine.id &&
+          other.dayOfWeek === routine.dayOfWeek &&
+          doTimeRangesOverlap(
+            routine.startsAt,
+            routine.endsAt,
+            other.startsAt,
+            other.endsAt,
+          ),
+        ))) {
+          return "teacher-time-conflict";
+        }
+      }
+
+      const [existingAssignment] = recordId === null
+        ? []
+        : await tx.select({
+          id: classSectionSubjectTeachers.id,
+          publicId: classSectionSubjectTeachers.publicId,
+          classSubjectId: classSectionSubjectTeachers.classSubjectId,
+          classSectionId: classSectionSubjectTeachers.classSectionId,
+          teacherId: classSectionSubjectTeachers.teacherId,
+        }).from(classSectionSubjectTeachers)
+          .where(and(
+            eq(classSectionSubjectTeachers.id, recordId),
+            eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+          ))
+          .for("update").limit(1);
+      if (recordId !== null && !existingAssignment) return "section-assignment-not-found";
+
+      const [duplicate] = await tx.select({
+        id: classSectionSubjectTeachers.id,
+      }).from(classSectionSubjectTeachers)
+        .where(and(
+          eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+          eq(classSectionSubjectTeachers.classSubjectId, classSubject.id),
+          eq(classSectionSubjectTeachers.classSectionId, section.id),
+          eq(classSectionSubjectTeachers.teacherId, teacher.id),
+        ))
+        .limit(1);
+      if (duplicate && duplicate.id !== recordId) return "section-assignment-exists";
+
+      if (existingAssignment) {
+        await tx.update(classSectionSubjectTeachers).set({
+          classSubjectId: classSubject.id,
+          classSectionId: section.id,
+          teacherId: teacher.id,
+        }).where(and(
+          eq(classSectionSubjectTeachers.id, existingAssignment.id),
+          eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+        ));
+        await writeAudit(
+          tx,
+          context,
+          "academic.subject.section_teacher.updated",
+          "class_section_subject_teacher",
+          existingAssignment.publicId,
+          ["classSubjectId", "classSectionId", "teacherId"],
+        );
+        return "updated";
+      }
+
+      await tx.insert(classSectionSubjectTeachers).values({
+        publicId,
+        schoolId: context.schoolId,
+        classSubjectId: classSubject.id,
+        classSectionId: section.id,
+        teacherId: teacher.id,
+      });
+      await writeAudit(
+        tx,
+        context,
+        "academic.subject.section_teacher.assigned",
+        "class_section_subject_teacher",
+        publicId,
+        ["classSubjectId", "classSectionId", "teacherId"],
+      );
+      return "created";
+    });
+
+    if (outcome === "school-not-found") return { error: "The school record could not be verified." };
+    if (outcome === "class-subject-not-found") return { error: "Choose a class subject belonging to your school." };
+    if (outcome === "section-not-found") return { error: "Choose a stream belonging to your school." };
+    if (outcome === "year-not-active") return { error: "Choose a stream in the active academic year." };
+    if (outcome === "teacher-not-found") return { error: "Choose an active teacher belonging to your school." };
+    if (outcome === "section-class-mismatch") return { error: "Choose a stream in the selected class." };
+    if (outcome === "teacher-branch-mismatch") return { error: "Choose a teacher who works at the selected class branch." };
+    if (outcome === "section-assignment-not-found") return { error: "The section teacher assignment was not found." };
+    if (outcome === "section-assignment-exists") return { error: "That teacher is already assigned to this subject and stream." };
+  } catch (error) {
+    if (isDuplicateEntryError(error)) {
+      return { error: "That teacher is already assigned to this subject and stream." };
+    }
+    throw error;
+  }
+
+  revalidatePath("/admin/academics");
+  revalidatePath("/portal/teacher");
+  return { success: true };
+}
+
+export async function removeSubjectTeacherFromSection(formData: FormData): Promise<void> {
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
+  const recordId = readRecordId(formData);
+  if (!recordId) throw new Error("Invalid section subject-teacher removal request.");
+
+  const removed = await db.transaction(async (tx) => {
+    const [assignment] = await tx.select({
+      publicId: classSectionSubjectTeachers.publicId,
+    }).from(classSectionSubjectTeachers)
+      .where(and(
+        eq(classSectionSubjectTeachers.id, recordId),
+        eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+      ))
+      .for("update").limit(1);
+    if (!assignment) return false;
+
+    await tx.delete(classSectionSubjectTeachers).where(and(
+      eq(classSectionSubjectTeachers.id, recordId),
+      eq(classSectionSubjectTeachers.schoolId, context.schoolId),
+    ));
+    await writeAudit(
+      tx,
+      context,
+      "academic.subject.section_teacher.removed",
+      "class_section_subject_teacher",
+      assignment.publicId,
+      ["deleted"],
+    );
+    return true;
+  });
+  if (!removed) throw new Error("The section subject-teacher assignment was not found.");
+
+  revalidatePath("/admin/academics");
+  revalidatePath("/portal/teacher");
 }
 
 const placementSchema = z.object({

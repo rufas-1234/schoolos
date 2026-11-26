@@ -24,8 +24,10 @@ import {
   createClassRoom,
   createClassRoutine,
   createSchoolBranch,
+  assignSubjectTeacherToSection,
   deleteClassRoom,
   deleteClassRoutine,
+  removeSubjectTeacherFromSection,
   placeStudent,
   recordEnrollmentOperation,
   recordEnrollmentOperationsBulk,
@@ -871,6 +873,122 @@ export function SubjectTeacherForm({
         onValueChange={setTeacherId}
       />
     </ActionForm>
+  );
+}
+
+export function SectionSubjectTeacherForm({
+  branches,
+  assignments,
+  sections,
+  teachers,
+  defaultAssignmentId,
+  record,
+}: {
+  branches: Option[];
+  assignments: (Option & { branchId: number; classLevelId: number })[];
+  sections: (Option & { branchId: number; classLevelId: number })[];
+  teachers: (Option & { branchId: number })[];
+  defaultAssignmentId?: number;
+  record?: {
+    id: number;
+    assignmentId: number;
+    sectionId: number;
+    teacherId: number;
+  };
+}) {
+  const initialAssignmentId = record?.assignmentId ?? defaultAssignmentId;
+  const [branchId, setBranchId] = useState(
+    String(assignments.find((assignment) => assignment.id === initialAssignmentId)?.branchId ?? ""),
+  );
+  const [assignmentId, setAssignmentId] = useState(String(initialAssignmentId ?? ""));
+  const [sectionId, setSectionId] = useState(String(record?.sectionId ?? ""));
+  const [teacherId, setTeacherId] = useState(String(record?.teacherId ?? ""));
+  const availableAssignments = assignments.filter((assignment) => String(assignment.branchId) === branchId);
+  const selectedAssignment = availableAssignments.find((assignment) => String(assignment.id) === assignmentId);
+  const availableSections = selectedAssignment
+    ? sections.filter((section) => section.classLevelId === selectedAssignment.classLevelId)
+    : [];
+  const availableTeachers = teachers.filter((teacher) => String(teacher.branchId) === branchId);
+
+  return (
+    <ActionForm
+      title={record ? "Edit subject teacher for stream" : "Assign subject teacher to stream"}
+      action={assignSubjectTeacherToSection}
+      submitLabel={record ? "Save stream assignment" : "Assign teacher"}
+      recordId={record?.id}
+    >
+      <SearchableSelect
+        label="Branch"
+        name="branchId"
+        options={branches.map((branch) => ({ value: String(branch.id), label: branch.label }))}
+        defaultValue={branchId}
+        required
+        disabled={branches.length === 0 || Boolean(defaultAssignmentId || record)}
+        placeholder={branches.length === 0 ? "Create a branch first" : "Search branches..."}
+        onValueChange={(value) => {
+          setBranchId(value);
+          setAssignmentId("");
+          setSectionId("");
+          setTeacherId("");
+        }}
+      />
+      <SearchableSelect
+        key={branchId}
+        label="Class subject"
+        name="classSubjectId"
+        options={availableAssignments.map((assignment) => ({ value: String(assignment.id), label: assignment.label }))}
+        defaultValue={assignmentId}
+        required
+        disabled={!branchId || Boolean(defaultAssignmentId || record) || availableAssignments.length === 0}
+        placeholder={!branchId ? "Choose a branch first" : "Search class subjects..."}
+        onValueChange={(value) => {
+          setAssignmentId(value);
+          setSectionId("");
+          setTeacherId("");
+        }}
+      />
+      {(defaultAssignmentId || record) && (
+        <input type="hidden" name="classSubjectId" value={assignmentId} />
+      )}
+      <SearchableSelect
+        key={`section-${assignmentId}`}
+        label="Stream / section"
+        name="sectionId"
+        options={availableSections.map((section) => ({ value: String(section.id), label: section.label }))}
+        defaultValue={sectionId}
+        required
+        disabled={!selectedAssignment || Boolean(record) || availableSections.length === 0}
+        placeholder={!selectedAssignment ? "Choose a class subject first" : "Search streams..."}
+        onValueChange={(value) => {
+          setSectionId(value);
+          setTeacherId("");
+        }}
+      />
+      {record && <input type="hidden" name="sectionId" value={sectionId} />}
+      <SearchableSelect
+        key={`section-teacher-${branchId}-${sectionId}`}
+        label="Teacher"
+        name="teacherId"
+        options={availableTeachers.map((teacher) => ({ value: String(teacher.id), label: teacher.label }))}
+        defaultValue={teacherId}
+        required
+        disabled={!sectionId || availableTeachers.length === 0}
+        placeholder="Search teachers..."
+        onValueChange={setTeacherId}
+      />
+      <p className="text-xs text-slate-500">
+        Assign teachers independently for each stream. You can add more than one teacher to the same subject and stream.
+      </p>
+    </ActionForm>
+  );
+}
+
+export function RemoveSectionSubjectTeacherForm({ id, label }: { id: number; label: string }) {
+  return (
+    <form action={removeSubjectTeacherFromSection}>
+      <input type="hidden" name="recordId" value={id} />
+      <AdminDeleteButton label={`Remove ${label}`} buttonText="Remove assignment" showLabel />
+    </form>
   );
 }
 

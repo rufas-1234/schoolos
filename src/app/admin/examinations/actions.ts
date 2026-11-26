@@ -27,6 +27,7 @@ import {
   examTypes,
   examinations,
   schoolBranches,
+  studentElectiveSelections,
   staffMembers,
   studentEnrollments,
   students,
@@ -35,6 +36,12 @@ import {
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate, isValidDateRange } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { getExamSubjectTeacherSectionScope } from "@/lib/exam-subject-teacher-scope";
+import {
+  isElectiveSelectionStatus,
+  resolveElectiveRoster,
+  type ElectiveSelectionStatus,
+} from "@/lib/elective-selection-policy";
 import { isSystemSuperAdmin } from "@/lib/platform-admin-policy";
 import {
   canEditExamAttendance,
@@ -86,27 +93,7 @@ function value(formData: FormData, key: string): string {
 }
 
 async function assignedSubject(examSubjectId: number, schoolId: number, userId: string) {
-  const [record] = await db
-    .select({ id: examSubjects.id, status: examSubjects.status })
-    .from(examSubjects)
-    .innerJoin(classSubjects, and(
-      eq(classSubjects.id, examSubjects.classSubjectId),
-      eq(classSubjects.schoolId, schoolId),
-    ))
-    .innerJoin(teachers, and(
-      eq(teachers.id, classSubjects.teacherId!),
-      eq(teachers.schoolId, schoolId),
-      eq(teachers.status, "active"),
-    ))
-    .innerJoin(staffMembers, and(
-      eq(staffMembers.id, teachers.staffMemberId!),
-      eq(staffMembers.schoolId, schoolId),
-      eq(staffMembers.linkedUserId, userId),
-      eq(staffMembers.status, "active"),
-    ))
-    .where(and(eq(examSubjects.id, examSubjectId), eq(examSubjects.schoolId, schoolId)))
-    .limit(1);
-  return record ?? null;
+  return getExamSubjectTeacherSectionScope(examSubjectId, schoolId, userId);
 }
 
 export async function createGradingScale(
@@ -1061,6 +1048,8 @@ export async function syncExamMarksRoster(examSubjectId: number): Promise<{
     examId: examinations.id,
     classLevelId: examClasses.classLevelId,
     academicYearId: examinations.academicYearId,
+    classSubjectId: classSubjects.id,
+    isCompulsory: classSubjects.isCompulsory,
   }).from(examSubjects)
     .innerJoin(examClasses, and(
       eq(examClasses.id, examSubjects.examClassId),
@@ -1079,18 +1068,23 @@ export async function syncExamMarksRoster(examSubjectId: number): Promise<{
   if (!record || record.status !== "draft" || record.examStatus !== "open") {
     return { error: "Only an open draft assessment roster can be synchronized." };
   }
+  const assignment = await assignedSubject(record.id, context.schoolId, context.user.id);
   if (!canEnterExamMarks(
     context.grantedPermissions,
-    Boolean(await assignedSubject(record.id, context.schoolId, context.user.id)),
+    Boolean(assignment),
   )) {
     return { error: "You can only synchronize or edit marks for your assigned subjects unless your role has examination management or results publishing access." };
   }
+  const assignedSectionIds = context.grantedPermissions.some((permission) =>
+    permission === "examinations.create" || permission === "results.publish",
+  ) ? null : assignment?.sectionIds ?? null;
 
   const result = await db.transaction(async (tx) => {
     const [locked] = await tx.select({
       id: examSubjects.id,
       status: examSubjects.status,
       examStatus: examinations.status,
+      isCompulsory: classSubjects.isCompulsory,
     }).from(examSubjects)
       .innerJoin(examClasses, and(
         eq(examClasses.id, examSubjects.examClassId),
@@ -1109,8 +1103,9 @@ export async function syncExamMarksRoster(examSubjectId: number): Promise<{
       .limit(1);
     if (!locked || locked.status !== "draft" || locked.examStatus !== "open") return null;
 
-    const eligibleEnrollments = await tx.select({
+    const enrolledRoster = await tx.select({
       id: studentEnrollments.id,
+      selectionStatus: studentElectiveSelections.status,
     }).from(studentEnrollments)
       .innerJoin(classSections, and(
         eq(classSections.id, studentEnrollments.classSectionId),
@@ -1122,12 +1117,38 @@ export async function syncExamMarksRoster(examSubjectId: number): Promise<{
         eq(students.id, studentEnrollments.studentId),
         eq(students.schoolId, context.schoolId),
       ))
+      .leftJoin(studentElectiveSelections, and(
+        eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+        eq(studentElectiveSelections.classSubjectId, record.classSubjectId),
+        eq(studentElectiveSelections.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.academicYearId, record.academicYearId),
         eq(studentEnrollments.status, "enrolled"),
         ne(students.status, "disabled"),
-      ));
+        ...(assignedSectionIds ? [inArray(classSections.id, assignedSectionIds)] : []),
+      ))
+      .for("update");
+    for (const enrollment of enrolledRoster) {
+      if (enrollment.selectionStatus !== null && !isElectiveSelectionStatus(enrollment.selectionStatus)) {
+        throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+      }
+    }
+    const electiveRoster = resolveElectiveRoster(
+      enrolledRoster.map((enrollment) => ({
+        enrollmentId: enrollment.id,
+        selectionStatus: enrollment.selectionStatus,
+      })),
+      locked.isCompulsory,
+    );
+    if (electiveRoster.pendingEnrollmentIds.length) {
+      return { error: "Confirm every student's optional-subject choice before synchronizing marks." } as const;
+    }
+    const eligibleEnrollmentIds = new Set(electiveRoster.participantEnrollmentIds);
+    const eligibleEnrollments = enrolledRoster.filter((enrollment) =>
+      eligibleEnrollmentIds.has(enrollment.id),
+    );
 
     const components = await tx.select({
         id: examComponents.id,
@@ -1226,7 +1247,15 @@ export async function saveExamMarks(
     maxMarks: examSubjects.maxMarks,
     examinationId: examinations.id,
     examinationStatus: examinations.status,
+    isCompulsory: classSubjects.isCompulsory,
+    classSubjectId: classSubjects.id,
+    classLevelId: examClasses.classLevelId,
+    academicYearId: examinations.academicYearId,
   }).from(examSubjects).innerJoin(examClasses, eq(examClasses.id, examSubjects.examClassId))
+    .innerJoin(classSubjects, and(
+      eq(classSubjects.id, examSubjects.classSubjectId),
+      eq(classSubjects.schoolId, context.schoolId),
+    ))
     .innerJoin(examinations, eq(examinations.id, examClasses.examinationId))
     .where(and(eq(examSubjects.id, examSubjectId.data), eq(examSubjects.schoolId, context.schoolId)))
     .limit(1);
@@ -1237,18 +1266,72 @@ export async function saveExamMarks(
   if (!canEnterExamMarks(context.grantedPermissions, Boolean(assignment))) {
     return { error: "You can only enter marks for your assigned subjects unless your role has examination management or results publishing access." };
   }
+  const assignedSectionIds = context.grantedPermissions.some((permission) =>
+    permission === "examinations.create" || permission === "results.publish",
+  ) ? null : assignment?.sectionIds ?? null;
+  const activeRoster = await db.select({
+    enrollmentId: studentEnrollments.id,
+    selectionStatus: studentElectiveSelections.status,
+  }).from(studentEnrollments)
+    .innerJoin(classSections, and(
+      eq(classSections.id, studentEnrollments.classSectionId),
+      eq(classSections.schoolId, context.schoolId),
+      eq(classSections.classLevelId, record.classLevelId),
+      eq(classSections.academicYearId, record.academicYearId),
+    ))
+    .innerJoin(students, and(
+      eq(students.id, studentEnrollments.studentId),
+      eq(students.schoolId, context.schoolId),
+    ))
+    .leftJoin(studentElectiveSelections, and(
+      eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+      eq(studentElectiveSelections.classSubjectId, record.classSubjectId),
+      eq(studentElectiveSelections.schoolId, context.schoolId),
+    ))
+    .where(and(
+      eq(studentEnrollments.schoolId, context.schoolId),
+      eq(studentEnrollments.academicYearId, record.academicYearId),
+      eq(studentEnrollments.status, "enrolled"),
+      ne(students.status, "disabled"),
+      ...(assignedSectionIds ? [inArray(classSections.id, assignedSectionIds)] : []),
+    ));
+  for (const enrollment of activeRoster) {
+    if (enrollment.selectionStatus !== null && !isElectiveSelectionStatus(enrollment.selectionStatus)) {
+      throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+    }
+  }
+  const electiveRoster = resolveElectiveRoster(activeRoster.map((enrollment) => ({
+    enrollmentId: enrollment.enrollmentId,
+    selectionStatus: enrollment.selectionStatus,
+  })), record.isCompulsory);
+  if (electiveRoster.pendingEnrollmentIds.length) {
+    return { error: "Confirm every student's optional-subject choice before saving marks." };
+  }
+  if (!electiveRoster.participantEnrollmentIds.length) {
+    return { error: "No students have selected this optional subject." };
+  }
+  const participantIds = electiveRoster.participantEnrollmentIds;
   const currentMarks = await db.select({
     id: examMarks.id,
     enrollmentId: examMarks.enrollmentId,
     marks: examMarks.marks,
   }).from(examMarks)
+    .innerJoin(studentEnrollments, and(
+      eq(studentEnrollments.id, examMarks.enrollmentId),
+      eq(studentEnrollments.schoolId, context.schoolId),
+    ))
     .where(and(
       eq(examMarks.schoolId, context.schoolId),
       eq(examMarks.examSubjectId, record.id),
+      inArray(studentEnrollments.id, participantIds),
+      ...(assignedSectionIds ? [inArray(studentEnrollments.classSectionId, assignedSectionIds)] : []),
     ));
   if (!currentMarks.length) return { error: "This assessment has no enrolled students on its roster." };
   const currentAttendance = currentMarks.length
-    ? await db.select({ enrollmentId: examAttendance.enrollmentId }).from(examAttendance)
+    ? await db.select({
+      enrollmentId: examAttendance.enrollmentId,
+      status: examAttendance.status,
+    }).from(examAttendance)
       .where(and(
         eq(examAttendance.schoolId, context.schoolId),
         eq(examAttendance.examSubjectId, record.id),
@@ -1260,6 +1343,9 @@ export async function saveExamMarks(
     currentAttendance.map((attendance) => attendance.enrollmentId),
   )) {
     return { error: "Record attendance for every student before saving marks. X and Y codes remain available." };
+  }
+  if (currentAttendance.some((attendance) => attendance.status === "not_applicable")) {
+    return { error: "Students taking an optional subject must have a real attendance status before saving marks." };
   }
   const componentDefinitions = await db.select({
     id: examComponents.id,
@@ -1376,10 +1462,15 @@ export async function saveExamMarks(
       maxMarks: examSubjects.maxMarks,
       examinationId: examinations.id,
       examinationStatus: examinations.status,
+      isCompulsory: classSubjects.isCompulsory,
     }).from(examSubjects)
       .innerJoin(examClasses, and(
         eq(examClasses.id, examSubjects.examClassId),
         eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSubjects, and(
+        eq(classSubjects.id, examSubjects.classSubjectId),
+        eq(classSubjects.schoolId, context.schoolId),
       ))
       .innerJoin(examinations, and(
         eq(examinations.id, examClasses.examinationId),
@@ -1391,18 +1482,68 @@ export async function saveExamMarks(
     if (!lockedSubject || lockedSubject.status !== "draft" || lockedSubject.examinationStatus !== "open") {
       return "locked" as const;
     }
+    const lockedRoster = await tx.select({
+      enrollmentId: studentEnrollments.id,
+      selectionStatus: studentElectiveSelections.status,
+    }).from(studentEnrollments)
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.classLevelId, record.classLevelId),
+        eq(classSections.academicYearId, record.academicYearId),
+      ))
+      .innerJoin(students, and(
+        eq(students.id, studentEnrollments.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .leftJoin(studentElectiveSelections, and(
+        eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+        eq(studentElectiveSelections.classSubjectId, record.classSubjectId),
+        eq(studentElectiveSelections.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.academicYearId, record.academicYearId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+        ...(assignedSectionIds ? [inArray(classSections.id, assignedSectionIds)] : []),
+      ))
+      .for("update");
+    for (const enrollment of lockedRoster) {
+      if (enrollment.selectionStatus !== null && !isElectiveSelectionStatus(enrollment.selectionStatus)) {
+        throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+      }
+    }
+    const lockedElectiveRoster = resolveElectiveRoster(lockedRoster.map((enrollment) => ({
+      enrollmentId: enrollment.enrollmentId,
+      selectionStatus: enrollment.selectionStatus,
+    })), lockedSubject.isCompulsory);
+    if (lockedElectiveRoster.pendingEnrollmentIds.length) return "pending-elections" as const;
+    if (
+      lockedElectiveRoster.participantEnrollmentIds.length !== participantIds.length ||
+      lockedElectiveRoster.participantEnrollmentIds.some((id) => !participantIds.includes(id))
+    ) return "roster-changed" as const;
     const lockedMarks = await tx.select({
       id: examMarks.id,
       enrollmentId: examMarks.enrollmentId,
       marks: examMarks.marks,
     }).from(examMarks)
+      .innerJoin(studentEnrollments, and(
+        eq(studentEnrollments.id, examMarks.enrollmentId),
+        eq(studentEnrollments.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(examMarks.schoolId, context.schoolId),
         eq(examMarks.examSubjectId, record.id),
+        inArray(studentEnrollments.id, lockedElectiveRoster.participantEnrollmentIds),
+        ...(assignedSectionIds ? [inArray(studentEnrollments.classSectionId, assignedSectionIds)] : []),
       )).for("update");
     if (lockedMarks.length !== currentMarks.length) return "roster-changed" as const;
     const lockedAttendance = lockedMarks.length
-      ? await tx.select({ enrollmentId: examAttendance.enrollmentId }).from(examAttendance)
+      ? await tx.select({
+        enrollmentId: examAttendance.enrollmentId,
+        status: examAttendance.status,
+      }).from(examAttendance)
         .where(and(
           eq(examAttendance.schoolId, context.schoolId),
           eq(examAttendance.examSubjectId, record.id),
@@ -1414,6 +1555,9 @@ export async function saveExamMarks(
       lockedAttendance.map((attendance) => attendance.enrollmentId),
     )) {
       return "attendance-incomplete" as const;
+    }
+    if (lockedAttendance.some((attendance) => attendance.status === "not_applicable")) {
+      return "invalid-attendance" as const;
     }
     const lockedComponents = await tx.select({
       id: examComponentMarks.id,
@@ -1513,8 +1657,10 @@ export async function saveExamMarks(
     return "saved" as const;
   });
   if (saveOutcome === "locked") return { error: "This assessment was submitted or published while you were editing. Reload before continuing." };
+  if (saveOutcome === "pending-elections") return { error: "Elective choices became unresolved while you were editing. Reload and confirm them before saving." };
   if (saveOutcome === "roster-changed") return { error: "The assessment roster changed while you were editing. Reload before continuing." };
   if (saveOutcome === "attendance-incomplete") return { error: "Record attendance for every student before saving marks. X and Y codes remain available." };
+  if (saveOutcome === "invalid-attendance") return { error: "Students taking an optional subject must have a real attendance status before saving marks." };
   if (saveOutcome === "invalid-mark") return { error: "A mark exceeds the current assessment maximum." };
   revalidatePath(`/admin/examinations/${record.examinationId}`);
   revalidatePath(`/admin/examinations/${record.examinationId}/subjects/${record.id}`);
@@ -1534,6 +1680,7 @@ export async function saveExamAttendance(
     publicId: examSubjects.publicId,
     status: examSubjects.status,
     isCompulsory: classSubjects.isCompulsory,
+    classSubjectId: classSubjects.id,
     examClassId: examClasses.id,
     classLevelId: examClasses.classLevelId,
     academicYearId: examinations.academicYearId,
@@ -1563,14 +1710,20 @@ export async function saveExamAttendance(
   }
   const canManage = context.grantedPermissions.includes("examinations.create") ||
     context.grantedPermissions.includes("results.publish");
-  if (subject.status !== "approved" && !canManage &&
-    !(await assignedSubject(subject.id, context.schoolId, context.user.id))) {
+  const assignment = subject.status !== "approved"
+    ? await assignedSubject(subject.id, context.schoolId, context.user.id)
+    : undefined;
+  if (subject.status !== "approved" && !canManage && !assignment) {
     return { error: "You can only mark attendance for your assigned subjects." };
   }
+  const assignedSectionIds = canManage ? null : assignment?.sectionIds ?? null;
   if (subject.status === "approved" && !isSuperAdmin) {
     return { error: "Only a system superadmin can change attendance on approved results." };
   }
-  const roster = await db.select({ enrollmentId: studentEnrollments.id }).from(studentEnrollments)
+  const roster = await db.select({
+    enrollmentId: studentEnrollments.id,
+    selectionStatus: studentElectiveSelections.status,
+  }).from(studentEnrollments)
     .innerJoin(classSections, and(
       eq(classSections.id, studentEnrollments.classSectionId),
       eq(classSections.schoolId, context.schoolId),
@@ -1581,22 +1734,49 @@ export async function saveExamAttendance(
       eq(students.id, studentEnrollments.studentId),
       eq(students.schoolId, context.schoolId),
     ))
+    .leftJoin(studentElectiveSelections, and(
+      eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+      eq(studentElectiveSelections.classSubjectId, subject.classSubjectId),
+      eq(studentElectiveSelections.schoolId, context.schoolId),
+    ))
     .where(and(
       eq(studentEnrollments.schoolId, context.schoolId),
       eq(studentEnrollments.academicYearId, subject.academicYearId),
       eq(studentEnrollments.status, "enrolled"),
       ne(students.status, "disabled"),
+      ...(assignedSectionIds ? [inArray(classSections.id, assignedSectionIds)] : []),
     ));
   if (!roster.length) return { error: "There are no enrolled students on this exam roster." };
   const statuses = new Map<number, { status: "present" | "absent" | "late" | "excused" | "not_applicable" | "x" | "y"; note: string | null }>();
+  const selectionStatusByEnrollment = new Map<number, ElectiveSelectionStatus | "not_required">();
   for (const enrollment of roster) {
+    if (
+      enrollment.selectionStatus !== null &&
+      !isElectiveSelectionStatus(enrollment.selectionStatus)
+    ) {
+      throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+    }
+    const selectionStatus = subject.isCompulsory
+      ? "not_required"
+      : enrollment.selectionStatus ?? "not_selected";
+    selectionStatusByEnrollment.set(enrollment.enrollmentId, selectionStatus);
+    if (selectionStatus === "pending") {
+      return { error: "Confirm every student's optional-subject choice before recording attendance." };
+    }
+    if (selectionStatus === "not_selected") {
+      statuses.set(enrollment.enrollmentId, { status: "not_applicable", note: null });
+      continue;
+    }
     const rawStatus = value(formData, `attendance_${enrollment.enrollmentId}`);
     const result = z.enum(["present", "absent", "late", "excused", "not_applicable", "x", "y"]).safeParse(rawStatus);
-    if (!result.success) return { error: "Choose an attendance status for every student in the roster." };
+    if (!result.success) return { error: "Choose an attendance status for every student taking the subject." };
     const rawNote = value(formData, `note_${enrollment.enrollmentId}`).trim();
     if (rawNote.length > 500) return { error: "Attendance notes must be 500 characters or fewer." };
     if (result.data === "not_applicable" && subject.isCompulsory) {
       return { error: "Only an optional subject can be marked not applicable." };
+    }
+    if (result.data === "not_applicable" && selectionStatus === "selected") {
+      return { error: "Students taking an optional subject must have a real attendance status." };
     }
     if ((result.data === "x" || result.data === "y") && !rawNote) {
       return { error: "Add a note for every X absence or Y malpractice code." };
@@ -1608,10 +1788,15 @@ export async function saveExamAttendance(
       id: examSubjects.id,
       status: examSubjects.status,
       examStatus: examinations.status,
+      isCompulsory: classSubjects.isCompulsory,
     }).from(examSubjects)
       .innerJoin(examClasses, and(
         eq(examClasses.id, examSubjects.examClassId),
         eq(examClasses.schoolId, context.schoolId),
+      ))
+      .innerJoin(classSubjects, and(
+        eq(classSubjects.id, examSubjects.classSubjectId),
+        eq(classSubjects.schoolId, context.schoolId),
       ))
       .innerJoin(examinations, and(
         eq(examinations.id, examClasses.examinationId),
@@ -1624,7 +1809,52 @@ export async function saveExamAttendance(
       examStatus: locked.examStatus,
       assessmentStatus: locked.status,
       isSuperAdmin,
-    })) return false;
+    })) return "locked" as const;
+    const lockedRoster = await tx.select({
+      enrollmentId: studentEnrollments.id,
+      selectionStatus: studentElectiveSelections.status,
+    }).from(studentEnrollments)
+      .innerJoin(classSections, and(
+        eq(classSections.id, studentEnrollments.classSectionId),
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.classLevelId, subject.classLevelId),
+        eq(classSections.academicYearId, subject.academicYearId),
+      ))
+      .innerJoin(students, and(
+        eq(students.id, studentEnrollments.studentId),
+        eq(students.schoolId, context.schoolId),
+      ))
+      .leftJoin(studentElectiveSelections, and(
+        eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+        eq(studentElectiveSelections.classSubjectId, subject.classSubjectId),
+        eq(studentElectiveSelections.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(studentEnrollments.schoolId, context.schoolId),
+        eq(studentEnrollments.academicYearId, subject.academicYearId),
+        eq(studentEnrollments.status, "enrolled"),
+        ne(students.status, "disabled"),
+        ...(assignedSectionIds ? [inArray(classSections.id, assignedSectionIds)] : []),
+      ))
+      .for("update");
+    if (
+      lockedRoster.length !== statuses.size ||
+      lockedRoster.some((enrollment) => !statuses.has(enrollment.enrollmentId))
+    ) return "roster-changed" as const;
+    for (const enrollment of lockedRoster) {
+      if (
+        enrollment.selectionStatus !== null &&
+        !isElectiveSelectionStatus(enrollment.selectionStatus)
+      ) {
+        throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+      }
+      const currentSelectionStatus = locked.isCompulsory
+        ? "not_required"
+        : enrollment.selectionStatus ?? "not_selected";
+      if (currentSelectionStatus !== selectionStatusByEnrollment.get(enrollment.enrollmentId)) {
+        return "selections-changed" as const;
+      }
+    }
     for (const [enrollmentId, attendance] of statuses) {
       await tx.insert(examAttendance).values({
         publicId: randomUUID(),
@@ -1651,9 +1881,11 @@ export async function saveExamAttendance(
       resourcePublicId: subject.publicId,
       changedFields: ["attendance"],
     });
-    return true;
+    return "saved" as const;
   });
-  if (!outcome) return { error: "Attendance is locked because the assessment or examination status changed. Reload the page." };
+  if (outcome === "locked") return { error: "Attendance is locked because the assessment or examination status changed. Reload the page." };
+  if (outcome === "roster-changed") return { error: "The enrolled student roster changed. Reload the page before saving attendance." };
+  if (outcome === "selections-changed") return { error: "Elective choices changed while attendance was being saved. Reload the page." };
   revalidatePath(`/admin/examinations/${subject.examId}/attendance/${subject.id}`);
   revalidatePath(`/admin/examinations/${subject.examId}/subjects/${subject.id}`);
   revalidatePath(`/admin/examinations/${subject.examId}`);
@@ -1682,6 +1914,7 @@ export async function submitExamSubject(
       examinationStatus: examinations.status,
       maxMarks: examSubjects.maxMarks,
       isCompulsory: classSubjects.isCompulsory,
+      classSubjectId: classSubjects.id,
       classLevelId: examClasses.classLevelId,
       academicYearId: examinations.academicYearId,
     }).from(examSubjects)
@@ -1701,7 +1934,10 @@ export async function submitExamSubject(
       .for("update")
       .limit(1);
     if (!record || record.status !== "draft" || record.examinationStatus !== "open") return "locked" as const;
-    const roster = await tx.select({ id: studentEnrollments.id })
+    const roster = await tx.select({
+      id: studentEnrollments.id,
+      selectionStatus: studentElectiveSelections.status,
+    })
       .from(studentEnrollments)
       .innerJoin(classSections, and(
         eq(classSections.id, studentEnrollments.classSectionId),
@@ -1713,15 +1949,31 @@ export async function submitExamSubject(
         eq(students.id, studentEnrollments.studentId),
         eq(students.schoolId, context.schoolId),
       ))
+      .leftJoin(studentElectiveSelections, and(
+        eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+        eq(studentElectiveSelections.classSubjectId, record.classSubjectId),
+        eq(studentElectiveSelections.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.academicYearId, record.academicYearId),
         eq(studentEnrollments.status, "enrolled"),
         ne(students.status, "disabled"),
-      ));
+      ))
+      .for("update");
     if (!roster.length) return "no-enrollments" as const;
-    const rosterIds = roster.map((enrollment) => enrollment.id);
-    const attendanceRows = await tx.select({
+    for (const enrollment of roster) {
+      if (enrollment.selectionStatus !== null && !isElectiveSelectionStatus(enrollment.selectionStatus)) {
+        throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+      }
+    }
+    const electiveRoster = resolveElectiveRoster(roster.map((enrollment) => ({
+      enrollmentId: enrollment.id,
+      selectionStatus: enrollment.selectionStatus,
+    })), record.isCompulsory);
+    if (electiveRoster.pendingEnrollmentIds.length) return "pending-elections" as const;
+    const rosterIds = electiveRoster.participantEnrollmentIds;
+    const attendanceRows = rosterIds.length ? await tx.select({
       enrollmentId: examAttendance.enrollmentId,
       status: examAttendance.status,
       note: examAttendance.note,
@@ -1729,12 +1981,12 @@ export async function submitExamSubject(
       eq(examAttendance.examSubjectId, record.id),
       eq(examAttendance.schoolId, context.schoolId),
       inArray(examAttendance.enrollmentId, rosterIds),
-    ));
+    )) : [];
+    if (attendanceRows.some((entry) => entry.status === "not_applicable")) return "invalid-marks" as const;
     const allowedUnmarkedEnrollmentIds = attendanceRows.filter((entry) =>
-      (entry.status === "x" || entry.status === "y") && Boolean(entry.note?.trim()) ||
-      entry.status === "not_applicable" && !record.isCompulsory,
+      (entry.status === "x" || entry.status === "y") && Boolean(entry.note?.trim()),
     ).map((entry) => entry.enrollmentId);
-    const marks = await tx.select({
+    const marks = rosterIds.length ? await tx.select({
       enrollmentId: examMarks.enrollmentId,
       marks: examMarks.marks,
     }).from(examMarks)
@@ -1743,7 +1995,7 @@ export async function submitExamSubject(
         eq(examMarks.examSubjectId, record.id),
         inArray(examMarks.enrollmentId, rosterIds),
       ))
-      .for("update");
+      .for("update") : [];
     if (missingExamRosterEnrollmentIds(
       rosterIds,
       marks.map((mark) => mark.enrollmentId),
@@ -1773,6 +2025,7 @@ export async function submitExamSubject(
   if (outcome === "locked") return { error: "Only draft assessments in an open examination can be submitted." };
   if (outcome === "roster-incomplete") return { error: "The enrolled class roster changed. Reload the marks sheet to add every currently enrolled student before submitting." };
   if (outcome === "no-enrollments") return { error: "There are no enrolled students on this exam roster." };
+  if (outcome === "pending-elections") return { error: "Confirm every student's optional-subject choice before submitting marks." };
   if (outcome === "invalid-marks") return { error: "Complete every required mark or record a valid no-result status, and correct out-of-range marks before submitting." };
   revalidatePath(`/admin/examinations/${outcome}`);
   return { success: true };
@@ -1805,6 +2058,7 @@ export async function reviewExamSubject(
       examinationStatus: examinations.status,
       maxMarks: examSubjects.maxMarks,
       isCompulsory: classSubjects.isCompulsory,
+      classSubjectId: classSubjects.id,
       classTeacherId: examClasses.classTeacherId,
       classLevelId: examClasses.classLevelId,
       academicYearId: examinations.academicYearId,
@@ -1868,7 +2122,10 @@ export async function reviewExamSubject(
         return "forbidden" as const;
       }
     }
-    const roster = await tx.select({ id: studentEnrollments.id })
+    const roster = await tx.select({
+      id: studentEnrollments.id,
+      selectionStatus: studentElectiveSelections.status,
+    })
       .from(studentEnrollments)
       .innerJoin(classSections, and(
         eq(classSections.id, studentEnrollments.classSectionId),
@@ -1880,15 +2137,31 @@ export async function reviewExamSubject(
         eq(students.id, studentEnrollments.studentId),
         eq(students.schoolId, context.schoolId),
       ))
+      .leftJoin(studentElectiveSelections, and(
+        eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+        eq(studentElectiveSelections.classSubjectId, record.classSubjectId),
+        eq(studentElectiveSelections.schoolId, context.schoolId),
+      ))
       .where(and(
         eq(studentEnrollments.schoolId, context.schoolId),
         eq(studentEnrollments.academicYearId, record.academicYearId),
         eq(studentEnrollments.status, "enrolled"),
         ne(students.status, "disabled"),
-      ));
+      ))
+      .for("update");
     if (!roster.length) return "no-enrollments" as const;
-    const rosterIds = roster.map((enrollment) => enrollment.id);
-    const attendanceRows = await tx.select({
+    for (const enrollment of roster) {
+      if (enrollment.selectionStatus !== null && !isElectiveSelectionStatus(enrollment.selectionStatus)) {
+        throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+      }
+    }
+    const electiveRoster = resolveElectiveRoster(roster.map((enrollment) => ({
+      enrollmentId: enrollment.id,
+      selectionStatus: enrollment.selectionStatus,
+    })), record.isCompulsory);
+    if (electiveRoster.pendingEnrollmentIds.length) return "pending-elections" as const;
+    const rosterIds = electiveRoster.participantEnrollmentIds;
+    const attendanceRows = rosterIds.length ? await tx.select({
       enrollmentId: examAttendance.enrollmentId,
       status: examAttendance.status,
       note: examAttendance.note,
@@ -1896,12 +2169,12 @@ export async function reviewExamSubject(
       eq(examAttendance.examSubjectId, record.id),
       eq(examAttendance.schoolId, context.schoolId),
       inArray(examAttendance.enrollmentId, rosterIds),
-    ));
+    )) : [];
+    if (attendanceRows.some((entry) => entry.status === "not_applicable")) return "invalid-marks" as const;
     const allowedUnmarkedEnrollmentIds = attendanceRows.filter((entry) =>
-      (entry.status === "x" || entry.status === "y") && Boolean(entry.note?.trim()) ||
-      entry.status === "not_applicable" && !record.isCompulsory,
+      (entry.status === "x" || entry.status === "y") && Boolean(entry.note?.trim()),
     ).map((entry) => entry.enrollmentId);
-    const markRows = await tx.select({
+    const markRows = rosterIds.length ? await tx.select({
       enrollmentId: examMarks.enrollmentId,
       marks: examMarks.marks,
     }).from(examMarks)
@@ -1910,7 +2183,7 @@ export async function reviewExamSubject(
         eq(examMarks.examSubjectId, record.id),
         inArray(examMarks.enrollmentId, rosterIds),
       ))
-      .for("update");
+      .for("update") : [];
     if (
       missingExamRosterEnrollmentIds(rosterIds, markRows.map((mark) => mark.enrollmentId)).length
     ) {
@@ -1939,6 +2212,7 @@ export async function reviewExamSubject(
   if (outcome === "locked") return { error: "Only submitted assessment results in an open examination can be reviewed." };
   if (outcome === "forbidden") return { error: "Only the assigned class teacher or a results publisher can review this assessment." };
   if (outcome === "no-enrollments") return { error: "There are no enrolled students on this exam roster." };
+  if (outcome === "pending-elections") return { error: "Confirm every student's optional-subject choice before reviewing marks." };
   if (outcome === "invalid-marks") return { error: "This assessment has incomplete or invalid marks and cannot be approved." };
   revalidatePath(`/admin/examinations/${outcome}`);
   revalidatePath("/portal/teacher");
@@ -2096,6 +2370,7 @@ export async function publishExamination(
       status: examSubjects.status,
       maxMarks: examSubjects.maxMarks,
       isCompulsory: classSubjects.isCompulsory,
+      classSubjectId: classSubjects.id,
       classLevelId: examClasses.classLevelId,
     }).from(examSubjects).innerJoin(examClasses, and(
       eq(examClasses.id, examSubjects.examClassId),
@@ -2111,7 +2386,10 @@ export async function publishExamination(
       return "incomplete" as const;
     }
     for (const subject of subjectsToPublish) {
-      const roster = await tx.select({ id: studentEnrollments.id })
+      const roster = await tx.select({
+        id: studentEnrollments.id,
+        selectionStatus: studentElectiveSelections.status,
+      })
         .from(studentEnrollments)
         .innerJoin(classSections, and(
           eq(classSections.id, studentEnrollments.classSectionId),
@@ -2123,6 +2401,11 @@ export async function publishExamination(
           eq(students.id, studentEnrollments.studentId),
           eq(students.schoolId, context.schoolId),
         ))
+        .leftJoin(studentElectiveSelections, and(
+          eq(studentElectiveSelections.studentEnrollmentId, studentEnrollments.id),
+          eq(studentElectiveSelections.classSubjectId, subject.classSubjectId),
+          eq(studentElectiveSelections.schoolId, context.schoolId),
+        ))
         .where(and(
           eq(studentEnrollments.schoolId, context.schoolId),
           eq(studentEnrollments.academicYearId, exam.academicYearId),
@@ -2130,6 +2413,17 @@ export async function publishExamination(
           ne(students.status, "disabled"),
         ));
       if (!roster.length) return "invalid-attendance" as const;
+      for (const enrollment of roster) {
+        if (enrollment.selectionStatus !== null && !isElectiveSelectionStatus(enrollment.selectionStatus)) {
+          throw new Error(`Unknown elective selection status: ${enrollment.selectionStatus}`);
+        }
+      }
+      const electiveRoster = resolveElectiveRoster(roster.map((enrollment) => ({
+        enrollmentId: enrollment.id,
+        selectionStatus: enrollment.selectionStatus,
+      })), subject.isCompulsory);
+      if (electiveRoster.pendingEnrollmentIds.length) return "pending-elections" as const;
+      const participantIds = new Set(electiveRoster.participantEnrollmentIds);
       const attendanceRows = await tx.select({
         enrollmentId: examAttendance.enrollmentId,
         status: examAttendance.status,
@@ -2145,6 +2439,8 @@ export async function publishExamination(
       ).length > 0 || attendanceRows.some((entry) =>
         !["present", "absent", "late", "excused", "not_applicable", "x", "y"].includes(entry.status) ||
         entry.status === "not_applicable" && subject.isCompulsory ||
+        entry.status === "not_applicable" && participantIds.has(entry.enrollmentId) ||
+        entry.status !== "not_applicable" && !participantIds.has(entry.enrollmentId) ||
         (entry.status === "x" || entry.status === "y") && !entry.note?.trim(),
       );
       if (invalidAttendance) return "invalid-attendance" as const;
@@ -2215,6 +2511,7 @@ export async function publishExamination(
   });
   if (outcome === "locked") return { error: "This examination is already published or unavailable." };
   if (outcome === "incomplete") return { error: "Every subject must be submitted and approved before this class can publish." };
+  if (outcome === "pending-elections") return { error: "Confirm every student's optional-subject choice before publishing results." };
   if (outcome === "invalid-attendance") return { error: "Complete attendance for every enrolled student and correct any invalid attendance codes before publishing." };
   if (outcome === "invalid-marks") return { error: "Incomplete or out-of-range marks prevent publication. Review present or late students." };
   revalidatePath("/admin/examinations");
