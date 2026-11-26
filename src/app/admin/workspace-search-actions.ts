@@ -221,9 +221,10 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("hr-settings", "HR settings", "Configure staff fields and HR settings", "/admin/hr/settings", ["staff settings", "human resources settings"]);
   }
   if (canManageFees || canManageAccounts) {
-    addPage("finance-portal", "Finance portal", "Financial overview, fee collection, and accounts shortcuts", "/portal/finance", ["finance", "finance workspace", "accounts portal", "bursar"]);
+    addPage("finance-overview", "Finance overview", "Open finance links in the school administration area", "/admin/finance", ["finance", "finance workspace", "accounts portal", "bursar"]);
   }
   if (canManageFees) {
+    addPage("fee-overview", "Fees overview", "Open fee setup, collection, invoice, and report links", "/admin/fees/overview", ["fees", "fee dashboard", "fee setup", "fee overview"]);
     if (permissions.has("fees.manage")) {
       addPage("fee-setup", "Fee setup", "Configure fee groups, types, discounts, and structures", "/admin/fees", ["fees setup", "fee structure", "fee types", "discounts"]);
     }
@@ -271,6 +272,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("dormitories", "Dormitory management", "Manage school dormitories, rooms, occupancy, and student assignments", "/admin/dormitories", ["hostel", "boarding", "residents", "room assignments"]);
   }
   if (permissions.has("roles.manage")) {
+    addPage("users-overview", "Users overview", "Open school user accounts, access, and role shortcuts", "/admin/users/overview", ["user overview", "user dashboard", "accounts"]);
     addPage("users", "Users", "School user accounts and access", "/admin/users", ["user list", "accounts"]);
     addPage("user-roles", "User roles", "Create roles and manage account permissions", "/admin/users/roles", ["permissions", "roles"]);
   }

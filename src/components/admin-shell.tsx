@@ -155,7 +155,7 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    href: "/portal/finance",
+    href: "/admin/finance",
     label: "Finance overview",
     icon: ChartNoAxesCombined,
     permission: "fees.manage",
@@ -178,12 +178,13 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    href: "/admin/fees/collection",
+    href: "/admin/fees/overview",
     label: "Fees",
     icon: CircleDollarSign,
     permission: "fees.manage",
     permissionAlternatives: ["payments.record"],
     children: [
+      { id: "fees-overview", label: "Fees overview", href: "/admin/fees/overview", matchPath: "/admin/fees/overview" },
       { id: "fee-setup", label: "Fee setup", href: "/admin/fees", matchQuery: { key: "section", value: null }, permission: "fees.manage" },
       { id: "fee-discounts", label: "Scholarships & discounts", href: "/admin/fees?section=discounts", matchPath: "/admin/fees", matchQuery: { key: "section", value: "discounts" }, permission: "fees.manage" },
       { id: "fee-structure-create", label: "Set up fee structure", href: "/admin/fees?section=structure", matchPath: "/admin/fees", matchQuery: { key: "section", value: "structure" }, permission: "fees.manage" },
@@ -252,11 +253,12 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    href: "/admin/users",
+    href: "/admin/users/overview",
     label: "Users",
     icon: UserRoundCog,
     permission: "roles.manage",
     children: [
+      { id: "users-overview", label: "Users overview", href: "/admin/users/overview", matchPath: "/admin/users/overview" },
       { id: "user-list", label: "User list", href: "/admin/users" },
       { id: "create-role", label: "Create role", href: "/admin/users/roles?section=create-role", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "create-role" } },
       { id: "school-roles", label: "School roles", href: "/admin/users/roles?section=school-roles", matchPath: "/admin/users/roles", matchQuery: { key: "section", value: "school-roles" } },
@@ -414,7 +416,7 @@ export function AdminShell({
   const homeHref = permissions.includes("dashboard.view")
     ? "/admin/dashboard"
     : permissions.includes("roles.manage")
-        ? "/admin/users"
+        ? "/admin/users/overview"
       : permissions.includes("school.settings.manage")
         ? "/admin/settings"
       : permissions.includes("results.enter")
@@ -426,7 +428,7 @@ export function AdminShell({
       : permissions.includes("inventory.manage")
         ? "/admin/inventory"
       : permissions.includes("accounts.manage") || permissions.includes("fees.manage") || permissions.includes("payments.record")
-        ? "/portal/finance"
+        ? "/admin/finance"
       : permissions.includes("dormitories.manage")
         ? "/portal/dormitories"
       : permissions.includes("library.manage")
@@ -691,11 +693,11 @@ export function AdminShell({
           const active =
             pathname === href ||
             (pathname.startsWith(`${href}/`) && !nestedNavigationActive) ||
-            (href === "/admin/users" && pathname.startsWith("/admin/users")) ||
+            (href === "/admin/users/overview" && pathname.startsWith("/admin/users")) ||
             (href === "/admin/examinations" && pathname === "/admin/exam-analytics") ||
             (label === "Inventory" && pathname.startsWith("/admin/inventory")) ||
             (label === "Accounts" && pathname.startsWith("/admin/accounts")) ||
-            (href === "/admin/fees/collection" && pathname.startsWith("/admin/fees")) ||
+            (href === "/admin/fees/overview" && pathname.startsWith("/admin/fees")) ||
             (href === "/admin/hr" && pathname === "/admin/settings/roles") ||
             (label === "System" && pathname.startsWith("/admin/system"));
           if (children) {
@@ -706,13 +708,13 @@ export function AdminShell({
             );
             const resolvedSections = visibleSections;
             const isStudentInfo = href === "/admin/students";
-            const isUsers = href === "/admin/users";
+            const isUsers = href === "/admin/users/overview";
             const isHumanResources = href === "/admin/hr";
             const isInventory = label === "Inventory";
             const isAccounts = label === "Accounts";
             const isLibrary = label === "Library";
             const isDormitories = label === "Dormitories";
-            const isFees = href === "/admin/fees/collection";
+            const isFees = href === "/admin/fees/overview";
             const isExaminations = href === "/admin/examinations";
             const isSystem = label === "System";
             const sectionOpen = leftSidebarQuery.trim() ? true : isStudentInfo

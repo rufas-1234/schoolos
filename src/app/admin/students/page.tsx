@@ -491,25 +491,27 @@ export default async function StudentsPage({
           <p className="text-sm font-medium text-violet-700">Phase 2</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Student records</h1>
         </div>
-        <Link
-          href="/admin/dashboard"
-          className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          Back to overview
-          <ArrowUpRight size={16} />
-        </Link>
-        <Link
-          href="/admin/students/categories"
-          className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          Student categories
-        </Link>
-        <Link
-          href="/admin/students/multi-class"
-          className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          Multi-class student
-        </Link>
+        <nav aria-label="Student record shortcuts" className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/students/overview"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Back to overview
+            <ArrowUpRight size={16} />
+          </Link>
+          <Link
+            href="/admin/students/categories"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Student categories
+          </Link>
+          <Link
+            href="/admin/students/multi-class"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Multi-class student
+          </Link>
+        </nav>
       </div>
 
       <div className="print:block">
