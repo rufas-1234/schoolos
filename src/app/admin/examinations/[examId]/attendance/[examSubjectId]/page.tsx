@@ -137,7 +137,7 @@ export default async function ExamAttendancePage({
     }
     const selectionStatus = record.isCompulsory
       ? "not_required" as const
-      : student.electiveSelectionStatus ?? "not_selected";
+      : student.electiveSelectionStatus ?? "pending";
     return {
       enrollmentId: student.enrollmentId,
       name: `${student.name} ${student.lastName}`,

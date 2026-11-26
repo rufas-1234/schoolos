@@ -18,7 +18,7 @@ export function resolveElectiveRoster(
   return {
     pendingEnrollmentIds: isCompulsory
       ? []
-      : roster.filter((student) => student.selectionStatus === "pending")
+      : roster.filter((student) => student.selectionStatus === null || student.selectionStatus === "pending")
         .map((student) => student.enrollmentId),
     participantEnrollmentIds: roster.filter((student) =>
       isCompulsory || student.selectionStatus === "selected",
@@ -30,7 +30,7 @@ export function getElectiveAttendanceDefault(
   selectionStatus: ElectiveSelectionStatus | null,
   savedAttendanceStatus: string | null,
 ): string | null {
-  if (selectionStatus === null || selectionStatus === "not_selected") return "not_applicable";
+  if (selectionStatus === "not_selected") return "not_applicable";
   if (selectionStatus !== "selected" || savedAttendanceStatus === "not_applicable") return null;
   return savedAttendanceStatus;
 }

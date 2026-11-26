@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getElectiveAttendanceDefault, resolveElectiveRoster } from "./elective-selection-policy";
 
 describe("getElectiveAttendanceDefault", () => {
-  it("defaults unconfigured and confirmed non-participants to not applicable", () => {
-    expect(getElectiveAttendanceDefault(null, null)).toBe("not_applicable");
+  it("defaults confirmed non-participants to not applicable", () => {
     expect(getElectiveAttendanceDefault("not_selected", null)).toBe("not_applicable");
     expect(getElectiveAttendanceDefault("not_selected", "present")).toBe("not_applicable");
   });
@@ -13,6 +12,7 @@ describe("getElectiveAttendanceDefault", () => {
     expect(getElectiveAttendanceDefault("selected", "present")).toBe("present");
     expect(getElectiveAttendanceDefault("selected", "not_applicable")).toBeNull();
     expect(getElectiveAttendanceDefault("pending", "present")).toBeNull();
+    expect(getElectiveAttendanceDefault(null, null)).toBeNull();
   });
 });
 
@@ -23,18 +23,8 @@ describe("resolveElectiveRoster", () => {
       { enrollmentId: 2, selectionStatus: "not_selected" },
       { enrollmentId: 3, selectionStatus: null },
     ], false)).toEqual({
-      pendingEnrollmentIds: [],
+      pendingEnrollmentIds: [3],
       participantEnrollmentIds: [1],
-    });
-  });
-
-  it("keeps explicitly pending elective choices unresolved", () => {
-    expect(resolveElectiveRoster([
-      { enrollmentId: 1, selectionStatus: "pending" },
-      { enrollmentId: 2, selectionStatus: "not_selected" },
-    ], false)).toEqual({
-      pendingEnrollmentIds: [1],
-      participantEnrollmentIds: [],
     });
   });
 

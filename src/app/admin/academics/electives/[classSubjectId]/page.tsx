@@ -110,7 +110,7 @@ export default async function ElectiveSelectionsPage({
       name: `${student.firstName} ${student.lastName}`,
       admissionNumber: student.admissionNumber,
       sectionName: student.sectionName,
-      selectionStatus: student.selectionStatus ?? "not_selected",
+      selectionStatus: student.selectionStatus ?? "pending",
     };
   });
   const sections = [...new Map(studentsWithChoices.map((student) => [

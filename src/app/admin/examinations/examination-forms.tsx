@@ -468,6 +468,9 @@ export function SaveExamAttendanceForm({
       <p className="text-xs text-slate-500" aria-live="polite">
         Showing {visibleCount} of {students.length} students
       </p>
+      <p className="text-sm text-slate-600">
+        Save marked rows as you go. Blank attendance is left unchanged and remains unresolved if not previously recorded; students not taking an optional subject are recorded as not applicable. Complete all attendance and resolve pending elective choices before submitting marks.
+      </p>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Student</th><th className="p-3">Admission no.</th><th className="p-3">Elective choice</th><th className="p-3">Attendance</th><th className="p-3">Note</th></tr></thead>
@@ -492,7 +495,6 @@ export function SaveExamAttendanceForm({
                     ? <span className="font-medium text-slate-600">Not taking optional subject</span>
                     : (
                       <select
-                        required
                         name={`attendance_${student.enrollmentId}`}
                         value={statuses[student.enrollmentId] ?? ""}
                         onChange={(event) => setStatuses((current) => ({

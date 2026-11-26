@@ -1758,18 +1758,19 @@ export async function saveExamAttendance(
     }
     const selectionStatus = subject.isCompulsory
       ? "not_required"
-      : enrollment.selectionStatus ?? "not_selected";
+      : enrollment.selectionStatus ?? "pending";
     selectionStatusByEnrollment.set(enrollment.enrollmentId, selectionStatus);
     if (selectionStatus === "pending") {
-      return { error: "Confirm every student's optional-subject choice before recording attendance." };
+      continue;
     }
     if (selectionStatus === "not_selected") {
       statuses.set(enrollment.enrollmentId, { status: "not_applicable", note: null });
       continue;
     }
     const rawStatus = value(formData, `attendance_${enrollment.enrollmentId}`);
+    if (!rawStatus) continue;
     const result = z.enum(["present", "absent", "late", "excused", "not_applicable", "x", "y"]).safeParse(rawStatus);
-    if (!result.success) return { error: "Choose an attendance status for every student taking the subject." };
+    if (!result.success) return { error: "Choose a valid attendance status." };
     const rawNote = value(formData, `note_${enrollment.enrollmentId}`).trim();
     if (rawNote.length > 500) return { error: "Attendance notes must be 500 characters or fewer." };
     if (result.data === "not_applicable" && subject.isCompulsory) {
@@ -1783,6 +1784,7 @@ export async function saveExamAttendance(
     }
     statuses.set(enrollment.enrollmentId, { status: result.data, note: rawNote || null });
   }
+  if (!statuses.size) return { error: "Record at least one attendance status before saving." };
   const outcome = await db.transaction(async (tx) => {
     const [locked] = await tx.select({
       id: examSubjects.id,
@@ -1838,8 +1840,8 @@ export async function saveExamAttendance(
       ))
       .for("update");
     if (
-      lockedRoster.length !== statuses.size ||
-      lockedRoster.some((enrollment) => !statuses.has(enrollment.enrollmentId))
+      lockedRoster.length !== selectionStatusByEnrollment.size ||
+      lockedRoster.some((enrollment) => !selectionStatusByEnrollment.has(enrollment.enrollmentId))
     ) return "roster-changed" as const;
     for (const enrollment of lockedRoster) {
       if (
@@ -1850,7 +1852,7 @@ export async function saveExamAttendance(
       }
       const currentSelectionStatus = locked.isCompulsory
         ? "not_required"
-        : enrollment.selectionStatus ?? "not_selected";
+        : enrollment.selectionStatus ?? "pending";
       if (currentSelectionStatus !== selectionStatusByEnrollment.get(enrollment.enrollmentId)) {
         return "selections-changed" as const;
       }
