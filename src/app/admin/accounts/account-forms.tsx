@@ -147,7 +147,7 @@ export function AccountForms({
         </div>
       </ActionForm>}
 
-      {section === "income" && <ActionForm action={createAccountTransaction} title="Record income">
+      {section === "income" && <ActionForm action={createAccountTransaction} title="Add income">
         <input type="hidden" name="transactionType" value="income" />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <CategoryField type="income" options={incomeAccounts} />
@@ -161,7 +161,7 @@ export function AccountForms({
         </div>
       </ActionForm>}
 
-      {section === "expenses" && <ActionForm action={createAccountTransaction} title="Record expense">
+      {section === "expenses" && <ActionForm action={createAccountTransaction} title="Add expense">
         <input type="hidden" name="transactionType" value="expense" />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <CategoryField type="expense" options={expenseAccounts} />

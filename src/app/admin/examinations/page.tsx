@@ -30,6 +30,8 @@ import { canViewExamSubject } from "@/lib/examination-policy";
 import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
+import { TablePagination } from "@/components/table-pagination";
+import { parsePageSize } from "@/components/pagination-utils";
 import {
   CreateExamTypeForm,
   CreateExaminationForm,
@@ -53,6 +55,8 @@ export default async function ExaminationsPage({
     sectionId?: string;
     subjectId?: string;
     search?: string;
+    page?: string | string[];
+    pageSize?: string | string[];
   }>;
 }) {
   const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
@@ -67,6 +71,8 @@ export default async function ExaminationsPage({
     sectionId: rawSectionId,
     subjectId: rawSubjectId,
     search: rawSearch,
+    page: rawPage,
+    pageSize: rawPageSize,
   } = await searchParams;
   const search = rawSearch?.trim().slice(0, 120) ?? "";
   const normalizedSearch = search.toLocaleLowerCase();
@@ -531,6 +537,26 @@ export default async function ExaminationsPage({
       classSection.academicYearId === assessment.academicYearId,
     )),
   );
+  const marksPageSize = parsePageSize(rawPageSize);
+  const marksPageCount = Math.max(1, Math.ceil(filteredAssessments.length / marksPageSize));
+  const requestedMarksPage = typeof rawPage === "string" && /^\d+$/.test(rawPage) ? Number(rawPage) : 1;
+  const marksPage = Number.isSafeInteger(requestedMarksPage)
+    ? Math.min(Math.max(1, requestedMarksPage), marksPageCount)
+    : 1;
+  const marksPageAssessments = filteredAssessments.slice(
+    (marksPage - 1) * marksPageSize,
+    marksPage * marksPageSize,
+  );
+  const marksHrefForPage = (targetPage: number) => {
+    const params = new URLSearchParams({ section: "marks", page: String(targetPage), pageSize: String(marksPageSize) });
+    if (search) params.set("search", search);
+    if (branchFilter) params.set("branchId", String(branchFilter));
+    if (examFilter) params.set("examId", String(examFilter));
+    if (classFilter) params.set("classLevelId", String(classFilter));
+    if (sectionFilter) params.set("sectionId", String(sectionFilter));
+    if (subjectFilter) params.set("subjectId", String(subjectFilter));
+    return `/admin/examinations?${params.toString()}`;
+  };
   const visibleAssessments = filteredAssessments;
   const assessmentIds = visibleAssessments.map((assessment) => assessment.id);
   const assessmentComponents = assessmentIds.length
@@ -767,7 +793,7 @@ export default async function ExaminationsPage({
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Date</th><th className="p-3">Branch</th><th className="p-3">Exam</th><th className="p-3">Class</th><th className="p-3">Subject</th><th className="p-3">Maximum marks</th><th className="p-3">Marks entered</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead>
-              <tbody>{visibleAssessments.map((row) => {
+              <tbody>{marksPageAssessments.map((row) => {
                 const entered = markRows.filter((mark) => mark.examSubjectId === row.id && mark.marks !== null).length;
                 const rosterCount = markRows.filter((mark) => mark.examSubjectId === row.id).length;
                 const attendanceRoster = attendanceRosterBySubjectId.get(row.id) ?? [];
@@ -790,6 +816,13 @@ export default async function ExaminationsPage({
               })}</tbody>
             </table>
           </div>
+          <TablePagination
+            ariaLabel="Marks register"
+            currentPage={marksPage}
+            pageSize={marksPageSize}
+            totalRows={filteredAssessments.length}
+            hrefForPage={marksHrefForPage}
+          />
           {visibleAssessments.length === 0 && <p className="rounded-xl bg-slate-50 p-5 text-sm text-slate-500">No subject marks registers match these criteria.</p>}
         </section>
       )}

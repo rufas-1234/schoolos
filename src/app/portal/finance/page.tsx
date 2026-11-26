@@ -634,9 +634,9 @@ export default async function FinancePortalPage() {
             {permissions.has("fees.manage") && <ShortcutCard href="/admin/fees" title="Fee setup" description="Manage fee structures, discounts, and scholarships." />}
           </>}
           {canManageAccounts && <>
-            <ShortcutCard href="/admin/accounts?section=income" title="Income" description="Record income and review transaction status." />
+            <ShortcutCard href="/admin/accounts?section=income" title="Income" description="Add income and review transaction status." />
             <ShortcutCard href="/admin/accounts?section=profit" title="Profit & loss" description="Review income and expense totals for a selected period." />
-            <ShortcutCard href="/admin/accounts?section=expenses" title="Expenses" description="Record expenses and review approval status." />
+            <ShortcutCard href="/admin/accounts?section=expenses" title="Expenses" description="Add expenses and review approval status." />
             <ShortcutCard href="/admin/accounts?section=bank" title="Bank accounts" description="Review school cash and bank account balances." />
             <ShortcutCard href="/admin/accounts?section=reports" title="Accounts reports" description="Filter, print, and export finance activity." />
           </>}
