@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { SearchableSelect } from "@/components/searchable-select";
 import { printCurrentPage } from "@/components/print-button";
 import { PAGE_SIZE_OPTIONS } from "@/components/pagination-utils";
@@ -38,6 +38,76 @@ export type AdminTableRow = {
   actions?: ReactNode;
 };
 
+function observeDialogFeedback(dialog: HTMLDialogElement) {
+  let animationFrame = 0;
+  const scrollToFeedback = () => {
+    const messages = dialog.querySelectorAll<HTMLElement>('[role="alert"], [role="status"]');
+    const feedback = messages.item(messages.length - 1);
+    if (!feedback) return;
+
+    const content = dialog.querySelector<HTMLElement>(".admin-dialog-content");
+    const scrollContainer = [content, dialog].find((element) => {
+      if (!element || element.scrollHeight <= element.clientHeight + 1) return false;
+      const overflowY = window.getComputedStyle(element).overflowY;
+      return overflowY === "auto" || overflowY === "scroll";
+    });
+    if (!scrollContainer) return;
+
+    const containerBounds = scrollContainer.getBoundingClientRect();
+    const feedbackBounds = feedback.getBoundingClientRect();
+    const visibleTop = containerBounds.top + 12;
+    const visibleBottom = containerBounds.bottom - 12;
+    if (feedbackBounds.top >= visibleTop && feedbackBounds.bottom <= visibleBottom) return;
+
+    const targetTop = scrollContainer.scrollTop +
+      feedbackBounds.top - containerBounds.top -
+      (scrollContainer.clientHeight - feedbackBounds.height) / 2;
+    scrollContainer.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  };
+  const scheduleScroll = () => {
+    window.cancelAnimationFrame(animationFrame);
+    animationFrame = window.requestAnimationFrame(scrollToFeedback);
+  };
+  const observer = new MutationObserver(scheduleScroll);
+  observer.observe(dialog, { subtree: true, childList: true, characterData: true });
+  scheduleScroll();
+
+  return () => {
+    observer.disconnect();
+    window.cancelAnimationFrame(animationFrame);
+  };
+}
+
+function useDialogFeedback(dialogRef: { current: HTMLDialogElement | null }) {
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const stopObserving = useCallback(() => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+  }, []);
+  const openDialog = useCallback(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    stopObserving();
+    cleanupRef.current = observeDialogFeedback(dialog);
+  }, [dialogRef, stopObserving]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.addEventListener("close", stopObserving);
+    return () => {
+      dialog.removeEventListener("close", stopObserving);
+      stopObserving();
+    };
+  }, [dialogRef, stopObserving]);
+
+  return { openDialog, stopObserving };
+}
+
 export function AdminActionDialog({
   label,
   title,
@@ -55,6 +125,7 @@ export function AdminActionDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const { openDialog, stopObserving } = useDialogFeedback(dialogRef);
   const searchParams = useSearchParams();
   const shouldOpen = openWhenSearchParam
     ? searchParams.get(openWhenSearchParam.name) === openWhenSearchParam.value
@@ -63,15 +134,18 @@ export function AdminActionDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (shouldOpen && !dialog.open) dialog.showModal();
-    else if (!shouldOpen && dialog.open) dialog.close();
-  }, [shouldOpen]);
+    if (shouldOpen) openDialog();
+    else {
+      stopObserving();
+      if (dialog.open) dialog.close();
+    }
+  }, [openDialog, shouldOpen, stopObserving]);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => dialogRef.current?.showModal()}
+        onClick={openDialog}
         aria-label={label}
         className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-700 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
       >
@@ -121,15 +195,16 @@ export function AdminRecordDialog({
   const titleId = useId();
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
+  const { openDialog } = useDialogFeedback(dialogRef);
   const Icon = mode === "view" ? Eye : Pencil;
   const actionLabel = mode === "view" ? "View" : "Edit";
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (initialOpen && !dialog.open) dialog.showModal();
-    else if (!initialOpen && dialog.open) dialog.close();
-  }, [initialOpen]);
+    if (initialOpen) openDialog();
+    else if (dialog.open) dialog.close();
+  }, [initialOpen, openDialog]);
 
   useEffect(() => {
     if (previousPathname.current === pathname) return;
@@ -141,7 +216,7 @@ export function AdminRecordDialog({
     <>
       <button
         type="button"
-        onClick={() => dialogRef.current?.showModal()}
+        onClick={openDialog}
         aria-label={`${actionLabel} ${title}`}
         title={`${actionLabel} ${title}`}
         className={triggerLabel

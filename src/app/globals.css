@@ -566,7 +566,14 @@ h6 {
 }
 
 .admin-dialog-content {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(90dvh - 5rem);
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
 }
 
@@ -586,7 +593,7 @@ h6 {
   min-width: min(94vw, 28rem);
   min-height: 14rem;
   max-width: 98vw;
-  max-height: 94dvh;
+  max-height: min(90dvh, calc(100dvh - 1rem));
 }
 
 @media (min-width: 640px) {
@@ -632,6 +639,7 @@ h6 {
 
   .admin-resizable-dialog > .admin-dialog-content {
     min-height: 0;
+    max-height: calc(88dvh - 4.5rem);
     padding: 1rem;
   }
 
@@ -676,6 +684,7 @@ h6 {
   .admin-library-dialog > .admin-dialog-content {
     flex: none;
     min-height: 0;
+    max-height: none;
     overflow: visible;
     padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
   }
