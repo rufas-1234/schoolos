@@ -215,7 +215,7 @@ export default async function HumanResourcesPage({
           <ToolCard href="/admin/hr/designations" title="Designations" detail="Manage the job titles used for staff members." />
           <ToolCard href={staffHref({ showAll: true })} title="Staff directory" detail="Manage staff profiles, employment details, and school account links." />
           <ToolCard href="/admin/hr/attendance" title="Staff attendance records" detail="Record daily present, absent, late, and excused marks, then print the daily register." />
-          <ToolCard href="/admin/hr/leave" title="Leave management" detail="Set leave types and per-person entitlement; review requests." />
+          <ToolCard href="/admin/hr/leave" title="Leave overview" detail="Define leave types, set entitlements, review requests, and print leave reports." />
           <ToolCard href="/admin/hr/payroll" title="Payroll records" detail="Prepare monthly gross and net pay for Finance to pay, then print payroll reports." />
           <ToolCard href="/admin/hr/reports" title="Staff reports" detail="Review attendance totals for a selected date range and print the report." />
         </div>

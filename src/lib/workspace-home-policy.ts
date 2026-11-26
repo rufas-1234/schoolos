@@ -20,6 +20,6 @@ export function getWorkspaceHomePath(
   if (linkedPortals.student) return "/portal/student";
   if (linkedPortals.parent) return "/portal/parent";
   if (granted.has("students.view")) return "/admin/students";
-  if (linkedPortals.staff) return "/account/security";
+  if (linkedPortals.staff) return "/portal/staff/leave";
   return "/unauthorized";
 }

@@ -4,6 +4,9 @@ import { AdminShell } from "@/components/admin-shell";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { staffMembers } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +36,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     "students.create",
     "students.update",
   ]);
-  const academicYearSelection = await getSchoolAcademicYearSelection(context.schoolId);
+  const [academicYearSelection, [linkedStaffRecord]] = await Promise.all([
+    getSchoolAcademicYearSelection(context.schoolId),
+    db.select({ id: staffMembers.id }).from(staffMembers).where(and(
+      eq(staffMembers.schoolId, context.schoolId),
+      eq(staffMembers.linkedUserId, context.user.id),
+      eq(staffMembers.status, "active"),
+    )).limit(1),
+  ]);
   return (
     <AdminShell
       schoolName={context.schoolName}
@@ -49,6 +59,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       multiSchoolEnabled={context.multiSchoolEnabled}
       workspaceIsPractice={context.schoolIsPractice}
       isPlatformAdmin={isPlatformAdminEmail(context.user.email)}
+      linkedStaffMember={Boolean(linkedStaffRecord)}
       academicYears={academicYearSelection.years.map(({ id, name }) => ({ id, name }))}
       selectedAcademicYearId={academicYearSelection.selectedYear?.id ?? null}
     >

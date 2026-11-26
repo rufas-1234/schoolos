@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, isNull, like, or, sum } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, like, or, sum } from "drizzle-orm";
+import Link from "next/link";
 import { db } from "@/db";
 import {
   schoolBranches,
@@ -12,6 +13,8 @@ import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
 import { LeaveBalanceForm, LeaveRequestForm, LeaveReviewForm, LeaveTypeForm } from "../hr-forms";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
+import { PrintButton } from "@/components/print-button";
+import { DownloadCsv } from "@/components/download-csv";
 
 export default async function StaffLeavePage({
   searchParams,
@@ -51,7 +54,7 @@ export default async function StaffLeavePage({
   const requestStatus = ["pending", "approved", "rejected"].includes(statusCandidate)
     ? statusCandidate
     : "all";
-  const [staff, types, balances, usage, requests] = await Promise.all([
+  const [staff, types, requestCounts, balances, usage, requests] = await Promise.all([
     db.select({
       id: staffMembers.id,
       firstName: staffMembers.firstName,
@@ -66,7 +69,10 @@ export default async function StaffLeavePage({
     db.select({
       id: staffLeaveTypes.id,
       name: staffLeaveTypes.name,
+      branchId: staffLeaveTypes.branchId,
+      branchName: schoolBranches.name,
     }).from(staffLeaveTypes)
+      .leftJoin(schoolBranches, eq(staffLeaveTypes.branchId, schoolBranches.id))
       .where(and(
         eq(staffLeaveTypes.schoolId, context.schoolId),
         ...(branchId ? [or(
@@ -75,6 +81,17 @@ export default async function StaffLeavePage({
         )] : []),
       ))
       .orderBy(asc(staffLeaveTypes.name)),
+    db.select({ status: staffLeaveRequests.status, total: count() })
+      .from(staffLeaveRequests)
+      .innerJoin(staffMembers, and(
+        eq(staffLeaveRequests.staffId, staffMembers.id),
+        eq(staffMembers.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(staffLeaveRequests.schoolId, context.schoolId),
+        ...(branchId ? [eq(staffMembers.branchId, branchId)] : []),
+      ))
+      .groupBy(staffLeaveRequests.status),
     db.select({
       id: staffLeaveBalances.id,
       staffName: staffMembers.firstName,
@@ -128,6 +145,7 @@ export default async function StaffLeavePage({
       staffName: staffMembers.firstName,
       staffLastName: staffMembers.lastName,
       leaveTypeName: staffLeaveTypes.name,
+      leaveYear: staffLeaveRequests.leaveYear,
       startDate: staffLeaveRequests.startDate,
       endDate: staffLeaveRequests.endDate,
       requestedDays: staffLeaveRequests.requestedDays,
@@ -166,6 +184,9 @@ export default async function StaffLeavePage({
   }));
   const leaveTypeOptions = types.map((type) => ({ value: String(type.id), label: type.name }));
   const currentLeaveYear = new Date().getFullYear();
+  const pendingRequestCount = Number(requestCounts.find((item) => item.status === "pending")?.total ?? 0);
+  const approvedRequestCount = Number(requestCounts.find((item) => item.status === "approved")?.total ?? 0);
+  const rejectedRequestCount = Number(requestCounts.find((item) => item.status === "rejected")?.total ?? 0);
   const usedDays = new Map<string, number>();
   const pendingDays = new Map<string, number>();
   for (const item of usage) {
@@ -181,11 +202,22 @@ export default async function StaffLeavePage({
     <div className="space-y-7">
       <header>
         <p className="text-sm font-medium text-violet-700">Human resources</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Leave management</h1>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Leave overview</h1>
         <p className="mt-2 max-w-3xl text-sm text-slate-500">
           Define leave types and calendar-day entitlements, then submit and review requests.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/portal/staff/leave" className="inline-flex items-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Open staff leave page</Link>
+          <Link href="/admin/hr/leave?requestStatus=pending" className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Pending leave requests</Link>
+        </div>
       </header>
+
+      <section aria-label="Leave overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <LeaveMetric label="Pending requests" value={pendingRequestCount} tone="amber" />
+        <LeaveMetric label="Approved requests" value={approvedRequestCount} tone="emerald" />
+        <LeaveMetric label="Rejected requests" value={rejectedRequestCount} tone="rose" />
+        <LeaveMetric label="Leave types" value={types.length} tone="violet" />
+      </section>
 
       <SmartFilterForm method="get" className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <SearchableSelect
@@ -254,8 +286,41 @@ export default async function StaffLeavePage({
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">Leave entitlements</h2>
-          <p className="mt-1 text-sm text-slate-500">Entitlements are assigned per staff member, leave type, and calendar year.</p>
+          <h2 className="font-semibold text-slate-900">Leave types</h2>
+          <p className="mt-1 text-sm text-slate-500">Leave types available to each branch. Types without a branch apply school-wide.</p>
+        </div>
+        {types.length ? <div className="overflow-x-auto">
+          <table className="w-full min-w-[28rem] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Leave type</th><th className="px-5 py-3">Branch scope</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {types.map((type) => <tr key={type.id}><td className="px-5 py-3 font-medium text-slate-800">{type.name}</td><td className="px-5 py-3 text-slate-600">{type.branchName ?? "All branches"}</td></tr>)}
+            </tbody>
+          </table>
+        </div> : <p className="p-6 text-sm text-slate-500">No leave types are defined yet. Add a leave type above.</p>}
+      </section>
+
+      <section id="leave-entitlements-report" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-900">Leave entitlements</h2>
+              <p className="mt-1 text-sm text-slate-500">Entitlements are assigned per staff member, leave type, and calendar year.</p>
+            </div>
+            <div className="print:hidden flex flex-wrap gap-2">
+              <PrintButton targetId="leave-entitlements-report" label="Print entitlement report" pageOrientation="landscape" />
+              <DownloadCsv
+                fileName={`leave-entitlements-${leaveYear ?? "all-years"}.csv`}
+                headers={["Staff member", "Leave type", "Year", "Entitled days", "Approved days", "Pending days", "Available days"]}
+                rows={balances.map((balance) => {
+                  const key = `${balance.staffId}:${balance.leaveTypeId}:${balance.leaveYear}`;
+                  const entitlement = Number(balance.entitlementDays);
+                  const approved = usedDays.get(key) ?? 0;
+                  const pending = pendingDays.get(key) ?? 0;
+                  return [`${balance.staffName} ${balance.staffLastName}`, balance.leaveTypeName, balance.leaveYear, entitlement, approved, pending, Math.max(0, entitlement - approved - pending)];
+                })}
+              />
+            </div>
+          </div>
         </div>
         {balances.length === 0 ? (
           <p className="p-7 text-center text-sm text-slate-500">No entitlements assigned yet.</p>
@@ -289,10 +354,32 @@ export default async function StaffLeavePage({
         )}
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section id="leave-requests-report" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">Leave requests</h2>
-          <p className="mt-1 text-sm text-slate-500">Showing the latest 100 requests.</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-900">Leave requests</h2>
+              <p className="mt-1 text-sm text-slate-500">Showing the latest 100 matching requests.</p>
+            </div>
+            <div className="print:hidden flex flex-wrap gap-2">
+              <PrintButton targetId="leave-requests-report" label="Print leave report" pageOrientation="landscape" />
+              <DownloadCsv
+                fileName={`leave-requests-${leaveYear ?? "all-years"}.csv`}
+                headers={["Staff member", "Leave type", "Start date", "End date", "Days", "Year", "Reason", "Status", "Review note"]}
+                rows={requests.map((request) => [
+                  `${request.staffName} ${request.staffLastName}`,
+                  request.leaveTypeName,
+                  request.startDate,
+                  request.endDate,
+                  request.requestedDays,
+                  request.leaveYear,
+                  request.reason,
+                  request.status,
+                  request.reviewNote ?? "",
+                ])}
+              />
+            </div>
+          </div>
         </div>
         {requests.length === 0 ? (
           <p className="p-7 text-center text-sm text-slate-500">No leave requests yet.</p>
@@ -317,7 +404,7 @@ export default async function StaffLeavePage({
                     {request.status}
                   </span>
                 </div>
-                {request.status === "pending" && <LeaveReviewForm publicId={request.publicId} />}
+                {request.status === "pending" && <div className="print:hidden"><LeaveReviewForm publicId={request.publicId} /></div>}
               </li>
             ))}
           </ul>
@@ -331,4 +418,25 @@ function parsePositiveId(value: string | string[] | undefined): number | undefin
   if (typeof value !== "string" || !/^\d+$/.test(value)) return undefined;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function LeaveMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "amber" | "emerald" | "rose" | "violet";
+}) {
+  const styles = {
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    rose: "border-rose-200 bg-rose-50 text-rose-800",
+    violet: "border-violet-200 bg-violet-50 text-violet-800",
+  }[tone];
+  return <article className={`rounded-2xl border p-4 ${styles}`}>
+    <p className="text-sm font-semibold">{label}</p>
+    <p className="mt-2 text-3xl font-bold tabular-nums">{value}</p>
+  </article>;
 }

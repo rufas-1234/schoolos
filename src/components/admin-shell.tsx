@@ -148,7 +148,7 @@ const navigation: NavigationItem[] = [
       { id: "staff", label: "Staff directory", href: "/admin/staff", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "staff-applications", label: "Staff applications", href: "/admin/staff/applications", matchPath: "/admin/staff/applications", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "attendance", label: "Staff attendance records", href: "/admin/hr/attendance", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
-      { id: "leave", label: "Leave management", href: "/admin/hr/leave", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "leave", label: "Leave overview", href: "/admin/hr/leave", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "payroll", label: "Payroll records", href: "/admin/hr/payroll", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "reports", label: "Staff attendance reports", href: "/admin/hr/reports", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "settings", label: "HR settings", href: "/admin/hr/settings", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
@@ -288,7 +288,7 @@ const navigation: NavigationItem[] = [
 const navigationGroups = [
   { label: "Home", labels: ["Overview"] },
   { label: "Teaching & learning", labels: ["Academics", "Student Info", "Examinations"] },
-  { label: "People", labels: ["Human resources", "Users"] },
+  { label: "People", labels: ["Human resources", "Users", "My leave"] },
   { label: "School operations", labels: ["Finance overview", "Accounts", "Fees", "Inventory", "Library", "Dormitories"] },
   { label: "Configuration", labels: ["System", "School profile"] },
 ];
@@ -308,6 +308,7 @@ export function AdminShell({
   multiSchoolEnabled,
   workspaceIsPractice,
   isPlatformAdmin,
+  linkedStaffMember,
   academicYears,
   selectedAcademicYearId,
 }: {
@@ -325,6 +326,7 @@ export function AdminShell({
   multiSchoolEnabled: boolean;
   workspaceIsPractice: boolean;
   isPlatformAdmin: boolean;
+  linkedStaffMember: boolean;
   academicYears: { id: number; name: string }[];
   selectedAcademicYearId: number | null;
 }) {
@@ -399,6 +401,14 @@ export function AdminShell({
       permissions.includes(item.permission) ||
       (item.permissionAlternatives?.some((permission) => permissions.includes(permission)) ?? false)
     );
+  if (linkedStaffMember) {
+    visibleNavigation.push({
+      href: "/portal/staff/leave",
+      label: "My leave",
+      icon: CalendarDays,
+      permission: "staff.linked",
+    });
+  }
   const rightSidebarItems = visibleNavigation.map((item) => ({
       ...item,
       children: item.children?.filter((child) =>

@@ -9,6 +9,7 @@ const teacherNavigation = [
   { href: "/portal/teacher?section=register", label: "Class register & attendance", icon: ClipboardList },
   { href: "/portal/teacher?section=assessments", label: "Examination work", icon: ClipboardCheck },
   { href: "/portal/teacher?section=timetable", label: "My timetable", icon: CalendarDays },
+  { href: "/portal/staff/leave", label: "My leave", icon: CalendarDays },
 ];
 
 export function TeacherPortalShell({

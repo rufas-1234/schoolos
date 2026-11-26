@@ -17,7 +17,7 @@ import {
   staffMembers,
   staffPayrollRecords,
 } from "@/db/schema";
-import { requireSchoolPermission } from "@/lib/access-control";
+import { requireSchoolMember, requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { parseCsvRows } from "@/lib/csv-import";
 import {
@@ -64,6 +64,7 @@ function revalidateHr() {
   revalidatePath("/admin/hr/attendance");
   revalidatePath("/admin/hr/reports");
   revalidatePath("/admin/hr/leave");
+  revalidatePath("/portal/staff/leave");
   revalidatePath("/admin/hr/payroll");
   revalidatePath("/admin/staff");
   revalidatePath("/admin/dashboard");
@@ -512,6 +513,105 @@ export async function createStaffLeaveRequest(
   if (outcome === "invalid-leave-type") return { error: "Choose a leave type available to this branch." };
   if (outcome === "overlap") return { error: "This staff member already has a pending or approved leave request during those dates." };
   if (outcome === "over-balance") return { error: "This request exceeds the available leave entitlement." };
+  revalidateHr();
+  return { success: true };
+}
+
+export async function applyForMyLeave(
+  _previousState: HrActionState,
+  formData: FormData,
+): Promise<HrActionState> {
+  const context = await requireSchoolMember();
+  const result = z.object({
+    leaveTypeId: idField,
+    startDate: dateField,
+    endDate: dateField,
+    reason: z.string().trim().min(3).max(1000),
+  }).safeParse({
+    leaveTypeId: value(formData, "leaveTypeId"),
+    startDate: value(formData, "startDate"),
+    endDate: value(formData, "endDate"),
+    reason: value(formData, "reason"),
+  });
+  if (!result.success || result.data.endDate < result.data.startDate ||
+    result.data.startDate.slice(0, 4) !== result.data.endDate.slice(0, 4)) {
+    return { error: "Enter a valid leave type, reason, and date range within one calendar year." };
+  }
+  const leaveYear = Number(result.data.startDate.slice(0, 4));
+  const requestedDays = inclusiveCalendarDays(result.data.startDate, result.data.endDate);
+  if (requestedDays === null || requestedDays > 366) {
+    return { error: "Leave requests must be 1–366 calendar days." };
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    const [staff] = await tx.select({ id: staffMembers.id, branchId: staffMembers.branchId })
+      .from(staffMembers).where(and(
+        eq(staffMembers.schoolId, context.schoolId),
+        eq(staffMembers.linkedUserId, context.user.id),
+        eq(staffMembers.status, "active"),
+      )).for("update").limit(1);
+    if (!staff) return "staff-not-linked";
+    const [leaveType] = await tx.select({ id: staffLeaveTypes.id })
+      .from(staffLeaveTypes).where(and(
+        eq(staffLeaveTypes.id, result.data.leaveTypeId),
+        eq(staffLeaveTypes.schoolId, context.schoolId),
+        ...(staff.branchId
+          ? [or(eq(staffLeaveTypes.branchId, staff.branchId), isNull(staffLeaveTypes.branchId))]
+          : [isNull(staffLeaveTypes.branchId)]),
+      )).limit(1);
+    if (!leaveType) return "invalid-leave-type";
+    const [balance] = await tx.select({ entitlementDays: staffLeaveBalances.entitlementDays })
+      .from(staffLeaveBalances).where(and(
+        eq(staffLeaveBalances.schoolId, context.schoolId),
+        eq(staffLeaveBalances.staffId, staff.id),
+        eq(staffLeaveBalances.leaveTypeId, leaveType.id),
+        eq(staffLeaveBalances.leaveYear, leaveYear),
+      )).for("update").limit(1);
+    if (!balance) return "no-balance";
+    const existing = await tx.select({
+      startDate: staffLeaveRequests.startDate,
+      endDate: staffLeaveRequests.endDate,
+      requestedDays: staffLeaveRequests.requestedDays,
+      leaveTypeId: staffLeaveRequests.leaveTypeId,
+    }).from(staffLeaveRequests).where(and(
+      eq(staffLeaveRequests.schoolId, context.schoolId),
+      eq(staffLeaveRequests.staffId, staff.id),
+      eq(staffLeaveRequests.leaveYear, leaveYear),
+      inArray(staffLeaveRequests.status, ["pending", "approved"]),
+    ));
+    if (existing.some((request) =>
+      request.startDate <= result.data.endDate && request.endDate >= result.data.startDate
+    )) return "overlap";
+    const reservedDays = existing
+      .filter((request) => request.leaveTypeId === leaveType.id)
+      .reduce((total, request) => total + request.requestedDays, 0);
+    if (!fitsLeaveEntitlement(Number(balance.entitlementDays), reservedDays, requestedDays)) {
+      return "over-balance";
+    }
+
+    const publicId = randomUUID();
+    await tx.insert(staffLeaveRequests).values({
+      publicId,
+      schoolId: context.schoolId,
+      staffId: staff.id,
+      leaveTypeId: leaveType.id,
+      leaveYear,
+      startDate: result.data.startDate,
+      endDate: result.data.endDate,
+      requestedDays,
+      reason: result.data.reason,
+      createdBy: context.user.id,
+    });
+    await writeAudit(tx, context.schoolId, context.user.id, "staff.leave.requested",
+      "staff_leave_request", publicId, ["staffId", "leaveTypeId", "startDate", "endDate", "requestedDays", "reason"]);
+    return "created";
+  });
+
+  if (outcome === "staff-not-linked") return { error: "Your account is not linked to an active staff record. Contact your school administrator." };
+  if (outcome === "invalid-leave-type") return { error: "Choose a leave type available to your branch." };
+  if (outcome === "no-balance") return { error: "No entitlement is assigned for this leave type and year. Contact HR." };
+  if (outcome === "overlap") return { error: "You already have a pending or approved leave request during those dates." };
+  if (outcome === "over-balance") return { error: "This request exceeds your available leave entitlement." };
   revalidateHr();
   return { success: true };
 }

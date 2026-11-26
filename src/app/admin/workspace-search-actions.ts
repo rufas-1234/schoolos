@@ -37,6 +37,8 @@ import {
   teachers,
   schoolMemberships,
   staffApplications,
+  staffLeaveRequests,
+  staffLeaveTypes,
   studentCertificates,
   user,
 } from "@/db/schema";
@@ -216,7 +218,48 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("hr-designations", "Designations", "Manage staff job designations", "/admin/hr/designations", ["designation", "job title"]);
     addPage("staff-attendance", "Staff attendance", "Staff daily attendance register", "/admin/hr/attendance", ["attendance register", "absent", "present"]);
     addPage("staff-attendance-reports", "Staff attendance reports", "Attendance summaries and reports", "/admin/hr/reports", ["report", "reports"]);
-    addPage("staff-leave", "Leave management", "Staff leave requests and records", "/admin/hr/leave", ["leave"]);
+    addPage("staff-leave", "Leave overview", "Define leave types, assign entitlements, review staff requests, and print reports", "/admin/hr/leave", ["leave", "leave requests", "pending leave"]);
+    const leaveQueryTokens = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    const leaveRequestRows = await db.select({
+      publicId: staffLeaveRequests.publicId,
+      staffId: staffMembers.id,
+      branchId: staffMembers.branchId,
+      firstName: staffMembers.firstName,
+      lastName: staffMembers.lastName,
+      employeeCode: staffMembers.employeeCode,
+      leaveTypeId: staffLeaveTypes.id,
+      leaveTypeName: staffLeaveTypes.name,
+      startDate: staffLeaveRequests.startDate,
+      endDate: staffLeaveRequests.endDate,
+      status: staffLeaveRequests.status,
+      reason: staffLeaveRequests.reason,
+    }).from(staffLeaveRequests)
+      .innerJoin(staffMembers, and(
+        eq(staffLeaveRequests.staffId, staffMembers.id),
+        eq(staffMembers.schoolId, context.schoolId),
+      ))
+      .innerJoin(staffLeaveTypes, and(
+        eq(staffLeaveRequests.leaveTypeId, staffLeaveTypes.id),
+        eq(staffLeaveTypes.schoolId, context.schoolId),
+      ))
+      .where(and(
+        eq(staffLeaveRequests.schoolId, context.schoolId),
+          fuzzyTextMatch(leaveQueryTokens, staffMembers.firstName, staffMembers.lastName, staffMembers.employeeCode,
+          staffLeaveTypes.name, staffLeaveRequests.reason, staffLeaveRequests.status),
+      ))
+      .orderBy(desc(staffLeaveRequests.createdAt))
+      .limit(20);
+    for (const request of leaveRequestRows) {
+      const staffName = `${request.firstName} ${request.lastName}`;
+      results.push({
+        id: `staff-leave-${request.publicId}`,
+        title: `${staffName} · ${request.leaveTypeName}`,
+        description: `${request.status} · ${request.startDate} to ${request.endDate} · ${request.employeeCode ?? "No staff number"}`,
+        href: `/admin/hr/leave?search=${encodeURIComponent(staffName)}&staffId=${request.staffId}&leaveTypeId=${request.leaveTypeId}&requestStatus=${request.status}${request.branchId ? `&branchId=${request.branchId}` : ""}`,
+        category: "Staff",
+        searchTerms: [staffName, request.employeeCode ?? "", request.leaveTypeName, request.status, request.reason],
+      });
+    }
     addPage("payroll", "Payroll records", "Staff payroll and pay history", "/admin/hr/payroll", ["salary", "pay"]);
     addPage("hr-settings", "HR settings", "Configure staff fields and HR settings", "/admin/hr/settings", ["staff settings", "human resources settings"]);
   }
