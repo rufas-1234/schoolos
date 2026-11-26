@@ -19,6 +19,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isCalendarDate } from "@/lib/academic-policy";
+import { parseCsvRows } from "@/lib/csv-import";
 import {
   canReviewLeaveRequest,
   calculatePayrollAmounts,
@@ -29,7 +30,7 @@ import {
   staffAttendanceStatuses,
 } from "@/lib/hr-policy";
 
-export type HrActionState = { error?: string; success?: boolean };
+export type HrActionState = { error?: string; success?: boolean; imported?: number };
 
 const idField = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe());
 const dateField = z.string().refine(isCalendarDate);
@@ -139,6 +140,93 @@ export async function recordStaffAttendance(
   if (outcome === "not-found") return { error: "Active staff record was not found in this school." };
   revalidateHr();
   return { success: true };
+}
+
+export async function importStaffAttendanceFromCsv(
+  _previousState: HrActionState,
+  formData: FormData,
+): Promise<HrActionState> {
+  const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
+  const uploadedFile = formData.get("csvFile");
+  if (!(uploadedFile instanceof File) || uploadedFile.size === 0) return { error: "Choose a completed attendance CSV file." };
+  if (uploadedFile.size > 1_000_000) return { error: "The attendance CSV must be 1 MB or smaller." };
+  let rows: string[][];
+  try {
+    rows = parseCsvRows(await uploadedFile.text());
+  } catch (error) {
+    return { error: error instanceof Error ? `The CSV file is invalid: ${error.message}` : "The CSV file is invalid." };
+  }
+  const nonemptyRows = rows.filter((row) => row.some((cell) => cell.trim() !== ""));
+  const headers = nonemptyRows[0]?.map((header) => header.trim().toLocaleLowerCase());
+  if (!headers?.length) return { error: "The CSV file is empty." };
+  if (new Set(headers).size !== headers.length) return { error: "The CSV contains duplicate column names." };
+  const supportedHeaders = new Set(["staffid", "employeecode", "staffname", "attendancedate", "status", "note"]);
+  const unknownHeader = headers.find((header) => !supportedHeaders.has(header));
+  if (unknownHeader) return { error: `Unsupported CSV column: ${unknownHeader}.` };
+  const index = new Map(headers.map((header, column) => [header, column]));
+  for (const required of ["staffid", "attendancedate", "status"]) {
+    if (!index.has(required)) return { error: `The CSV is missing the required "${required}" column.` };
+  }
+  const dataRows = nonemptyRows.slice(1);
+  if (!dataRows.length) return { error: "The CSV has headers but no staff rows." };
+  if (dataRows.length > 1000) return { error: "Import attendance for up to 1,000 staff members at a time." };
+  const marks = new Map<number, { date: string; status: string; note: string }>();
+  for (const [rowIndex, row] of dataRows.entries()) {
+    const rowNumber = rowIndex + 2;
+    const staffIdResult = idField.safeParse(row[index.get("staffid")!] ?? "");
+    if (!staffIdResult.success) return { error: `Row ${rowNumber}: enter a valid staff ID.` };
+    if (marks.has(staffIdResult.data)) return { error: `Row ${rowNumber}: staff IDs must not be repeated.` };
+    const date = (row[index.get("attendancedate")!] ?? "").trim();
+    if (!isCalendarDate(date)) return { error: `Row ${rowNumber}: enter a valid attendance date.` };
+    const status = (row[index.get("status")!] ?? "").trim().toLocaleLowerCase();
+    const note = (row[index.get("note")!] ?? "").trim();
+    if (status && !staffAttendanceStatuses.includes(status as typeof staffAttendanceStatuses[number])) {
+      return { error: `Row ${rowNumber}: use Present, Absent, Late, Excused, or leave status blank.` };
+    }
+    if (note.length > 500) return { error: `Row ${rowNumber}: notes must be 500 characters or fewer.` };
+    if (status) marks.set(staffIdResult.data, { date, status, note });
+  }
+  if (!marks.size) return { error: "Add a status to at least one staff row before uploading." };
+  const [school] = await db.select({ timezone: schools.timezone }).from(schools)
+    .where(eq(schools.id, context.schoolId)).limit(1);
+  if (!school) return { error: "School settings could not be loaded." };
+  if ([...marks.values()].some((mark) => mark.date > todayInTimezone(school.timezone))) {
+    return { error: "Staff attendance cannot be recorded for a future date." };
+  }
+  const ids = [...marks.keys()];
+  const outcome = await db.transaction(async (tx) => {
+    const staff = await tx.select({ id: staffMembers.id }).from(staffMembers).where(and(
+      eq(staffMembers.schoolId, context.schoolId),
+      eq(staffMembers.status, "active"),
+      inArray(staffMembers.id, ids),
+    )).for("update");
+    if (staff.length !== ids.length) return "staff-not-found";
+    for (const member of staff) {
+      const mark = marks.get(member.id)!;
+      const [existing] = await tx.select({ publicId: staffAttendance.publicId }).from(staffAttendance).where(and(
+        eq(staffAttendance.schoolId, context.schoolId),
+        eq(staffAttendance.staffId, member.id),
+        eq(staffAttendance.attendanceDate, mark.date),
+      )).limit(1);
+      const publicId = existing?.publicId ?? randomUUID();
+      await tx.insert(staffAttendance).values({
+        publicId,
+        schoolId: context.schoolId,
+        staffId: member.id,
+        attendanceDate: mark.date,
+        status: mark.status,
+        note: mark.note || null,
+        recordedBy: context.user.id,
+      }).onDuplicateKeyUpdate({ set: { status: mark.status, note: mark.note || null, recordedBy: context.user.id } });
+      await writeAudit(tx, context.schoolId, context.user.id,
+        existing ? "staff.attendance.updated" : "staff.attendance.recorded",
+        "staff_attendance", publicId, ["attendanceDate", "status", "note", "csvImport"]);
+    }
+    return "saved";
+  });
+  if (outcome === "staff-not-found") return { error: "The file contains a staff ID that is not active in this school. Download a fresh CSV." };
+  revalidateHr();
+  return { success: true, imported: marks.size };
 }
 
 export async function recordStaffAttendanceBulk(

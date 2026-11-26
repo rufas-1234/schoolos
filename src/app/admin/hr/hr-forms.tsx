@@ -12,6 +12,7 @@ import {
   deleteStaffPayrollRecord,
   recordStaffAttendanceBulk,
   recordStaffAttendance,
+  importStaffAttendanceFromCsv,
   recordStaffPayroll,
   reviewStaffLeaveRequest,
   updateStaffPayroll,
@@ -67,6 +68,22 @@ export function AttendanceForm({
       </button>
       {state.error && <span role="alert" className="basis-full text-xs text-rose-600">{state.error}</span>}
       {state.success && <span role="status" className="basis-full text-xs text-emerald-700">Saved</span>}
+    </form>
+  );
+}
+
+export function StaffAttendanceCsvImportForm() {
+  const [state, action, pending] = useActionState(importStaffAttendanceFromCsv, {});
+  return (
+    <form action={action} className="print:hidden flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end">
+      <label className="block flex-1 space-y-1.5 text-sm font-medium text-slate-700">
+        Upload completed CSV to save attendance
+        <input type="file" name="csvFile" accept=".csv,text/csv" required className="block w-full rounded-lg border border-slate-200 p-2 text-sm font-normal" />
+      </label>
+      <button type="submit" disabled={pending} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+        {pending ? "Uploading..." : "Upload attendance CSV"}
+      </button>
+      <p aria-live="polite" className="text-sm text-slate-600">{state.error ?? (state.success ? `${state.imported} staff attendance marks uploaded.` : "")}</p>
     </form>
   );
 }

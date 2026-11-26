@@ -8,7 +8,9 @@ import { parseStaffRoleFilter } from "@/lib/hr-policy";
 import { staffRoles } from "@/lib/staff-policy";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
-import { AttendanceForm, BulkAttendanceForm, StaffAttendanceSelectAll } from "../hr-forms";
+import { DownloadCsv } from "@/components/download-csv";
+import { staffAttendanceStatuses } from "@/lib/hr-policy";
+import { AttendanceForm, BulkAttendanceForm, StaffAttendanceCsvImportForm, StaffAttendanceSelectAll } from "../hr-forms";
 import { PrintReportButton } from "../reports/print-report-button";
 
 export default async function StaffAttendancePage({
@@ -112,7 +114,7 @@ export default async function StaffAttendancePage({
           Record daily attendance for active staff. A saved mark can be updated for that date.
         </p>
         </div>
-        <PrintReportButton />
+        <PrintReportButton title="Staff attendance register" pageOrientation="landscape" pageMargin="8mm" />
       </header>
 
       <SmartFilterForm method="get" className="print:hidden flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -216,7 +218,7 @@ export default async function StaffAttendancePage({
       <section className="attendance-print-only print-report-content space-y-5">
         <header className="print-report-heading">
           <p className="print-report-kicker">Human resources · Attendance register</p>
-          <h2>Staff attendance records</h2>
+          <h2>Staff Attendance Register</h2>
           <p>
             {branches.find((branch) => branch.id === branchId)?.name ?? "All branches"} · {attendanceDate}
             {selectedRole !== "all" ? ` · ${selectedRole === "unassigned" ? "Unassigned role" : selectedRole}` : " · All staff roles"}
@@ -229,22 +231,24 @@ export default async function StaffAttendancePage({
                 <th className="px-4 py-3">Staff member</th>
                 <th className="px-4 py-3">Employee ID</th>
                 <th className="px-4 py-3">Role / department</th>
-                <th className="px-4 py-3">Attendance status</th>
+                <th className="px-2 py-3">Present</th>
+                <th className="px-2 py-3">Absent</th>
+                <th className="px-2 py-3">Late</th>
+                <th className="px-2 py-3">Excused</th>
                 <th className="px-4 py-3">Note</th>
                 <th className="px-4 py-3">Signature</th>
               </tr>
             </thead>
             <tbody>
               {staff.map((member) => {
-                const mark = byStaff.get(member.id);
                 return (
                   <tr key={member.id}>
-                    <td className="px-4 py-3 font-medium">{member.firstName} {member.lastName}</td>
-                    <td className="px-4 py-3">{member.employeeCode ?? "—"}</td>
-                    <td className="px-4 py-3">{[member.personnelRole, member.department].filter(Boolean).join(" · ") || "—"}</td>
-                    <td className="px-4 py-3 capitalize">{mark?.status ?? "Not recorded"}</td>
-                    <td className="px-4 py-3">{mark?.note ?? "—"}</td>
-                    <td className="px-4 py-3"><span className="block h-6 min-w-24 border-b border-slate-400" /></td>
+                    <td className="px-2 py-3 font-medium">{member.firstName} {member.lastName}</td>
+                    <td className="px-2 py-3">{member.employeeCode ?? "—"}</td>
+                    <td className="px-2 py-3">{[member.personnelRole, member.department].filter(Boolean).join(" · ") || "—"}</td>
+                    {staffAttendanceStatuses.map((status) => <td key={status} className="px-2 py-3 text-center"><span className="attendance-mark-box" /></td>)}
+                    <td className="px-2 py-3"><span className="attendance-note-line" /></td>
+                    <td className="px-2 py-3"><span className="block h-6 min-w-20 border-b border-slate-400" /></td>
                   </tr>
                 );
               })}
@@ -252,6 +256,17 @@ export default async function StaffAttendancePage({
           </table>
           {staff.length === 0 && <p className="p-6 text-center text-sm">No staff members match these filters.</p>}
         </section>
+      </section>
+      <section className="print:hidden space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadCsv
+            fileName={`staff-attendance-${attendanceDate}.csv`}
+            headers={["staffId", "employeeCode", "staffName", "attendanceDate", "status", "note"]}
+            rows={staff.map((member) => [member.id, member.employeeCode ?? "", `${member.firstName} ${member.lastName}`, attendanceDate, "", ""])}
+          />
+          <p className="text-xs text-slate-500">Fill the status column with Present, Absent, Late, or Excused. Leave it blank to skip that person.</p>
+        </div>
+        <StaffAttendanceCsvImportForm />
       </section>
     </div>
   );

@@ -3,9 +3,10 @@
 import { useActionState, useMemo, useState } from "react";
 import { CheckCheck, Save } from "lucide-react";
 import { PrintButton } from "@/components/print-button";
+import { DownloadCsv } from "@/components/download-csv";
 import { attendanceStatuses, type AttendanceStatus } from "@/lib/attendance-policy";
 import { SearchableSelect } from "@/components/searchable-select";
-import { saveAttendance } from "./attendance-actions";
+import { importAttendanceFromCsv, saveAttendance, type AttendanceCsvImportState } from "./attendance-actions";
 import type { AcademicActionState } from "./actions";
 
 type AttendanceOption = { id: number; label: string };
@@ -46,6 +47,10 @@ export function AttendanceWorkspace({
   const [statuses, setStatuses] = useState(initialStatuses);
   const [state, formAction, pending] = useActionState<AcademicActionState, FormData>(
     saveAttendance,
+    {},
+  );
+  const [importState, importAction, importPending] = useActionState<AttendanceCsvImportState, FormData>(
+    importAttendanceFromCsv,
     {},
   );
   const setAllStatuses = (status: AttendanceStatus) => {
@@ -133,7 +138,14 @@ export function AttendanceWorkspace({
                 </span>
               ))}
             </div>
-            <PrintButton label="Print attendance report" targetId="student-attendance-report-output" />
+            <div className="flex flex-wrap gap-2">
+              <PrintButton label="Print blank register" targetId="student-attendance-report-output" pageOrientation="landscape" pageMargin="8mm" includeQrCode={false} />
+              <DownloadCsv
+                fileName={`student-attendance-${attendanceDate}.csv`}
+                headers={["studentId", "admissionNumber", "studentName", "attendanceDate", "status", "note"]}
+                rows={roster.map((student) => [student.studentId, student.admissionNumber ?? "", `${student.firstName} ${student.lastName}`, attendanceDate, "", ""])}
+              />
+            </div>
           </div>
           {canManageAttendance ? (
             <form action={formAction}>
@@ -248,13 +260,27 @@ export function AttendanceWorkspace({
               </table>
             </div>
           )}
+          {canManageAttendance && (
+            <form action={importAction} className="print:hidden flex flex-col gap-3 border-t border-slate-100 p-4 sm:flex-row sm:items-end">
+              <input type="hidden" name="classSectionId" value={selectedSectionId} />
+              <input type="hidden" name="attendanceDate" value={attendanceDate} />
+              <label className="block flex-1 space-y-1.5 text-sm font-medium text-slate-700">
+                Upload completed CSV to save attendance
+                <input type="file" name="csvFile" accept=".csv,text/csv" required className="block w-full rounded-lg border border-slate-200 p-2 text-sm font-normal" />
+              </label>
+              <button type="submit" disabled={importPending} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                {importPending ? "Uploading..." : "Upload attendance CSV"}
+              </button>
+              <p aria-live="polite" className="text-sm text-slate-600">{importState.error ?? (importState.success ? `${importState.imported} student attendance marks uploaded.` : "")}</p>
+            </form>
+          )}
           <section
             id="student-attendance-report-output"
             className="hidden student-report-document p-6 print:block print-report-content"
           >
             <header className="mb-5 border-b-2 border-black pb-4 text-center">
               <h1 className="text-2xl font-bold">{schoolName}</h1>
-              <h2 className="mt-1 text-xl font-bold">Student Attendance Report</h2>
+              <h2 className="mt-1 text-xl font-bold">Student Attendance Register</h2>
               <p className="mt-2 text-sm">
                 {sections.find((section) => String(section.id) === selectedSectionId)?.label ?? "Class section"} · {attendanceDate}
               </p>
@@ -265,7 +291,10 @@ export function AttendanceWorkspace({
                   <th>No.</th>
                   <th>Student</th>
                   <th>Admission number</th>
-                  <th>Status</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Late</th>
+                  <th>Excused</th>
                   <th>Note</th>
                 </tr>
               </thead>
@@ -275,14 +304,14 @@ export function AttendanceWorkspace({
                     <td>{index + 1}</td>
                     <td>{student.firstName} {student.lastName}</td>
                     <td>{student.admissionNumber ?? "—"}</td>
-                    <td>{student.status ? statusLabels[student.status] : "Not marked"}</td>
-                    <td>{student.note ?? "—"}</td>
+                    {attendanceStatuses.map((status) => <td key={status} className="text-center"><span className="attendance-mark-box" /></td>)}
+                    <td><span className="attendance-note-line" /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <footer className="mt-6 border-t border-black pt-2 text-xs">
-              {roster.length} enrolled {roster.length === 1 ? "student" : "students"} · Generated {new Date().toLocaleDateString()}
+              {roster.length} enrolled {roster.length === 1 ? "student" : "students"} · Teacher signature: ______________________________
             </footer>
           </section>
         </section>

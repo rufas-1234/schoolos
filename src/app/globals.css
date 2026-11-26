@@ -1612,6 +1612,38 @@ h6 {
     display: block !important;
   }
 
+  .attendance-mark-box {
+    display: inline-block;
+    width: 5mm;
+    height: 5mm;
+    border: 0.35mm solid #334155;
+    vertical-align: middle;
+  }
+
+  .attendance-note-line {
+    display: block;
+    min-width: 24mm;
+    height: 5mm;
+    border-bottom: 0.25mm solid #94a3b8;
+  }
+
+  #student-attendance-report-output table {
+    table-layout: fixed;
+  }
+
+  #student-attendance-report-output th:nth-child(2) {
+    width: 25%;
+  }
+
+  #student-attendance-report-output th:nth-child(3) {
+    width: 15%;
+  }
+
+  #student-attendance-report-output th:nth-child(n+4):nth-child(-n+7) {
+    width: 9%;
+    text-align: center;
+  }
+
   .admin-print-header {
     position: fixed;
     top: -25mm;
