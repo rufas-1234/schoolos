@@ -2334,6 +2334,17 @@ h6 {
     vertical-align: top;
   }
 
+  .print-row-number-cell {
+    border: 1px solid var(--report-border);
+    min-width: 8mm;
+    padding: 2.2mm 2mm;
+    color: var(--report-muted);
+    text-align: center;
+    vertical-align: top;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
   .print-report-content thead,
   .print-report-table thead {
     display: table-header-group;

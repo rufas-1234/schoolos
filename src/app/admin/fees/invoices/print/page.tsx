@@ -363,7 +363,7 @@ export default async function FeeInvoicePrintPage({
 
             <div className="fee-invoice-divider" aria-hidden="true">★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★</div>
 
-            <table className="fee-invoice-items w-full border-collapse text-left text-sm">
+            <table data-print-no-numbers className="fee-invoice-items w-full border-collapse text-left text-sm">
               <thead>
                 <tr>
                   <th>Qty</th>

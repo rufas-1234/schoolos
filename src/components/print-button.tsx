@@ -94,6 +94,7 @@ export async function printCurrentPage({
     structure: string | null;
     target: string | null;
   }> = [];
+  const printRowNumberCells = addPrintRowNumbers(target);
   const previousTitle = document.title;
   const rootWasDark = document.documentElement.classList.contains("dark");
   const bodyWasDark = document.body.classList.contains("dark");
@@ -156,6 +157,7 @@ export async function printCurrentPage({
   const restore = () => {
     window.removeEventListener("afterprint", restore);
     for (const stamp of qrStamps) stamp.remove();
+    for (const cell of printRowNumberCells) cell.remove();
     for (const change of changedAttributes) {
       if (change.hidden === null) change.element.removeAttribute(printHiddenAttribute);
       else change.element.setAttribute(printHiddenAttribute, change.hidden);
@@ -178,6 +180,52 @@ export async function printCurrentPage({
 
   window.addEventListener("afterprint", restore);
   window.print();
+}
+
+function addPrintRowNumbers(target: HTMLElement): HTMLTableCellElement[] {
+  const insertedCells: HTMLTableCellElement[] = [];
+  const existingNumberHeaders = new Set([
+    "no",
+    "no.",
+    "#",
+    "s/n",
+    "sr no",
+    "sr. no",
+    "serial no",
+    "serial number",
+  ]);
+
+  for (const table of target.querySelectorAll<HTMLTableElement>("table:not([data-print-no-numbers])")) {
+    const headerRow = Array.from(table.tHead?.rows ?? []).find((row) =>
+      row.cells.length > 1 || row.cells[0]?.colSpan === 1,
+    );
+    if (!headerRow) continue;
+
+    const firstHeader = headerRow.cells[0]?.textContent?.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+    if (firstHeader && existingNumberHeaders.has(firstHeader)) continue;
+
+    const dataRows = Array.from(table.tBodies)
+      .flatMap((body) => Array.from(body.rows))
+      .filter((row) => row.cells.length > 0 && !(row.cells.length === 1 && row.cells[0].colSpan > 1));
+    if (dataRows.length === 0) continue;
+
+    const numberHeader = document.createElement("th");
+    numberHeader.className = "print-row-number-cell";
+    numberHeader.scope = "col";
+    numberHeader.textContent = "No.";
+    headerRow.prepend(numberHeader);
+    insertedCells.push(numberHeader);
+
+    dataRows.forEach((row, index) => {
+      const numberCell = document.createElement("td");
+      numberCell.className = "print-row-number-cell";
+      numberCell.textContent = String(index + 1);
+      row.prepend(numberCell);
+      insertedCells.push(numberCell);
+    });
+  }
+
+  return insertedCells;
 }
 
 function getQrTargets(target: HTMLElement, pageSize: "A4" | "ID-1"): HTMLElement[] {

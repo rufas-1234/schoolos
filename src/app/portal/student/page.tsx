@@ -925,7 +925,7 @@ export default async function StudentPortalPage({
                     })}
                   </div>
                   <div className="hidden overflow-x-auto sm:block print:block">
-                    <table className="w-full min-w-[35rem] text-left text-sm">
+                    <table data-print-no-numbers className="w-full min-w-[35rem] text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                         <tr>
                           <th className="px-4 py-3 font-semibold">Day</th>
@@ -1288,7 +1288,7 @@ export default async function StudentPortalPage({
                       </dl>
                       <div className="fee-invoice-divider" aria-hidden="true">★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★</div>
                       <div className="hidden overflow-x-auto sm:block print:block">
-                        <table className="fee-invoice-items w-full min-w-[34rem] border-collapse text-left text-sm">
+                        <table data-print-no-numbers className="fee-invoice-items w-full min-w-[34rem] border-collapse text-left text-sm">
                           <thead>
                             <tr><th>Qty</th><th>Description</th><th className="text-right">Unit price</th><th className="text-right">Amount</th></tr>
                           </thead>

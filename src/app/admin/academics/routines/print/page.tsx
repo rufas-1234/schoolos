@@ -122,7 +122,7 @@ export default async function ClassRoutinePrintPage({
 
         <section className="print-report-panel overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           {timeSlots.length > 0 ? (
-            <table className="print-report-table w-full min-w-[52rem] border-collapse text-left text-sm">
+            <table data-print-no-numbers className="print-report-table w-full min-w-[52rem] border-collapse text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                 <tr>
                   <th scope="col">Time</th>

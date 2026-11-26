@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { db } from "@/db";
+import { TablePagination } from "@/components/table-pagination";
+import { parsePageSize } from "@/components/pagination-utils";
+import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
   academicYears,
   classLevels,
@@ -40,15 +43,45 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type AssessmentSearchParams = {
+  classLevelId?: string | string[];
+  sectionId?: string | string[];
+  subjectId?: string | string[];
+  sortBy?: string | string[];
+  sortDirection?: string | string[];
+  page?: string | string[];
+  pageSize?: string | string[];
+};
+
+function firstQueryValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function positiveInteger(value: string | undefined): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function requestedPage(value: string | undefined): number {
+  return positiveInteger(value) ?? 1;
+}
+
 export default async function ExaminationDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ examId: string }>;
+  searchParams: Promise<AssessmentSearchParams>;
 }) {
   const context = await requireSchoolPermission(["examinations.create", "results.enter", "results.publish"]);
-  const { examId: rawId } = await params;
+  const [{ examId: rawId }, query] = await Promise.all([params, searchParams]);
   if (!/^\d+$/.test(rawId)) notFound();
   const examId = Number(rawId);
+  const pageSize = parsePageSize(query.pageSize);
+  const requestedSortBy = firstQueryValue(query.sortBy);
+  const sortBy = requestedSortBy === "section" || requestedSortBy === "subject" ? requestedSortBy : "class";
+  const sortDirection = firstQueryValue(query.sortDirection) === "desc" ? "desc" : "asc";
   const [exam] = await db.select({
     id: examinations.id,
     name: examinations.name,
@@ -169,6 +202,7 @@ export default async function ExaminationDetailPage({
     publicId: examSubjects.publicId,
     examClassId: examClasses.id,
     classLevelId: classLevels.id,
+    subjectId: classSubjects.subjectId,
     className: classLevels.name,
     subjectName: subjects.name,
     subjectCode: subjects.code,
@@ -255,6 +289,99 @@ export default async function ExaminationDetailPage({
     eq(teachers.schoolId, context.schoolId),
   )).where(and(eq(examClasses.schoolId, context.schoolId), eq(examClasses.examinationId, exam.id)))
     .orderBy(asc(classLevels.name));
+  const classRowsWithSubjects = classRows.filter((classRow) =>
+    visibleSubjects.some((subject) => subject.examClassId === classRow.id),
+  );
+  const classFilterOptionsById = new Map<number, { id: number; name: string }>();
+  for (const classRow of classRowsWithSubjects) {
+    classFilterOptionsById.set(classRow.classLevelId, { id: classRow.classLevelId, name: classRow.className });
+  }
+  const classFilterOptions = [...classFilterOptionsById.values()]
+    .sort((first, second) => first.name.localeCompare(second.name));
+  const sectionRows = classRowsWithSubjects.length
+    ? await db.select({
+      id: classSections.id,
+      classLevelId: classSections.classLevelId,
+      name: classSections.name,
+    }).from(classSections).where(and(
+      eq(classSections.schoolId, context.schoolId),
+      eq(classSections.academicYearId, exam.academicYearId),
+      inArray(classSections.classLevelId, [...new Set(classRowsWithSubjects.map((row) => row.classLevelId))]),
+    )).orderBy(asc(classSections.name))
+    : [];
+  const requestedClassLevelId = positiveInteger(firstQueryValue(query.classLevelId));
+  const classFilter = classRowsWithSubjects.some((row) => row.classLevelId === requestedClassLevelId)
+    ? requestedClassLevelId
+    : null;
+  const sectionOptions = sectionRows.filter((section) =>
+    classFilter === null || section.classLevelId === classFilter,
+  );
+  const requestedSectionId = positiveInteger(firstQueryValue(query.sectionId));
+  const sectionFilter = sectionOptions.some((section) => section.id === requestedSectionId)
+    ? requestedSectionId
+    : null;
+  const classesMatchingClassAndSection = classRowsWithSubjects.filter((classRow) =>
+    (classFilter === null || classRow.classLevelId === classFilter) &&
+    (sectionFilter === null || sectionRows.some((section) =>
+      section.id === sectionFilter && section.classLevelId === classRow.classLevelId,
+    )),
+  );
+  const classIdsMatchingFilters = new Set(classesMatchingClassAndSection.map((row) => row.id));
+  const subjectOptions = [...new Map(visibleSubjects
+    .filter((subject) => classIdsMatchingFilters.has(subject.examClassId))
+    .map((subject) => [subject.subjectId, { id: subject.subjectId, name: subject.subjectName }])).values()]
+    .sort((first, second) => first.name.localeCompare(second.name));
+  const requestedSubjectId = positiveInteger(firstQueryValue(query.subjectId));
+  const subjectFilter = subjectOptions.some((subject) => subject.id === requestedSubjectId)
+    ? requestedSubjectId
+    : null;
+  const filteredClassRows = classesMatchingClassAndSection.filter((classRow) =>
+    subjectFilter === null || visibleSubjects.some((subject) =>
+      subject.examClassId === classRow.id && subject.subjectId === subjectFilter,
+    ),
+  );
+  const sectionSortValue = (classLevelId: number) => sectionRows
+    .filter((section) => section.classLevelId === classLevelId)
+    .map((section) => section.name)
+    .sort((first, second) => first.localeCompare(second))
+    .join(", ");
+  const subjectSortValue = (examClassId: number) => visibleSubjects
+    .filter((subject) => subject.examClassId === examClassId &&
+      (subjectFilter === null || subject.subjectId === subjectFilter))
+    .map((subject) => subject.subjectName)
+    .sort((first, second) => first.localeCompare(second))
+    .join(", ");
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+  const sortedClassRows = [...filteredClassRows].sort((first, second) => {
+    const firstValue = sortBy === "section"
+      ? sectionSortValue(first.classLevelId)
+      : sortBy === "subject"
+        ? subjectSortValue(first.id)
+        : first.className;
+    const secondValue = sortBy === "section"
+      ? sectionSortValue(second.classLevelId)
+      : sortBy === "subject"
+        ? subjectSortValue(second.id)
+        : second.className;
+    const comparison = collator.compare(firstValue, secondValue);
+    if (comparison !== 0) return sortDirection === "asc" ? comparison : -comparison;
+    return collator.compare(first.className, second.className) || first.id - second.id;
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedClassRows.length / pageSize));
+  const page = Math.min(requestedPage(firstQueryValue(query.page)), totalPages);
+  const pageClassRows = sortedClassRows.slice((page - 1) * pageSize, page * pageSize);
+  const pageHref = (targetPage: number) => {
+    const params = new URLSearchParams({
+      sortBy,
+      sortDirection,
+      page: String(targetPage),
+      pageSize: String(pageSize),
+    });
+    if (classFilter !== null) params.set("classLevelId", String(classFilter));
+    if (sectionFilter !== null) params.set("sectionId", String(sectionFilter));
+    if (subjectFilter !== null) params.set("subjectId", String(subjectFilter));
+    return `/admin/examinations/${exam.id}?${params.toString()}#assessments`;
+  };
   const classTeacherOptions = canConfigure
     ? await db.select({
       classLevelId: classSections.classLevelId,
@@ -364,21 +491,91 @@ export default async function ExaminationDetailPage({
       )}
 
       <section className="space-y-5">
-        <h2 id="assessments" className="text-xl font-bold text-slate-950">Classes and assessments</h2>
-        {classRows.map((classRow) => {
-          const subjectRows = visibleSubjects.filter((subject) => subject.examClassId === classRow.id);
-          if (!subjectRows.length) return null;
-          const classPublished = subjectRows.every((subject) => subject.status === "published");
-          const classApproved = subjectRows.every((subject) => subject.status === "approved");
+        <div>
+          <h2 id="assessments" className="text-xl font-bold text-slate-950">Classes and assessments</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Filter and sort class assessment groups. Choosing a section narrows the displayed classes; approval and publishing still apply to the whole class.
+          </p>
+        </div>
+        <SmartFilterForm method="get" action={`/admin/examinations/${exam.id}#assessments`} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <input type="hidden" name="pageSize" value={pageSize} />
+          <label className="text-sm font-medium text-slate-700">Class
+            <select name="classLevelId" defaultValue={classFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+              <option value="">All classes</option>
+              {classFilterOptions.map((classLevel) => <option key={classLevel.id} value={classLevel.id}>{classLevel.name}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-700">Section
+            <select name="sectionId" defaultValue={sectionFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+              <option value="">All sections</option>
+              {sectionOptions.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {classFilterOptionsById.get(section.classLevelId)?.name ?? "Class"} · {section.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-700">Subject
+            <select name="subjectId" defaultValue={subjectFilter?.toString() ?? ""} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+              <option value="">All subjects</option>
+              {subjectOptions.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-700">Sort by
+            <select name="sortBy" defaultValue={sortBy} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+              <option value="class">Class</option>
+              <option value="section">Section</option>
+              <option value="subject">Subject</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-slate-700">Order
+            <select name="sortDirection" defaultValue={sortDirection} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </label>
+          <div className="flex items-end gap-2">
+            <button type="submit" className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white">Apply</button>
+            <Link href={`/admin/examinations/${exam.id}#assessments`} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Reset</Link>
+          </div>
+        </SmartFilterForm>
+
+        {sortedClassRows.length === 0 ? (
+          <p className="rounded-2xl border bg-white p-8 text-center text-slate-500">
+            {visibleSubjects.length === 0
+              ? "No subject assessments are assigned to your account for this examination."
+              : "No class assessments match these filters."}
+          </p>
+        ) : pageClassRows.map((classRow) => {
+          const allClassSubjects = visibleSubjects.filter((subject) => subject.examClassId === classRow.id);
+          const subjectRows = allClassSubjects
+            .filter((subject) => subjectFilter === null || subject.subjectId === subjectFilter)
+            .sort((first, second) => {
+              const comparison = collator.compare(first.subjectName, second.subjectName);
+              return sortBy === "subject" && sortDirection === "desc" ? -comparison : comparison;
+            });
+          const classSections = sectionRows.filter((section) => section.classLevelId === classRow.classLevelId);
+          const displayedSections = sectionFilter === null
+            ? classSections
+            : classSections.filter((section) => section.id === sectionFilter);
+          const classPublished = allClassSubjects.every((subject) => subject.status === "published");
+          const classApproved = allClassSubjects.every((subject) => subject.status === "approved");
           const isAssignedClassTeacher = classRow.classTeacherId !== null && myTeacherIds.includes(classRow.classTeacherId)
             || myClassTeacherClassLevelIds.has(classRow.classLevelId);
           const canReviewClassSubject = canReviewExamSubject(context.grantedPermissions, isAssignedClassTeacher);
           return (
             <article key={classRow.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
-                <h3 className="text-lg font-bold">{classRow.className}</h3>
+                <div>
+                  <h3 className="text-lg font-bold">{classRow.className}</h3>
+                  {displayedSections.length > 0 && <p className="mt-1 text-xs text-slate-600">Sections: {displayedSections.map((section) => section.name).join(", ")}</p>}
+                </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm text-slate-500">{subjectRows.length} subjects</span>
+                  <span className="text-sm text-slate-500">
+                    {subjectRows.length === allClassSubjects.length
+                      ? `${allClassSubjects.length} subjects`
+                      : `${subjectRows.length} of ${allClassSubjects.length} subjects shown`}
+                  </span>
                   {(classPublished || canPreviewReports) && (
                     <>
                       <Link href={`/admin/examinations/${exam.id}/reports/${classRow.id}${classPublished ? "" : "?preview=test"}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
@@ -415,7 +612,7 @@ export default async function ExaminationDetailPage({
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-900">Class publication status</p>
                   <p className="mt-1 text-sm text-slate-600">
-                    {classPublished ? "Published — marks are locked." : `${subjectRows.filter((subject) => subject.status === "approved").length} of ${subjectRows.length} subjects approved.`}
+                    {classPublished ? "Published — marks are locked." : `${allClassSubjects.filter((subject) => subject.status === "approved").length} of ${allClassSubjects.length} subjects approved.`}
                   </p>
                 </div>
               </div>
@@ -447,7 +644,15 @@ export default async function ExaminationDetailPage({
             </article>
           );
         })}
-        {visibleSubjects.length === 0 && <p className="rounded-2xl border bg-white p-8 text-center text-slate-500">No subject assessments are assigned to your account for this examination.</p>}
+        {sortedClassRows.length > 0 && (
+          <TablePagination
+            ariaLabel="Class assessment approvals"
+            currentPage={page}
+            pageSize={pageSize}
+            totalRows={sortedClassRows.length}
+            hrefForPage={pageHref}
+          />
+        )}
       </section>
     </main>
   );
