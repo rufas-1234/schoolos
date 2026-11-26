@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { parseCsvRows } from "@/lib/csv-import";
+import { normalizeSectionName } from "@/lib/student-import-policy";
 import { createStudent, type StudentActionState } from "./actions";
 
 const maxCsvBytes = 1_000_000;
@@ -95,8 +96,9 @@ function uniqueMatch<T>(
   label: string,
   getName: (candidate: T) => string,
   value: string,
+  normalizeName: (name: string) => string = normalize,
 ): { match?: T; error?: string } {
-  const found = candidates.filter((candidate) => normalize(getName(candidate)) === normalize(value));
+  const found = candidates.filter((candidate) => normalizeName(getName(candidate)) === normalizeName(value));
   if (found.length === 1) return { match: found[0] };
   if (found.length > 1) return { error: `More than one ${label} matches "${value}".` };
   return { error: `No active ${label} matches "${value}".` };
@@ -249,6 +251,7 @@ export async function importStudentsFromCsv(
       "section",
       (section) => section.name,
       readValue(record, "sectionName"),
+      normalizeSectionName,
     );
     if (!sectionResult.match) {
       addFailure({ row: rowNumber, message: sectionResult.error ?? "Choose a valid section." });
