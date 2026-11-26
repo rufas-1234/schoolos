@@ -121,7 +121,7 @@ export default async function DashboardPage() {
       color: "bg-violet-50 text-violet-700",
     },
     (context.grantedPermissions.includes("academics.manage") || context.grantedPermissions.includes("school.settings.manage")) && {
-      href: "/admin/academics",
+      href: "/admin/academics/overview",
       label: "Academics",
       icon: <CalendarDays size={20} />,
       color: "bg-sky-50 text-sky-700",
@@ -306,7 +306,7 @@ export default async function DashboardPage() {
             </span>
           </div>
           <div className="mt-6 space-y-4">
-            <SetupItem number="01" title="Academic structure" description="Manage school years, branches, classes, subjects, and timetables." href="/admin/academics" />
+            <SetupItem number="01" title="Academic structure" description="Manage school years, branches, classes, subjects, and timetables." href="/admin/academics/overview" />
             <SetupItem number="02" title="Student directory" description="Review admissions and manage student records." href="/admin/students" />
             <SetupItem number="03" title="Staff directory" description="Keep teaching and non-teaching staff details up to date." href="/admin/staff" />
             <SetupItem number="04" title="School profile" description="Update contact information, currency, and timezone." href="/admin/settings" />

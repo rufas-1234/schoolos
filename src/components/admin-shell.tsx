@@ -64,7 +64,7 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
   {
-    href: "/admin/academics",
+    href: "/admin/academics/overview",
     label: "Academics",
     icon: CalendarDays,
     permission: "academics.manage",

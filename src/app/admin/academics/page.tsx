@@ -1,6 +1,7 @@
 import { and, asc, countDistinct, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { CalendarDays } from "lucide-react";
 import {
@@ -95,6 +96,7 @@ export default async function AcademicStructurePage({
     typeof requestedSection === "string" && isAcademicSectionId(requestedSection)
       ? requestedSection
       : undefined;
+  if (!sectionId) redirect("/admin/academics/overview");
   const academicSearch = typeof requestedSearch === "string" ? requestedSearch.slice(0, 160) : "";
   const notice = requestedNotice === "class-deleted" ? "Class and its unused academic setup were permanently deleted." : null;
   const selectedSection = academicSections.find((section) => section.id === sectionId);
