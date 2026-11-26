@@ -61,6 +61,7 @@ function financeNavigation(permissions: readonly string[]) {
 
 export function ManagementPortalShell({
   children,
+  adminMode = false,
   schoolName,
   schoolLogoUrl,
   schoolAddress,
@@ -73,6 +74,7 @@ export function ManagementPortalShell({
   selectedAcademicYearId,
 }: {
   children: React.ReactNode;
+  adminMode?: boolean;
   schoolName: string;
   schoolLogoUrl: string | null;
   schoolAddress: string | null;
@@ -94,6 +96,8 @@ export function ManagementPortalShell({
     : portalType === "dormitory"
       ? dormitoryNavigation
       : financeNavigation(permissions);
+
+  if (adminMode) return <>{children}</>;
 
   return (
     <PortalShell

@@ -220,8 +220,8 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("payroll", "Payroll records", "Staff payroll and pay history", "/admin/hr/payroll", ["salary", "pay"]);
     addPage("hr-settings", "HR settings", "Configure staff fields and HR settings", "/admin/hr/settings", ["staff settings", "human resources settings"]);
   }
-  if (canManageFees || canManageAccounts) {
-    addPage("finance-overview", "Finance overview", "Open finance links in the school administration area", "/admin/finance", ["finance", "finance workspace", "accounts portal", "bursar"]);
+  if (canManageFees || canManageAccounts || permissions.has("inventory.manage")) {
+    addPage("finance-overview", "Finance overview", "Financial summary of fee collections, accounts, and school stock", "/admin/finance", ["finance", "finance workspace", "accounts portal", "bursar"]);
   }
   if (canManageFees) {
     addPage("fee-overview", "Fees overview", "Open fee setup, collection, invoice, and report links", "/admin/fees/overview", ["fees", "fee dashboard", "fee setup", "fee overview"]);
