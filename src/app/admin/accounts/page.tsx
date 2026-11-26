@@ -21,6 +21,7 @@ import { DownloadCsv } from "@/components/download-csv";
 import { PrintButton } from "@/components/print-button";
 import {
   AccountForms,
+  AccountSectionSelect,
   PayrollPaymentForm,
   ProfitLossFilters,
   ReviewTransactionForm,
@@ -547,7 +548,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         </p>
       </header>
 
-      {section !== "reports" && <nav aria-label="Accounts sections" className="flex flex-wrap gap-2">
+      <AccountSectionSelect section={section} from={from} to={to} options={sections} />
+      {section !== "reports" && <nav aria-label="Accounts sections" className="hidden flex-wrap gap-2 lg:flex">
         {sections.filter((item) => item.id !== "reports").map((item) => (
           <a key={item.id} href={`/admin/accounts?section=${item.id}${item.id === "profit" ? `&from=${from}&to=${to}` : ""}`}
             aria-current={section === item.id ? "page" : undefined}

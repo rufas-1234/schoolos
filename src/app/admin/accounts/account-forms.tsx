@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import {
@@ -15,6 +16,41 @@ import {
 
 export type AccountOption = { id: number; label: string };
 export type AccountCurrencyOption = { code: string; label: string };
+
+export function AccountSectionSelect({
+  section,
+  from,
+  to,
+  options,
+}: {
+  section: string;
+  from: string;
+  to: string;
+  options: Array<{ id: string; label: string }>;
+}) {
+  const router = useRouter();
+  return (
+    <label className="block space-y-1.5 text-sm font-medium text-slate-700 lg:hidden">
+      Accounts section
+      <select
+        aria-label="Accounts section"
+        value={section}
+        onChange={(event) => {
+          const selectedSection = event.currentTarget.value;
+          const params = new URLSearchParams({ section: selectedSection });
+          if (selectedSection === "profit") {
+            params.set("from", from);
+            params.set("to", to);
+          }
+          router.push(`/admin/accounts?${params.toString()}`);
+        }}
+        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-semibold text-slate-800 shadow-sm"
+      >
+        {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+      </select>
+    </label>
+  );
+}
 
 function ActionForm({
   action,
