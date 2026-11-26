@@ -19,6 +19,8 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { SmartFilterForm } from "@/components/smart-filter-form";
 import { removeStudentClass } from "../class-actions";
 import { StudentClassForm } from "../student-class-form";
+import { resolveBranchFilterId } from "@/lib/branch-selection-policy";
+import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
 
 type SearchParam = string | string[] | undefined;
 type SearchParams = {
@@ -51,11 +53,7 @@ export default async function MultiClassStudentsPage({
   const classValue = singleValue(params.classLevelId);
   const sectionValue = singleValue(params.sectionId);
   const studentPublicId = singleValue(params.studentPublicId);
-  const branchId = positiveId(branchValue);
-  const academicYearId = positiveId(yearValue);
-  const classLevelId = positiveId(classValue);
-  const sectionId = positiveId(sectionValue);
-  const [branches, years, classes] = await Promise.all([
+  const [branches, years, academicYearSelection] = await Promise.all([
     db
       .select({ id: schoolBranches.id, name: schoolBranches.name, code: schoolBranches.code })
       .from(schoolBranches)
@@ -66,19 +64,28 @@ export default async function MultiClassStudentsPage({
       .from(academicYears)
       .where(and(eq(academicYears.schoolId, context.schoolId), eq(academicYears.status, "active")))
       .orderBy(asc(academicYears.startDate)),
-    db
-      .select({ id: classLevels.id, branchId: classLevels.branchId, name: classLevels.name })
-      .from(classLevels)
-      .innerJoin(schoolBranches, eq(classLevels.branchId, schoolBranches.id))
-      .where(
-        and(
-          eq(classLevels.schoolId, context.schoolId),
-          eq(schoolBranches.status, "active"),
-          ...(branchId === null ? [] : [eq(classLevels.branchId, branchId)]),
-        ),
-      )
-      .orderBy(asc(classLevels.name)),
+    getSchoolAcademicYearSelection(context.schoolId),
   ]);
+  const branchId = resolveBranchFilterId(branches, branchValue);
+  const defaultYearId = years.some((year) => year.id === academicYearSelection.selectedYear?.id)
+    ? academicYearSelection.selectedYear?.id ?? null
+    : years[0]?.id ?? null;
+  const requestedYearId = yearValue === undefined || yearValue === "" ? defaultYearId : positiveId(yearValue);
+  const academicYearId = years.some((year) => year.id === requestedYearId) ? requestedYearId : defaultYearId;
+  const classLevelId = positiveId(classValue);
+  const sectionId = positiveId(sectionValue);
+  const classes = await db
+    .select({ id: classLevels.id, branchId: classLevels.branchId, name: classLevels.name })
+    .from(classLevels)
+    .innerJoin(schoolBranches, eq(classLevels.branchId, schoolBranches.id))
+    .where(
+      and(
+        eq(classLevels.schoolId, context.schoolId),
+        eq(schoolBranches.status, "active"),
+        ...(branchId === null ? [] : [eq(classLevels.branchId, branchId)]),
+      ),
+    )
+    .orderBy(asc(classLevels.name));
   const sections = branchId !== null && academicYearId !== null
     ? await db
         .select({
