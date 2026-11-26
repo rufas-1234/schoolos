@@ -113,7 +113,11 @@ export async function requireSchoolMember() {
     schoolIsPractice: membership.isPracticeWorkspace,
     practiceParentSchoolId: membership.practiceParentSchoolId,
     membershipId: membership.membershipId,
-    schoolChoices: memberships.map(({ schoolPublicId, schoolName }) => ({ schoolPublicId, schoolName })),
+    schoolChoices: memberships.map(({ schoolPublicId, schoolName, isPracticeWorkspace }) => ({
+      schoolPublicId,
+      schoolName,
+      isPracticeWorkspace,
+    })),
     multiSchoolEnabled: isMultiSchoolEnabled(),
   };
 }

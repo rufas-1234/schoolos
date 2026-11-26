@@ -49,6 +49,8 @@ export default async function AccountSecurityPage() {
       userName={context.user.name}
       portalLabel="School workspace"
       navigation={navigation}
+      schoolChoices={context.schoolChoices}
+      currentSchoolPublicId={context.schoolPublicId}
     >
       <AccountSecurityContent schoolName={context.schoolName} />
     </PortalShell>

@@ -91,6 +91,7 @@ export default async function SelectSchoolPage({
             >
               <span>
                 <span className="block font-semibold text-slate-900">{membership.schoolName}</span>
+                {membership.isPracticeWorkspace && <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-amber-700">Practice workspace</span>}
                 {membership.schoolAddress && <span className="mt-1 block text-sm text-slate-500">{membership.schoolAddress}</span>}
               </span>
               <span aria-hidden="true" className="text-lg text-violet-700">→</span>

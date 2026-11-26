@@ -797,6 +797,8 @@ export default async function StudentPortalPage({
       schoolEmail={context.schoolEmail}
       userName={context.user.name}
       portalType="student"
+      schoolChoices={context.schoolChoices}
+      currentSchoolPublicId={context.schoolPublicId}
     >
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
         <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-7">

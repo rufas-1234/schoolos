@@ -42,6 +42,8 @@ export function FamilyPortalShell({
   schoolEmail,
   userName,
   portalType,
+  schoolChoices,
+  currentSchoolPublicId,
 }: {
   children: React.ReactNode;
   schoolName: string;
@@ -51,6 +53,8 @@ export function FamilyPortalShell({
   schoolEmail: string | null;
   userName: string;
   portalType: "student" | "parent";
+  schoolChoices: { schoolPublicId: string; schoolName: string; isPracticeWorkspace: boolean }[];
+  currentSchoolPublicId: string;
 }) {
   const isStudent = portalType === "student";
 
@@ -65,6 +69,8 @@ export function FamilyPortalShell({
       portalLabel={isStudent ? "Student Portal" : "Parent Portal"}
       navigation={isStudent ? studentNavigation : parentNavigation}
       searchScope={isStudent ? "student" : undefined}
+      schoolChoices={schoolChoices}
+      currentSchoolPublicId={currentSchoolPublicId}
     >
       {children}
     </PortalShell>

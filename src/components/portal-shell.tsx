@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { CalendarDays, CircleHelp, GraduationCap, KeyRound, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { setSelectedAcademicYear } from "@/app/admin/academic-year-actions";
+import { selectSchool } from "@/app/select-school/actions";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { schoolLogoSource } from "@/lib/school-logo";
@@ -31,6 +32,8 @@ export function PortalShell({
   searchScope,
   academicYears,
   selectedAcademicYearId,
+  schoolChoices,
+  currentSchoolPublicId,
 }: {
   children: ReactNode;
   schoolName: string;
@@ -44,6 +47,8 @@ export function PortalShell({
   searchScope?: "teaching" | "student";
   academicYears?: { id: number; name: string }[];
   selectedAcademicYearId?: number | null;
+  schoolChoices?: { schoolPublicId: string; schoolName: string; isPracticeWorkspace: boolean }[];
+  currentSchoolPublicId?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -203,6 +208,26 @@ export function PortalShell({
               </div>
             )}
             <div className="flex items-center gap-3">
+              {schoolChoices && schoolChoices.length > 1 && currentSchoolPublicId && (
+                <form action={selectSchool} className="relative">
+                  <label htmlFor="portal-school-workspace" className="sr-only">School workspace</label>
+                  <select
+                    id="portal-school-workspace"
+                    name="schoolPublicId"
+                    aria-label="School workspace"
+                    title="Switch school workspace"
+                    defaultValue={currentSchoolPublicId}
+                    onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                    className="h-9 max-w-[34vw] rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400 sm:max-w-52 sm:px-3 sm:text-sm"
+                  >
+                    {schoolChoices.map((choice) => (
+                      <option key={choice.schoolPublicId} value={choice.schoolPublicId}>
+                        {choice.isPracticeWorkspace ? `Practice · ${choice.schoolName}` : choice.schoolName}
+                      </option>
+                    ))}
+                  </select>
+                </form>
+              )}
               {academicYears && (
                 <form action={setSelectedAcademicYear} className="relative min-w-0">
                   <label htmlFor="portal-academic-year" className="sr-only">Academic year</label>

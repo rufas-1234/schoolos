@@ -19,6 +19,8 @@ export function TeacherPortalShell({
   schoolPhone,
   schoolEmail,
   teacherName,
+  schoolChoices,
+  currentSchoolPublicId,
 }: {
   children: React.ReactNode;
   schoolName: string;
@@ -27,6 +29,8 @@ export function TeacherPortalShell({
   schoolPhone: string | null;
   schoolEmail: string | null;
   teacherName: string;
+  schoolChoices: { schoolPublicId: string; schoolName: string; isPracticeWorkspace: boolean }[];
+  currentSchoolPublicId: string;
 }) {
   return (
     <PortalShell
@@ -39,6 +43,8 @@ export function TeacherPortalShell({
       portalLabel="Teacher Portal"
       navigation={teacherNavigation}
       searchScope="teaching"
+      schoolChoices={schoolChoices}
+      currentSchoolPublicId={currentSchoolPublicId}
     >
       {children}
     </PortalShell>

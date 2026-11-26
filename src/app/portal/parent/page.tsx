@@ -161,6 +161,8 @@ export default async function ParentPortalPage() {
       schoolEmail={context.schoolEmail}
       userName={context.user.name}
       portalType="parent"
+      schoolChoices={context.schoolChoices}
+      currentSchoolPublicId={context.schoolPublicId}
     >
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
         <header className="rounded-3xl bg-gradient-to-br from-violet-800 to-indigo-900 p-6 text-white shadow-lg sm:p-9">

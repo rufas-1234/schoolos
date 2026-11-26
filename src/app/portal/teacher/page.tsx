@@ -759,6 +759,8 @@ export default async function TeacherPortalPage({
       schoolPhone={context.schoolPhone}
       schoolEmail={context.schoolEmail}
       teacherName={teacherName}
+      schoolChoices={context.schoolChoices}
+      currentSchoolPublicId={context.schoolPublicId}
     >
       <main id="teacher-portal-print" className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-8">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
