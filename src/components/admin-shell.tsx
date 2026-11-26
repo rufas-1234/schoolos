@@ -1110,7 +1110,7 @@ export function AdminShell({
         )}
         <main className="admin-shell-main mx-auto max-w-[1500px] px-3 py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-9">{children}</main>
       </div>
-      <nav aria-label="Mobile primary navigation" className="admin-mobile-bottom-navigation print:hidden fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[35] flex items-stretch justify-around rounded-2xl border border-slate-200 bg-white/95 px-2 py-1.5 shadow-[0_10px_35px_-15px_rgba(15,23,42,0.55)] backdrop-blur lg:hidden">
+      <nav aria-label="Mobile primary navigation" className="admin-mobile-bottom-navigation print:hidden fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[35] flex items-stretch justify-around rounded-2xl border px-2 py-1.5 backdrop-blur-2xl lg:hidden">
         {mobilePrimaryNavigation.map((item) => {
           const itemPath = item.href.split("?")[0];
           const active = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
@@ -1132,7 +1132,7 @@ export function AdminShell({
         })}
         <div className="relative flex min-w-0 flex-1">
           {mobileMoreOpen && (
-            <div className="admin-mobile-more-panel absolute bottom-[calc(100%+0.65rem)] right-1 max-h-[min(70dvh,34rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
+            <div className="admin-mobile-more-panel absolute bottom-[calc(100%+0.65rem)] right-1 max-h-[min(70dvh,34rem)] w-[min(23rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border p-3">
               <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white pb-2">
                 <p className="text-sm font-semibold text-slate-900">More pages</p>
                 <button type="button" onClick={() => setMobileMoreOpen(false)} aria-label="Close more pages" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={17} /></button>

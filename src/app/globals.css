@@ -510,15 +510,39 @@ html {
   top: max(1rem, env(safe-area-inset-top));
 }
 
-.dark .admin-mobile-bottom-navigation {
-  border-color: #334155;
-  background-color: rgb(15 23 42 / 96%);
+.admin-mobile-bottom-navigation,
+.admin-mobile-more-panel {
+  border-color: rgb(255 255 255 / 66%);
+  background: linear-gradient(135deg, rgb(255 255 255 / 75%), rgb(248 250 252 / 48%));
+  box-shadow:
+    0 14px 38px rgb(15 23 42 / 20%),
+    inset 0 1px 0 rgb(255 255 255 / 90%),
+    inset 0 -1px 0 rgb(255 255 255 / 32%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(190%);
 }
 
-.dark .admin-mobile-more-panel,
+.admin-mobile-more-panel {
+  background: linear-gradient(145deg, rgb(255 255 255 / 84%), rgb(248 250 252 / 68%));
+}
+
+.admin-mobile-more-panel .sticky {
+  background: linear-gradient(145deg, rgb(255 255 255 / 88%), rgb(248 250 252 / 72%));
+}
+
+.dark .admin-mobile-bottom-navigation,
+.dark .admin-mobile-more-panel {
+  border-color: rgb(255 255 255 / 20%);
+  background: linear-gradient(135deg, rgb(30 41 59 / 82%), rgb(15 23 42 / 72%));
+  box-shadow:
+    0 14px 38px rgb(0 0 0 / 36%),
+    inset 0 1px 0 rgb(255 255 255 / 22%),
+    inset 0 -1px 0 rgb(255 255 255 / 8%);
+}
+
 .dark .admin-mobile-more-panel .sticky {
-  border-color: #334155;
-  background-color: #0f172a;
+  border-color: rgb(255 255 255 / 12%);
+  background: linear-gradient(145deg, rgb(30 41 59 / 90%), rgb(15 23 42 / 82%));
 }
 
 @media (min-width: 768px) {
