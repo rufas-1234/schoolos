@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -513,11 +513,19 @@ export async function createExamination(
       createdBy: context.user.id,
     }).$returningId();
     for (const classLevelId of classIds) {
+      const [classTeacher] = await tx.select({ id: classSections.classTeacherId }).from(classSections)
+        .where(and(
+          eq(classSections.schoolId, context.schoolId),
+          eq(classSections.academicYearId, year.id),
+          eq(classSections.classLevelId, classLevelId),
+          isNotNull(classSections.classTeacherId),
+        )).limit(1);
       const [examClass] = await tx.insert(examClasses).values({
         publicId: randomUUID(),
         schoolId: context.schoolId,
         examinationId: exam.id,
         classLevelId,
+        classTeacherId: classTeacher?.id ?? null,
       }).$returningId();
       const classAssignments = assignments.filter((assignment) => assignment.classLevelId === classLevelId);
       const newSubjects = await tx.insert(examSubjects).values(classAssignments.map((assignment) => ({

@@ -2431,19 +2431,64 @@ h6 {
 
   .fee-statement-card {
     border-color: #d8deea !important;
-    padding: 5mm !important;
+    padding: 1mm !important;
     box-shadow: none !important;
   }
 
+  body:has(.fee-statement-card) .fee-invoice-page {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
   .fee-statement-items {
-    font-size: 8pt;
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 7pt;
+  }
+
+  .fee-statement-card > .overflow-x-auto {
+    margin-right: -1mm;
+    margin-left: -1mm;
+  }
+
+  .fee-statement-items thead {
+    display: table-header-group;
   }
 
   .fee-statement-items th,
   .fee-statement-items td {
-    padding: 2mm 1.4mm;
+    padding: 1.2mm 0.8mm;
+    overflow-wrap: anywhere;
     vertical-align: top;
   }
+
+  .fee-statement-items .print-row-number-cell {
+    box-sizing: border-box;
+    width: 5%;
+    min-width: 5mm;
+    padding: 0.5mm 0.2mm;
+    font-size: 6pt;
+  }
+
+  .fee-statement-items th:nth-child(1),
+  .fee-statement-items td:nth-child(1) { width: 5%; }
+  .fee-statement-items th:nth-child(2),
+  .fee-statement-items td:nth-child(2) { width: 12%; }
+  .fee-statement-items th:nth-child(3),
+  .fee-statement-items td:nth-child(3) { width: 20%; }
+  .fee-statement-items th:nth-child(4),
+  .fee-statement-items td:nth-child(4) { width: 17%; }
+  .fee-statement-items th:nth-child(5),
+  .fee-statement-items td:nth-child(5),
+  .fee-statement-items th:nth-child(6),
+  .fee-statement-items td:nth-child(6),
+  .fee-statement-items th:nth-child(7),
+  .fee-statement-items td:nth-child(7),
+  .fee-statement-items th:nth-child(8),
+  .fee-statement-items td:nth-child(8) { width: 10%; }
+  .fee-statement-items th:nth-child(9),
+  .fee-statement-items td:nth-child(9) { width: 6%; }
 
   .fee-statement-totals {
     break-inside: avoid;

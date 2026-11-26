@@ -62,6 +62,7 @@ import {
   SchoolBranchForm,
   SchoolBranchList,
   SectionAssignmentForm,
+  ClassTeacherAssignmentForm,
   StudentPlacementForm,
   SectionSubjectTeacherForm,
   RemoveSectionSubjectTeacherForm,
@@ -994,8 +995,11 @@ export default async function AcademicStructurePage({
                     <AdminActionDialog label="Add sections" title="Add class sections">
                       <ClassSectionsForm branches={branchOptions} years={yearOptions} classes={classOptions} />
                     </AdminActionDialog>
-                    <AdminActionDialog label="Assign section capacity or teacher" title="Update section assignments">
-                      <SectionAssignmentForm branches={branchOptions} sections={sectionOptions} teachers={teacherOptions} />
+                    <AdminActionDialog label="Assign section capacity" title="Update section capacity">
+                      <SectionAssignmentForm branches={branchOptions} sections={sectionOptions} />
+                    </AdminActionDialog>
+                    <AdminActionDialog label="Assign class teacher" title="Appoint one teacher for the whole class">
+                      <ClassTeacherAssignmentForm branches={branchOptions} years={yearOptions} classes={classOptions} teachers={teacherOptions} />
                     </AdminActionDialog>
                   </>
                 }
@@ -1035,11 +1039,9 @@ export default async function AcademicStructurePage({
                       <SectionAssignmentForm
                         branches={allBranchOptions}
                         sections={sectionOptions}
-                        teachers={teacherOptions}
                         record={{
                           sectionId: section.id,
                           capacity: section.capacity,
-                          teacherId: section.classTeacherId,
                         }}
                       />
                     </div>

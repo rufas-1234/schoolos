@@ -101,7 +101,7 @@ export default function GuidePage() {
                 <Step n={6}>Create named user accounts and assign only the roles needed for each person.</Step>
               </ol>
               <h3 className="font-semibold text-slate-900">Practice in an isolated workspace</h3>
-              <p>School administrators can open <strong>School profile → Practice mode → Start practice mode</strong> to create a separate workspace for training. It has its own records and basic setup, carries over the school’s currency settings, and does not copy student, staff, or finance records. The account menu identifies it as a practice workspace, and a banner remains visible while you are using it.</p>
+              <p>School administrators can open <strong>School profile → Practice mode → Start practice mode</strong> to create a separate workspace for training. It has its own records and basic setup, carries over the school’s currency settings, and gives active school members access using their existing sign-in. It creates separate, minimal student and staff profiles for linked student and teacher accounts; it does not copy live enrollments, marks, fees, payroll, or other school records. The account menu identifies it as a practice workspace, and a banner remains visible while you are using it.</p>
               <p>Use <strong>Reset practice</strong> to permanently delete the current sandbox and its stored files, then create a clean one, or <strong>Finish practice</strong> to permanently delete it and return to the live school. Deletion cannot be undone. Your live school records are not affected. Always confirm the workspace name before entering or using records.</p>
             </GuideSection>
 

@@ -16,6 +16,8 @@ import {
   classSections,
   classSectionSubjectTeachers,
   classSubjects,
+  examClasses,
+  examinations,
   schools,
   schoolBranches,
   studentAcademicEvents,
@@ -880,7 +882,6 @@ const sectionAssignmentSchema = z.object({
     .refine(
       (value) => value === null || (Number.isSafeInteger(value) && value <= MAX_SECTION_CAPACITY),
     ),
-  teacherId: optionalIdField,
 });
 
 export async function updateSectionAssignment(
@@ -891,9 +892,8 @@ export async function updateSectionAssignment(
   const result = sectionAssignmentSchema.safeParse({
     sectionId: readFormValue(formData, "sectionId"),
     capacity: readFormValue(formData, "capacity"),
-    teacherId: readFormValue(formData, "teacherId"),
   });
-  if (!result.success) return { error: "Choose a section, a valid capacity, and an optional class teacher." };
+  if (!result.success) return { error: "Choose a section and a valid capacity." };
 
   const outcome = await db.transaction(async (tx) => {
     const [section] = await tx
@@ -901,30 +901,12 @@ export async function updateSectionAssignment(
         id: classSections.id,
         publicId: classSections.publicId,
         capacity: classSections.capacity,
-        branchId: classLevels.branchId,
       })
       .from(classSections)
-      .innerJoin(classLevels, eq(classSections.classLevelId, classLevels.id))
       .where(and(eq(classSections.id, result.data.sectionId), eq(classSections.schoolId, context.schoolId)))
       .for("update")
       .limit(1);
     if (!section) return "section-not-found";
-
-    if (result.data.teacherId !== null) {
-      const [teacher] = await tx
-        .select({ id: teachers.id, branchId: teachers.branchId })
-        .from(teachers)
-        .where(
-          and(
-            eq(teachers.id, result.data.teacherId),
-            eq(teachers.schoolId, context.schoolId),
-            eq(teachers.status, "active"),
-          ),
-        )
-        .limit(1);
-      if (!teacher) return "teacher-not-found";
-      if (teacher.branchId !== section.branchId) return "teacher-branch-mismatch";
-    }
 
     if (result.data.capacity !== null) {
       const [enrollmentCount] = await tx
@@ -942,7 +924,7 @@ export async function updateSectionAssignment(
 
     await tx
       .update(classSections)
-      .set({ capacity: result.data.capacity, classTeacherId: result.data.teacherId })
+      .set({ capacity: result.data.capacity })
       .where(and(eq(classSections.id, section.id), eq(classSections.schoolId, context.schoolId)));
     await writeAudit(
       tx,
@@ -950,19 +932,103 @@ export async function updateSectionAssignment(
       "academic.section.assignment.updated",
       "class_section",
       section.publicId,
-      ["capacity", "classTeacherId"],
+      ["capacity"],
     );
     return "updated";
   });
 
   if (outcome === "section-not-found") return { error: "Choose a section belonging to your school." };
-  if (outcome === "teacher-not-found") return { error: "Choose an active teacher belonging to your school." };
-  if (outcome === "teacher-branch-mismatch") return { error: "Choose a teacher who works at the selected class branch." };
   if (outcome === "capacity-too-low") {
     return { error: "Capacity cannot be lower than the number of currently enrolled students." };
   }
   revalidatePath("/admin/academics");
   return { success: true };
+}
+
+const classTeacherAssignmentSchema = z.object({
+  academicYearId: idField,
+  classLevelId: idField,
+  teacherId: optionalIdField,
+});
+
+export async function updateClassTeacherAssignment(
+  _previousState: AcademicActionState,
+  formData: FormData,
+): Promise<AcademicActionState> {
+  const context = await requireSchoolPermission(["academics.manage", "school.settings.manage"]);
+  const result = classTeacherAssignmentSchema.safeParse({
+    academicYearId: readFormValue(formData, "academicYearId"),
+    classLevelId: readFormValue(formData, "classLevelId"),
+    teacherId: readFormValue(formData, "teacherId"),
+  });
+  if (!result.success) return { error: "Choose an academic year, class, and optional class teacher." };
+
+  const outcome = await db.transaction(async (tx) => {
+    const [classLevel] = await tx.select({ id: classLevels.id, publicId: classLevels.publicId, branchId: classLevels.branchId })
+      .from(classLevels).where(and(
+        eq(classLevels.id, result.data.classLevelId),
+        eq(classLevels.schoolId, context.schoolId),
+      )).for("update").limit(1);
+    const [year] = await tx.select({ id: academicYears.id })
+      .from(academicYears).where(and(
+        eq(academicYears.id, result.data.academicYearId),
+        eq(academicYears.schoolId, context.schoolId),
+      )).for("update").limit(1);
+    if (!classLevel || !year) return "structure-not-found";
+
+    if (result.data.teacherId !== null) {
+      const [teacher] = await tx.select({ id: teachers.id, branchId: teachers.branchId })
+        .from(teachers).where(and(
+          eq(teachers.id, result.data.teacherId),
+          eq(teachers.schoolId, context.schoolId),
+          eq(teachers.status, "active"),
+        )).limit(1);
+      if (!teacher) return "teacher-not-found";
+      if (teacher.branchId !== classLevel.branchId) return "teacher-branch-mismatch";
+    }
+
+    const sections = await tx.select({ id: classSections.id, publicId: classSections.publicId })
+      .from(classSections).where(and(
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.academicYearId, year.id),
+        eq(classSections.classLevelId, classLevel.id),
+      ));
+    if (!sections.length) return "sections-not-found";
+
+    await tx.update(classSections).set({ classTeacherId: result.data.teacherId })
+      .where(and(
+        eq(classSections.schoolId, context.schoolId),
+        eq(classSections.academicYearId, year.id),
+        eq(classSections.classLevelId, classLevel.id),
+      ));
+    const exams = await tx.select({ id: examinations.id }).from(examinations).where(and(
+      eq(examinations.schoolId, context.schoolId),
+      eq(examinations.academicYearId, year.id),
+    ));
+    if (exams.length) {
+      await tx.update(examClasses).set({ classTeacherId: result.data.teacherId })
+        .where(and(
+          eq(examClasses.schoolId, context.schoolId),
+          eq(examClasses.classLevelId, classLevel.id),
+          inArray(examClasses.examinationId, exams.map((exam) => exam.id)),
+        ));
+    }
+    await writeAudit(tx, context, "academic.class_teacher.updated", "class_level", classLevel.publicId, [
+      "academicYearId",
+      "classTeacherId",
+      "classSections",
+      "examClasses",
+    ]);
+    return "updated";
+  });
+
+  if (outcome === "structure-not-found") return { error: "Choose a class and academic year belonging to your school." };
+  if (outcome === "teacher-not-found") return { error: "Choose an active teacher belonging to your school." };
+  if (outcome === "teacher-branch-mismatch") return { error: "Choose a teacher who works at the selected class branch." };
+  if (outcome === "sections-not-found") return { error: "Create at least one section for this class and academic year first." };
+  revalidatePath("/admin/academics");
+  revalidatePath("/admin/examinations");
+  return { success: true, message: "The class teacher now oversees every section in this class." };
 }
 
 export async function setClassLevelStatus(

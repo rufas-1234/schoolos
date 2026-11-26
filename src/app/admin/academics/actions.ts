@@ -875,7 +875,7 @@ export async function createClassSections(
     if (year.status === "archived") return "year-archived";
 
     const existing = await tx
-      .select({ name: classSections.name })
+      .select({ name: classSections.name, classTeacherId: classSections.classTeacherId })
       .from(classSections)
       .where(
         and(
@@ -885,6 +885,7 @@ export async function createClassSections(
         ),
       );
     const existingNames = new Set(existing.map((section) => section.name.toLocaleLowerCase()));
+    const classTeacherId = existing.find((section) => section.classTeacherId !== null)?.classTeacherId ?? null;
     const missingNames = names.filter((name) => !existingNames.has(name.toLocaleLowerCase()));
     if (missingNames.length === 0) return "already-exists";
 
@@ -896,6 +897,7 @@ export async function createClassSections(
         academicYearId,
         classLevelId,
         name,
+        classTeacherId,
       });
       await writeAudit(tx, context, "academic.section.created", "class_section", publicId, [
         "academicYearId",

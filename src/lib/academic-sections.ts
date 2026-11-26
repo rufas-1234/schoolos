@@ -22,7 +22,7 @@ export const academicSections = [
   {
     id: "sections",
     label: "Class sections",
-    description: "Create year-specific class streams, set capacity, and assign class teachers.",
+    description: "Create year-specific class streams, set capacity, and appoint one class teacher for every stream in a class.",
   },
   {
     id: "subjects",
@@ -41,7 +41,7 @@ export const academicSections = [
   },
   {
     id: "routines",
-    label: "Class routine",
+    label: "Timetable",
     description: "Build a weekly timetable for each class section.",
   },
   {

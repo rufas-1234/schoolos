@@ -33,7 +33,6 @@ import {
   hasCompleteExamAttendance,
 } from "@/lib/examination-policy";
 import {
-  AssignExamClassTeacherForm,
   PrincipalRemarkForm,
   PublishExamClassForm,
   ReviewCorrectionForm,
@@ -382,23 +381,6 @@ export default async function ExaminationDetailPage({
     if (subjectFilter !== null) params.set("subjectId", String(subjectFilter));
     return `/admin/examinations/${exam.id}?${params.toString()}#assessments`;
   };
-  const classTeacherOptions = canConfigure
-    ? await db.select({
-      classLevelId: classSections.classLevelId,
-      id: teachers.id,
-      name: teachers.firstName,
-      lastName: teachers.lastName,
-    }).from(classSections).innerJoin(teachers, and(
-      eq(teachers.id, classSections.classTeacherId!),
-      eq(teachers.schoolId, context.schoolId),
-      eq(teachers.status, "active"),
-    )).where(and(
-      eq(classSections.schoolId, context.schoolId),
-      eq(classSections.academicYearId, exam.academicYearId),
-      inArray(classSections.classLevelId, classRows.map((classRow) => classRow.classLevelId)),
-      eq(teachers.schoolId, context.schoolId),
-    )).orderBy(asc(teachers.firstName), asc(teachers.lastName))
-    : [];
   const pendingCorrections = canReview
     ? await db.select({
       id: examMarkCorrections.id,
@@ -581,27 +563,20 @@ export default async function ExaminationDetailPage({
                       <Link href={`/admin/examinations/${exam.id}/reports/${classRow.id}${classPublished ? "" : "?preview=test"}`} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
                         {classPublished ? "Generate class report" : "Preview test report"}
                       </Link>
-                      {classPublished && exam.status === "published" && <Link href={`/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRow.id}`} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">Bulk progress cards</Link>}
+                      {classPublished && <Link href={`/admin/examinations/report-center/progress-card?examId=${exam.id}&classId=${classRow.id}`} className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white">Bulk progress cards</Link>}
                     </>
                   )}
                 </div>
               </div>
               <div className="grid gap-3 border-b p-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-900">Class review teacher</p>
+                  <p className="text-sm font-semibold text-slate-900">Class teacher</p>
                   <p className="mt-1 text-sm text-slate-600">
                     {classRow.classTeacherFirstName
                       ? `${classRow.classTeacherFirstName} ${classRow.classTeacherLastName}`
                       : "Not assigned"}
                   </p>
-                  {canConfigure && exam.status === "open" && (
-                    <AssignExamClassTeacherForm
-                      examClassId={classRow.id}
-                      classTeacherId={classRow.classTeacherId}
-                      teachers={classTeacherOptions.filter((teacher) => teacher.classLevelId === classRow.classLevelId)
-                        .map((teacher) => ({ id: teacher.id, name: `${teacher.name} ${teacher.lastName}` }))}
-                    />
-                  )}
+                  {canConfigure && exam.status === "open" && <Link className="mt-2 inline-block text-sm font-semibold text-violet-700" href="/admin/academics?section=sections">Change this class teacher in Academics</Link>}
                   {canPublishExamClass(context.grantedPermissions) && exam.status === "open" && !classPublished && (
                     <div className="mt-3">
                       <PublishExamClassForm examClassId={classRow.id} disabled={!classApproved} />

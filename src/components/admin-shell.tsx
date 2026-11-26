@@ -75,7 +75,7 @@ const navigation: NavigationItem[] = [
         href: "/admin/academics/overview",
         matchPath: "/admin/academics/overview",
       },
-      ...academicSections.filter((section) => section.id !== "teachers").map((section) => ({
+      ...academicSections.map((section) => ({
         id: section.id,
         label: section.label,
         href: `/admin/academics?section=${section.id}`,

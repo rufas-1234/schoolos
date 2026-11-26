@@ -559,6 +559,15 @@ export default async function ExaminationReportPage({
     .orderBy(asc(classLevels.name)) : [];
   const examClass = classes.find((item) => item.id === requestedClassId) ?? classes[0] ?? null;
 
+  const classSubjectStatuses = examDetails && examClass
+    ? await db.select({ status: examSubjects.status }).from(examSubjects).where(and(
+      eq(examSubjects.schoolId, context.schoolId),
+      eq(examSubjects.examClassId, examClass.id),
+    ))
+    : [];
+  const classResultsPublished = classSubjectStatuses.length > 0 &&
+    classSubjectStatuses.every((item) => item.status === "published");
+
   const subjectRows = examDetails && examClass
     ? await db.select({
       id: examSubjects.id,
@@ -617,7 +626,7 @@ export default async function ExaminationReportPage({
   );
   const selectedSubject = assessments.find((item) => item.id === requestedSubjectId) ?? null;
 
-  const resultRows = hasResults && examDetails && examClass && examDetails.status === "published" && assessments.length
+  const resultRows = hasResults && examDetails && examClass && (classResultsPublished || examDetails.status === "published") && assessments.length
     ? await db.select({
       enrollmentId: studentEnrollments.id,
       studentId: students.id,
@@ -779,7 +788,7 @@ export default async function ExaminationReportPage({
   const meritResults = reportOrderedResults.filter((row) => row.complete);
   if (!examDetails?.allowRanking) meritResults.sort((first, second) => first.name.localeCompare(second.name));
   const activeResult = results.find((row) => row.enrollmentId === requestedEnrollmentId) ?? null;
-  const reportIsReady = !!examDetails && examDetails.status === "published";
+  const reportIsReady = !!examDetails && (examDetails.status === "published" || classResultsPublished);
   const canPrintBulkCards = isProgressCard;
   const showFeeBalance = context.grantedPermissions.includes("fees.balance.view") ||
     context.grantedPermissions.includes("payments.record") ||
@@ -1004,7 +1013,7 @@ export default async function ExaminationReportPage({
           )}
 
           {hasResults && !reportIsReady && examDetails && (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 print:hidden">Reports unlock after the examination is published. Draft marks are not shown here.</p>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 print:hidden">Reports unlock after this class is published. Draft marks are not shown here.</p>
           )}
 
           {reportIsReady && examDetails && examClass && (
