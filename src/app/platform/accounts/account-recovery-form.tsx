@@ -10,10 +10,12 @@ export function AccountRecoveryForm({
   userId,
   name,
   email,
+  standardIdentifiers,
 }: {
   userId: string;
   name: string;
   email: string;
+  standardIdentifiers: { id: number; kind: string; identifier: string }[];
 }) {
   const [state, action, pending] = useActionState(updatePlatformAccountCredentials, initialState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -26,7 +28,9 @@ export function AccountRecoveryForm({
     if (confirmationField instanceof HTMLInputElement) confirmationField.value = "";
     if (state.success) {
       const setupField = formRef.current?.elements.namedItem("issuePasswordSetup");
+      const standardLoginField = formRef.current?.elements.namedItem("standardLoginIdentifierId");
       if (setupField instanceof HTMLInputElement) setupField.checked = false;
+      if (standardLoginField instanceof HTMLSelectElement) standardLoginField.value = "";
     }
   }, [state.error, state.setupUrl, state.success]);
 
@@ -44,6 +48,24 @@ export function AccountRecoveryForm({
           maxLength={320}
           className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-900"
         />
+      </label>
+      <label className="block text-xs font-medium text-slate-600">
+        Reset to the standard student/staff password <span className="font-normal">(optional)</span>
+        <select
+          name="standardLoginIdentifierId"
+          defaultValue=""
+          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-900"
+        >
+          <option value="">Choose a linked student or staff number</option>
+          {standardIdentifiers.map((identifier) => (
+            <option key={identifier.id} value={identifier.id}>
+              {identifier.kind === "student_admission" ? "Student · Admission number" : "Staff · Staff number"}: {identifier.identifier}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block font-normal leading-5">
+          Students use the admission number with password Student@admission-number. Staff use the staff number with password Staff@staff-number.
+        </span>
       </label>
       <label className="block text-xs font-medium text-slate-600">
         Temporary password <span className="font-normal">(optional)</span>
@@ -79,6 +101,13 @@ export function AccountRecoveryForm({
       </label>
       {state.error && <p role="alert" className="text-xs font-medium text-red-700">{state.error}</p>}
       {state.success && <p role="status" className="text-xs font-medium text-emerald-700">{state.success}</p>}
+      {state.standardPassword && state.standardLoginIdentifier && (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs leading-5 text-emerald-900">
+          Sign-in number: <strong>{state.standardLoginIdentifier}</strong><br />
+          Temporary password: <strong>{state.standardPassword}</strong><br />
+          Share these securely. The recipient must change the password at first sign-in.
+        </p>
+      )}
       {state.setupUrl && <AccountSetupLink url={state.setupUrl} />}
       <button
         type="submit"

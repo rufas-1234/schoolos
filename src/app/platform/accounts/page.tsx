@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { AdminDataTable } from "@/components/admin-data-table";
 import { db } from "@/db";
-import { schoolMemberships, schools, user } from "@/db/schema";
+import { schoolMemberships, schools, user, userLoginIdentifiers } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/platform-access";
 import { AccountRecoveryForm } from "./account-recovery-form";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PlatformAccountsPage() {
   await requirePlatformAdmin();
-  const accounts = await db.select({
+  const [accounts, loginIdentifiers] = await Promise.all([db.select({
     userId: user.id,
     name: user.name,
     email: user.email,
@@ -20,7 +20,21 @@ export default async function PlatformAccountsPage() {
   }).from(schoolMemberships)
     .innerJoin(user, eq(user.id, schoolMemberships.userId))
     .innerJoin(schools, eq(schools.id, schoolMemberships.schoolId))
-    .orderBy(asc(user.name), asc(schools.name));
+    .orderBy(asc(user.name), asc(schools.name)),
+  db.select({
+    id: userLoginIdentifiers.id,
+    userId: userLoginIdentifiers.userId,
+    kind: userLoginIdentifiers.kind,
+    identifier: userLoginIdentifiers.identifier,
+  }).from(userLoginIdentifiers).where(inArray(userLoginIdentifiers.kind, ["student_admission", "staff_employee_code"]))]);
+  const standardIdentifiersByUser = new Map<string, typeof loginIdentifiers>();
+  for (const identifier of loginIdentifiers) {
+    const existing = standardIdentifiersByUser.get(identifier.userId) ?? [];
+    if (!existing.some((item) => item.kind === identifier.kind && item.identifier === identifier.identifier)) {
+      existing.push(identifier);
+      standardIdentifiersByUser.set(identifier.userId, existing);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-10 sm:px-8">
@@ -48,9 +62,9 @@ export default async function PlatformAccountsPage() {
           ]}
           rows={accounts.map((account) => ({
             id: `${account.userId}-${account.schoolPublicId}`,
-            searchableText: `${account.name} ${account.email} ${account.schoolName} ${account.schoolPublicId}`,
+            searchableText: `${account.name} ${account.email} ${account.schoolName} ${account.schoolPublicId} ${(standardIdentifiersByUser.get(account.userId) ?? []).map((identifier) => identifier.identifier).join(" ")}`,
             values: {
-              member: `${account.name} · ${account.email}`,
+              member: `${account.name} · ${account.email}${standardIdentifiersByUser.has(account.userId) ? ` · Login number: ${standardIdentifiersByUser.get(account.userId)!.map((identifier) => identifier.identifier).join(", ")}` : ""}`,
               school: account.schoolName,
               status: account.membershipStatus,
             },
@@ -59,6 +73,7 @@ export default async function PlatformAccountsPage() {
                 userId={account.userId}
                 name={account.name}
                 email={account.email}
+                standardIdentifiers={standardIdentifiersByUser.get(account.userId) ?? []}
               />
             ),
           }))}

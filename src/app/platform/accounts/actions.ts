@@ -15,13 +15,20 @@ import {
   staffMembers,
   students,
   user,
+  userLoginIdentifiers,
   userStudentLinks,
 } from "@/db/schema";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { issuePasswordSetupLink } from "@/lib/account-setup";
 import { requirePlatformAdmin } from "@/lib/platform-access";
 
-export type PlatformAccountRecoveryState = { error?: string; success?: string; setupUrl?: string };
+export type PlatformAccountRecoveryState = {
+  error?: string;
+  success?: string;
+  setupUrl?: string;
+  standardPassword?: string;
+  standardLoginIdentifier?: string;
+};
 
 export async function updatePlatformAccountCredentials(
   _previousState: PlatformAccountRecoveryState,
@@ -33,17 +40,48 @@ export async function updatePlatformAccountCredentials(
     email: z.string().trim().email().max(320).transform((email) => email.toLowerCase()),
     password: z.string().max(128),
     passwordConfirmation: z.string().max(128),
+    standardLoginIdentifierId: z.union([
+      z.literal(""),
+      z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive()),
+    ]).transform((value) => value === "" ? null : value),
     issuePasswordSetup: z.string().transform((value) => value === "true"),
   }).safeParse({
     userId: formData.get("userId"),
     email: formData.get("email"),
     password: formData.get("password") ?? "",
     passwordConfirmation: formData.get("passwordConfirmation") ?? "",
+    standardLoginIdentifierId: formData.get("standardLoginIdentifierId") ?? "",
     issuePasswordSetup: formData.get("issuePasswordSetup") ?? "",
   });
   if (!parsed.success) return { error: "Enter a valid email address and account." };
-  const { userId, email, password, passwordConfirmation, issuePasswordSetup } = parsed.data;
-  const passwordError = getStaffLoginPasswordError(password, passwordConfirmation);
+  const {
+    userId,
+    email,
+    password: manuallyEnteredPassword,
+    passwordConfirmation,
+    standardLoginIdentifierId,
+    issuePasswordSetup,
+  } = parsed.data;
+  if (standardLoginIdentifierId !== null && (manuallyEnteredPassword || passwordConfirmation)) {
+    return { error: "Clear the manually entered password to use a standard student or staff password." };
+  }
+  const [standardIdentifier] = standardLoginIdentifierId === null ? [] : await db.select({
+    kind: userLoginIdentifiers.kind,
+    identifier: userLoginIdentifiers.identifier,
+  }).from(userLoginIdentifiers).where(and(
+    eq(userLoginIdentifiers.id, standardLoginIdentifierId),
+    eq(userLoginIdentifiers.userId, userId),
+  )).limit(1);
+  if (standardLoginIdentifierId !== null &&
+    (!standardIdentifier || !["student_admission", "staff_employee_code"].includes(standardIdentifier.kind))) {
+    return { error: "Choose a valid student admission number or staff number linked to this account." };
+  }
+  const password = standardIdentifier
+    ? `${standardIdentifier.kind === "student_admission" ? "Student" : "Staff"}@${standardIdentifier.identifier}`
+    : manuallyEnteredPassword;
+  const passwordError = standardIdentifier
+    ? null
+    : getStaffLoginPasswordError(password, passwordConfirmation);
   if (passwordError) return { error: passwordError };
   if (issuePasswordSetup && password) {
     return { error: "Choose either a temporary password or a one-time setup link, not both." };
@@ -154,6 +192,10 @@ export async function updatePlatformAccountCredentials(
       : issuePasswordSetup
         ? "Account updated. Copy the one-time setup link below and share it securely."
         : "Account updated.",
+    ...(standardIdentifier && password ? {
+      standardPassword: password,
+      standardLoginIdentifier: standardIdentifier.identifier,
+    } : {}),
     ...(setupUrl ? { setupUrl } : {}),
   };
 }

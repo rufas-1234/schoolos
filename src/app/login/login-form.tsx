@@ -111,14 +111,14 @@ export function LoginForm() {
 
       <form onSubmit={handlePasswordSubmit} className="space-y-5">
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-slate-700">Email, phone number, or admission number</span>
+          <span className="mb-2 block text-sm font-medium text-slate-700">Email, phone number, admission number, or staff number</span>
           <span className="relative block">
             <KeyRound size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               autoComplete="username"
               className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
               name="identifier"
-              placeholder="Email, phone, or admission number"
+              placeholder="Email, phone, admission number, or staff number"
               required
               type="text"
             />
