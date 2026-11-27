@@ -321,7 +321,10 @@ export async function requireSchoolMember() {
   };
 }
 
-export async function requireSchoolPermission(permissionKey: string | readonly string[]) {
+export async function requireSchoolPermission(
+  permissionKey: string | readonly string[],
+  options: { allowExpiredSubscription?: boolean } = {},
+) {
   const requiredPermissions = typeof permissionKey === "string" ? [permissionKey] : permissionKey;
   const context = await requireSchoolMember();
   const granted = await db
@@ -349,12 +352,17 @@ export async function requireSchoolPermission(permissionKey: string | readonly s
     }).from(schoolSubscriptions).innerJoin(subscriptionPlans, eq(subscriptionPlans.id, schoolSubscriptions.planId))
       .where(eq(schoolSubscriptions.schoolId, context.schoolId)).limit(1);
     if (subscription) {
-      if (!isSubscriptionCurrent(subscription)) redirect("/subscription?reason=expired");
+      if (!isSubscriptionCurrent(subscription) && !options.allowExpiredSubscription) redirect("/subscription?reason=expired");
+      if (!isSubscriptionCurrent(subscription) && options.allowExpiredSubscription) {
+        accessibleKeys = grantedKeys.filter((key) => key === "school.settings.manage");
+      }
+      if (isSubscriptionCurrent(subscription)) {
       const included = new Set(subscription.includedModules);
       accessibleKeys = grantedKeys.filter((key) => {
         const module = getPermissionSubscriptionModule(key);
         return !module || included.has("all") || included.has(module);
       });
+      }
     }
   }
   const requestedModuleBlocked = requiredPermissions.some((key) => {
