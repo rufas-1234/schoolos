@@ -135,6 +135,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
 
   if (permissions.has("dashboard.view")) {
     addPage("dashboard", "Overview dashboard", "School dashboard and activity overview", "/admin/dashboard", ["home"]);
+    addPage("school-calendar", "School calendar", "View terms, exam periods, examinations, and school holidays", "/admin/calendar", ["calendar", "events", "school holidays"]);
   }
   if (permissions.has("results.enter")) {
     addPage("teacher-portal", "Teacher portal", "Teacher class lists, attendance, and marks entry", "/portal/teacher", ["teacher", "my classes", "class portal"]);

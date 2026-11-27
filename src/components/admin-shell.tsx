@@ -64,6 +64,7 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard, permission: "dashboard.view" },
+  { href: "/admin/calendar", label: "Calendar", icon: CalendarDays, permission: "dashboard.view", permissionAlternatives: ["academics.manage", "school.settings.manage", "examinations.create", "results.enter", "results.publish"] },
   {
     href: "/admin/academics/overview",
     label: "Academics",
@@ -300,7 +301,7 @@ const navigation: NavigationItem[] = [
 
 const navigationGroups = [
   { label: "Home", labels: ["Overview"] },
-  { label: "Teaching & learning", labels: ["Academics", "Student Info", "Examinations"] },
+  { label: "Teaching & learning", labels: ["Calendar", "Academics", "Student Info", "Examinations"] },
   { label: "People", labels: ["Human resources", "Users", "My leave", "Behavior"] },
   { label: "School operations", labels: ["Finance overview", "Accounts", "Fees", "Inventory", "Library", "Dormitories"] },
   { label: "Configuration", labels: ["System", "School profile"] },

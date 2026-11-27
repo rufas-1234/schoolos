@@ -29,6 +29,7 @@ import { requireSchoolPermission } from "@/lib/access-control";
 import { schoolLogoSource } from "@/lib/school-logo";
 import { WorkspaceQuickSearch } from "@/components/workspace-quick-search";
 import { getSchoolAcademicYearSelection } from "@/lib/academic-year-selection";
+import { getSchoolCalendarEvents } from "@/lib/school-calendar";
 
 export default async function DashboardPage() {
   const context = await requireSchoolPermission("dashboard.view");
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
     staffResult,
     pendingStaffResult,
     recentActivity,
+    calendarEvents,
   ] = await Promise.all([
     db
       .select({ value: count() })
@@ -95,6 +97,7 @@ export default async function DashboardPage() {
       .where(eq(auditLogs.schoolId, context.schoolId))
       .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
       .limit(6),
+    getSchoolCalendarEvents(context.schoolId, selectedYear?.id),
   ]);
   const memberCount = Number(membersResult[0]?.value ?? 0);
   const studentCount = Number(studentsResult[0]?.value ?? 0);
@@ -292,6 +295,29 @@ export default async function DashboardPage() {
           href="/admin/staff"
         />
       </div>
+
+      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900">Workspace calendar</h2>
+            <p className="mt-1 text-sm text-slate-500">Upcoming terms, exam periods, examinations, and holidays{selectedYear ? ` · ${selectedYear.name}` : ""}.</p>
+          </div>
+          <Link href="/admin/calendar" className="text-sm font-semibold text-violet-700 hover:underline">Open calendar <ArrowUpRight size={15} className="ml-1 inline" /></Link>
+        </div>
+        {calendarEvents.filter((event) => event.endDate >= new Date().toISOString().slice(0, 10)).slice(0, 5).length ? (
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {calendarEvents.filter((event) => event.endDate >= new Date().toISOString().slice(0, 10)).slice(0, 5).map((event) => (
+              <li key={event.id} className="rounded-xl bg-slate-50 p-3">
+                <p className="truncate text-sm font-semibold text-slate-800">{event.title}</p>
+                <p className="mt-1 text-xs text-slate-500">{event.startDate}{event.endDate !== event.startDate ? ` – ${event.endDate}` : ""}</p>
+                <p className="mt-1 text-[11px] font-medium capitalize text-violet-700">{event.type.replaceAll("-", " ")}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No upcoming school dates are scheduled. Add term or holiday dates to populate the calendar.</p>
+        )}
+      </section>
 
       <div className="grid gap-5 xl:grid-cols-[1.4fr_0.9fr]">
         <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
