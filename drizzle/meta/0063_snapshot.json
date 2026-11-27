@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "00e4bd9f-7cbc-46a4-a5a5-440c470d6e02",
-  "prevId": "200a2a2b-1320-47b6-80ce-69d75ea8f427",
+  "id": "ac1d5e72-8111-45d6-b60f-aa775e72833f",
+  "prevId": "00e4bd9f-7cbc-46a4-a5a5-440c470d6e02",
   "tables": {
     "academic_holidays": {
       "name": "academic_holidays",
@@ -14640,6 +14640,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'monthly'"
+        },
+        "pricingModel": {
+          "name": "pricingModel",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'flat'"
         },
         "currency": {
           "name": "currency",

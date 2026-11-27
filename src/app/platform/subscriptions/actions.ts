@@ -1,11 +1,11 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, countDistinct, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { schools, schoolSubscriptions, subscriptionInvoices, subscriptionPlans } from "@/db/schema";
+import { schools, schoolSubscriptions, studentEnrollments, subscriptionInvoices, subscriptionPlans } from "@/db/schema";
 import { getSubscriptionPeriodEnd } from "@/lib/subscription-policy";
 import { requirePlatformAdmin } from "@/lib/platform-access";
 
@@ -53,7 +53,7 @@ export async function createSubscriptionInvoice(_previous: SubscriptionActionSta
     id: schoolSubscriptions.id, status: schoolSubscriptions.status,
     periodEnd: schoolSubscriptions.currentPeriodEnd, planId: subscriptionPlans.id,
     amount: subscriptionPlans.amount, currency: subscriptionPlans.currency,
-    interval: subscriptionPlans.billingInterval, isTrial: subscriptionPlans.isTrial,
+    interval: subscriptionPlans.billingInterval, pricingModel: subscriptionPlans.pricingModel, isTrial: subscriptionPlans.isTrial,
   }).from(schoolSubscriptions).innerJoin(subscriptionPlans, eq(subscriptionPlans.id, schoolSubscriptions.planId))
     .where(eq(schoolSubscriptions.schoolId, parsed.data.schoolId)).limit(1);
   if (!current || current.isTrial || Number(current.amount) <= 0) return { error: "Assign a paid plan before creating an invoice." };
@@ -66,9 +66,17 @@ export async function createSubscriptionInvoice(_previous: SubscriptionActionSta
   const dueAt = new Date(now);
   dueAt.setDate(dueAt.getDate() + 14);
   const suffix = randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
+  let invoiceAmount = Number(current.amount);
+  if (current.pricingModel === "per_student") {
+    const [enrollmentCount] = await db.select({ total: countDistinct(studentEnrollments.studentId) }).from(studentEnrollments)
+      .where(and(eq(studentEnrollments.schoolId, parsed.data.schoolId), eq(studentEnrollments.status, "enrolled")));
+    const activeStudents = Number(enrollmentCount?.total ?? 0);
+    if (!activeStudents) return { error: "This school has no enrolled students to bill yet." };
+    invoiceAmount *= activeStudents;
+  }
   await db.insert(subscriptionInvoices).values({
     publicId: randomUUID(), schoolId: parsed.data.schoolId, subscriptionId: current.id,
-    invoiceNumber: `SO-${now.getFullYear()}-${suffix}`, amount: current.amount, currency: current.currency,
+    invoiceNumber: `SO-${now.getFullYear()}-${suffix}`, amount: invoiceAmount.toFixed(2), currency: current.currency,
     periodStart: start, periodEnd: end, dueAt, status: "open",
   });
   revalidatePath("/platform/subscriptions");

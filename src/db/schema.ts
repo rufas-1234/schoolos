@@ -126,6 +126,7 @@ export const subscriptionPlans = mysqlTable(
     name: varchar("name", { length: 120 }).notNull(),
     description: varchar("description", { length: 1000 }),
     billingInterval: varchar("billingInterval", { length: 20 }).notNull().default("monthly"),
+    pricingModel: varchar("pricingModel", { length: 20 }).notNull().default("flat"),
     currency: varchar("currency", { length: 3 }).notNull().default("KES"),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull().default("0.00"),
     studentLimit: int("studentLimit", { unsigned: true }),

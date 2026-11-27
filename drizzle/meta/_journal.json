@@ -442,6 +442,13 @@
       "when": 1795771746099,
       "tag": "0063_subscription_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "5",
+      "when": 1795775396487,
+      "tag": "0063_wise_black_knight",
+      "breakpoints": true
     }
   ]
 }

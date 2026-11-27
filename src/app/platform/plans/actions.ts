@@ -18,7 +18,8 @@ const planSchema = z.object({
   code: z.string().trim().min(2).max(48).regex(/^[a-z0-9-]+$/),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(1000),
-  billingInterval: z.enum(["monthly", "yearly"]),
+  billingInterval: z.enum(["monthly", "termly", "yearly"]),
+  pricingModel: z.enum(["flat", "per_student"]),
   currency: z.string().trim().regex(/^[A-Za-z]{3}$/),
   amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
   studentLimit: z.union([z.literal(""), z.string().regex(/^\d+$/)]),
@@ -46,7 +47,7 @@ export async function saveSubscriptionPlan(_previous: PlanActionState, formData:
     if (existing.isTrial) return { error: "The system trial plan is managed by the platform and cannot be edited here." };
     await db.update(subscriptionPlans).set({
       code: values.code, name: values.name, description: values.description || null,
-      billingInterval: values.billingInterval, currency: values.currency.toUpperCase(), amount: values.amount,
+      billingInterval: values.billingInterval, pricingModel: values.pricingModel, currency: values.currency.toUpperCase(), amount: values.amount,
       studentLimit: values.studentLimit ? Number(values.studentLimit) : null,
       branchLimit: values.branchLimit ? Number(values.branchLimit) : null,
       trialDays: Number(values.trialDays), includedModules, isActive: values.isActive === "true",
@@ -55,7 +56,7 @@ export async function saveSubscriptionPlan(_previous: PlanActionState, formData:
   } else {
     await db.insert(subscriptionPlans).values({
       publicId: randomUUID(), code: values.code, name: values.name,
-      description: values.description || null, billingInterval: values.billingInterval,
+      description: values.description || null, billingInterval: values.billingInterval, pricingModel: values.pricingModel,
       currency: values.currency.toUpperCase(), amount: values.amount,
       studentLimit: values.studentLimit ? Number(values.studentLimit) : null,
       branchLimit: values.branchLimit ? Number(values.branchLimit) : null,

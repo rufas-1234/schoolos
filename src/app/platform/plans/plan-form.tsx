@@ -10,6 +10,7 @@ export type PlanFormValue = {
   name?: string;
   description?: string | null;
   billingInterval?: string;
+  pricingModel?: string;
   currency?: string;
   amount?: string;
   studentLimit?: number | null;
@@ -26,9 +27,10 @@ export function PlanForm({ plan }: { plan?: PlanFormValue }) {
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="space-y-1 text-sm font-medium">Plan name<input required name="name" defaultValue={plan?.name} maxLength={120} placeholder="Core" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>
       <label className="space-y-1 text-sm font-medium">Plan code<input required name="code" defaultValue={plan?.code} pattern="[a-z0-9-]+" maxLength={48} placeholder="core" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>
-      <label className="space-y-1 text-sm font-medium">Billing cycle<select name="billingInterval" defaultValue={plan?.billingInterval ?? "monthly"} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></label>
-      <label className="space-y-1 text-sm font-medium">Currency<input required name="currency" defaultValue={plan?.currency ?? "KES"} minLength={3} maxLength={3} pattern="[A-Za-z]{3}" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>
-      <label className="space-y-1 text-sm font-medium">Price per billing cycle<input required name="amount" type="number" min="0" step="0.01" defaultValue={plan?.amount ?? ""} placeholder="Set your price" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>
+      <label className="space-y-1 text-sm font-medium">Billing cycle<select name="billingInterval" defaultValue={plan?.billingInterval ?? "termly"} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3"><option value="monthly">Monthly</option><option value="termly">Termly (every 3 months)</option><option value="yearly">Yearly</option></select></label>
+      <label className="space-y-1 text-sm font-medium">Price basis<select name="pricingModel" defaultValue={plan?.pricingModel ?? "per_student"} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3"><option value="per_student">Per student</option><option value="flat">Flat per cycle</option></select></label>
+      <label className="space-y-1 text-sm font-medium">Currency<select required name="currency" defaultValue={plan?.currency ?? "USD"} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3"><option value="USD">USD — US dollar</option><option value="KES">KES — Kenyan shilling</option><option value="UGX">UGX — Ugandan shilling</option><option value="TZS">TZS — Tanzanian shilling</option><option value="RWF">RWF — Rwandan franc</option><option value="NGN">NGN — Nigerian naira</option><option value="ZAR">ZAR — South African rand</option><option value="GBP">GBP — British pound</option><option value="EUR">EUR — Euro</option><option value="CAD">CAD — Canadian dollar</option><option value="AUD">AUD — Australian dollar</option></select></label>
+      <label className="space-y-1 text-sm font-medium">Rate / price<input required name="amount" type="number" min="0" step="0.01" defaultValue={plan?.amount ?? "1.00"} placeholder="Set your price" className="h-11 w-full rounded-xl border border-slate-200 px-3" /><span className="block text-xs font-normal text-slate-500">This is per student each cycle when Per student is selected; otherwise it is the flat cycle price.</span></label>
       <label className="space-y-1 text-sm font-medium">Active student limit<input name="studentLimit" type="number" min="1" defaultValue={plan?.studentLimit ?? ""} placeholder="No limit" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>
       <label className="space-y-1 text-sm font-medium">Branch limit<input name="branchLimit" type="number" min="1" defaultValue={plan?.branchLimit ?? ""} placeholder="No limit" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>
       <label className="space-y-1 text-sm font-medium">Trial days before billing<input name="trialDays" type="number" min="0" max="365" defaultValue={plan?.trialDays ?? 0} className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>

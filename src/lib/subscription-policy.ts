@@ -38,6 +38,7 @@ export function isSubscriptionCurrent(input: {
 export function getSubscriptionPeriodEnd(start: Date, interval: string) {
   const end = new Date(start);
   if (interval === "yearly") end.setFullYear(end.getFullYear() + 1);
+  else if (interval === "termly") end.setMonth(end.getMonth() + 3);
   else end.setMonth(end.getMonth() + 1);
   return end;
 }
