@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isDuplicateEntryError } from "@/lib/db-errors";
+import { getStudentCapacityError } from "@/lib/subscription-entitlements";
 
 export type StudentClassActionState = { error?: string; success?: boolean };
 
@@ -57,6 +58,8 @@ export async function addStudentClass(
   if (!parsed.success) return { error: "Select a valid student and class section." };
 
   const values = parsed.data;
+  const capacityError = await getStudentCapacityError(context.schoolId, values.academicYearId, values.studentPublicId);
+  if (capacityError) return { error: capacityError };
   const outcome = await db.transaction(async (tx) => {
     const [student] = await tx
       .select({

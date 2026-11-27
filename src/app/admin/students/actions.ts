@@ -30,6 +30,7 @@ import {
   type StudentAdditionalDetails,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { getStudentCapacityError } from "@/lib/subscription-entitlements";
 import { isCalendarDate } from "@/lib/academic-policy";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { issuePasswordSetupLink } from "@/lib/account-setup";
@@ -334,6 +335,8 @@ export async function createStudent(
   }
 
   const admission = result.data;
+  const capacityError = await getStudentCapacityError(context.schoolId, admission.academicYearId);
+  if (capacityError) return { error: capacityError };
   if (!hasValidDocumentScope(admission.additionalDetails, context.schoolPublicId)) {
     return { error: "The uploaded documents do not belong to this school." };
   }

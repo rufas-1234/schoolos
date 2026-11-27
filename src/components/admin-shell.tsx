@@ -1134,14 +1134,24 @@ export function AdminShell({
                     </Link>
                   )}
                   {permissions.includes("school.settings.manage") && (
-                    <Link
-                      href="/admin/settings"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-                    >
-                      <Settings size={16} />
-                      School profile
-                    </Link>
+                    <>
+                      <Link
+                        href="/admin/settings"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                      >
+                        <Settings size={16} />
+                        School profile
+                      </Link>
+                      <Link
+                        href="/subscription"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                      >
+                        <CircleDollarSign size={16} />
+                        Subscription &amp; billing
+                      </Link>
+                    </>
                   )}
                   <Link
                     href="/admin/account-security"

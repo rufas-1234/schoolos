@@ -117,6 +117,85 @@ export const schools = mysqlTable("schools", {
   index("schools_practice_parent_idx").on(table.practiceParentSchoolId),
 ]);
 
+export const subscriptionPlans = mysqlTable(
+  "subscription_plans",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    code: varchar("code", { length: 48 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: varchar("description", { length: 1000 }),
+    billingInterval: varchar("billingInterval", { length: 20 }).notNull().default("monthly"),
+    currency: varchar("currency", { length: 3 }).notNull().default("KES"),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull().default("0.00"),
+    studentLimit: int("studentLimit", { unsigned: true }),
+    branchLimit: int("branchLimit", { unsigned: true }),
+    trialDays: int("trialDays", { unsigned: true }).notNull().default(0),
+    includedModules: json("includedModules").$type<string[]>().notNull(),
+    isTrial: boolean("isTrial").notNull().default(false),
+    isActive: boolean("isActive").notNull().default(true),
+    sortOrder: int("sortOrder", { unsigned: true }).notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("subscription_plans_code_interval_currency_uq").on(table.code, table.billingInterval, table.currency),
+    index("subscription_plans_active_sort_idx").on(table.isActive, table.sortOrder),
+  ],
+);
+
+export const schoolSubscriptions = mysqlTable(
+  "school_subscriptions",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    planId: bigint("planId", { mode: "number", unsigned: true }).notNull().references(() => subscriptionPlans.id),
+    status: varchar("status", { length: 20 }).notNull().default("trialing"),
+    billingMode: varchar("billingMode", { length: 20 }).notNull().default("manual"),
+    currentPeriodStart: timestamp("currentPeriodStart"),
+    currentPeriodEnd: timestamp("currentPeriodEnd"),
+    trialEndsAt: timestamp("trialEndsAt"),
+    graceUntil: timestamp("graceUntil"),
+    cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").notNull().default(false),
+    createdBy: varchar("createdBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("school_subscriptions_school_uq").on(table.schoolId),
+    index("school_subscriptions_plan_status_idx").on(table.planId, table.status),
+    index("school_subscriptions_period_end_idx").on(table.status, table.currentPeriodEnd),
+  ],
+);
+
+export const subscriptionInvoices = mysqlTable(
+  "subscription_invoices",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    subscriptionId: bigint("subscriptionId", { mode: "number", unsigned: true }).notNull().references(() => schoolSubscriptions.id),
+    invoiceNumber: varchar("invoiceNumber", { length: 48 }).notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    periodStart: timestamp("periodStart").notNull(),
+    periodEnd: timestamp("periodEnd").notNull(),
+    dueAt: timestamp("dueAt").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("open"),
+    paidAt: timestamp("paidAt"),
+    paymentMethod: varchar("paymentMethod", { length: 30 }),
+    paymentReference: varchar("paymentReference", { length: 120 }),
+    confirmedBy: varchar("confirmedBy", { length: 36 }).references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("subscription_invoices_school_number_uq").on(table.schoolId, table.invoiceNumber),
+    uniqueIndex("subscription_invoices_subscription_period_uq").on(table.subscriptionId, table.periodStart, table.periodEnd),
+    index("subscription_invoices_school_status_due_idx").on(table.schoolId, table.status, table.dueAt),
+  ],
+);
+
 export const schoolCurrencies = mysqlTable(
   "school_currencies",
   {

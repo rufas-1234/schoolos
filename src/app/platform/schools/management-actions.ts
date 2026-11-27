@@ -13,6 +13,7 @@ import {
   schoolWorkspaceStatuses,
 } from "@/lib/school-lifecycle-policy";
 import { requirePlatformAdmin } from "@/lib/platform-access";
+import { createTrialSubscriptionForSchool } from "@/lib/school-provisioning";
 
 export type SchoolManagementState = { error?: string; success?: string };
 
@@ -85,6 +86,7 @@ export async function reviewSchool(
           approvedAt: new Date(),
           approvedBy: actor.id,
         }).where(eq(schools.id, school.id));
+        await createTrialSubscriptionForSchool(tx, school.id, actor.id);
         await writeSchoolAudit(tx, actor.id, school.id, school.publicId, "school.approved", [
           "status",
           "approvedAt",

@@ -27,6 +27,7 @@ import {
   teachers,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
+import { getBranchCapacityError } from "@/lib/subscription-entitlements";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 import { getSectionSubjectTeacherScopeError } from "@/lib/subject-teacher-policy";
 import {
@@ -223,6 +224,10 @@ export async function createSchoolBranch(
     address: readFormValue(formData, "address"),
   });
   if (!result.success) return { error: "Enter a branch name, short code, and valid contact details." };
+  if (recordId === null) {
+    const capacityError = await getBranchCapacityError(context.schoolId);
+    if (capacityError) return { error: capacityError };
+  }
 
   const publicId = randomUUID();
   try {

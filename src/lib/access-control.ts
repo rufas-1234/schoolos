@@ -8,12 +8,14 @@ import { hasPermission } from "@/lib/access-policy";
 import { activeSchoolCookieName, isMultiSchoolEnabled, resolveSchoolChoice } from "@/lib/school-context-policy";
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy";
 import { schoolWorkspaceStatuses } from "@/lib/school-lifecycle-policy";
+import { getPermissionSubscriptionModule, isSubscriptionCurrent } from "@/lib/subscription-policy";
 import {
   permissions,
   rolePermissions,
   roles,
   schoolBranches,
   schoolMemberships,
+  schoolSubscriptions,
   schools,
   staffMembers,
   students,
@@ -21,6 +23,7 @@ import {
   user,
   userStudentLinks,
   userRoles,
+  subscriptionPlans,
 } from "@/db/schema";
 
 async function syncPracticeAccessForUser(userId: string) {
@@ -335,7 +338,34 @@ export async function requireSchoolPermission(permissionKey: string | readonly s
     );
 
   const grantedKeys = granted.map((permission) => permission.permissionKey);
-  if (!requiredPermissions.some((required) => hasPermission(grantedKeys, required))) {
+  let accessibleKeys = grantedKeys;
+  if (!context.schoolIsPractice) {
+    const [subscription] = await db.select({
+      status: schoolSubscriptions.status,
+      currentPeriodEnd: schoolSubscriptions.currentPeriodEnd,
+      trialEndsAt: schoolSubscriptions.trialEndsAt,
+      graceUntil: schoolSubscriptions.graceUntil,
+      includedModules: subscriptionPlans.includedModules,
+    }).from(schoolSubscriptions).innerJoin(subscriptionPlans, eq(subscriptionPlans.id, schoolSubscriptions.planId))
+      .where(eq(schoolSubscriptions.schoolId, context.schoolId)).limit(1);
+    if (subscription) {
+      if (!isSubscriptionCurrent(subscription)) redirect("/subscription?reason=expired");
+      const included = new Set(subscription.includedModules);
+      accessibleKeys = grantedKeys.filter((key) => {
+        const module = getPermissionSubscriptionModule(key);
+        return !module || included.has("all") || included.has(module);
+      });
+    }
+  }
+  const requestedModuleBlocked = requiredPermissions.some((key) => {
+    const module = getPermissionSubscriptionModule(key);
+    return module !== null && grantedKeys.includes(key) && !accessibleKeys.includes(key);
+  });
+  const permissionCandidates = requestedModuleBlocked
+    ? requiredPermissions.filter((key) => key !== "school.settings.manage")
+    : requiredPermissions;
+  if (!permissionCandidates.some((required) => hasPermission(accessibleKeys, required))) {
+    if (requestedModuleBlocked) redirect("/subscription?reason=module");
     redirect("/unauthorized");
   }
   const roleNames = await db
@@ -346,7 +376,7 @@ export async function requireSchoolPermission(permissionKey: string | readonly s
 
   return {
     ...context,
-    grantedPermissions: granted.map((permission) => permission.permissionKey),
+    grantedPermissions: accessibleKeys,
     roleNames: roleNames.map((role) => role.name),
   };
 }

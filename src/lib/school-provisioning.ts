@@ -11,7 +11,9 @@ import {
   schoolBranches,
   schoolCurrencies,
   schoolMemberships,
+  schoolSubscriptions,
   schools,
+  subscriptionPlans,
   userRoles,
 } from "@/db/schema";
 import { defaultChartAccounts, defaultRolePermissionKeys, initialSchoolRoles, schoolPermissionCatalog } from "@/lib/school-defaults";
@@ -19,6 +21,29 @@ import { defaultChartAccounts, defaultRolePermissionKeys, initialSchoolRoles, sc
 type SchoolTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export class SchoolNameConflictError extends Error {}
+
+export async function createTrialSubscriptionForSchool(
+  tx: SchoolTransaction,
+  schoolId: number,
+  actorUserId: string,
+) {
+  const [existing] = await tx.select({ id: schoolSubscriptions.id }).from(schoolSubscriptions)
+    .where(eq(schoolSubscriptions.schoolId, schoolId)).limit(1);
+  if (existing) return;
+  const [plan] = await tx.select({ id: subscriptionPlans.id, trialDays: subscriptionPlans.trialDays })
+    .from(subscriptionPlans).where(and(
+      eq(subscriptionPlans.isTrial, true),
+      eq(subscriptionPlans.isActive, true),
+    )).limit(1);
+  if (!plan) return;
+  const now = new Date();
+  const trialEndsAt = new Date(now.getTime() + Math.max(plan.trialDays, 1) * 86_400_000);
+  await tx.insert(schoolSubscriptions).values({
+    publicId: randomUUID(), schoolId, planId: plan.id, status: "trialing",
+    billingMode: "manual", currentPeriodStart: now, currentPeriodEnd: trialEndsAt,
+    trialEndsAt, createdBy: actorUserId,
+  });
+}
 
 export async function provisionSchoolWorkspace(
   tx: SchoolTransaction,
@@ -73,6 +98,9 @@ export async function provisionSchoolWorkspace(
   const [school] = await tx.select({ id: schools.id }).from(schools)
     .where(eq(schools.publicId, schoolPublicId)).limit(1);
   if (!school) throw new Error("The new school record could not be loaded.");
+  if (isApproved && !isPracticeWorkspace) {
+    await createTrialSubscriptionForSchool(tx, school.id, actorUserId);
+  }
   const currencyRows = currencies?.length
     ? currencies
     : [{

@@ -435,6 +435,13 @@
       "when": 1795768060546,
       "tag": "0062_transport_and_staff_certificates",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "5",
+      "when": 1795771746099,
+      "tag": "0063_subscription_plans",
+      "breakpoints": true
     }
   ]
 }
