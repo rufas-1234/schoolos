@@ -11,6 +11,58 @@ import { requirePlatformAdmin } from "@/lib/platform-access";
 
 export type SubscriptionActionState = { error?: string; success?: string };
 const positiveId = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().positive().safe());
+const localDateTime = z.string().refine((value) => value === "" || Number.isFinite(new Date(value).getTime()));
+
+export async function updateSchoolSubscription(_previous: SubscriptionActionState, formData: FormData): Promise<SubscriptionActionState> {
+  await requirePlatformAdmin();
+  const parsed = z.object({
+    subscriptionId: positiveId,
+    planId: positiveId,
+    status: z.enum(["trialing", "pending_payment", "active", "past_due", "canceled"]),
+    periodStart: localDateTime,
+    periodEnd: localDateTime,
+    trialEndsAt: localDateTime,
+    graceUntil: localDateTime,
+    cancelAtPeriodEnd: z.enum(["true", "false"]),
+  }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Check the plan, status, and subscription dates." };
+  const values = parsed.data;
+  const parseDate = (value: string) => value ? new Date(value) : null;
+  const periodStart = parseDate(values.periodStart);
+  const periodEnd = parseDate(values.periodEnd);
+  if (periodStart && periodEnd && periodEnd <= periodStart) return { error: "The period end must be after its start." };
+  const [existing] = await db.select({ id: schoolSubscriptions.id }).from(schoolSubscriptions)
+    .where(eq(schoolSubscriptions.id, values.subscriptionId)).limit(1);
+  const [plan] = await db.select({ id: subscriptionPlans.id }).from(subscriptionPlans)
+    .where(eq(subscriptionPlans.id, values.planId)).limit(1);
+  if (!existing || !plan) return { error: "The subscription or plan could not be found." };
+  await db.update(schoolSubscriptions).set({
+    planId: plan.id,
+    status: values.status,
+    currentPeriodStart: periodStart,
+    currentPeriodEnd: periodEnd,
+    trialEndsAt: parseDate(values.trialEndsAt),
+    graceUntil: parseDate(values.graceUntil),
+    cancelAtPeriodEnd: values.cancelAtPeriodEnd === "true",
+  }).where(eq(schoolSubscriptions.id, values.subscriptionId));
+  revalidatePath("/platform/subscriptions");
+  revalidatePath("/subscription");
+  return { success: "School subscription updated." };
+}
+
+export async function removeSchoolSubscription(_previous: SubscriptionActionState, formData: FormData): Promise<SubscriptionActionState> {
+  await requirePlatformAdmin();
+  const parsed = z.object({ subscriptionId: positiveId }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Choose a subscription to remove." };
+  const [existing] = await db.select({ id: schoolSubscriptions.id }).from(schoolSubscriptions)
+    .where(eq(schoolSubscriptions.id, parsed.data.subscriptionId)).limit(1);
+  if (!existing) return { error: "That subscription was not found." };
+  await db.update(schoolSubscriptions).set({ status: "canceled", graceUntil: null, cancelAtPeriodEnd: true })
+    .where(eq(schoolSubscriptions.id, existing.id));
+  revalidatePath("/platform/subscriptions");
+  revalidatePath("/subscription");
+  return { success: "Subscription removed from service. Its record and invoices were kept for history." };
+}
 
 export async function assignSchoolPlan(_previous: SubscriptionActionState, formData: FormData): Promise<SubscriptionActionState> {
   const actor = await requirePlatformAdmin();
