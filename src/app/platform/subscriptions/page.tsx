@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import Link from "next/link";
 import { AdminDataTable } from "@/components/admin-data-table";
 import { db } from "@/db";
 import { schools, schoolSubscriptions, subscriptionInvoices, subscriptionPlans } from "@/db/schema";
@@ -19,7 +20,7 @@ export default async function PlatformSubscriptionsPage() {
   const availableSchools = schoolRows.filter((school) => school.status === "active").map((school) => ({ id: school.id, label: school.name }));
   const planOptions = plans.map((plan) => ({ id: plan.id, label: plan.trial ? `${plan.name} · ${plan.trialDays} days free` : `${plan.name} · ${plan.currency} ${Number(plan.amount).toLocaleString()} / ${plan.interval === "yearly" ? "year" : "month"}` }));
   return <main className="mx-auto max-w-7xl space-y-6 px-4 py-7 sm:px-7">
-    <header><p className="text-sm font-semibold uppercase tracking-widest text-violet-700">SchoolOS platform</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Subscriptions &amp; billing</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Assign plans to approved schools, issue renewal invoices, and record confirmed payments. Schools retain access for seven days after an invoice period ends while renewal is being arranged.</p></header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-widest text-violet-700">SchoolOS platform</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Subscriptions &amp; billing</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Assign plans to approved schools, issue renewal invoices, and record confirmed payments. Schools retain access for seven days after an invoice period ends while renewal is being arranged.</p></div><Link href="/platform/plans" className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50">Create or manage plans</Link></header>
     <div className="grid gap-5 lg:grid-cols-2">
       <section className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="mb-4 text-lg font-semibold">Assign or change a plan</h2><AssignPlanForm schools={availableSchools} plans={planOptions}/></section>
       <section className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="mb-4 text-lg font-semibold">Create a renewal invoice</h2><CreateInvoiceForm schools={subscriptions.map((item)=>({id:item.schoolId,label:`${item.school} · ${item.plan}`}))}/><p className="mt-3 text-xs text-slate-500">Invoices are due in 14 days. Confirm payment only after checking the M-Pesa or bank transaction.</p></section>
