@@ -50,7 +50,7 @@ export function RemoveSchoolSubscriptionForm({ subscriptionId, school }: { subsc
   return <AdminActionDialog label="Remove" title={`Remove ${school} subscription`}>
     <form action={action} className="space-y-4 p-5">
       <input type="hidden" name="subscriptionId" value={subscriptionId}/>
-      <p className="text-sm leading-6 text-slate-700">This cancels subscription access for {school}. The subscription and invoice history remain available for records. You can restore access later by editing the subscription status.</p>
+      <p className="text-sm leading-6 text-slate-700">This removes the subscription assignment for {school}. The school will have full access without plan restrictions. Existing invoices remain in billing history.</p>
       {state.error&&<p role="alert" className="text-sm text-rose-700">{state.error}</p>}{state.success&&<p role="status" className="text-sm text-emerald-700">{state.success}</p>}
       <button disabled={pending} className="rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{pending?"Removing…":"Remove subscription"}</button>
     </form>

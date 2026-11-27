@@ -57,11 +57,13 @@ export async function removeSchoolSubscription(_previous: SubscriptionActionStat
   const [existing] = await db.select({ id: schoolSubscriptions.id }).from(schoolSubscriptions)
     .where(eq(schoolSubscriptions.id, parsed.data.subscriptionId)).limit(1);
   if (!existing) return { error: "That subscription was not found." };
-  await db.update(schoolSubscriptions).set({ status: "canceled", graceUntil: null, cancelAtPeriodEnd: true })
-    .where(eq(schoolSubscriptions.id, existing.id));
+  await db.transaction(async (tx) => {
+    await tx.update(subscriptionInvoices).set({ subscriptionId: null }).where(eq(subscriptionInvoices.subscriptionId, existing.id));
+    await tx.delete(schoolSubscriptions).where(eq(schoolSubscriptions.id, existing.id));
+  });
   revalidatePath("/platform/subscriptions");
   revalidatePath("/subscription");
-  return { success: "Subscription removed from service. Its record and invoices were kept for history." };
+  return { success: "Subscription assignment removed. The school keeps full access, and invoice history was preserved." };
 }
 
 export async function assignSchoolPlan(_previous: SubscriptionActionState, formData: FormData): Promise<SubscriptionActionState> {
@@ -145,7 +147,9 @@ export async function confirmSubscriptionInvoice(_previous: SubscriptionActionSt
   if (!invoice || invoice.status !== "open") return { error: "Only open invoices can be marked paid." };
   await db.transaction(async (tx) => {
     await tx.update(subscriptionInvoices).set({ status: "paid", paidAt: new Date(), paymentMethod: parsed.data.paymentMethod, paymentReference: parsed.data.paymentReference, confirmedBy: actor.id }).where(eq(subscriptionInvoices.id, invoice.id));
-    await tx.update(schoolSubscriptions).set({ status: "active", currentPeriodStart: invoice.periodStart, currentPeriodEnd: invoice.periodEnd, trialEndsAt: null, graceUntil: null, cancelAtPeriodEnd: false }).where(eq(schoolSubscriptions.id, invoice.subscriptionId));
+    if (invoice.subscriptionId !== null) {
+      await tx.update(schoolSubscriptions).set({ status: "active", currentPeriodStart: invoice.periodStart, currentPeriodEnd: invoice.periodEnd, trialEndsAt: null, graceUntil: null, cancelAtPeriodEnd: false }).where(eq(schoolSubscriptions.id, invoice.subscriptionId));
+    }
   });
   revalidatePath("/platform/subscriptions");
   revalidatePath("/subscription");

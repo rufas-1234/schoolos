@@ -1,0 +1,1 @@
+ALTER TABLE `subscription_invoices` MODIFY COLUMN `subscriptionId` bigint unsigned;

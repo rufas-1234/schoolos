@@ -176,7 +176,7 @@ export const subscriptionInvoices = mysqlTable(
     id: id(),
     publicId: varchar("publicId", { length: 36 }).notNull().unique(),
     schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
-    subscriptionId: bigint("subscriptionId", { mode: "number", unsigned: true }).notNull().references(() => schoolSubscriptions.id),
+    subscriptionId: bigint("subscriptionId", { mode: "number", unsigned: true }).references(() => schoolSubscriptions.id),
     invoiceNumber: varchar("invoiceNumber", { length: 48 }).notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     currency: varchar("currency", { length: 3 }).notNull(),
