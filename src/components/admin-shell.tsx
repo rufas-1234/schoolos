@@ -7,6 +7,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BookOpen,
   BookMarked,
+  Award,
+  BusFront,
   ClipboardCheck,
   BedDouble,
   BriefcaseBusiness,
@@ -84,12 +86,6 @@ const navigation: NavigationItem[] = [
         href: `/admin/academics?section=${section.id}`,
         matchQuery: { key: "section", value: section.id },
       })),
-      {
-        id: "certificates",
-        label: "Certificates",
-        href: "/admin/academics/certificates",
-        matchPath: "/admin/academics/certificates",
-      },
     ],
   },
   {
@@ -255,6 +251,22 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
+    href: "/admin/transport",
+    label: "Transport",
+    icon: BusFront,
+    permission: "transport.manage",
+    permissionAlternatives: ["school.settings.manage"],
+    children: [
+      { id: "transport-overview", label: "Transport overview", href: "/admin/transport", matchQuery: { key: "section", value: null } },
+      { id: "transport-routes", label: "Routes", href: "/admin/transport?section=routes", matchPath: "/admin/transport", matchQuery: { key: "section", value: "routes" } },
+      { id: "transport-points", label: "Pickup points", href: "/admin/transport?section=points", matchPath: "/admin/transport", matchQuery: { key: "section", value: "points" } },
+      { id: "transport-drivers", label: "Drivers", href: "/admin/transport?section=drivers", matchPath: "/admin/transport", matchQuery: { key: "section", value: "drivers" } },
+      { id: "transport-fees", label: "Fee master", href: "/admin/transport?section=fees", matchPath: "/admin/transport", matchQuery: { key: "section", value: "fees" } },
+      { id: "transport-assignments", label: "Student assignments", href: "/admin/transport?section=assignments", matchPath: "/admin/transport", matchQuery: { key: "section", value: "assignments" } },
+      { id: "transport-reports", label: "Reports & printouts", href: "/admin/transport?section=reports", matchPath: "/admin/transport", matchQuery: { key: "section", value: "reports" } },
+    ],
+  },
+  {
     href: "/admin/inventory",
     label: "Inventory",
     icon: PackageOpen,
@@ -282,6 +294,19 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
+    href: "/admin/certificates",
+    label: "Certificates",
+    icon: Award,
+    permission: "students.view",
+    permissionAlternatives: ["staff.manage", "academics.manage", "school.settings.manage"],
+    children: [
+      { id: "certificate-overview", label: "Certificates overview", href: "/admin/certificates" },
+      { id: "certificate-student-ids", label: "Student IDs", href: "/admin/students/ids", permission: "students.view" },
+      { id: "certificate-staff", label: "Staff certificates", href: "/admin/certificates/staff", permission: "staff.manage", permissionAlternatives: ["school.settings.manage"] },
+      { id: "certificate-students", label: "Student certificates", href: "/admin/academics/certificates", permission: "academics.manage", permissionAlternatives: ["school.settings.manage"] },
+    ],
+  },
+  {
     href: "/admin/system/settings",
     label: "System",
     icon: Settings,
@@ -302,8 +327,8 @@ const navigation: NavigationItem[] = [
 const navigationGroups = [
   { label: "Home", labels: ["Overview"] },
   { label: "Teaching & learning", labels: ["Calendar", "Academics", "Student Info", "Examinations"] },
-  { label: "People", labels: ["Human resources", "Users", "My leave", "Behavior"] },
-  { label: "School operations", labels: ["Finance overview", "Accounts", "Fees", "Inventory", "Library", "Dormitories"] },
+  { label: "People", labels: ["Human resources", "Users", "Certificates", "My leave", "Behavior"] },
+  { label: "School operations", labels: ["Finance overview", "Accounts", "Fees", "Inventory", "Library", "Dormitories", "Transport"] },
   { label: "Configuration", labels: ["System", "School profile"] },
 ];
 
@@ -387,6 +412,8 @@ export function AdminShell({
   const [behaviorOpen, setBehaviorOpen] = useState(() => pathname.startsWith("/admin/students/behavior"));
   const [libraryOpen, setLibraryOpen] = useState(() => pathname.startsWith("/admin/library"));
   const [dormitoriesOpen, setDormitoriesOpen] = useState(() => pathname.startsWith("/admin/dormitories"));
+  const [transportOpen, setTransportOpen] = useState(() => pathname.startsWith("/admin/transport"));
+  const [certificatesOpen, setCertificatesOpen] = useState(() => pathname.startsWith("/admin/certificates") || pathname === "/admin/students/ids" || pathname === "/admin/academics/certificates");
   const [systemOpen, setSystemOpen] = useState(() => pathname.startsWith("/admin/system"));
   const router = useRouter();
   const expandDesktopSidebar = () => {
@@ -723,6 +750,7 @@ export function AdminShell({
             (label === "Inventory" && pathname.startsWith("/admin/inventory")) ||
             (label === "Accounts" && pathname.startsWith("/admin/accounts")) ||
             (href === "/admin/fees/overview" && pathname.startsWith("/admin/fees")) ||
+            (href === "/admin/certificates" && (pathname.startsWith("/admin/certificates") || pathname === "/admin/students/ids" || pathname === "/admin/academics/certificates")) ||
             (href === "/admin/hr" && pathname === "/admin/settings/roles") ||
             (label === "System" && pathname.startsWith("/admin/system"));
           if (children) {
@@ -739,6 +767,8 @@ export function AdminShell({
             const isAccounts = label === "Accounts";
             const isLibrary = label === "Library";
             const isDormitories = label === "Dormitories";
+            const isTransport = href === "/admin/transport";
+            const isCertificates = href === "/admin/certificates";
             const isFees = href === "/admin/fees/overview";
             const isExaminations = href === "/admin/examinations";
             const isBehavior = href === "/admin/students/behavior";
@@ -757,6 +787,10 @@ export function AdminShell({
                   ? libraryOpen
                 : isDormitories
                   ? dormitoriesOpen
+                : isTransport
+                  ? transportOpen
+                : isCertificates
+                  ? certificatesOpen
                 : isFees
                   ? feesOpen
                   : isExaminations
@@ -780,6 +814,10 @@ export function AdminShell({
                   ? setLibraryOpen
                 : isDormitories
                   ? setDormitoriesOpen
+                : isTransport
+                  ? setTransportOpen
+                : isCertificates
+                  ? setCertificatesOpen
                 : isFees
                   ? setFeesOpen
                   : isExaminations

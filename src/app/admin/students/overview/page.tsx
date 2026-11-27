@@ -3,7 +3,6 @@ import {
   ArrowUpRight,
   ClipboardList,
   GraduationCap,
-  IdCard,
   Users,
   UserPlus,
   type LucideIcon,
@@ -129,14 +128,6 @@ export default async function StudentOverviewPage() {
       icon: GraduationCap,
       tone: "emerald" as const,
       visible: canUpdate,
-    },
-    {
-      href: "/admin/students/ids",
-      title: "Student ID cards",
-      detail: "View and print student identification cards.",
-      icon: IdCard,
-      tone: "sky" as const,
-      visible: true,
     },
     {
       href: "/admin/students/groups",

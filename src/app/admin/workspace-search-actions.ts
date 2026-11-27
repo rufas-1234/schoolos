@@ -4,6 +4,7 @@ import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import {
+  academicTerms,
   academicYears,
   auditLogs,
   accountTransactions,
@@ -40,6 +41,12 @@ import {
   staffLeaveRequests,
   staffLeaveTypes,
   studentCertificates,
+  staffCertificates,
+  transportRoutes,
+  transportDrivers,
+  transportPickupPoints,
+  transportFeeMasters,
+  transportAssignments,
   user,
 } from "@/db/schema";
 import { requireSchoolPermission } from "@/lib/access-control";
@@ -71,6 +78,7 @@ const workspacePermissions = [
   "inventory.manage",
   "library.manage",
   "dormitories.manage",
+  "transport.manage",
   "dashboard.view",
   "roles.manage",
 ] as const;
@@ -80,7 +88,7 @@ export type WorkspaceSearchResult = {
   title: string;
   description: string;
   href: string;
-  category: "Pages" | "Users" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Library" | "Dormitories" | "Fees" | "Accounts";
+  category: "Pages" | "Users" | "Students" | "Staff" | "Academics" | "Examinations" | "Inventory" | "Library" | "Dormitories" | "Transport" | "Fees" | "Accounts";
   searchTerms?: string[];
 };
 
@@ -119,6 +127,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   const canManageInventory = permissions.has("inventory.manage");
   const canManageLibrary = permissions.has("library.manage");
   const canManageDormitories = permissions.has("dormitories.manage");
+  const canManageTransport = permissions.has("transport.manage") || permissions.has("school.settings.manage");
   const canManageStudents = permissions.has("students.view");
   const canManageStudentSettings = permissions.has("school.settings.manage") || permissions.has("students.update");
   const results: WorkspaceSearchResult[] = [];
@@ -319,6 +328,21 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("dormitory-portal", "Dormitory portal", "Dormitory overview, room assignments, and caretaker shortcuts", "/portal/dormitories", ["dormitory caretaker", "boarding", "hostel portal"]);
     addPage("dormitories", "Dormitory management", "Manage school dormitories, rooms, occupancy, and student assignments", "/admin/dormitories", ["hostel", "boarding", "residents", "room assignments"]);
   }
+  if (canManageTransport) {
+    addPage("transport-overview", "Transport overview", "Manage student transport routes, pickup points, drivers, and term fees", "/admin/transport", ["school transport", "bus routes"]);
+    addPage("transport-routes", "Transport routes", "Create and review school transport routes", "/admin/transport?section=routes", ["bus route"]);
+    addPage("transport-pickup-points", "Transport pickup points", "Manage route stops and pickup times", "/admin/transport?section=points", ["pickup point", "dropoff stop"]);
+    addPage("transport-drivers", "Transport drivers", "Manage school transport drivers", "/admin/transport?section=drivers", ["driver", "driving license"]);
+    addPage("transport-fee-master", "Transport fee master", "Set route transport fees by academic term", "/admin/transport?section=fees", ["transport fee", "bus fee"]);
+    addPage("transport-assignments", "Student transport assignments", "Assign students to routes, pickup points, and term fees", "/admin/transport?section=assignments", ["bus students", "transport roster"]);
+    addPage("transport-reports", "Transport reports & printouts", "Filter and print student transport fee assignments", "/admin/transport?section=reports", ["transport report", "transport invoice"]);
+  }
+  if (permissions.has("students.view") || permissions.has("staff.manage") || permissions.has("academics.manage") || permissions.has("school.settings.manage")) {
+    addPage("certificates-overview", "Certificates overview", "Student IDs, staff certificates, and student achievement certificates", "/admin/certificates", ["certificates", "student id card"]);
+  }
+  if (permissions.has("students.view")) addPage("student-ids-register", "Student IDs", "Find and print student identification cards", "/admin/students/ids", ["id cards", "student card"]);
+  if (permissions.has("staff.manage") || permissions.has("school.settings.manage")) addPage("staff-certificates", "Staff certificates", "Issue and print staff certificates", "/admin/certificates/staff", ["staff certificate", "employee certificate"]);
+  if (canManageAcademics) addPage("student-certificates", "Student certificates", "Issue and print student achievement certificates", "/admin/academics/certificates", ["student certificate", "achievement award"]);
   if (permissions.has("roles.manage")) {
     addPage("users-overview", "Users overview", "Open school user accounts, access, and role shortcuts", "/admin/users/overview", ["user overview", "user dashboard", "accounts"]);
     addPage("users", "Users", "School user accounts and access", "/admin/users", ["user list", "accounts"]);
@@ -1000,6 +1024,13 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
         .limit(20)
       : Promise.resolve([]),
   ]);
+  const [transportRouteRows, transportDriverRows, transportFeeRows, transportAssignmentRows, staffCertificateRows] = await Promise.all([
+    canManageTransport ? db.select({ id: transportRoutes.id, name: transportRoutes.name, code: transportRoutes.code, driver: transportDrivers.name }).from(transportRoutes).leftJoin(transportDrivers, and(eq(transportDrivers.id, transportRoutes.driverId), eq(transportDrivers.schoolId, context.schoolId))).where(and(eq(transportRoutes.schoolId, context.schoolId), or(tokenMatch(transportRoutes.name), tokenMatch(transportRoutes.code), tokenMatch(transportDrivers.name)))).orderBy(asc(transportRoutes.name)).limit(20) : Promise.resolve([]),
+    canManageTransport ? db.select({ id: transportDrivers.id, name: transportDrivers.name, phone: transportDrivers.phone, license: transportDrivers.licenseNumber }).from(transportDrivers).where(and(eq(transportDrivers.schoolId, context.schoolId), or(tokenMatch(transportDrivers.name), tokenMatch(transportDrivers.phone), tokenMatch(transportDrivers.licenseNumber)))).orderBy(asc(transportDrivers.name)).limit(20) : Promise.resolve([]),
+    canManageTransport ? db.select({ id: transportFeeMasters.id, route: transportRoutes.name, term: academicTerms.name, year: academicYears.name }).from(transportFeeMasters).innerJoin(transportRoutes, and(eq(transportRoutes.id, transportFeeMasters.routeId), eq(transportRoutes.schoolId, context.schoolId))).innerJoin(academicTerms, and(eq(academicTerms.id, transportFeeMasters.academicTermId), eq(academicTerms.schoolId, context.schoolId))).innerJoin(academicYears, and(eq(academicYears.id, transportFeeMasters.academicYearId), eq(academicYears.schoolId, context.schoolId))).where(and(eq(transportFeeMasters.schoolId, context.schoolId), or(tokenMatch(transportRoutes.name), tokenMatch(academicTerms.name), tokenMatch(academicYears.name)))).orderBy(asc(academicTerms.startDate)).limit(20) : Promise.resolve([]),
+    canManageTransport ? db.select({ id: transportAssignments.id, publicId: transportAssignments.publicId, student: sql<string>`concat(${students.firstName}, ' ', ${students.lastName})`, admission: students.admissionNumber, route: transportRoutes.name, point: transportPickupPoints.name, term: academicTerms.name, yearId: transportFeeMasters.academicYearId }).from(transportAssignments).innerJoin(students, and(eq(students.id, transportAssignments.studentId), eq(students.schoolId, context.schoolId))).innerJoin(transportRoutes, and(eq(transportRoutes.id, transportAssignments.routeId), eq(transportRoutes.schoolId, context.schoolId))).innerJoin(transportPickupPoints, and(eq(transportPickupPoints.id, transportAssignments.pickupPointId), eq(transportPickupPoints.schoolId, context.schoolId))).innerJoin(transportFeeMasters, and(eq(transportFeeMasters.id, transportAssignments.feeMasterId), eq(transportFeeMasters.schoolId, context.schoolId))).innerJoin(academicTerms, and(eq(academicTerms.id, transportFeeMasters.academicTermId), eq(academicTerms.schoolId, context.schoolId))).where(and(eq(transportAssignments.schoolId, context.schoolId), or(tokenMatch(students.firstName), tokenMatch(students.lastName), tokenMatch(students.admissionNumber), tokenMatch(transportRoutes.name), tokenMatch(transportPickupPoints.name), tokenMatch(academicTerms.name)))).orderBy(asc(students.lastName), asc(students.firstName)).limit(20) : Promise.resolve([]),
+    canManageStaff ? db.select({ id: staffCertificates.id, publicId: staffCertificates.publicId, number: staffCertificates.certificateNumber, title: staffCertificates.title, staff: sql<string>`concat(${staffMembers.firstName}, ' ', ${staffMembers.lastName})`, employeeCode: staffMembers.employeeCode }).from(staffCertificates).innerJoin(staffMembers, and(eq(staffMembers.id, staffCertificates.staffId), eq(staffMembers.schoolId, context.schoolId))).where(and(eq(staffCertificates.schoolId, context.schoolId), or(tokenMatch(staffCertificates.certificateNumber), tokenMatch(staffCertificates.title), tokenMatch(staffMembers.firstName), tokenMatch(staffMembers.lastName), tokenMatch(staffMembers.employeeCode)))).orderBy(desc(staffCertificates.issuedAt)).limit(20) : Promise.resolve([]),
+  ]);
 
   const [dormitorySearchRows, residentSearchRows] = canManageDormitories
     ? await Promise.all([
@@ -1280,6 +1311,41 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
   for (const certificate of certificateRows) {
     results.push(studentCertificateWorkspaceResult(certificate));
   }
+  for (const route of transportRouteRows) results.push({
+    id: `transport-route-${route.id}`,
+    title: `${route.code} · ${route.name}`,
+    description: `Transport route · ${route.driver ?? "Driver unassigned"}`,
+    href: "/admin/transport?section=routes",
+    category: "Transport",
+  });
+  for (const driver of transportDriverRows) results.push({
+    id: `transport-driver-${driver.id}`,
+    title: driver.name,
+    description: `Transport driver · ${driver.phone} · License ${driver.license}`,
+    href: "/admin/transport?section=drivers",
+    category: "Transport",
+  });
+  for (const fee of transportFeeRows) results.push({
+    id: `transport-fee-${fee.id}`,
+    title: `${fee.route} · ${fee.term}`,
+    description: `Transport term fee · ${fee.year}`,
+    href: "/admin/transport?section=fees",
+    category: "Transport",
+  });
+  for (const assignment of transportAssignmentRows) results.push({
+    id: `transport-assignment-${assignment.id}`,
+    title: assignment.student,
+    description: `Transport assignment · ${assignment.admission ?? "No admission number"} · ${assignment.route} · ${assignment.point} · ${assignment.term}`,
+    href: "/admin/transport?section=reports",
+    category: "Transport",
+  });
+  for (const certificate of staffCertificateRows) results.push({
+    id: `staff-certificate-${certificate.publicId}`,
+    title: `${certificate.title} · ${certificate.staff}`,
+    description: `Staff certificate · ${certificate.number} · ${certificate.employeeCode ?? "No staff number"}`,
+    href: `/admin/certificates/staff/${encodeURIComponent(certificate.publicId)}/print`,
+    category: "Staff",
+  });
   for (const exam of examRows) {
     results.push({
       id: `exam-${exam.id}`,

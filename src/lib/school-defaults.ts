@@ -20,6 +20,7 @@ export const schoolPermissionCatalog = [
   ["inventory.manage", "Manage school inventory and assets"],
   ["library.manage", "Manage library books and lending"],
   ["dormitories.manage", "Manage dormitories, rooms, and student assignments"],
+  ["transport.manage", "Manage school transport routes, drivers, assignments, and fees"],
   ["accounts.manage", "Manage school accounts, income, expenses, and reports"],
   ["staff.payroll.pay", "Record staff payroll payments"],
   ["fees.balance.view", "View outstanding student fee balances"],
@@ -78,6 +79,7 @@ export const schoolAdminPermissionKeys = [
   "inventory.manage",
   "library.manage",
   "dormitories.manage",
+  "transport.manage",
   "reports.export",
   "examinations.create",
   "examinations.delete",
@@ -93,5 +95,6 @@ export const defaultRolePermissionKeys: Readonly<Record<string, readonly string[
   Teacher: ["results.enter"],
   Librarian: ["library.manage"],
   "Hostel administrator": ["dormitories.manage"],
+  "Transport manager": ["transport.manage"],
   "Human resources officer": ["staff.manage"],
 };

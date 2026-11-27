@@ -1310,6 +1310,140 @@ export const studentCertificates = mysqlTable(
   ],
 );
 
+export const staffCertificates = mysqlTable(
+  "staff_certificates",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    staffId: bigint("staffId", { mode: "number", unsigned: true }).notNull().references(() => staffMembers.id),
+    certificateNumber: varchar("certificateNumber", { length: 48 }).notNull(),
+    category: varchar("category", { length: 120 }).notNull(),
+    title: varchar("title", { length: 160 }).notNull(),
+    achievement: varchar("achievement", { length: 2000 }).notNull(),
+    issuedAt: date("issuedAt", { mode: "string" }).notNull(),
+    issuedBy: varchar("issuedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("staff_certificates_school_number_uq").on(table.schoolId, table.certificateNumber),
+    index("staff_certificates_school_staff_issued_idx").on(table.schoolId, table.staffId, table.issuedAt),
+    index("staff_certificates_school_category_idx").on(table.schoolId, table.category),
+  ],
+);
+
+export const transportDrivers = mysqlTable(
+  "transport_drivers",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    staffId: bigint("staffId", { mode: "number", unsigned: true }).references(() => staffMembers.id),
+    name: varchar("name", { length: 160 }).notNull(),
+    phone: varchar("phone", { length: 40 }).notNull(),
+    licenseNumber: varchar("licenseNumber", { length: 80 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("transport_drivers_school_license_uq").on(table.schoolId, table.licenseNumber),
+    index("transport_drivers_school_status_idx").on(table.schoolId, table.status),
+  ],
+);
+
+export const transportRoutes = mysqlTable(
+  "transport_routes",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    branchId: bigint("branchId", { mode: "number", unsigned: true }).references(() => schoolBranches.id),
+    driverId: bigint("driverId", { mode: "number", unsigned: true }).references(() => transportDrivers.id),
+    name: varchar("name", { length: 120 }).notNull(),
+    code: varchar("code", { length: 40 }).notNull(),
+    description: varchar("description", { length: 500 }),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("transport_routes_school_code_uq").on(table.schoolId, table.code),
+    index("transport_routes_school_branch_idx").on(table.schoolId, table.branchId),
+    index("transport_routes_school_status_idx").on(table.schoolId, table.status),
+  ],
+);
+
+export const transportPickupPoints = mysqlTable(
+  "transport_pickup_points",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    routeId: bigint("routeId", { mode: "number", unsigned: true }).notNull().references(() => transportRoutes.id),
+    name: varchar("name", { length: 160 }).notNull(),
+    sequence: int("sequence", { unsigned: true }).notNull().default(1),
+    pickupTime: varchar("pickupTime", { length: 8 }),
+    dropoffTime: varchar("dropoffTime", { length: 8 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("transport_pickup_route_name_uq").on(table.routeId, table.name),
+    index("transport_pickup_school_route_sequence_idx").on(table.schoolId, table.routeId, table.sequence),
+  ],
+);
+
+export const transportFeeMasters = mysqlTable(
+  "transport_fee_masters",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    academicYearId: bigint("academicYearId", { mode: "number", unsigned: true }).notNull().references(() => academicYears.id),
+    academicTermId: bigint("academicTermId", { mode: "number", unsigned: true }).notNull().references(() => academicTerms.id),
+    routeId: bigint("routeId", { mode: "number", unsigned: true }).notNull().references(() => transportRoutes.id),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("transport_fee_route_term_uq").on(table.schoolId, table.routeId, table.academicTermId),
+    index("transport_fee_school_year_term_idx").on(table.schoolId, table.academicYearId, table.academicTermId),
+  ],
+);
+
+export const transportAssignments = mysqlTable(
+  "transport_assignments",
+  {
+    id: id(),
+    publicId: varchar("publicId", { length: 36 }).notNull().unique(),
+    schoolId: bigint("schoolId", { mode: "number", unsigned: true }).notNull().references(() => schools.id),
+    studentId: bigint("studentId", { mode: "number", unsigned: true }).notNull().references(() => students.id),
+    enrollmentId: bigint("enrollmentId", { mode: "number", unsigned: true }).notNull().references(() => studentEnrollments.id),
+    feeMasterId: bigint("feeMasterId", { mode: "number", unsigned: true }).notNull().references(() => transportFeeMasters.id),
+    routeId: bigint("routeId", { mode: "number", unsigned: true }).notNull().references(() => transportRoutes.id),
+    pickupPointId: bigint("pickupPointId", { mode: "number", unsigned: true }).notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    assignedBy: varchar("assignedBy", { length: 36 }).notNull().references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("transport_assignment_student_fee_uq").on(table.schoolId, table.studentId, table.feeMasterId),
+    index("transport_assignment_school_status_idx").on(table.schoolId, table.status),
+    index("transport_assignment_school_route_idx").on(table.schoolId, table.routeId),
+    foreignKey({
+      name: "transport_assign_pickup_point_fk",
+      columns: [table.pickupPointId],
+      foreignColumns: [transportPickupPoints.id],
+    }),
+  ],
+);
+
 export const studentSettings = mysqlTable(
   "student_settings",
   {
