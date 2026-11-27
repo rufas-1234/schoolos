@@ -14,6 +14,31 @@ const id = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().pos
 const name = z.string().trim().min(2).max(160);
 const read = (data: FormData, key: string) => typeof data.get(key) === "string" ? String(data.get(key)).trim() : "";
 
+export async function assignTransportDriver(_previous: TransportActionState, formData: FormData): Promise<TransportActionState> {
+  const context = await requireSchoolPermission(["transport.manage", "school.settings.manage"]);
+  const parsed = z.object({ routeId: id, driverId: z.union([z.literal(""), id]) }).safeParse({
+    routeId: read(formData, "routeId"),
+    driverId: read(formData, "driverId"),
+  });
+  if (!parsed.success) return { error: "Choose a route and a driver." };
+
+  const [route] = await db.select({ id: transportRoutes.id }).from(transportRoutes)
+    .where(and(eq(transportRoutes.id, parsed.data.routeId), eq(transportRoutes.schoolId, context.schoolId))).limit(1);
+  if (!route) return { error: "Choose a route belonging to this school." };
+
+  if (parsed.data.driverId) {
+    const [driver] = await db.select({ id: transportDrivers.id }).from(transportDrivers)
+      .where(and(eq(transportDrivers.id, parsed.data.driverId), eq(transportDrivers.schoolId, context.schoolId), eq(transportDrivers.status, "active"))).limit(1);
+    if (!driver) return { error: "Choose an active driver belonging to this school." };
+  }
+
+  await db.update(transportRoutes).set({ driverId: parsed.data.driverId || null })
+    .where(and(eq(transportRoutes.id, route.id), eq(transportRoutes.schoolId, context.schoolId)));
+  revalidatePath("/admin/transport");
+  revalidatePath("/admin/dashboard");
+  return { success: parsed.data.driverId ? "Driver assigned to route." : "Driver removed from route." };
+}
+
 export async function createTransportRecord(_previous: TransportActionState, formData: FormData): Promise<TransportActionState> {
   const context = await requireSchoolPermission(["transport.manage", "school.settings.manage"]);
   const kind = read(formData, "kind");
