@@ -4,18 +4,21 @@ import {
   cloneElement,
   createContext,
   isValidElement,
+  useCallback,
   useActionState,
   useContext,
   useEffect,
   useRef,
   useState,
 } from "react";
+import { AdminRecordDialog } from "@/components/admin-data-table";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 import { AccountSetupLink } from "@/components/account-setup-link";
 import { AccountTemporaryPassword } from "@/components/account-temporary-password";
 import { createStaffMember, updateStaffMember, type StaffActionState } from "./actions";
 import type { StaffCustomField, StaffDocuments, StaffStoredFile } from "@/db/schema";
 import { employmentTypes, staffContractTypes, staffGenders, staffMaritalStatuses, staffRoles } from "@/lib/staff-policy";
+import { createStaffCatalogEntry } from "@/app/admin/hr/catalog-actions";
 
 type StaffEditRecord = {
   publicId: string;
@@ -100,10 +103,22 @@ export function StaffForm({
   const formRef = useRef<HTMLFormElement>(null);
   const submittedValues = useRef<Map<string, string[]> | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState(record?.branchId?.toString() ?? "");
+  const [departmentCatalog, setDepartmentCatalog] = useState(departments);
+  const [designationCatalog, setDesignationCatalog] = useState(designations);
+  const [selectedDepartment, setSelectedDepartment] = useState(record?.department ?? "");
+  const [selectedDesignation, setSelectedDesignation] = useState(record?.jobTitle ?? "");
+  const handleDepartmentCreated = useCallback((entry: { id: number; name: string; branchId: number }) => {
+    setDepartmentCatalog((current) => [...current.filter((item) => item.name !== entry.name || item.branchId !== entry.branchId), entry]);
+    setSelectedDepartment(entry.name);
+  }, []);
+  const handleDesignationCreated = useCallback((entry: { id: number; name: string; branchId: number }) => {
+    setDesignationCatalog((current) => [...current.filter((item) => item.name !== entry.name || item.branchId !== entry.branchId), entry]);
+    setSelectedDesignation(entry.name);
+  }, []);
   const [loginAccessEnabled, setLoginAccessEnabled] = useState(record?.loginAccessEnabled ?? false);
   const customField = (index: number) => record?.customFields?.[index];
-  const departmentOptions = branchCatalogOptions(departments, selectedBranchId, record?.department);
-  const designationOptions = branchCatalogOptions(designations, selectedBranchId, record?.jobTitle);
+  const departmentOptions = branchCatalogOptions(departmentCatalog, selectedBranchId, selectedDepartment);
+  const designationOptions = branchCatalogOptions(designationCatalog, selectedBranchId, selectedDesignation);
 
   useEffect(() => {
     if (state.success) {
@@ -176,27 +191,43 @@ export function StaffForm({
               </select>
             </Field>
             <StaffSearchableSelectField
-              key={`department-${selectedBranchId}`}
+              label="Branch"
+              name="branchId"
+              options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
+              defaultValue={selectedBranchId}
+              placeholder="Search branches..."
+              onValueChange={(value) => {
+                setSelectedBranchId(value);
+                setSelectedDepartment("");
+                setSelectedDesignation("");
+              }}
+            />
+            <StaffSearchableSelectField
+              key={`department-${selectedBranchId}-${departmentOptions.length}`}
               label="Department"
               name="department"
               options={departmentOptions.map((option) => ({
                 value: option.name,
                 label: `${option.name}${option.branchId === null ? " (All branches)" : ""}`,
               }))}
-              defaultValue={record?.department ?? ""}
+              defaultValue={selectedDepartment}
               placeholder="Search departments..."
+              onValueChange={setSelectedDepartment}
             />
+            <StaffCatalogQuickAdd kind="department" branchId={selectedBranchId} onCreated={handleDepartmentCreated} />
             <StaffSearchableSelectField
-              key={`designation-${selectedBranchId}`}
+              key={`designation-${selectedBranchId}-${designationOptions.length}`}
               label="Designation"
               name="jobTitle"
               options={designationOptions.map((option) => ({
                 value: option.name,
                 label: `${option.name}${option.branchId === null ? " (All branches)" : ""}`,
               }))}
-              defaultValue={record?.jobTitle ?? ""}
+              defaultValue={selectedDesignation}
               placeholder="Search designations..."
+              onValueChange={setSelectedDesignation}
             />
+            <StaffCatalogQuickAdd kind="designation" branchId={selectedBranchId} onCreated={handleDesignationCreated} />
             <Field label="First name"><input name="firstName" required minLength={2} maxLength={120} defaultValue={record?.firstName ?? ""} className={inputClass} /></Field>
             <Field label="Last name"><input name="lastName" required minLength={2} maxLength={120} defaultValue={record?.lastName ?? ""} className={inputClass} /></Field>
             <Field label="Father's name"><input name="fatherName" maxLength={160} defaultValue={record?.fatherName ?? ""} className={inputClass} /></Field>
@@ -263,14 +294,6 @@ export function StaffForm({
             <Field label="Emergency mobile"><input name="emergencyContactPhone" type="tel" maxLength={40} defaultValue={record?.emergencyContactPhone ?? ""} className={inputClass} /></Field>
             <Field label="Emergency contact name"><input name="emergencyContactName" maxLength={160} defaultValue={record?.emergencyContactName ?? ""} className={inputClass} /></Field>
             <Field label="Driving license"><input name="drivingLicense" maxLength={80} defaultValue={record?.drivingLicense ?? ""} className={inputClass} /></Field>
-            <StaffSearchableSelectField
-              label="Branch"
-              name="branchId"
-              options={branches.map((branch) => ({ value: String(branch.id), label: branch.name }))}
-              defaultValue={selectedBranchId}
-              placeholder="Search branches..."
-              onValueChange={setSelectedBranchId}
-            />
             <Field label="Profile photo" fieldName="profilePhotoFileName">
               <StaffFileField
                 purpose="profilePhoto"
@@ -386,6 +409,55 @@ export function StaffForm({
     </form>
     </requiredStaffFieldsContext.Provider>
     </visibleStaffFieldsContext.Provider>
+  );
+}
+
+function StaffCatalogQuickAdd({
+  kind,
+  branchId,
+  onCreated,
+}: {
+  kind: "department" | "designation";
+  branchId: string;
+  onCreated: (entry: { id: number; name: string; branchId: number }) => void;
+}) {
+  const [state, action, pending] = useActionState(createStaffCatalogEntry, {});
+  useEffect(() => {
+    if (!state.entry || state.entry.kind !== kind) return;
+    onCreated(state.entry);
+  }, [kind, onCreated, state.entry]);
+  const label = kind === "department" ? "department" : "designation";
+  return (
+    <div className="-mt-3 sm:col-span-2 sm:-mt-2">
+      <AdminRecordDialog title={`Quick add ${label}`} triggerLabel={`+ Quick add ${label}`}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">Add a {label} to the selected branch, then it will be selected in this staff form.</p>
+          {!branchId && <p role="alert" className="text-sm text-amber-700">Choose a branch in the staff form first.</p>}
+          <label className="block space-y-1.5 text-sm font-medium text-slate-700">
+            {label[0].toUpperCase() + label.slice(1)} name
+            <input
+              name={kind === "department" ? "quickDepartmentName" : "quickDesignationName"}
+              minLength={2}
+              maxLength={120}
+              autoComplete="off"
+              className={inputClass}
+            />
+          </label>
+          {state.error && <p role="alert" className="text-sm text-rose-700">{state.error}</p>}
+          {state.success && <p role="status" className="text-sm text-emerald-700">Added {label}. It is selected in the staff form.</p>}
+          <button
+            type="submit"
+            name="kind"
+            value={kind}
+            formAction={action}
+            disabled={pending || !branchId}
+            className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {pending ? "Adding..." : `Add ${label}`}
+          </button>
+        </div>
+      </AdminRecordDialog>
+    </div>
   );
 }
 

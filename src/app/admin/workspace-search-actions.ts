@@ -219,7 +219,7 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("staff-applications", "Staff applications", "Review public staff registrations", "/admin/staff/applications", ["staff registration", "applicants", "employment application"]);
     addPage("hr-overview", "HR overview", "Human resources staff summary", "/admin/hr", ["human resources", "staff summary"]);
     addPage("hr-departments", "Departments", "Manage staff departments", "/admin/hr/departments", ["department"]);
-    addPage("hr-designations", "Designations", "Manage staff job designations", "/admin/hr/designations", ["designation", "job title"]);
+    addPage("hr-designations", "Departments & designations", "Manage staff departments and job designations together", "/admin/hr/departments#designations", ["designation", "job title"]);
     addPage("staff-attendance", "Staff attendance", "Staff daily attendance register", "/admin/hr/attendance", ["attendance register", "absent", "present"]);
     addPage("staff-attendance-reports", "Staff attendance reports", "Attendance summaries and reports", "/admin/hr/reports", ["report", "reports"]);
     addPage("staff-leave", "Leave overview", "Define leave types, assign entitlements, review staff requests, and print reports", "/admin/hr/leave", ["leave", "leave requests", "pending leave"]);

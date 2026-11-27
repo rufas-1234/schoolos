@@ -7,7 +7,7 @@ import { CatalogDirectory } from "./catalog-directory";
 import { CreateCatalogEntryForm } from "./catalog-forms";
 import type { HrCatalogKind } from "./catalog-actions";
 
-export async function StaffCatalogPage({ kind }: { kind: HrCatalogKind }) {
+export async function StaffCatalogPage({ kind, showHeader = true }: { kind: HrCatalogKind; showHeader?: boolean }) {
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const [entries, staff, branches] = await Promise.all([
     kind === "department"
@@ -58,7 +58,7 @@ export async function StaffCatalogPage({ kind }: { kind: HrCatalogKind }) {
 
   return (
     <div className="space-y-7">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      {showHeader && <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm font-medium text-violet-700">Human resources</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{label}</h1>
@@ -69,7 +69,7 @@ export async function StaffCatalogPage({ kind }: { kind: HrCatalogKind }) {
         <Link href="/admin/hr" className="text-sm font-semibold text-violet-700 hover:text-violet-900">
           Back to HR overview
         </Link>
-      </header>
+      </header>}
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(18rem,0.75fr)_minmax(0,1.5fr)]">
         <CreateCatalogEntryForm kind={kind} branches={branches} />

@@ -157,8 +157,7 @@ const navigation: NavigationItem[] = [
     permissionAlternatives: ["staff.manage", "roles.manage"],
     children: [
       { id: "overview", label: "HR overview", href: "/admin/hr", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
-      { id: "departments", label: "Departments", href: "/admin/hr/departments", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
-      { id: "designations", label: "Designations", href: "/admin/hr/designations", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
+      { id: "departments", label: "Departments & designations", href: "/admin/hr/departments", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "staff", label: "Staff directory", href: "/admin/staff", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "staff-applications", label: "Staff applications", href: "/admin/staff/applications", matchPath: "/admin/staff/applications", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },
       { id: "attendance", label: "Staff attendance records", href: "/admin/hr/attendance", permission: "school.settings.manage", permissionAlternatives: ["staff.manage"] },

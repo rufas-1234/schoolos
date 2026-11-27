@@ -284,7 +284,7 @@ export default async function FeeInvoicePrintPage({
     .join(" · ") || `${requestedCurrency || school.currency} 0.00`;
 
   return (
-    <main className="fee-invoice-page mx-auto max-w-5xl space-y-6 p-6 text-slate-900 print:max-w-none print:p-0">
+    <main className="fee-invoice-page mx-auto max-w-2xl space-y-6 p-6 text-slate-900 print:max-w-none print:p-0">
       <header className="fee-invoice-overview flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 print:hidden">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Finances</p>
@@ -322,7 +322,7 @@ export default async function FeeInvoicePrintPage({
             key={invoice.id}
             data-print-qr-document
             data-print-item-count={1 + Number(discount > 0) + Number(fine > 0)}
-            className="fee-invoice-card space-y-5 rounded-2xl border border-slate-200 bg-white p-7"
+            className="fee-invoice-card space-y-5 rounded-2xl border border-slate-200 bg-white p-6"
           >
             <header className="fee-invoice-title-row flex flex-wrap items-start justify-between gap-5" data-print-qr-header>
               <div>

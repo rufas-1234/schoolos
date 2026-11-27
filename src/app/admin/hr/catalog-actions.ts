@@ -9,7 +9,11 @@ import { auditLogs, schoolBranches, staffDepartments, staffDesignations, staffMe
 import { requireSchoolPermission } from "@/lib/access-control";
 import { isDuplicateEntryError } from "@/lib/db-errors";
 
-export type HrCatalogActionState = { error?: string; success?: boolean };
+export type HrCatalogActionState = {
+  error?: string;
+  success?: boolean;
+  entry?: { id: number; name: string; branchId: number; kind: HrCatalogKind };
+};
 export type HrCatalogKind = "department" | "designation";
 
 const catalogKind = z.enum(["department", "designation"]);
@@ -35,7 +39,10 @@ export async function createStaffCatalogEntry(
   const context = await requireSchoolPermission(["school.settings.manage", "staff.manage"]);
   const kind = catalogKind.safeParse(value(formData, "kind"));
   const branchId = branchIdField.safeParse(value(formData, "branchId"));
-  const name = z.string().trim().min(2).max(120).safeParse(value(formData, "name"));
+  const rawName = kind.success
+    ? value(formData, kind.data === "department" ? "quickDepartmentName" : "quickDesignationName") || value(formData, "name")
+    : value(formData, "name");
+  const name = z.string().trim().min(2).max(120).safeParse(rawName);
   if (!kind.success || !branchId.success || !name.success) {
     return { error: "Enter a valid name between 2 and 120 characters." };
   }
@@ -81,7 +88,18 @@ export async function createStaffCatalogEntry(
   }
 
   revalidateCatalog();
-  return { success: true };
+  const [entry] = kind.data === "department"
+    ? await db.select({ id: staffDepartments.id }).from(staffDepartments).where(and(
+      eq(staffDepartments.schoolId, context.schoolId),
+      eq(staffDepartments.branchId, branch.id),
+      eq(staffDepartments.name, name.data),
+    )).limit(1)
+    : await db.select({ id: staffDesignations.id }).from(staffDesignations).where(and(
+      eq(staffDesignations.schoolId, context.schoolId),
+      eq(staffDesignations.branchId, branch.id),
+      eq(staffDesignations.name, name.data),
+    )).limit(1);
+  return { success: true, entry: entry ? { id: entry.id, name: name.data, branchId: branch.id, kind: kind.data } : undefined };
 }
 
 export async function updateStaffCatalogEntry(
