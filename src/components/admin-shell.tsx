@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BookOpen,
   BookMarked,
+  ClipboardCheck,
   BedDouble,
   BriefcaseBusiness,
   Calculator,
@@ -97,7 +98,7 @@ const navigation: NavigationItem[] = [
     permission: "students.view",
     permissionAlternatives: ["students.update"],
     children: [
-      ...studentSections.filter((section) => section.id !== "behavior-settings"),
+      ...studentSections,
       {
         id: "attendance-reports",
         label: "Student attendance reports",
@@ -133,6 +134,19 @@ const navigation: NavigationItem[] = [
       { id: "send-marks-sms", label: "Send Marks By SMS", href: "/admin/examinations?section=sms", permission: "examinations.create", permissionAlternatives: ["results.enter", "results.publish"], matchQuery: { key: "section", value: "sms" } },
       { id: "exam-reports", label: "Exams Reports", href: "/admin/examinations/report-center/exam-routine" },
       { id: "exam-analytics", label: "Exam Analytics", href: "/admin/exam-analytics", matchPath: "/admin/exam-analytics", permission: "examinations.create", permissionAlternatives: ["results.publish"] },
+    ],
+  },
+  {
+    href: "/admin/students/behavior",
+    label: "Behavior",
+    icon: ClipboardCheck,
+    permission: "students.view",
+    permissionAlternatives: ["students.update"],
+    children: [
+      { id: "behavior-overview", label: "Behavior overview", href: "/admin/students/behavior", matchPath: "/admin/students/behavior", matchQuery: { key: "view", value: null }, permission: "students.update" },
+      { id: "behavior-incidents", label: "Student incident reports", href: "/admin/students/behavior?view=incidents", matchPath: "/admin/students/behavior", matchQuery: { key: "view", value: "incidents" }, permission: "students.update" },
+      { id: "behavior-ranks", label: "Behavior reports & rankings", href: "/admin/students/behavior/reports", matchPath: "/admin/students/behavior/reports" },
+      { id: "behavior-categories", label: "Incident types & actions", href: "/admin/students/behavior/settings", matchPath: "/admin/students/behavior/settings", permission: "students.update" },
     ],
   },
   {
@@ -288,7 +302,7 @@ const navigation: NavigationItem[] = [
 const navigationGroups = [
   { label: "Home", labels: ["Overview"] },
   { label: "Teaching & learning", labels: ["Academics", "Student Info", "Examinations"] },
-  { label: "People", labels: ["Human resources", "Users", "My leave"] },
+  { label: "People", labels: ["Human resources", "Users", "My leave", "Behavior"] },
   { label: "School operations", labels: ["Finance overview", "Accounts", "Fees", "Inventory", "Library", "Dormitories"] },
   { label: "Configuration", labels: ["System", "School profile"] },
 ];
@@ -349,7 +363,7 @@ export function AdminShell({
     pathname.startsWith("/admin/academics"),
   );
   const [studentInfoOpen, setStudentInfoOpen] = useState(() =>
-    pathname.startsWith("/admin/students") || pathname.startsWith("/admin/admissions"),
+    (pathname.startsWith("/admin/students") && !pathname.startsWith("/admin/students/behavior")) || pathname.startsWith("/admin/admissions"),
   );
   const [usersOpen, setUsersOpen] = useState(() =>
     pathname.startsWith("/admin/users") || pathname === "/admin/settings/roles",
@@ -370,6 +384,7 @@ export function AdminShell({
   const [examinationsOpen, setExaminationsOpen] = useState(() =>
     pathname.startsWith("/admin/examinations") || pathname === "/admin/exam-analytics",
   );
+  const [behaviorOpen, setBehaviorOpen] = useState(() => pathname.startsWith("/admin/students/behavior"));
   const [libraryOpen, setLibraryOpen] = useState(() => pathname.startsWith("/admin/library"));
   const [dormitoriesOpen, setDormitoriesOpen] = useState(() => pathname.startsWith("/admin/dormitories"));
   const [systemOpen, setSystemOpen] = useState(() => pathname.startsWith("/admin/system"));
@@ -726,6 +741,7 @@ export function AdminShell({
             const isDormitories = label === "Dormitories";
             const isFees = href === "/admin/fees/overview";
             const isExaminations = href === "/admin/examinations";
+            const isBehavior = href === "/admin/students/behavior";
             const isSystem = label === "System";
             const sectionOpen = leftSidebarQuery.trim() ? true : isStudentInfo
               ? studentInfoOpen
@@ -745,6 +761,8 @@ export function AdminShell({
                   ? feesOpen
                   : isExaminations
                     ? examinationsOpen
+                  : isBehavior
+                    ? behaviorOpen
                   : isSystem
                     ? systemOpen
                   : academicsOpen;
@@ -766,6 +784,8 @@ export function AdminShell({
                   ? setFeesOpen
                   : isExaminations
                     ? setExaminationsOpen
+                  : isBehavior
+                    ? setBehaviorOpen
                   : isSystem
                     ? setSystemOpen
                   : setAcademicsOpen;

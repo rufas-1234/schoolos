@@ -1,7 +1,6 @@
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import {
   ArrowUpRight,
-  BookOpenCheck,
   ClipboardList,
   GraduationCap,
   IdCard,
@@ -146,14 +145,6 @@ export default async function StudentOverviewPage() {
       icon: Users,
       tone: "violet" as const,
       visible: true,
-    },
-    {
-      href: "/admin/students/behavior",
-      title: "Student Behaviours",
-      detail: "Review behavior records and actions.",
-      icon: BookOpenCheck,
-      tone: "amber" as const,
-      visible: canUpdate,
     },
     {
       href: "/admin/students/reports",

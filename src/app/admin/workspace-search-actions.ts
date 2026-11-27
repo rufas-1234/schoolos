@@ -168,6 +168,10 @@ export async function searchWorkspace(rawQuery: string): Promise<WorkspaceSearch
     addPage("student-attendance-reports", "Student attendance reports", "Review student attendance records day by day", "/admin/academics/attendance-reports", ["student attendance", "daily attendance report", "attendance history"]);
   }
   if (canManageStudents) {
+    addPage("behavior-overview", "Behavior overview", "Record and review student behavior and incidents", "/admin/students/behavior", ["behavior", "student conduct"]);
+    addPage("behavior-incidents", "Student incident reports", "Review recorded student incidents", "/admin/students/behavior?view=incidents", ["incident reports", "student incidents"]);
+    addPage("behavior-rankings", "Behavior reports & rankings", "Student, class, section, and incident behavior rankings", "/admin/students/behavior/reports", ["behavior report", "class-wise rank", "section-wise rank", "incident-wise rank"]);
+    addPage("behavior-incident-types", "Incident types & actions", "Configure behavior incident categories and follow-up actions", "/admin/students/behavior/settings", ["behavior settings", "incident categories"]);
     for (const section of studentSections) {
       if (
         ("permission" in section && section.permission && !permissions.has(section.permission)) &&

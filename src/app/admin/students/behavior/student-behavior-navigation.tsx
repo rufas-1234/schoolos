@@ -1,9 +1,11 @@
 import Link from "next/link";
 
-type StudentBehaviorSection = "records" | "categories";
+type StudentBehaviorSection = "records" | "incidents" | "reports" | "categories";
 
 const sections: { id: StudentBehaviorSection; label: string; href: string }[] = [
   { id: "records", label: "Records", href: "/admin/students/behavior" },
+  { id: "incidents", label: "Student incident reports", href: "/admin/students/behavior?view=incidents" },
+  { id: "reports", label: "Behavior reports & rankings", href: "/admin/students/behavior/reports" },
   { id: "categories", label: "Categories & actions", href: "/admin/students/behavior/settings" },
 ];
 

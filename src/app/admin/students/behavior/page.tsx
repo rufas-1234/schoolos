@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { AdminActionDialog, AdminDataTable, AdminRecordDialog } from "@/components/admin-data-table";
 import { db } from "@/db";
@@ -10,8 +10,9 @@ import { StudentBehaviorNavigation } from "./student-behavior-navigation";
 
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
-export default async function StudentBehaviorPage({ searchParams }: { searchParams: Promise<{ search?: string | string[] }> }) {
+export default async function StudentBehaviorPage({ searchParams }: { searchParams: Promise<{ search?: string | string[]; view?: string | string[] }> }) {
   const [context, params] = await Promise.all([requireSchoolPermission("students.update"), searchParams]);
+  const incidentsOnly = (Array.isArray(params.view) ? params.view[0] : params.view) === "incidents";
   const records = await db.select({
     id: studentBehaviorRecords.id,
     publicId: studentBehaviorRecords.publicId,
@@ -29,7 +30,10 @@ export default async function StudentBehaviorPage({ searchParams }: { searchPara
   }).from(studentBehaviorRecords)
     .innerJoin(students, and(eq(studentBehaviorRecords.studentId, students.id), eq(students.schoolId, context.schoolId)))
     .innerJoin(user, eq(studentBehaviorRecords.recordedBy, user.id))
-    .where(eq(studentBehaviorRecords.schoolId, context.schoolId))
+    .where(and(
+      eq(studentBehaviorRecords.schoolId, context.schoolId),
+      ...(incidentsOnly ? [inArray(studentBehaviorRecords.severity, ["low", "moderate", "serious"])] : []),
+    ))
     .orderBy(desc(studentBehaviorRecords.incidentDate), desc(studentBehaviorRecords.id));
   const studentRows = await db.select({ publicId: students.publicId, firstName: students.firstName, lastName: students.lastName, admissionNumber: students.admissionNumber })
     .from(students).where(eq(students.schoolId, context.schoolId)).orderBy(students.firstName, students.lastName);
@@ -45,12 +49,12 @@ export default async function StudentBehaviorPage({ searchParams }: { searchPara
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-sm font-medium text-violet-700">Student Info · Student Behaviours</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Student Behaviours</h1>
+        <p className="text-sm font-medium text-violet-700">Behavior</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{incidentsOnly ? "Student incident reports" : "Behavior overview"}</h1>
         <p className="mt-2 text-sm text-slate-500">Record positive conduct, incidents, and follow-up actions. Records also appear in each student profile.</p>
       </header>
-      <StudentBehaviorNavigation active="records" />
-      <AdminDataTable title="Student behaviour records" initialQuery={search} mobileCardView columns={[
+      <StudentBehaviorNavigation active={incidentsOnly ? "incidents" : "records"} />
+      <AdminDataTable title={incidentsOnly ? "Student incident reports" : "Student behavior records"} initialQuery={search} mobileCardView columns={[
         { key: "student", label: "Student" }, { key: "admission", label: "Admission no." }, { key: "date", label: "Incident date" }, { key: "category", label: "Category" }, { key: "severity", label: "Severity" }, { key: "action", label: "Action taken" }, { key: "recordedBy", label: "Recorded by" },
       ]} rows={records.map((record) => {
         const formRecord: BehaviorRecordFormData = { publicId: record.publicId, studentPublicId: record.studentPublicId, incidentDate: record.incidentDate, category: record.category, severity: record.severity, details: record.details, actionTaken: record.actionTaken, followUpDate: record.followUpDate };
