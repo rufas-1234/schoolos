@@ -19,6 +19,7 @@ type SchoolManagementControlsProps = {
   address: string | null;
   status: string;
   archived: boolean;
+  deleted: boolean;
 };
 
 function ActionMessage({ state }: { state: SchoolManagementState }) {
@@ -35,11 +36,12 @@ export function SchoolManagementControls({
   address,
   status,
   archived,
+  deleted,
 }: SchoolManagementControlsProps) {
   const [reviewState, reviewAction, reviewPending] = useActionState<SchoolManagementState, FormData>(reviewSchool, {});
   const [editState, editAction, editPending] = useActionState<SchoolManagementState, FormData>(updateSchool, {});
   const [archiveState, archiveAction, archivePending] = useActionState<SchoolManagementState, FormData>(archiveSchool, {});
-  const canReview = !archived && (status === "pending" || status === "rejected" || canReopenSchoolReview(status));
+  const canReview = !archived && !deleted && (status === "pending" || status === "rejected" || canReopenSchoolReview(status));
 
   return (
     <div className="w-full space-y-3">
@@ -88,7 +90,7 @@ export function SchoolManagementControls({
       )}
       <ActionMessage state={reviewState} />
 
-      <details className="rounded-lg border border-slate-200 bg-white p-3">
+      {!deleted && <details className="rounded-lg border border-slate-200 bg-white p-3">
         <summary className="cursor-pointer text-xs font-semibold text-slate-700">Edit school</summary>
         <form action={editAction} className="mt-3 space-y-3">
           <input type="hidden" name="schoolPublicId" value={schoolPublicId} />
@@ -117,11 +119,12 @@ export function SchoolManagementControls({
           </button>
           <ActionMessage state={editState} />
         </form>
-      </details>
+      </details>}
 
       <form
         action={archiveAction}
         onSubmit={(event) => {
+          if (deleted) return;
           if (!archived && !window.confirm(`Archive ${name}? Members will lose access, but school data will be preserved and can be restored.`)) {
             event.preventDefault();
           }
@@ -146,6 +149,12 @@ export function SchoolManagementControls({
         {!archived && <span className="text-xs text-slate-500">Preserves data; access is disabled.</span>}
         <ActionMessage state={archiveState} />
       </form>
+      {!deleted && <form action={archiveAction} onSubmit={(event) => { if (!window.confirm(`Move ${name} to Deleted? Access will be disabled and its data preserved. You can restore it later.`)) event.preventDefault(); }} className="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="schoolPublicId" value={schoolPublicId} />
+        <input type="hidden" name="decision" value="delete" />
+        <button type="submit" disabled={archivePending} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60">{archivePending ? "Saving…" : "Delete workspace"}</button>
+        <span className="text-xs text-slate-500">Recoverable; school records are kept.</span>
+      </form>}
     </div>
   );
 }

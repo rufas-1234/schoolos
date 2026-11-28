@@ -36,7 +36,7 @@ const updateSchema = z.object({
 
 const archiveSchema = z.object({
   schoolPublicId: z.string().uuid(),
-  decision: z.enum(["archive", "restore"]),
+  decision: z.enum(["archive", "delete", "restore"]),
 });
 
 async function writeSchoolAudit(
@@ -73,9 +73,10 @@ export async function reviewSchool(
         publicId: schools.publicId,
         status: schools.status,
         archivedAt: schools.archivedAt,
+        deletedAt: schools.deletedAt,
       }).from(schools).where(eq(schools.publicId, schoolPublicId)).for("update").limit(1);
       if (!school) throw new SchoolManagementError("That school workspace no longer exists.");
-      if (school.archivedAt) throw new SchoolManagementError("Restore the archived school before reviewing it.");
+      if (school.archivedAt || school.deletedAt) throw new SchoolManagementError("Restore the archived or deleted school before reviewing it.");
 
       if (decision === "approve") {
         if (!canApproveSchool(school.status)) {
@@ -203,6 +204,7 @@ export async function archiveSchool(
         id: schools.id,
         publicId: schools.publicId,
         archivedAt: schools.archivedAt,
+        deletedAt: schools.deletedAt,
       }).from(schools).where(eq(schools.publicId, schoolPublicId)).for("update").limit(1);
       if (!school) throw new SchoolManagementError("That school workspace no longer exists.");
 
@@ -214,13 +216,24 @@ export async function archiveSchool(
           "archivedAt",
           "archivedBy",
         ]);
-      } else {
-        if (!school.archivedAt) throw new SchoolManagementError("That school is not archived.");
-        await tx.update(schools).set({ archivedAt: null, archivedBy: null })
+      } else if (decision === "delete") {
+        if (school.deletedAt) throw new SchoolManagementError("That workspace is already deleted.");
+        const deletedAt = new Date();
+        await tx.update(schools).set({ archivedAt: deletedAt, archivedBy: actor.id, deletedAt })
           .where(eq(schools.id, school.id));
-        await writeSchoolAudit(tx, actor.id, school.id, school.publicId, "school.restored", [
+        await writeSchoolAudit(tx, actor.id, school.id, school.publicId, "school.deleted", [
           "archivedAt",
           "archivedBy",
+          "deletedAt",
+        ]);
+      } else {
+        if (!school.archivedAt) throw new SchoolManagementError("That school is not archived.");
+        await tx.update(schools).set({ archivedAt: null, archivedBy: null, deletedAt: null })
+          .where(eq(schools.id, school.id));
+        await writeSchoolAudit(tx, actor.id, school.id, school.publicId, school.deletedAt ? "school.restored_from_deleted" : "school.restored", [
+          "archivedAt",
+          "archivedBy",
+          "deletedAt",
         ]);
       }
     });
@@ -231,5 +244,5 @@ export async function archiveSchool(
 
   revalidatePath("/platform/schools");
   revalidatePath("/select-school");
-  return { success: decision === "archive" ? "School archived; its data has been preserved." : "School restored." };
+  return { success: decision === "delete" ? "Workspace deleted from active lists. Its data is preserved and can be restored from Deleted." : decision === "archive" ? "School archived; its data has been preserved." : "Workspace restored." };
 }

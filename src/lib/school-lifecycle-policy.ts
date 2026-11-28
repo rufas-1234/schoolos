@@ -22,6 +22,7 @@ export function canReopenSchoolReview(status: string) {
   return status === schoolWorkspaceStatuses.active;
 }
 
-export function getSchoolDisplayStatus(status: string, archivedAt: Date | null) {
+export function getSchoolDisplayStatus(status: string, archivedAt: Date | null, deletedAt: Date | null = null) {
+  if (deletedAt) return "deleted";
   return archivedAt ? "archived" : status;
 }

@@ -456,6 +456,13 @@
       "when": 1795811526651,
       "tag": "0064_overrated_luminals",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "5",
+      "when": 1795840000000,
+      "tag": "0065_workspace_soft_delete",
+      "breakpoints": true
     }
   ]
 }

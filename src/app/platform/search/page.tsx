@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or } from "drizzle-orm";
 import { ArrowUpRight, Building2, CreditCard, FileText, Search, Users, Wallet } from "lucide-react";
 import { db } from "@/db";
 import { schoolMemberships, schools, staffMembers, staffPayrollRecords, subscriptionInvoices, subscriptionPlans, schoolSubscriptions, user } from "@/db/schema";
@@ -17,10 +17,10 @@ export default async function PlatformGlobalSearchPage({ searchParams }: { searc
   const pattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
   const [workspaceRows, accountRows, planRows, subscriptionRows, invoiceRows, payrollRows] = await Promise.all([
     db.select({ id: schools.id, publicId: schools.publicId, name: schools.name, email: schools.email, phone: schools.phone, status: schools.status, archivedAt: schools.archivedAt }).from(schools)
-      .where(or(like(schools.name, pattern), like(schools.email, pattern), like(schools.phone, pattern), like(schools.publicId, pattern))).orderBy(desc(schools.createdAt)).limit(8),
+      .where(and(isNull(schools.deletedAt), or(like(schools.name, pattern), like(schools.email, pattern), like(schools.phone, pattern), like(schools.publicId, pattern)))).orderBy(desc(schools.createdAt)).limit(8),
     db.select({ id: user.id, name: user.name, email: user.email, school: schools.name }).from(schoolMemberships)
       .innerJoin(user, eq(user.id, schoolMemberships.userId)).innerJoin(schools, eq(schools.id, schoolMemberships.schoolId))
-      .where(or(like(user.name, pattern), like(user.email, pattern), like(schools.name, pattern))).orderBy(user.name).limit(8),
+      .where(and(isNull(schools.deletedAt), or(like(user.name, pattern), like(user.email, pattern), like(schools.name, pattern)))).orderBy(user.name).limit(8),
     db.select({ id: subscriptionPlans.id, name: subscriptionPlans.name, code: subscriptionPlans.code, currency: subscriptionPlans.currency, amount: subscriptionPlans.amount, interval: subscriptionPlans.billingInterval }).from(subscriptionPlans)
       .where(or(like(subscriptionPlans.name, pattern), like(subscriptionPlans.code, pattern), like(subscriptionPlans.currency, pattern))).orderBy(subscriptionPlans.sortOrder, subscriptionPlans.name).limit(8),
     db.select({ id: schoolSubscriptions.id, schoolId: schools.id, school: schools.name, plan: subscriptionPlans.name, status: schoolSubscriptions.status }).from(schoolSubscriptions)

@@ -104,6 +104,7 @@ export const schools = mysqlTable("schools", {
   approvedBy: varchar("approvedBy", { length: 36 }).references(() => user.id),
   archivedAt: timestamp("archivedAt"),
   archivedBy: varchar("archivedBy", { length: 36 }).references(() => user.id),
+  deletedAt: timestamp("deletedAt"),
   isPracticeWorkspace: boolean("isPracticeWorkspace").notNull().default(false),
   practiceParentSchoolId: bigint("practiceParentSchoolId", { mode: "number", unsigned: true }),
   createdAt: createdAt(),
