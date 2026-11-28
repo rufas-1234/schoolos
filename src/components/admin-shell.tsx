@@ -1126,6 +1126,8 @@ export function AdminShell({
                   {isPlatformAdmin && multiSchoolEnabled && (
                     <Link
                       href="/platform/schools"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() => setMenuOpen(false)}
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
                     >
