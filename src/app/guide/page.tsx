@@ -39,12 +39,8 @@ function Step({ n, children }: { n: number; children: ReactNode }) {
   return <li className="pl-1"><span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800">{n}</span>{children}</li>;
 }
 
-export default function GuidePage() {
+export function GuideContent({ platform = false }: { platform?: boolean }) {
   return (
-    <PublicPlatformShell
-      title="SchoolOS user guide"
-      navigation={sections.map(([id, label], index) => ({ href: `#${id}`, label: `${index + 1}. ${label}` }))}
-    >
       <main className="min-h-dvh bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-5xl">
         <header className="rounded-3xl bg-gradient-to-br from-violet-900 to-violet-700 px-6 py-9 text-white shadow-lg sm:px-10 sm:py-12">
@@ -316,6 +312,9 @@ export default function GuidePage() {
         </div>
       </div>
       </main>
-    </PublicPlatformShell>
   );
+}
+
+export default function GuidePage() {
+  return <PublicPlatformShell title="SchoolOS user guide" navigation={sections.map(([id, label], index) => ({ href: `#${id}`, label: `${index + 1}. ${label}` }))}><GuideContent /></PublicPlatformShell>;
 }

@@ -18,12 +18,14 @@ export type PlanFormValue = {
   trialDays?: number;
   includedModules?: string[];
   isActive?: boolean;
+  sortOrder?: number;
 };
 
 export function PlanForm({ plan }: { plan?: PlanFormValue }) {
   const [state, action, pending] = useActionState<PlanActionState, FormData>(saveSubscriptionPlan, {});
   return <form action={action} className="space-y-4">
     <input type="hidden" name="planId" value={plan?.id ?? ""} />
+    <input type="hidden" name="sortOrder" value={plan?.sortOrder ?? 0} />
     <div className="grid gap-4 sm:grid-cols-2">
       <label className="space-y-1 text-sm font-medium">Plan name<input required name="name" defaultValue={plan?.name} maxLength={120} placeholder="Core" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>
       <label className="space-y-1 text-sm font-medium">Plan code<input required name="code" defaultValue={plan?.code} pattern="[a-z0-9-]+" maxLength={48} placeholder="core" className="h-11 w-full rounded-xl border border-slate-200 px-3" /></label>

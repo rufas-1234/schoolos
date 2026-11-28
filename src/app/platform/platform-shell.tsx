@@ -87,14 +87,14 @@ export function PlatformShell({
         </section>;
       })}
       {visibleLinks.length === 0 && <p className="px-3 py-2 text-xs text-slate-500">No matching platform pages.</p>}
-      {!leftQuery.trim() && <Link href="/guide" onClick={() => mobile && setMobileOpen(false)} title={compact ? "User guide" : undefined} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100", compact && "justify-center px-0")}>
+      {!leftQuery.trim() && <Link href="/platform/guide" onClick={() => mobile && setMobileOpen(false)} title={compact ? "User guide" : undefined} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100", compact && "justify-center px-0")}>
         <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-slate-400 text-xs" aria-hidden="true">?</span><span className={cn(compact && "sr-only")}>User guide</span>
       </Link>}
     </nav>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-50 dark:text-slate-900">
+    <div className="platform-shell-root min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-50 dark:text-slate-900">
       <div id="platform-left-sidebar" className={cn("print:hidden fixed inset-y-0 left-0 z-30 hidden overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none lg:block", leftExpanded ? "w-[260px]" : "w-[68px]")}>
         <aside className={cn("flex h-full flex-col overflow-hidden border-r border-slate-200 bg-white py-5 transition-[padding] duration-200", leftExpanded ? "w-[260px] px-4" : "w-[68px] items-center px-2")}>
           <Link href="/platform/schools" aria-label="SchoolOS platform home" title={!leftExpanded ? "SchoolOS platform" : undefined} className={cn("mb-5 flex items-center gap-3 px-1", !leftExpanded && "justify-center")}>

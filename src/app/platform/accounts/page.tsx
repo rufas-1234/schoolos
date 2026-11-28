@@ -58,7 +58,7 @@ export default async function PlatformAccountsPage({ searchParams }: { searchPar
         <Link href="/platform/schools" className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900"><ArrowLeft size={16}/> School workspaces</Link>
         <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-700">SchoolOS platform</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Account recovery</h1><p className="mt-3 text-sm leading-6 text-slate-600">Find a staff or student account by name, email, admission number, or staff number. Update login access and issue recovery credentials from the account card.</p></div>
-          <Link href="/guide" className="text-sm font-semibold text-violet-700 underline underline-offset-4 hover:text-violet-900">Open user guide</Link>
+          <Link href="/platform/guide" className="text-sm font-semibold text-violet-700 underline underline-offset-4 hover:text-violet-900">Open user guide</Link>
         </div>
       </header>
 

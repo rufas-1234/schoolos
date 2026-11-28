@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { subscriptionPlans } from "@/db/schema";
 import { subscriptionModules } from "@/lib/subscription-policy";
+import { isDuplicateEntryError } from "@/lib/db-errors";
 import { requirePlatformAdmin } from "@/lib/platform-access";
 
 export type PlanActionState = { error?: string; success?: string };
@@ -34,12 +35,15 @@ export async function saveSubscriptionPlan(_previous: PlanActionState, formData:
   const parsed = planSchema.safeParse(Object.fromEntries(formData));
   const includedModules = [...new Set(["students", ...formData.getAll("modules").map(String)])];
   if (!parsed.success || !includedModules.length || includedModules.some((key) => !modules.has(key))) {
-    return { error: "Check the plan name, code, price, limits, currency, and selected modules." };
+    const fieldNames: Record<string, string> = { name: "Plan name", code: "Plan code", amount: "Price", studentLimit: "Student limit", branchLimit: "Branch limit", currency: "Currency", modules: "Selected modules", billingInterval: "Billing cycle", pricingModel: "Price basis", trialDays: "Trial days", sortOrder: "Display order", isActive: "Plan availability" };
+    const issue = parsed.success ? "Choose valid modules for this plan." : parsed.error.issues.map((item) => `${fieldNames[String(item.path[0])] ?? "Plan details"}: ${item.message}`).join(" ");
+    return { error: issue || "Check the plan details and try again." };
   }
   const values = parsed.data;
   if (Number(values.amount) < 0 || (values.billingInterval === "yearly" && Number(values.amount) === 0)) {
     return { error: "Enter a positive price for paid plans. Use the trial plan for free access." };
   }
+  try {
   if (values.planId) {
     const [existing] = await db.select({ id: subscriptionPlans.id, isTrial: subscriptionPlans.isTrial })
       .from(subscriptionPlans).where(eq(subscriptionPlans.id, values.planId)).limit(1);
@@ -63,6 +67,10 @@ export async function saveSubscriptionPlan(_previous: PlanActionState, formData:
       trialDays: Number(values.trialDays), includedModules,
       isActive: values.isActive === "true", sortOrder: Number(values.sortOrder),
     });
+  }
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return { error: "That plan code is already in use. Choose a unique code and try again." };
+    throw error;
   }
   revalidatePath("/platform/plans");
   revalidatePath("/platform/subscriptions");

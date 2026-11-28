@@ -109,6 +109,51 @@
   border-color: #514466;
 }
 
+/* Platform administration uses a neutral, Twitter-like black dark theme. */
+.dark .platform-shell-root {
+  background-color: #000;
+  color: #e7e9ea;
+}
+
+.dark .platform-shell-root [class*="text-slate-"] { color: #a1a1aa; }
+.dark .platform-shell-root [class~="text-slate-950"],
+.dark .platform-shell-root [class~="text-slate-900"],
+.dark .platform-shell-root [class~="text-slate-800"] { color: #e7e9ea; }
+.dark .platform-shell-root [class~="text-slate-700"] { color: #d1d5db; }
+.dark .platform-shell-root [class*="text-violet-"] { color: #c9b8ff; }
+.dark .platform-shell-root [class*="text-emerald-"] { color: #86efac; }
+.dark .platform-shell-root [class*="text-amber-"] { color: #fcd34d; }
+.dark .platform-shell-root [class*="text-rose-"] { color: #fda4af; }
+.dark .platform-shell-root [class*="border-slate-"] { border-color: #2f3336; }
+.dark .platform-shell-root [class~="border-violet-200"] { border-color: #514466; }
+.dark .platform-shell-root [class~="border-amber-200"] { border-color: #594820; }
+.dark .platform-shell-root [class~="bg-white"] { background-color: #16181c; }
+.dark .platform-shell-root [class~="bg-slate-50"] { background-color: #000; }
+.dark .platform-shell-root [class~="bg-slate-100"] { background-color: #202327; }
+.dark .platform-shell-root [class~="bg-slate-200"] { background-color: #2f3336; }
+.dark .platform-shell-root [class~="bg-violet-50"],
+.dark .platform-shell-root [class~="bg-violet-100"] { background-color: #211b2b; }
+.dark .platform-shell-root [class~="bg-emerald-50"],
+.dark .platform-shell-root [class~="bg-emerald-100"] { background-color: #10241a; }
+.dark .platform-shell-root [class~="bg-amber-50"],
+.dark .platform-shell-root [class~="bg-amber-100"] { background-color: #2b2414; }
+.dark .platform-shell-root [class~="bg-rose-50"],
+.dark .platform-shell-root [class~="bg-rose-100"] { background-color: #2b171b; }
+.dark .platform-shell-root [class~="bg-sky-50"] { background-color: #10212b; }
+.dark .platform-shell-root [class~="bg-blue-50"] { background-color: #111c2a; }
+.dark .platform-shell-root input,
+.dark .platform-shell-root select,
+.dark .platform-shell-root textarea {
+  border-color: #2f3336;
+  background-color: #000;
+  color: #e7e9ea;
+  color-scheme: dark;
+}
+.dark .platform-shell-root input::placeholder,
+.dark .platform-shell-root textarea::placeholder { color: #71767b; }
+.dark .platform-shell-root a:hover,
+.dark .platform-shell-root button:hover { filter: brightness(1.15); }
+
 .dark .portal-shell-content > header {
   border-color: #334155;
   background-color: #111827;
