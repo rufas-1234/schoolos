@@ -34,6 +34,7 @@ export function PlatformShell({
   const [leftQuery, setLeftQuery] = useState("");
   const [rightQuery, setRightQuery] = useState("");
   const leftSearchRef = useRef<HTMLInputElement>(null);
+  const globalSearchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const left = window.localStorage.getItem("schoolos-platform-left-sidebar");
@@ -48,16 +49,12 @@ export function PlatformShell({
     function focusSearch(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        if (!leftExpanded) {
-          setLeftExpanded(true);
-          window.localStorage.setItem("schoolos-platform-left-sidebar", "expanded");
-        }
-        window.setTimeout(() => leftSearchRef.current?.focus(), 40);
+        globalSearchRef.current?.focus();
       }
     }
     document.addEventListener("keydown", focusSearch);
     return () => document.removeEventListener("keydown", focusSearch);
-  }, [leftExpanded]);
+  }, []);
 
   const visibleLinks = useMemo(() => {
     const query = leftQuery.trim().toLocaleLowerCase();
@@ -144,7 +141,10 @@ export function PlatformShell({
             <button type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-expanded={mobileOpen} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 lg:hidden"><Menu size={20}/></button>
             <div className="min-w-0"><p className="truncate text-sm font-semibold sm:text-base">SchoolOS platform</p><p className="hidden truncate text-xs text-slate-500 sm:block">Workspace and account administration</p></div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4"><span className="hidden max-w-56 truncate text-sm font-medium text-slate-700 md:block">{userName}</span><ThemeToggle/><div className="lg:hidden"><PlatformSignOutButton/></div></div>
+          <form action="/platform/search" method="get" className="mx-3 flex min-w-0 flex-1 max-w-2xl items-center sm:mx-6">
+            <label className="relative block w-full"><span className="sr-only">Search platform records</span><Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input ref={globalSearchRef} name="q" type="search" minLength={2} maxLength={100} placeholder="Search workspaces, plans, invoices…" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-14 text-sm text-slate-800 outline-none placeholder:text-slate-500 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"/><kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Ctrl K</kbd></label>
+          </form>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4"><span className="hidden max-w-56 truncate text-sm font-medium text-slate-700 md:block">{userName}</span><div className="hidden sm:block"><ThemeToggle/></div><div className="lg:hidden"><PlatformSignOutButton/></div></div>
         </header>
         <main className="min-h-[calc(100vh-4rem)] md:min-h-[calc(100vh-76px)]">{children}</main>
       </div>

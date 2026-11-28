@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { AdminDataTable } from "@/components/admin-data-table";
+import Link from "next/link";
 import { db } from "@/db";
 import {
   chartOfAccounts,
@@ -13,8 +14,10 @@ import { PlatformPayrollPaymentForm } from "./platform-payroll-payment-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function PlatformPayrollPage() {
+export default async function PlatformPayrollPage({ searchParams }: { searchParams: Promise<{ search?: string | string[] }> }) {
   await requirePlatformAdmin();
+  const requestedSearch = (await searchParams).search;
+  const search = (Array.isArray(requestedSearch) ? requestedSearch[0] : requestedSearch ?? "").trim().toLocaleLowerCase();
 
   const activeSchools = await db.select({
     id: schools.id,
@@ -78,11 +81,12 @@ export default async function PlatformPayrollPage() {
     : [[], [], []];
 
   const currentDate = new Date().toISOString().slice(0, 10);
+  const visiblePayrollRecords = payrollRecords.filter((record) => !search || `${record.schoolName} ${record.staffName} ${record.staffLastName} ${record.employeeCode ?? ""} ${record.payPeriod} ${record.amount} ${record.currency}`.toLocaleLowerCase().includes(search));
   const schoolFilters = activeSchools.map((school) => ({
     value: school.publicId,
     label: school.name,
   }));
-  const rows = payrollRecords.map((record) => {
+  const rows = visiblePayrollRecords.map((record) => {
     const recordBanks = bankAccounts.filter((bank) =>
       bank.schoolId === record.schoolId && bank.currency === record.currency
     ).map((bank) => ({
@@ -140,10 +144,11 @@ export default async function PlatformPayrollPage() {
           <p className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             Use this after paying staff externally. SchoolOS records the expense and marks payroll paid; it does not transfer funds.
           </p>
+          {search && <p className="mt-3 text-sm text-slate-600">Filtered by <strong>{search}</strong> · <Link href="/platform/payroll" className="font-semibold text-violet-700">Clear search</Link></p>}
         </header>
 
         <AdminDataTable
-          title={`Awaiting payment · ${payrollRecords.length}`}
+          title={`Awaiting payment · ${visiblePayrollRecords.length}`}
           columns={[
             { key: "school", label: "School workspace" },
             { key: "staff", label: "Staff member" },

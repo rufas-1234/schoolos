@@ -8,8 +8,10 @@ import { AccountRecoveryForm } from "./account-recovery-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function PlatformAccountsPage() {
+export default async function PlatformAccountsPage({ searchParams }: { searchParams: Promise<{ search?: string | string[] }> }) {
   await requirePlatformAdmin();
+  const requestedSearch = (await searchParams).search;
+  const search = (Array.isArray(requestedSearch) ? requestedSearch[0] : requestedSearch ?? "").trim().toLocaleLowerCase();
   const [accounts, loginIdentifiers] = await Promise.all([db.select({
     userId: user.id,
     name: user.name,
@@ -35,6 +37,7 @@ export default async function PlatformAccountsPage() {
       standardIdentifiersByUser.set(identifier.userId, existing);
     }
   }
+  const visibleAccounts = accounts.filter((account) => !search || `${account.name} ${account.email} ${account.schoolName} ${account.schoolPublicId} ${(standardIdentifiersByUser.get(account.userId) ?? []).map((identifier) => identifier.identifier).join(" ")}`.toLocaleLowerCase().includes(search));
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-10 sm:px-8">
@@ -52,6 +55,7 @@ export default async function PlatformAccountsPage() {
             </Link>
           </div>
         </header>
+        {search && <p className="text-sm text-slate-600">Filtered by <strong>{search}</strong> · <Link href="/platform/accounts" className="font-semibold text-violet-700">Clear search</Link></p>}
 
         <AdminDataTable
           title="School accounts"
@@ -60,7 +64,7 @@ export default async function PlatformAccountsPage() {
             { key: "school", label: "School" },
             { key: "status", label: "Membership" },
           ]}
-          rows={accounts.map((account) => ({
+          rows={visibleAccounts.map((account) => ({
             id: `${account.userId}-${account.schoolPublicId}`,
             searchableText: `${account.name} ${account.email} ${account.schoolName} ${account.schoolPublicId} ${(standardIdentifiersByUser.get(account.userId) ?? []).map((identifier) => identifier.identifier).join(" ")}`,
             values: {
