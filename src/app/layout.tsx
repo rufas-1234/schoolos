@@ -12,6 +12,13 @@ const bodyFont = Inter({
 export const metadata: Metadata = {
   title: "SchoolOS | School management",
   description: "A secure school management workspace.",
+  icons: {
+    icon: [
+      { url: "/schoolos-favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/schoolos-apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
